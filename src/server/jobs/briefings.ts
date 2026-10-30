@@ -79,7 +79,7 @@ export async function buildBriefing(db: SupabaseClient, profile: Profile, kind: 
   }
 
   const week = await weekInsights(db, userId, zone, date);
-  lines.push(`Week ${week.start} → ${week.end}: ${week.tasksCompleted} tasks completed, ${week.focusMinutes} focus minutes.`);
+  lines.push(`Week ${week.start} → ${week.end}: ${week.tasksCompleted} task${week.tasksCompleted === 1 ? "" : "s"} completed, ${week.focusMinutes} focus minute${week.focusMinutes === 1 ? "" : "s"}.`);
   lines.push(...week.findings);
   Object.assign(data, { week: { ...week, days: week.days.map((d) => ({ date: d.date, completionRate: d.completionRate, planned: d.planned })) } });
   return { title: `Weekly review · week ending ${DateTime.fromISO(date).toFormat("LLL d")}`, body: lines.join("\n"), data };

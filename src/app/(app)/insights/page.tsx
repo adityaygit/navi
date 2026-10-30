@@ -45,7 +45,7 @@ export default async function InsightsPage() {
 
       <section className="card" aria-labelledby="week-h">
         <h2 id="week-h" className="h2">Last 7 days</h2>
-        <p className="muted text-sm">{week.tasksCompleted} tasks completed · {week.focusMinutes} focus minutes{week.estimate.medianRatio !== null ? ` · tasks take ~${week.estimate.medianRatio.toFixed(1)}× estimates (${week.estimate.samples} samples)` : ""}</p>
+        <p className="muted text-sm">{week.tasksCompleted} task{week.tasksCompleted === 1 ? "" : "s"} completed · {week.focusMinutes} focus minute{week.focusMinutes === 1 ? "" : "s"}{week.estimate.medianRatio !== null ? ` · tasks take ~${week.estimate.medianRatio.toFixed(1)}× estimates (${week.estimate.samples} samples)` : ""}</p>
         <ul className="mt-3 flex items-end gap-2" aria-label="Daily completion of counted blocks">
           {week.days.map((d) => {
             const pct = d.completionRate === null ? null : Math.round(d.completionRate * 100);

@@ -61,7 +61,7 @@ export async function dayReview(db: SupabaseClient, userId: string, zone: string
         ? `All ${blocks.length} planned blocks were rest, interruptions or blocked on missing information, so they aren't counted against you.`
         : `${counts.done} done and ${counts.partial} partly done out of ${counted} counted blocks (partial = half credit) = ${Math.round(completionRate * 100)}%.` +
           (excluded ? ` ${excluded} block${excluded === 1 ? "" : "s"} excluded (rest, interruptions, missing info).` : "") +
-          (counts.unmarked ? ` ${counts.unmarked} weren't marked; mark them to make this accurate.` : "");
+          (counts.unmarked ? ` ${counts.unmarked} ${counts.unmarked === 1 ? "wasn't marked; mark it" : "weren't marked; mark them"} to make this accurate.` : "");
 
   const findings: string[] = [];
   if (counts.avoided > 0) findings.push(`You skipped ${counts.avoided} block${counts.avoided === 1 ? "" : "s"} without an outside reason. Was the plan unrealistic, or is something about that work hard to start?`);

@@ -231,6 +231,32 @@ describe("plan stays in step with tasks", () => {
   });
 });
 
+describe("accountability", () => {
+  it("scores only what was recorded, excuses rest and real blockers, and asks about avoidance", async () => {
+    const day = DateTime.now().setZone(zone).minus({ days: 3 }).startOf("day");
+    const date = day.toISODate()!;
+    await db.from("plan_blocks").delete().eq("plan_date", date);
+    const outcomes: [string, string | null][] = [
+      ["done", null], ["partial", null], ["rest", null], ["interrupted", null],
+      ["skipped", "Blocked: missing the rubric"], ["skipped", null], ["planned", null],
+    ];
+    for (const [i, [status, reason]] of outcomes.entries()) {
+      const start = day.set({ hour: 9 + i });
+      const { error } = await db.from("plan_blocks").insert({ user_id: userId, title: `Block ${i}`, plan_date: date, starts_at: start.toISO(), ends_at: start.plus({ minutes: 45 }).toISO(), status, outcome_reason: reason });
+      expect(error).toBeNull();
+    }
+    const { dayReview } = await import("@/server/domain/insights");
+    const r = await dayReview(db, userId, zone, date);
+    // Counted: done, partial, skipped-without-reason, unmarked = 4. (1 + 0.5) / 4.
+    expect(r.completionRate).toBeCloseTo(0.375);
+    expect(r.explanation).toMatch(/1 done and 1 partly done out of 4 counted blocks .* = 38%/);
+    expect(r.explanation).toMatch(/3 blocks excluded/);
+    expect(r.explanation).toMatch(/1 wasn't marked; mark it/);
+    expect(r.findings.join(" ")).toMatch(/skipped 1 block without an outside reason/);
+    expect(r.findings.join(" ")).toMatch(/blocked on missing information/);
+  });
+});
+
 describe("briefings and budget", () => {
   it("stores each briefing once per local day", async () => {
     const { data: profile } = await db.from("profiles").select("*").eq("id", userId).single();
