@@ -3,7 +3,7 @@ import { useState } from "react";
 import { DateTime } from "luxon";
 import type { Task } from "@/lib/types";
 import { ActionButton } from "@/components/action-button";
-import { completeTaskAction, deleteItemAction, startFocusAction, updateTaskAction } from "../actions";
+import { completeTaskAction, deleteItemAction, startFocusAction, updateTaskAction } from "@/app/(app)/client-actions";
 import { TaskForm } from "./task-form";
 
 type Opt = { id: string; name?: string; title?: string };

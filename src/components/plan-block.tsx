@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { ActionButton } from "./action-button";
-import { blockOutcomeAction, startFocusAction } from "@/app/(app)/actions";
+import { blockOutcomeAction, startFocusAction } from "@/app/(app)/client-actions";
 import type { PlanBlock } from "@/lib/types";
 
 const STATUS_BADGE: Record<string, string> = {

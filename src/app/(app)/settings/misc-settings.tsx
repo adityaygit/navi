@@ -2,7 +2,7 @@
 import { useState, useTransition } from "react";
 import { clearDeviceDataForDeletedAccount } from "@/lib/device-privacy";
 import { useRouter } from "next/navigation";
-import { approveBudgetOverrideAction } from "../actions";
+import { approveBudgetOverrideAction } from "@/app/(app)/client-actions";
 import { announceChange } from "@/lib/offline-queue";
 
 export function BudgetOverride({ exceeded }: { exceeded: boolean }) {

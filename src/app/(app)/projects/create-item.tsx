@@ -1,6 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
-import { createItemAction } from "../actions";
+import { createItemAction } from "@/app/(app)/client-actions";
 import { announceChange } from "@/lib/offline-queue";
 
 type Kind = "workspaces" | "goals" | "projects" | "milestones";

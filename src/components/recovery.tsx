@@ -1,6 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
-import { recoverPlanAction } from "@/app/(app)/actions";
+import { recoverPlanAction } from "@/app/(app)/client-actions";
 import { announceChange } from "@/lib/offline-queue";
 
 const CATEGORIES = [

@@ -79,7 +79,8 @@ export function Chat({
     } catch (err) {
       setMessages((m) => m.filter((x) => x.id !== optimistic.id));
       setDraft(value);
-      setError(err instanceof Error ? err.message : "Couldn't reach Navi. Your message is still in the box.");
+      // A network failure (TypeError) gets a plain explanation, not the browser's wording.
+      setError(err instanceof Error && !(err instanceof TypeError) ? err.message : "Couldn't reach Navi, so there's no reply. Your message is still in the box; send it again when you're connected.");
       void flushQueue();
     } finally {
       setSending(false);

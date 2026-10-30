@@ -3,7 +3,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Proposal } from "@/lib/types";
 import { ProposalCard } from "@/components/proposal-card";
-import { completeOnboardingAction, restartOnboardingAction } from "../actions";
+import { completeOnboardingAction, restartOnboardingAction } from "@/app/(app)/client-actions";
 import { announceChange } from "@/lib/offline-queue";
 
 const GROUPS: [string, string[]][] = [

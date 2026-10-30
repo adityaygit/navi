@@ -1,6 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { announceChange } from "@/lib/offline-queue";
+import { connectionError } from "@/lib/connection";
 
 type Result = { ok: true; message?: string } | { ok: false; error: string };
 
@@ -35,9 +36,13 @@ export function ActionButton<A extends unknown[]>({
           if (confirm && !window.confirm(confirm)) return;
           setError(null);
           start(async () => {
-            const r = (await action(...((args ?? []) as A))) as Result;
-            if (r && "ok" in r && !r.ok) setError(r.error);
-            else announceChange();
+            try {
+              const r = (await action(...((args ?? []) as A))) as Result;
+              if (r && "ok" in r && !r.ok) setError(r.error);
+              else announceChange();
+            } catch {
+              setError(connectionError());
+            }
           });
         }}
       >

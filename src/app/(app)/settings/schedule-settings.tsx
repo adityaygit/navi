@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import type { AvailabilityWindow, Profile } from "@/lib/types";
-import { updateProfileAction } from "../actions";
+import { updateProfileAction } from "@/app/(app)/client-actions";
 import { announceChange } from "@/lib/offline-queue";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

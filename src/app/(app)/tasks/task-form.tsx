@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { DateTime } from "luxon";
-import { createTaskAction, updateTaskAction } from "../actions";
+import { createTaskAction, updateTaskAction } from "@/app/(app)/client-actions";
 import { announceChange } from "@/lib/offline-queue";
 import type { Task } from "@/lib/types";
 

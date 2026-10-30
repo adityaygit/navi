@@ -2,7 +2,7 @@
 import { useState, useTransition } from "react";
 import type { Memory } from "@/lib/types";
 import { ActionButton } from "@/components/action-button";
-import { addMemoryAction, confirmMemoryAction, correctMemoryAction, deleteMemoryAction, rejectMemoryAction } from "../actions";
+import { addMemoryAction, confirmMemoryAction, correctMemoryAction, deleteMemoryAction, rejectMemoryAction } from "@/app/(app)/client-actions";
 import { announceChange } from "@/lib/offline-queue";
 
 const ORIGIN: Record<Memory["origin"], [string, string]> = {

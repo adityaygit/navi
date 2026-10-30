@@ -2,7 +2,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { flushQueue } from "@/lib/offline-queue";
-import { adoptBrowserTimezoneAction } from "@/app/(app)/actions";
+import { adoptBrowserTimezoneAction } from "@/app/(app)/client-actions";
 
 // Keeps every open view in sync with persisted data: refreshes after changes
 // made elsewhere (chat, voice, other tabs), syncs the offline queue when the

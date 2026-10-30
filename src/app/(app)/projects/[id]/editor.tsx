@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import type { Project } from "@/lib/types";
-import { updateItemAction } from "../../actions";
+import { updateItemAction } from "@/app/(app)/client-actions";
 import { announceChange } from "@/lib/offline-queue";
 
 export function ProjectEditor({ project, workspaces, goals }: { project: Project; workspaces: { id: string; name: string }[]; goals: { id: string; name: string }[] }) {

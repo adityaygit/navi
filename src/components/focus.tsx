@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { ActionButton } from "./action-button";
-import { endFocusAction } from "@/app/(app)/actions";
+import { endFocusAction } from "@/app/(app)/client-actions";
 
 export function FocusCard({ session }: { session: { id: string; started_at: string; planned_minutes: number | null; task_title: string | null } }) {
   const [now, setNow] = useState(() => Date.now());

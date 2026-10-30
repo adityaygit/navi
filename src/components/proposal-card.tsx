@@ -2,7 +2,7 @@
 import { useState, useTransition } from "react";
 import { DateTime } from "luxon";
 import type { Proposal } from "@/lib/types";
-import { acceptProposalAction, editProposalAction, mergeProposalAction, setProposalStatusAction } from "@/app/(app)/actions";
+import { acceptProposalAction, editProposalAction, mergeProposalAction, setProposalStatusAction } from "@/app/(app)/client-actions";
 import { announceChange } from "@/lib/offline-queue";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

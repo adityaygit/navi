@@ -1,6 +1,6 @@
 "use client";
 import { ActionButton } from "@/components/action-button";
-import { acceptManyAction } from "../actions";
+import { acceptManyAction } from "@/app/(app)/client-actions";
 
 export function InboxBulk({ ids }: { ids: string[] }) {
   return (
