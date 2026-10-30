@@ -58,9 +58,65 @@ NAVI_ALLOW_DEVSIM=true npx next start -p 3000
 The e2e suite deletes and recreates the seeded `dev@` and `alice@` accounts.
 Never point it at a deployment with real data.
 
+**When the environment also holds hosted or provider settings** (for example a
+cloud session whose environment has `SUPABASE_*`, `GEMINI_API_KEY`, ...), run
+every test and local build through `scripts/local-only.sh`. Existing
+environment variables, even empty ones, take precedence over `.env.local`, so
+without it the tests either fail or, worse, would point at the hosted project.
+The wrapper removes those settings and loads `.env.local`; the test helpers
+also refuse to start unless the Supabase URL is local (`tests/local-guard.ts`).
+
+```bash
+scripts/local-only.sh npx vitest run
+scripts/local-only.sh npx next build
+NAVI_ALLOW_DEVSIM=true scripts/local-only.sh npx next start -p 3000 &
+E2E_BASE_URL=http://localhost:3000 scripts/local-only.sh npx playwright test
+```
+
+The test browser runs in UTC (`playwright.config.ts`) to match the test
+accounts, whatever the machine's `TZ`.
+
 ## Deploying
 
 ### 1. Supabase
+
+#### Moving to hosted Supabase (project `gxfkumxjeemceoygtuod`, "Navi")
+
+Settings come from Supabase → Project Settings → API Keys, and go into the
+environment (cloud environment settings, Vercel project settings), never into
+the repo:
+
+| Variable | Value |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://gxfkumxjeemceoygtuod.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | the **publishable** key (`sb_publishable_…`) |
+| `SUPABASE_SERVICE_ROLE_KEY` | the **secret** key (`sb_secret_…`), server only |
+| `SUPABASE_ACCESS_TOKEN` | a **personal access token** (`sbp_…`, Account → Access Tokens), scoped to this project. Used by the Supabase CLI, the Supabase MCP server (`.mcp.json`) and `check:deploy`. Not used by the app. |
+
+A personal access token is not a project key: in the app's
+`SUPABASE_SERVICE_ROLE_KEY` it is rejected (401).
+
+Steps (each is a change to the hosted project; do them deliberately, once):
+
+1. Apply the schema. Both migrations are required:
+   `20261030000001_core_schema.sql` and `20261031000001_replace_day_plan.sql`.
+   ```bash
+   npx supabase link --project-ref gxfkumxjeemceoygtuod   # uses SUPABASE_ACCESS_TOKEN; asks for the DB password
+   npx supabase db push                                   # applies supabase/migrations/*
+   npx supabase migration list                            # both should show as applied remotely
+   ```
+   Do **not** run `supabase/seed.sql` against the hosted project (it invites
+   test accounts). With the Supabase MCP server loaded, its migration tools
+   can do the same; apply the files exactly as they are in the repo.
+2. Enable the invite check (Auth → Hooks, below). Until then anyone could sign up.
+3. Set Site URL and redirect URLs once the app's URL is known (below).
+4. Invite the owner: `node scripts/allow-email.mjs add <email> "owner"` with the
+   hosted URL and secret key in the environment.
+5. Verify: `npm run check:deploy` (read-only; checks schema tables, invite
+   list, hook, redirects with `SUPABASE_ACCESS_TOKEN`), then try signing up
+   with an uninvited email and expect "Navi is invite-only right now".
+
+General steps:
 
 1. Create a project. Link it and push the schema:
    `npx supabase link --project-ref <ref>` then `npx supabase db push`.

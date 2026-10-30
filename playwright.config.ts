@@ -7,7 +7,9 @@ export default defineConfig({
   timeout: 90_000,
   fullyParallel: false,
   workers: 1,
-  use: { baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000", trace: "retain-on-failure", screenshot: "only-on-failure" },
+  // The browser runs in UTC to match the test accounts (set up in UTC); otherwise
+  // Navi adopts the machine's timezone and time-based checks shift.
+  use: { baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000", timezoneId: "UTC", trace: "retain-on-failure", screenshot: "only-on-failure" },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },
     { name: "iphone", use: { ...devices["iPhone 13"], browserName: "chromium" } },

@@ -1,112 +1,158 @@
 # Navi Build Intelligence — Persistent Checkpoint
 
 **Purpose:** Development memory for Claude Code (not Navi's end-user memory). Reconcile with code before trusting it.
-**Repo:** `https://github.com/adityaygit/navi` · **Dev branch:** `claude/charming-darwin-erd78b` (push verified working 2026-10-30).
-**Scope rule from owner:** This cloud session also mounted `/home/user/fairylearn-ai` by mistake. **Never read, modify, or push anything in fairylearn.** Work only in `/home/user/navi`.
-**Ops guide:** `docs/OPERATIONS.md` (local dev, tests, deploy steps, env vars, scheduler, spend limits).
+**Repo:** `https://github.com/adityaygit/navi` · **Dev branch:** `claude/charming-darwin-erd78b` (all work is pushed here; no PR open).
+**Scope rule from owner:** The original cloud session also mounted `/home/user/fairylearn-ai` by mistake. **Never read, modify, or push anything in fairylearn.** Work only in the Navi repo.
+**Product source of truth:** `Navi_Product_Spec.md` · **Ops guide:** `docs/OPERATIONS.md` (local dev, tests, hosted Supabase, deploy, env vars, scheduler, spend limits).
+**Last checkpoint:** 2026-10-30 (handoff before moving to a new cloud session). The handoff commit is the branch head; see `git log -1`.
+
+## How to resume in a fresh session ("resume")
+1. Clone/checkout `claude/charming-darwin-erd78b`; read `Navi_Product_Spec.md`, this file, then `git log --oneline -15` and `git status`.
+2. Local stack (container resets kill Docker; see Learnings if `dockerd` complains about a stale pid):
+   ```bash
+   sudo nohup dockerd > /tmp/dockerd.log 2>&1 &
+   npm ci
+   npm run db:start          # re-run once if it reports "db not ready"
+   npm run env:local         # writes .env.local (local keys, fresh VAPID + CRON secret, simulator); won't overwrite
+   ```
+3. **Always run tests and local builds through `scripts/local-only.sh`** when the session environment holds hosted/provider settings (it does now). It strips them and uses `.env.local`, and the test helpers refuse any non-local Supabase URL:
+   ```bash
+   scripts/local-only.sh npx vitest run
+   scripts/local-only.sh npx next build
+   NAVI_ALLOW_DEVSIM=true scripts/local-only.sh npx next start -p 3000 &
+   E2E_BASE_URL=http://localhost:3000 scripts/local-only.sh npx playwright test
+   ```
+4. Re-check the credential table below (names/lengths only, never print values), then continue from **Exact next steps**.
+
+## Credentials & environment status (checked 2026-10-30 ~15:30 UTC, read-only)
+Secrets live only in the cloud environment's settings ("Unrestricted full autonomous" environment → Edit → environment variables). Never in chat, never committed. A session only sees variables set before it started.
+
+| Variable | State in the environment | Verified |
+|---|---|---|
+| `GEMINI_API_KEY` | set | **Works.** `GET models/gemini-3.8-live` → 200, "Gemini 3.8 Live", `bidiGenerateContent`. No live session opened yet (no spend). |
+| `SUPABASE_SERVICE_ROLE_KEY` | set, **but holds a personal access token (`sbp_…`), not the project secret key** | As a token it works: Management API → project "Navi" (`gxfkumxjeemceoygtuod`, us-east-2, ACTIVE_HEALTHY, Postgres 17); token sees 1 project. As a service key the project API rejects it (401). Owner must move it to `SUPABASE_ACCESS_TOKEN` and put the project's **secret key** here. |
+| `SUPABASE_ACCESS_TOKEN` | present but **empty** | — (needed by `.mcp.json` Supabase MCP and `check:deploy`) |
+| `NEXT_PUBLIC_SUPABASE_URL` | present but **empty** | should be `https://gxfkumxjeemceoygtuod.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | present but **empty** | the project's publishable key |
+| `NEXT_PUBLIC_SITE_URL`, `NAVI_ADMIN_EMAILS`, `VERCEL_TOKEN`, `TRIGGER_SECRET_KEY` | present but **empty** | — |
+| `ANTHROPIC_API_KEY` | **not set** | — real chat/onboarding/planning still unverified |
+| `TZ` | `America/New_York` | Likely the owner's home timezone (confirm; use for `NAVI_BUDGET_TIMEZONE`). |
+
+**Hosted Supabase project state (read via Management API):** 0 migrations applied (no Navi tables yet); Before-User-Created (invite) hook **off**; Site URL set (value not checked); redirect allow-list empty; Google provider off. Nothing has been written to the hosted project.
+
+**Connectors:** no Supabase/Vercel connector in the account; Composio has no Supabase/Vercel account. `.mcp.json` (Supabase MCP) loads only when `SUPABASE_ACCESS_TOKEN` is set at session start.
 
 ## Status legend
 `not started` · `in progress` · `implemented` (code exists) · `verified` (tested, evidence below) · `blocked` (needs owner)
 
-## V1 roadmap & status (as of 2026-10-30)
+## V1 roadmap & status
 
 | Workstream | Status | Evidence / notes |
 |---|---|---|
 | Repo, push access, local dev stack | verified | Pushes land on `claude/charming-darwin-erd78b`. Local Supabase in Docker. |
-| Schema + RLS for all user tables | verified | `tests/integration/rls.test.ts`: own rows only, cross-user update/delete/forged insert blocked, anon sees nothing, users can't set approval execution state, allowlist unreadable. |
-| Invite-only access (auth hook allowlist) | verified | rls.test "rejects sign-ups not on the invite list". `scripts/allow-email.mjs add/remove/list` tested locally. |
-| Email auth (magic link + password) | verified (password) | e2e signs in via password (auto sign-up for invited emails). Magic link implemented; email delivery not exercised in tests. |
-| Google sign-in | blocked | Needs Google OAuth client + provider enabled in a Supabase project. Button hidden unless `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true`. |
-| Domain layer (entities, activity log + revert, approvals, proposals, memory, tasks, focus) | verified | flows.test: approval boundary (hard-deadline move + delete → approval, duplicate request reused, executes exactly once), Navi cannot mark work done. |
-| Conversational onboarding → reviewed setup → activation | verified (simulator) | flows.test + e2e (desktop & iPhone): greeting → questions → proposals for areas, goals, projects (linked to areas/goals), fixed commitments, routines, tasks and preferences, each labelled stated vs inferred with source quote → nothing active until approved → partial approve leaves rest in review → week plan generated. Real-model behaviour unverified (no key). |
-| Text + voice share one onboarding history | verified (domain) | flows.test "shares one history between text and voice turns". |
-| Capture → review inbox → task | verified | flows.test (idempotent on client_id, raw words kept, nothing created until accept, edit-on-accept) + e2e quick capture → inbox → accept → /tasks. Voice capture: "Dictate" in quick capture (browser speech recognition) saves `source=voice`; e2e with a stubbed recognizer. |
-| Offline capture queue + sync | verified (browser) | e2e: offline capture shows "Saved offline"/"Waiting to sync (1)", syncs after reconnect, appears in inbox. account.spec: on a shared browser, A's unsent capture is neither shown to nor synced into B's account, and syncs to A when A signs back in (test fails with the owner filter removed); cached offline pages are gone after sign-out. |
-| Planner (day/week, fixed vs flexible, DST) + recovery | verified | 10 scheduler unit tests incl. DST; flows.test recovery keeps unfinished work + records disruption; finishing/cancelling/deleting a task settles its open blocks (flows.test); e2e "plan my day" via chat, focus → finish, "My plan broke" dialog. |
-| Today / Chat / Planner / Tasks / Projects & Goals / Insights / Memory / Activity / Settings / More | verified (browser) | core.spec + manage.spec (desktop & iPhone): Today, Onboarding, Inbox, Tasks, Projects, Planner, Chat, focus, recovery, Memory add/correct/delete, Activity approve → executed, Settings save. a11y.spec: axe WCAG 2.1 A/AA clean on all pages + login, onboarding, capture dialog, light and dark. |
-| Persistent memory with provenance | verified | Memory UI e2e; flows.test: a project's memory is recalled in a brand-new conversation when the project is mentioned; rejected memories are not. |
-| Strict-but-fair accountability | verified | flows.test pins scoring: rest/interruptions/missing-info excluded, partial = half credit, unmarked counted and flagged, avoidance question asked. Only Navi-proof: Navi can't mark work done. |
-| Briefings 06:00/21:00, weekly review, deadline reminders, tick job | verified (local) | Unit: briefing windows across both US DST transitions, +05:30 zone, 3h catch-up, weekly day, custom times, disabled. flows.test: one briefing per local day; reminders held by quiet hours, dropped if they'd arrive after the deadline. Manual: `/api/cron/tick` 401 without/with wrong secret; second tick no-op. |
-| Web push | verified (local), device pending | push.test: real sender → local HTTPS push endpoint; payload decrypts (aes128gcm) to exactly what was sent, VAPID-signed, TTL set, 410 device removed. pwa.spec (full Chromium): a delivered push becomes the right notification with its deep link. Notifications without a device are recorded `no_subscription`. Subscribing via a real push service (FCM/APNs) and delivery to an iPhone unverified. |
-| PWA manifest, service worker, icons | verified (Chromium), device pending | pwa.spec: manifest (standalone, any + maskable 192/512 PNG icons, capture shortcut); opened pages readable offline, others fall back to /offline. Home-screen install on a real iPhone unverified. |
-| Real-time voice (Gemini Live) | client verified against a stand-in; **not delivered** | voice-live.spec (fake mic, stand-in Live socket via Playwright WebSocket routing): ephemeral-token URL, setup, 16 kHz PCM streaming, transcripts, tool calls run by the real server (create without quoted command refused), 24 kHz playback, barge-in, turn saved to the shared chat history, goAway → automatic resume with handle, End voice hangs up; onboarding by voice → proposals → review screen → activation. voice-server.test: session shares text+voice history and memory, same tools as chat (onboarding narrower), token single-use, ≤1 min to start / ≤30 min life, model+instructions+tools locked, resume handle carried, key never returned. Found and fixed: session hung up after the first saved turn; speaker AudioContext now created inside the tap (iOS). Ephemeral tokens are v1beta per current docs (SDK's "v1alpha only" warning is stale). Never connected to real Gemini (no `GEMINI_API_KEY`); keep open until tested with a key on a device. Fallback path also e2e-tested. |
-| AI runtime (roles, pricing, $2/day guard, shared tools, agent loop) | loop verified with mocked network; real calls pending | flows.test "stops new AI calls at the daily cap"; only `NAVI_ADMIN_EMAILS` can approve an override (unit test; nobody in production if unset). agent.test: request shape (effort per role, cached system prompt, no forced tool_choice, server-side fallbacks only on Sonnet), real tool execution + tool_result feedback incl. errors, usage recorded for the served model, refusal, planner→backup model on 404, provider error message, budget stop before calling. Request shapes checked against the Claude API reference (2026-10). No `ANTHROPIC_API_KEY` → real model calls unverified (`npm run smoke:ai` ready). Dev simulator labelled, refused in prod unless `NAVI_ALLOW_DEVSIM=true`. |
-| Data export + account deletion | verified (browser) | account.spec: `/api/export` returns only the person's rows (every row's user_id checked) as a dated JSON attachment; Settings → type DELETE → Delete everything removes the auth user, profile, tasks and memories, clears unsent captures on the device, lands on /login, and export then returns 401. |
-| Secret protection / access control | verified (local) | No server secret in `.next/static` (checked service key, VAPID private key, cron secret); only `.env.example` tracked; every private API route returns 401 signed out; pages redirect to /login; X-Frame-Options DENY, nosniff, referrer policy, permissions policy (mic self only). Nonce-based CSP from `src/proxy.ts` (scripts self+nonce, connect only to app/Supabase/Gemini Live, no framing); a11y.spec asserts zero CSP violations on every page and that the voice worklet loads. |
-| Phone layout (no sideways scrolling, 44px touch targets) | verified (emulated) | a11y.spec (now WCAG 2.2 AA tags) checks every main page on desktop and iPhone 13 with long titles and a pasted URL, and on iPhone that every visible button/summary is ≥44px tall (small buttons, "Why here?", disclosure toggles and the task check grow on touch screens only); screenshots reviewed 2026-10-30. |
-| CI (GitHub Actions `.github/workflows/ci.yml`) | verified | First run on GitHub passed: run 41067480200 on `8acf091` (typecheck, lint, unit, integration on local Supabase, build, 26 browser tests). Steps: typecheck, lint, unit, local Supabase + integration, build, Playwright desktop+iPhone with devsim; on push to main/claude/**, PRs, manual. Repo is public, so Actions minutes are free. |
-| Build / typecheck / lint | verified | `npx tsc --noEmit`, `npm run lint`, `npm run build` clean (2026-10-30). |
-| Pre-deploy check (`npm run check:deploy`) | verified (local) | Read-only. Run against local env (flags devsim, http site, short CRON_SECRET, seeded @navi.test invites) and a production-shaped env (passes; mismatched VAPID pair caught). Live-app checks pass against local prod build. Management API fields (`hook_before_user_created_enabled/_uri`, `site_url`, `uri_allow_list`) confirmed in api.supabase.com/api/v1-json 2026-10-30; not yet run against a hosted project. |
-| Deployment (Vercel) / Trigger.dev | blocked | No Vercel/Trigger.dev credentials in the cloud env. Steps in `docs/OPERATIONS.md`. |
-| Physical iPhone verification | blocked | Needs owner device (install, push, mic). Emulated iPhone 13 viewport passes e2e. |
-| Calendar/Gmail/Drive/GitHub integrations | not started (out of V1 core) | Shown as "not connected"; external approvals fail honestly ("isn't connected"). |
+| Schema + RLS for all user tables | verified | `tests/integration/rls.test.ts`: own rows only, cross-user update/delete/forged insert blocked, anon sees nothing, users can't set approval execution state, allowlist unreadable, `replace_day_plan` can't touch another user's plan. Two migrations: `20261030000001_core_schema`, `20261031000001_replace_day_plan`. |
+| Invite-only access (auth hook allowlist) | verified (local) | rls.test "rejects sign-ups not on the invite list". `scripts/allow-email.mjs add/remove/list`. **Hook is off on the hosted project** until configured. |
+| Email auth (magic link + password) | verified (password) | e2e signs in via password (auto sign-up for invited emails). Magic link implemented; email delivery not exercised. |
+| Google sign-in | blocked | Needs Google OAuth client + provider enabled in Supabase. Button hidden unless `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true`. |
+| Domain layer (entities, activity log + revert, approvals, proposals, memory, tasks, focus) | verified | flows.test: approval boundary (hard-deadline move + delete → approval, duplicate request reused, executes exactly once), Navi cannot mark work done; simultaneous accept/complete create one item. |
+| Conversational onboarding → reviewed setup → activation | verified (simulator) | flows.test + e2e (desktop & iPhone): questions → proposals for areas, goals, projects, fixed commitments, routines, tasks, preferences (stated vs inferred, source quote) → nothing active until approved → week plan. Voice onboarding e2e against a stand-in Live socket. **Real-model behaviour unverified (no Anthropic key).** |
+| Text + voice share one history | verified | flows.test (onboarding), voice-live.spec (chat: voice turn appears in text history). |
+| Capture → review inbox → task | verified | flows.test (idempotent on client_id, raw words kept, nothing created until accept, edit-on-accept) + e2e. Dictated capture saves `source=voice`. |
+| Offline capture queue + sync | verified (browser) | e2e offline capture → "Waiting to sync" → syncs on reconnect. account.spec: shared browser keeps each person's queue private; cached offline pages cleared on sign-out. offline-actions.spec: buttons offline say they didn't go through, page survives. |
+| Planner (day/week, fixed vs flexible, DST) + recovery | verified | Scheduler unit tests incl. DST; recovery keeps unfinished work; blocks settle on finish/cancel/delete; plans written atomically (no double booking); structure.spec plans around a fixed commitment. |
+| Tasks: subtasks, priorities, estimates, blockers, recurrence | verified | Recurrence: next occurrence after now at same local time, no duplicates (flows.test "recurring tasks"). |
+| UI: Today / Chat / Inbox / Planner / Tasks / Projects & Goals / Insights / Memory / Activity / Settings / More | verified (browser) | core/manage/structure specs on desktop + iPhone 13; a11y.spec axe WCAG 2.2 AA clean (light + dark), no sideways scrolling, ≥44px touch targets on iPhone, zero CSP violations. |
+| Persistent memory with provenance | verified | Memory UI e2e; project memory recalled in a new conversation; rejected memories excluded. |
+| Strict-but-fair accountability | verified | flows.test pins scoring (rest/interruptions/missing info excluded, partial = half, unmarked flagged, avoidance question). |
+| Briefings 06:00/21:00, weekly review, reminders, tick | verified (local) | Unit tests across US DST, +05:30, catch-up; one briefing per local day; reminders respect quiet hours/expiry; overlapping ticks send a push once; failed pushes retry ×2. **No scheduler deployed.** |
+| Web push | verified (local), device pending | push.test (real encryption to a local endpoint, VAPID, TTL, 410 cleanup, overlap, retry); pwa.spec (push → notification + deep link). Real push service + iPhone unverified. |
+| PWA manifest, service worker, icons | verified (Chromium), device pending | pwa.spec. Home-screen install on a real iPhone unverified. |
+| Real-time voice (Gemini Live) | client + server verified against stand-ins; **key now works; live session not yet tested — not delivered** | voice-live.spec (fake mic → 16 kHz PCM, transcripts, tool calls run by the real server, duplicate call ids run once, playback, barge-in, mute, goAway resume, connection loss turns mic off + Reconnect, turn saved to shared history, failed save kept as capture, voice onboarding). voice-server.test (locked single-use ephemeral token, shared history/memory/tools). `GEMINI_API_KEY` verified 2026-10-30 (model lookup). Next: `npm run smoke:ai gemini`, then a real device. |
+| AI runtime (roles, pricing, $2/day guard, tools, agent loop) | loop verified with mocked network; real calls pending | agent.test (request shape, tool execution + results, served-model usage, refusal, fallback only when nothing ran yet, partial-failure reporting, budget stop). Real Claude calls unverified (no `ANTHROPIC_API_KEY`). |
+| Data export + account deletion | verified (browser) | account.spec. |
+| Secret protection / access control | verified (local) | No server secret in `.next/static`; only `.env.example` tracked; private APIs 401 signed out; nonce CSP; security headers. Tests can't reach a hosted project (`tests/local-guard.ts`, `scripts/local-only.sh`). |
+| CI (`.github/workflows/ci.yml`) | verified | Green on GitHub for `8acf091`, `6beb342`, `bfb32f8` (typecheck, lint, unit, integration on local Supabase, build, Playwright desktop+iPhone with the simulator). |
+| Pre-deploy check (`npm run check:deploy`) | verified (local) | Read-only; not yet run against the hosted project (needs URL + keys). |
+| Hosted Supabase | **project exists, not set up** | See "Credentials" above and `docs/OPERATIONS.md` → "Moving to hosted Supabase". |
+| Deployment (Vercel) / scheduler (Trigger.dev) | blocked | Tokens present but empty. |
+| Physical iPhone verification | blocked | Needs owner device (install, push, mic). |
+| Calendar/Gmail/Drive/GitHub integrations | not started (out of V1 core) | Shown as "not connected"; external approvals fail honestly. |
 
-## Test commands & latest results (2026-10-30)
-- `npx vitest run` → 9 files, 66 tests passed (unit + integration; needs local Supabase). Includes agent.test (Claude tool loop with only the network call mocked) and voice-server.test (Gemini token minting with only Google's endpoint mocked).
-- `npx next build && NAVI_ALLOW_DEVSIM=true npx next start -p 3000` then `E2E_BASE_URL=http://localhost:3000 npx playwright test` → desktop + iPhone 13, 30 tests (latest 30/30 passed 2026-10-30): account.spec (shared-device capture privacy, export, deletion), offline-actions.spec (buttons offline fail visibly, page survives, nothing changes, works after reconnect), core.spec (onboarding→plan→capture→inbox→task, offline sync, voice fallback, dictated capture), manage.spec (focus, recovery, memory, approvals, settings), structure.spec (goals/projects/milestones, planning around a fixed commitment), a11y.spec (axe light + dark, zero CSP violations), pwa.spec (manifest, push → notification, offline pages), voice-live.spec. pwa/voice specs use the full-Chromium channel (headless shell denies notifications).
-- e2e deletes/recreates seeded `dev@`/`alice@` and its own `e2e-*`/`a11y-*@navi.test` users (added to the local allowlist by the tests); all use password `test-password-123`. Each test can run alone.
-- Screenshots land in `test-results/` (gitignored).
+## Acceptance gates (spec §7) — where each stands
+1. Google + email sign-in in a configured environment — email verified locally; **Google blocked; hosted not configured**.
+2. Conversational onboarding (text or voice) → review → saved — verified with simulator and voice stand-in; **real models pending**.
+3. Capture → proposals → review, survives reload, syncs — verified.
+4. Real views with working controls and honest empty states — verified (browser, emulated iPhone).
+5. Fixed/flexible blocks, focus, recovery, nothing lost — verified.
+6. Memory view/correct/delete with provenance; recall across sessions — verified.
+7. Saved 06:00/21:00 briefings, reminders, TZ/DST, quiet hours — verified locally; **no deployed scheduler**.
+8. Accountability grounded in real events — verified.
+9. Internal autonomy + external approval boundary, failure + duplicate protection — verified.
+10. Working real-time voice, interrupt, back to text with tools — verified against stand-in; **real Gemini Live + device pending (key works)**.
+11. iPhone install, push, offline capture — offline verified; **install/push on a real iPhone pending**.
+12. Usage recorded, $2/day guard — verified (mocked providers); **real usage numbers pending**.
+13. Persistence, secrets, access control, automated checks, mobile usability, deployed preview — all verified locally + CI; **no deployed preview yet**.
+14. Resume from repo + checkpoint — this file + `docs/OPERATIONS.md`.
+
+## Test commands & latest results (2026-10-30, handoff run, all via `scripts/local-only.sh`)
+- `npx tsc --noEmit` → pass · `npm run lint` → pass.
+- `npx vitest run` → **9 files, 66/66 passed** (unit + integration on local Supabase; Claude and Gemini network calls mocked).
+- `npx next build` → pass.
+- `npx playwright test` (prod build + `NAVI_ALLOW_DEVSIM=true`) → **30/30 passed** (desktop + iPhone 13): account, offline-actions, core, manage, structure, a11y, pwa, voice-live. First run in this container failed `structure.spec` ×2 because the machine is now `TZ=America/New_York` and the app adopts the browser timezone; fixed by pinning the test browser to UTC (`playwright.config.ts` `timezoneId`), then 30/30.
+- Not tested: real Claude calls, a real Gemini Live session, hosted Supabase, Vercel deploy, Trigger.dev, Google sign-in, real push service, physical iPhone.
+- e2e deletes/recreates seeded `dev@`/`alice@` and its own `*@navi.test` users (local allowlist); password `test-password-123`. Screenshots in `test-results/` (gitignored).
 
 ## Agent tooling in the repo
-- `.mcp.json`: Supabase MCP (hosted project above), token from `SUPABASE_ACCESS_TOKEN`; never commit a token.
-- `.claude/skills/supabase`, `.claude/skills/supabase-postgres-best-practices` (from `supabase/agent-skills`, pinned in `skills-lock.json`; Markdown only, reviewed 2026-10-30). Their feedback flow files a GitHub issue only after asking the owner.
-- Checked against the skill's security checklist: SECURITY DEFINER invite hook revoked from anon/authenticated/public; all owner policies use `TO authenticated` + ownership `USING` + `WITH CHECK`; `replace_day_plan` is SECURITY INVOKER.
+- `.mcp.json`: Supabase MCP for project `gxfkumxjeemceoygtuod` (owner's URL + features), auth header `Bearer ${SUPABASE_ACCESS_TOKEN}` (OAuth browser flow can't run in cloud sessions). Never commit a token.
+- `.claude/skills/supabase`, `.claude/skills/supabase-postgres-best-practices` (from `supabase/agent-skills`, pinned in `skills-lock.json`; Markdown only, reviewed). Their feedback flow files a GitHub issue only after asking the owner.
+- Schema checked against the skill's security checklist: SECURITY DEFINER invite hook revoked from anon/authenticated/public; owner policies `TO authenticated` + ownership `USING` + `WITH CHECK`; `replace_day_plan` SECURITY INVOKER.
+- Scripts: `env:local`, `check:deploy`, `smoke:ai`, `allow-email`, `scripts/local-only.sh`.
 
 ## Key decisions
 - Next.js 16.4 (Turbopack, `proxy.ts` not middleware), `cacheComponents: false` (all per-user dynamic data).
 - One domain layer used by server actions, API routes and AI tools (`src/server/ai/tools.ts`) so chat/voice/UI stay in sync.
 - AI never creates inferred commitments directly: `propose_items` → inbox. `create_task` only for explicit commands; `complete_task` only with quoted user statement.
-- Planner never invents availability (empty availability ⇒ no flexible blocks + warning); never moves fixed items; never marks work done.
-- Models only in `src/server/ai/config.ts` + env: fast=`claude-haiku-5-5` ($0.10/$0.50), planner=`claude-sonnet-5-5` ($2/$10, server-side refusal fallbacks "default"), voice=`gemini-3.8-live` ($0.005/min in, $0.018/min audio out). Forced tool_choice is a 400 on Sonnet 5.5 → use auto.
-- Budget: aggregate across providers in `ai_usage`, day boundary `NAVI_BUDGET_TIMEZONE` (UTC default), override table (≤$20/day). App-side guard is not a hard cap; set provider spend limits too.
+- Planner never invents availability; never moves fixed items; never marks work done. Day plans written by the locked `replace_day_plan` function.
+- Models only in `src/server/ai/config.ts` + env: fast=`claude-haiku-5-5`, planner=`claude-sonnet-5-5` (server-side refusal fallbacks "default"), voice=`gemini-3.8-live`. Forced tool_choice is a 400 on Sonnet 5.5 → auto. The backup model is used only if no tool step has run.
+- Budget: aggregate across providers in `ai_usage`, day boundary `NAVI_BUDGET_TIMEZONE` (UTC default), override only by `NAVI_ADMIN_EMAILS` (≤$20/day). App guard isn't a hard cap; set provider spend limits.
 - Gemini free tier is "used to improve products" → disclosed in Settings/voice UI.
-- Server actions are passed to client `ActionButton` by reference + `args` (closures can't cross the server/client boundary).
-- Scheduler: one idempotent `/api/cron/tick`; Trigger.dev task every 10 min calls it. Vercel Hobby cron (daily) is insufficient.
+- Client components import server actions from `@/app/(app)/client-actions` (network failures return `{ ok:false }` instead of crashing the page); server components pass originals to `ActionButton`.
+- Scheduler: one idempotent `/api/cron/tick`; Trigger.dev task every 10 min calls it (Vercel Hobby cron is daily only).
+- Tests run only against local Supabase (guard + wrapper); browser tests run in UTC.
 
 ## Learnings
 - Supabase auth hooks reload only on full `supabase stop --no-backup` + start.
-- Container resets kill dockerd: `sudo nohup dockerd > <log> 2>&1 &` then `npm run db:start` (re-run once if it reports "db not ready").
+- Container resets kill dockerd. If `dockerd` says "process with PID … is still running" but nothing runs: `sudo rm -f /var/run/docker.pid /var/run/docker.sock` then start it again. `npm run db:start` may need a second run ("db not ready").
+- Session env vars that exist but are **empty** still block `.env.local` (dotenv and Next.js never override existing variables) → use `scripts/local-only.sh`.
 - `pkill -f "next start"` can kill the calling shell; use `fuser -k 3000/tcp`.
-- In dev mode, wait for `networkidle` before `context.setOffline(true)` or hydration chunks never load.
+- In dev mode, wait for `networkidle` before `context.setOffline(true)`.
 - `scrollIntoView` returns a Promise in new Chromium; a concise-arrow effect returning it crashes React cleanup.
-- supabase-js bulk insert with rows that omit different keys sends NULL for the missing ones (column defaults don't apply) → insert rows separately in tests.
+- supabase-js bulk insert with differing keys sends NULLs → insert rows separately in tests.
 - This Chromium ships an unprefixed `SpeechRecognition`; test stubs must replace both names.
-- DevTools `ServiceWorker.deliverPushMessage` occasionally drops a push (~3/8 runs in one batch); pwa.spec redelivers up to 3 times (30/30 then passed on first delivery).
-- Recurring tasks: the next occurrence is the first one after now at the same local time (finishing late no longer creates overdue copies); completing an already-done task is a no-op, so a double tap or voice+UI can't spawn two successors (flows.test "recurring tasks", written failing first).
-- Simultaneous repeats: accepting a proposal claims it atomically (status flip guarded on the previous status, undone if creating the item fails); completing a task is a guarded update (`updateEntity` `unless`), so two requests at once create one item / one next occurrence (flows.test "simultaneous repeats", failed before).
-- Push delivery claims each notification (attempts bumped from the value read) so overlapping scheduler runs send it once (push.test, failed before: 2 deliveries). Failed deliveries retry after 5 and 10 minutes, then become `failed` (previously never retried).
-- Day plans are written by `replace_day_plan(p_user, p_day, p_blocks)` (migration `20261031000001`): security invoker (RLS applies), per-user-per-day advisory lock, replaces Navi's planned flexible blocks and inserts the new ones in one transaction. Two simultaneous runs used to leave a double booking (flows.test, failed before). rls.test: another user or anon can't use it on someone's plan. **Hosted deploy must `supabase db push` this migration.**
-- Voice: tool results are cached by call id in the client, so a call the Live service sends again isn't run twice (voice-live.spec). A dropped connection during a tool call no longer claims "Nothing was changed"; it says it may or may not have gone through.
-- Chat loop: if the provider fails after a tool step already ran, the turn is not restarted on the backup model (that could repeat actions); the reply lists what was done. A refusal after earlier steps no longer says "Nothing was changed" (agent.test, failed before).
-- Voice connection loss: the microphone is released (tracks stopped) and the person is told it's off; Reconnect turns it back on. Only an unexpected close of the *current* session counts as a loss (resume and Reconnect no longer race a stale close event). Mute verified to stop sending audio. voice-live.spec (the drop check failed on the previous component).
-- A server action that can't reach the server throws, and in React 19 that replaced the whole page with the error screen ("This page couldn't load") — seen when tapping Complete offline. ActionButton now catches it, and client components import `@/app/(app)/client-actions` (each action wrapped to return `{ ok: false, error }`). offline-actions.spec covers a server-page button and a client screen (inbox Accept); failed before.
-- Voice turn save failure: the whole turn (words, tool results, audio seconds that count toward the budget) is kept for the next save; if it fails at End voice, the spoken words go to the offline capture queue and sync to the inbox (voice-live.spec). Push off/test and Delete account no longer get stuck on a network failure.
-- `serviceWorker.controller` is null on a page's first load, so privacy clean-up must not rely only on messaging the worker; the page clears `*-pages` caches itself.
+- DevTools `ServiceWorker.deliverPushMessage` occasionally drops a push; pwa.spec redelivers up to 3 times.
+- `serviceWorker.controller` is null on first load → the page clears `*-pages` caches itself on sign-out/login.
+- A server action that can't reach the server throws; in React 19 that replaced the page with the error screen → handled (see Key decisions).
+- Supabase admin `createUser` bypasses the before-user-created hook, so it can't be used to probe the invite hook.
+- Concurrency fixes (each with a test that failed first): proposal accept claim, guarded task completion, recurring successor, push claim + retry, locked day plan, voice tool-call dedupe, chat partial-failure honesty, voice mic release on connection loss, voice turn kept on save failure.
 
-## Local dev quickstart
-```
-sudo nohup dockerd >/tmp/dockerd.log 2>&1 &
-cd /home/user/navi && npm install && npm run db:start   # prints local keys
-npm run env:local            # writes .env.local from local Supabase + fresh VAPID/CRON secrets (devsim)
-npm run dev
-```
-Seeded allowlist (local only): dev@navi.test, alice@navi.test, bob@navi.test.
-
-## Commits
-`e400992` handoff docs · `05863b4` scaffold/schema/planner · `095bcc9` AI runtime/capture/auth/shell · `9207241` Today/onboarding/inbox/chat/planner · `361078b` tasks/projects/insights/briefings/tick/push · `92df02a` memory/activity/settings/PWA/voice · `5286be2` build fixes + RLS/flow tests · `967df64` ActionButton refactor + e2e suite · `8d28b26` availability parsing, capture FAB, e2e fixes · `7d4e8f2` ops guide, invite script, voice fallback e2e · `dfea149` settle blocks on task finish/cancel/delete + manage e2e · `0016554` axe a11y + contrast · `6e128d7` owner-only budget override · `ef7992b` goals/projects/routines in setup · `c228123` dictated capture · `157b180` project memory recall · `e5b03bb` accountability tests · `95df9ca` reminder expiry · `4d30a13` briefing DST tests + record · `f2b7d88` CSP · `3acb55d` time-ordered day view + structure e2e · `afadb63` push delivery + SW tests · `277c611` voice hang-up fix + live voice e2e · `97561de` voice onboarding e2e · `3cbeaf8` phone layout fixes · `22fae22` smoke:ai script · `6b83dd3` agent loop tests · `0100d5b` budget test fix · `4aeebff` voice server tests · `16c8aff` shared-device privacy + export/delete e2e · `cf6aac9` record · `df8c562` no-sideways-scroll check + Tasks filters · `d0811f1`/`8cfc1d1` check:deploy · `bca0996` recurring-task fixes · `b429943` simultaneous accept/complete guards · `6d2ba09` push sent once across overlapping ticks + retry · `d41e03f` locked day-plan replacement (migration 20261031000001) · `78f5d24` voice tool calls deduplicated by id · `34546fb` chat loop partial-failure honesty · `8acf091` CI · `6beb342` touch targets · `bfb32f8` voice mic released on connection loss + mute test · `9e76a96` offline actions no longer crash the page · (this) voice turn kept on save failure; push/delete network errors
+## Commits (chronological)
+`e400992` handoff docs · `05863b4` scaffold/schema/planner · `095bcc9` AI runtime/capture/auth/shell · `9207241` Today/onboarding/inbox/chat/planner · `361078b` tasks/projects/insights/briefings/tick/push · `92df02a` memory/activity/settings/PWA/voice · `5286be2` build fixes + RLS/flow tests · `967df64` ActionButton refactor + e2e suite · `8d28b26` availability parsing, capture FAB · `7d4e8f2` ops guide, invite script, voice fallback e2e · `dfea149` settle blocks + manage e2e · `0016554` axe a11y + contrast · `6e128d7` owner-only budget override · `ef7992b` goals/projects/routines in setup · `c228123` dictated capture · `157b180` project memory recall · `e5b03bb` accountability tests · `95df9ca` reminder expiry · `4d30a13` briefing DST tests · `f2b7d88` CSP · `3acb55d` time-ordered day view + structure e2e · `afadb63` push delivery + SW tests · `277c611` voice hang-up fix + live voice e2e · `97561de` voice onboarding e2e · `3cbeaf8` phone layout fixes · `22fae22` smoke:ai · `6b83dd3` agent loop tests · `0100d5b` budget test fix · `4aeebff` voice server tests · `16c8aff` shared-device privacy + export/delete e2e · `cf6aac9` record · `df8c562` no-sideways-scroll check · `d0811f1`/`8cfc1d1` check:deploy · `bca0996` recurring-task fixes · `b429943` simultaneous accept/complete · `6d2ba09` push once + retry · `d41e03f` locked day plan (migration `20261031000001`) · `78f5d24` voice tool-call dedupe · `34546fb` chat partial-failure honesty · `8acf091` CI · `6beb342` touch targets · `bfb32f8` voice mic release + mute test · `9e76a96` offline actions don't crash · `0d5e9b9` voice turn kept; push/delete errors · `0151b43` Supabase MCP + agent skills · (handoff) test safety guard, UTC test browser, this record, hosted Supabase guide.
 
 ## True blockers (owner action needed)
-Secrets go in the cloud environment's settings (environment menu → Edit) as env vars, never in chat. Full list given to owner 2026-10-30:
-1. `ANTHROPIC_API_KEY` (+ a console spend limit) → verify real chat/onboarding/capture/planning (`npm run smoke:ai`).
-2. `GEMINI_API_KEY` (AI Studio) → verify `gemini-3.8-live` real-time voice.
-3. Hosted Supabase: **project created by owner (ref `gxfkumxjeemceoygtuod`)**. Supabase MCP server added to `.mcp.json` (owner's URL + features) with `Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}`, because the OAuth browser flow can't run in a cloud session. Still needed as environment variables: `SUPABASE_ACCESS_TOKEN` (scoped personal access token, this project only), then `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`. MCP tools appear only in a session started after the token is set.
-4. Vercel: owner connects the repo, or `VERCEL_TOKEN`; chosen URL → `NEXT_PUBLIC_SITE_URL`.
-5. Trigger.dev `TRIGGER_SECRET_KEY` + project id (or accept Vercel Cron fallback). `CRON_SECRET`/VAPID keys can be generated by Claude.
-6. Google OAuth client (configured in Supabase Auth) for Google sign-in.
-7. Owner decisions: invite-list emails, `NAVI_ADMIN_EMAILS`, home timezone (`NAVI_BUDGET_TIMEZONE`).
-8. Physical iPhone check after deploy: install, push, mic/voice.
-Network check 2026-10-30: api.anthropic.com, generativelanguage.googleapis.com, api.vercel.com, api.supabase.com, api.trigger.dev all reachable from the cloud env.
+1. **Fix Supabase variables** (environment settings, "Unrestricted full autonomous"):
+   - Move the `sbp_…` value from `SUPABASE_SERVICE_ROLE_KEY` to `SUPABASE_ACCESS_TOKEN`.
+   - Set `NEXT_PUBLIC_SUPABASE_URL=https://gxfkumxjeemceoygtuod.supabase.co`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` = publishable key, `SUPABASE_SERVICE_ROLE_KEY` = secret key (Supabase → Project Settings → API Keys).
+2. `ANTHROPIC_API_KEY` (+ console spend limit).
+3. Vercel: connect the repo or fill `VERCEL_TOKEN`; choose the URL → `NEXT_PUBLIC_SITE_URL`.
+4. Trigger.dev: fill `TRIGGER_SECRET_KEY` + project ref (or accept the Vercel Cron fallback).
+5. Google OAuth client (configured in Supabase Auth) for Google sign-in.
+6. Owner decisions: invite-list emails; `NAVI_ADMIN_EMAILS` (owner's email); confirm home timezone (environment says America/New_York).
+7. Physical iPhone check after deploy: install, push, mic/voice.
 
-## Exact next action
-1. Phone-width review done (a11y.spec now fails on sideways scrolling, saves `test-results/phone/*.png`). Next: make deployment a single scripted step once hosted credentials arrive (migrations push, VAPID/CRON secret generation, Trigger.dev deploy), verified as far as possible without credentials.
-2. When hosted credentials arrive: `npm run check:deploy -- https://<app>` until clean. When AI keys arrive: run `npm run smoke:ai` (written, fails cleanly without keys; budget-checked, records usage), then run the app with `NAVI_AI_PROVIDER=anthropic` and repeat the core e2e flows manually with the real model; record results here.
+## Exact next steps (in order; nothing below has been started)
+1. Re-check credentials (names/lengths only). If Supabase variables are fixed: run `npm run check:deploy` (read-only) to see the hosted gaps.
+2. Hosted Supabase setup (owner already asked for it; these are writes to the owner's project — follow `docs/OPERATIONS.md` → "Moving to hosted Supabase"): apply both migrations (`supabase link` + `supabase db push`, or MCP), enable the Before-User-Created hook → `public.navi_before_user_created`, set Site URL + redirect URLs once the app URL is known, add the owner's email to `allowed_emails`. Never run `supabase/seed.sql` on hosted. Verify with `check:deploy` and an uninvited sign-up attempt.
+3. `npm run smoke:ai gemini` (fraction of a cent, budget-checked) to open one real Gemini Live session; then `npm run smoke:ai anthropic` once the Anthropic key exists.
+4. Run the app locally against real models (`NAVI_AI_PROVIDER=anthropic`) and repeat onboarding/capture/planning/voice flows; record results here.
+5. Deploy to Vercel with production env (see OPERATIONS), Trigger.dev tick, then `npm run check:deploy -- https://<app>`.
+6. Owner iPhone verification; then Google sign-in.

@@ -1,8 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
+import { assertLocalSupabase } from "../local-guard";
 
-config({ path: ".env.local" });
+config({ path: ".env.local", quiet: true });
+assertLocalSupabase();
 const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
 
 async function resetAccount(email: string) {

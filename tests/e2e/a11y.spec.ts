@@ -2,6 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
+import { assertLocalSupabase } from "../local-guard";
 
 // Automated WCAG 2.1 A/AA checks (axe) on every main page, with real data on
 // screen, plus a check that no page scrolls sideways (on the iPhone profile
@@ -9,6 +10,7 @@ import { config } from "dotenv";
 // don't replace a manual screen-reader pass.
 
 config({ path: ".env.local", quiet: true });
+assertLocalSupabase();
 const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
 
 const PAGES = ["/", "/chat", "/inbox", "/planner", "/tasks", "/projects", "/insights", "/memory", "/activity", "/settings", "/more"];
