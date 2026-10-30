@@ -139,7 +139,7 @@ export function scheduleDay(input: SchedulerInput): SchedulerOutput {
   let free: Interval[] = windows
     .map((w) => Interval.fromDateTimes(atLocalTime(date, w.start, zone), atLocalTime(date, w.end, zone)))
     .filter((i) => i.isValid)
-    .map((i) => (i.end! <= earliest ? null : i.start! < earliest ? Interval.fromDateTimes(earliest, i.end!) : i))
+    .map((i): Interval | null => (i.end! <= earliest ? null : i.start! < earliest ? Interval.fromDateTimes(earliest, i.end!) : i))
     .filter((i): i is Interval => i !== null && i.end! <= dayEnd.plus({ minutes: 1 }));
   // Round the first usable minute up to the next 5 minutes for tidy blocks.
   free = free.map((i) => {

@@ -15,6 +15,9 @@ export type Ctx = {
   userId: string;
   actor: "user" | "navi" | "system";
   timezone: string;
+  /** Set while handling a chat turn / capture so proposals link back to their source. */
+  conversationId?: string;
+  captureId?: string;
 };
 
 export class AuthError extends Error {}

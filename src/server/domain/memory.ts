@@ -26,7 +26,7 @@ export async function addMemory(ctx: Ctx, input: MemoryInput): Promise<Memory> {
     .select("*")
     .eq("kind", input.kind)
     .eq("status", "active")
-    .ilike("content", input.content.trim())
+    .ilike("content", input.content.trim().replace(/[%_\\]/g, "\\$&"))
     .maybeSingle();
   if (dup) {
     const { data } = await ctx.db
