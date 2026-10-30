@@ -42,7 +42,11 @@ function fromLocalInput(v: string, zone: string): string | null {
 export function proposalSummary(p: Proposal, zone: string): string {
   const pl = p.payload as Record<string, unknown>;
   const parts: string[] = [];
-  if (pl.due_at) parts.push(`due ${DateTime.fromISO(String(pl.due_at)).setZone(zone).toFormat("ccc LLL d, h:mm a")}`);
+  if (pl.due_at) {
+    // A soft due date at 23:59 means "that day", with no time of day.
+    const due = DateTime.fromISO(String(pl.due_at)).setZone(zone);
+    parts.push(`due ${due.toFormat(due.hour === 23 && due.minute === 59 ? "ccc LLL d" : "ccc LLL d, h:mm a")}`);
+  }
   if (pl.starts_at) parts.push(DateTime.fromISO(String(pl.starts_at)).setZone(zone).toFormat("ccc h:mm a"));
   const rec = pl.recurrence as { days?: number[] } | null | undefined;
   if (rec?.days) {
@@ -193,6 +197,12 @@ export function ProposalCard({
                   </div>
                 </>
               )}
+              {proposal.kind === "note" && (
+                <div className="sm:col-span-2">
+                  <label className="label" htmlFor={`nb-${proposal.id}`}>Note</label>
+                  <textarea id={`nb-${proposal.id}`} className="input min-h-20" value={String(payload.body ?? proposal.source_excerpt ?? "")} onChange={(e) => set("body", e.target.value)} />
+                </div>
+              )}
               {proposal.kind === "preference" && (
                 <p className="muted text-sm sm:col-span-2">Accept these, then fine-tune them in Settings.</p>
               )}
@@ -200,6 +210,7 @@ export function ProposalCard({
           )}
           {proposal.source_excerpt && <blockquote className="muted mt-2 border-l-2 border-border pl-2 text-sm">“{proposal.source_excerpt}”</blockquote>}
           {proposal.rationale && <p className="muted mt-1 text-xs">Why: {proposal.rationale}</p>}
+          {proposal.kind === "note" && <p className="muted mt-1 text-xs">Accepting saves it in Notes (under More).</p>}
           {proposal.kind === "question" && (
             <p className="muted mt-1 text-xs">{selectable ? "If kept, it's saved" : "Saving keeps it"} in Memory as an open question, so you can find it there and Navi can bring it up or help answer it in chat.</p>
           )}

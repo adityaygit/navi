@@ -194,7 +194,7 @@ async function materialize(ctx: Ctx, proposal: Proposal, edits?: Record<string, 
   } else if (proposal.kind === "note") {
     const row = await createEntity<{ id: string }>(userCtx, "notes", {
       title: (payload.title as string) ?? null,
-      body: String(payload.body ?? proposal.source_excerpt ?? ""),
+      body: String(payload.body ?? proposal.source_excerpt ?? payload.title ?? ""),
       source: "capture",
     });
     resultTable = "notes";

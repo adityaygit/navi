@@ -23,6 +23,10 @@ export type SchedulerInput = {
   estimateRatio?: number;
   maxBlockMinutes?: number;
   bufferMinutes?: number;
+  /** Shortest work block worth making for part of a longer task (default 30). */
+  minChunkMinutes?: number;
+  /** Work up to this long is placed in one block or not at all that day (default 60). */
+  wholeUpToMinutes?: number;
 };
 
 export type PlannedBlock = {
@@ -44,6 +48,8 @@ export type SchedulerOutput = {
 };
 
 const DEFAULT_ESTIMATE = 30;
+export const MIN_CHUNK_MINUTES = 30;
+export const WHOLE_UP_TO_MINUTES = 60;
 
 /** Expand an event (possibly weekly-recurring) to its occurrence on `date`. */
 export function eventOccurrence(ev: CalendarEvent, date: string, zone: string): Interval | null {
@@ -93,8 +99,10 @@ export function taskScore(task: Task, now: DateTime): number {
 
 export function scheduleDay(input: SchedulerInput): SchedulerOutput {
   const { date, zone } = input;
-  const maxBlock = input.maxBlockMinutes ?? 90;
   const buffer = input.bufferMinutes ?? 10;
+  const minChunk = input.minChunkMinutes ?? MIN_CHUNK_MINUTES;
+  const maxBlock = Math.max(minChunk, input.maxBlockMinutes ?? 90);
+  const wholeUpTo = Math.max(2 * minChunk, input.wholeUpToMinutes ?? WHOLE_UP_TO_MINUTES);
   const ratio = Math.min(2, Math.max(0.8, input.estimateRatio ?? 1));
   const warnings: string[] = [];
   const dow = weekdayOf(date, zone);
@@ -153,11 +161,13 @@ export function scheduleDay(input: SchedulerInput): SchedulerOutput {
   const freeMinutes = Math.round(free.reduce((s, i) => s + i.length("minutes"), 0));
 
   // 3. Work queue: flexible routines for today, then tasks by score.
-  type Item = { title: string; task_id: string | null; routine_id: string | null; minutes: number; reason: string; score: number; dueBy?: DateTime };
+  // `total` is the whole (adjusted) amount of work, `minutes` what's still left
+  // to place, so each block's reason can say which part of the work it is.
+  type Item = { title: string; task_id: string | null; routine_id: string | null; minutes: number; total: number; reason: string; score: number; dueBy?: DateTime };
   const queue: Item[] = [];
   for (const r of input.routines) {
     if (!r.active || !r.days.includes(dow) || r.start_time || keptRoutineIds.has(r.id)) continue;
-    queue.push({ title: r.title, task_id: null, routine_id: r.id, minutes: r.duration_minutes, reason: "Routine for today", score: 30 });
+    queue.push({ title: r.title, task_id: null, routine_id: r.id, minutes: r.duration_minutes, total: r.duration_minutes, reason: "Routine for today", score: 30 });
   }
   // A parent with open subtasks is worked on through its subtasks.
   const parentsWithOpenChildren = new Set(
@@ -177,13 +187,14 @@ export function scheduleDay(input: SchedulerInput): SchedulerOutput {
       reasons.push(due < input.now ? "overdue" : `due ${due.toFormat("ccc h:mm a")}`);
     }
     reasons.push(`P${t.priority}`);
-    if (!t.estimate_minutes) reasons.push(`no estimate, assumed ${DEFAULT_ESTIMATE}m`);
+    if (!t.estimate_minutes) reasons.push(`no estimate, ${DEFAULT_ESTIMATE}m assumed`);
     else if (ratio !== 1) reasons.push(`estimate adjusted ×${ratio.toFixed(2)} from your history`);
     queue.push({
       title: t.title,
       task_id: t.id,
       routine_id: null,
       minutes: remaining,
+      total: adjusted,
       reason: reasons.join(", "),
       score: taskScore(t, input.now),
       dueBy: t.due_at ? DateTime.fromISO(t.due_at) : undefined,
@@ -191,24 +202,32 @@ export function scheduleDay(input: SchedulerInput): SchedulerOutput {
   }
   queue.sort((a, b) => b.score - a.score || (a.dueBy?.toMillis() ?? Infinity) - (b.dueBy?.toMillis() ?? Infinity));
 
-  // 4. Greedy placement: each item takes the earliest slot that fits a chunk.
+  // 4. Greedy placement: each item takes the earliest slot that fits. Short
+  // work (up to `wholeUpTo` minutes) goes in one block or waits for a day with
+  // room; longer work is split into blocks of at least `minChunk` minutes, and
+  // never leaves a sliver smaller than that for later.
   const blocks: PlannedBlock[] = [];
   const unscheduled: SchedulerOutput["unscheduled"] = [];
   for (const item of queue) {
     let left = item.minutes;
     let placedAny = false;
+    // Short work, or a remainder too small to split into two real blocks, goes in whole.
+    const wholeNow = () => item.total <= wholeUpTo || left < 2 * minChunk;
     while (left > 0) {
-      const chunk = Math.min(left, maxBlock);
-      const minChunk = Math.min(chunk, 15);
-      const slotIdx = free.findIndex((f) => f.length("minutes") >= minChunk);
+      const whole = wholeNow();
+      const need = whole ? left : minChunk;
+      const slotIdx = free.findIndex((f) => f.length("minutes") >= need);
       if (slotIdx === -1) break;
       const slot = free[slotIdx];
-      const len = Math.min(chunk, Math.floor(slot.length("minutes")));
+      let len = whole ? left : Math.min(left, maxBlock, Math.floor(slot.length("minutes")));
+      const rest = left - len;
+      if (rest > 0 && rest < minChunk) len = left - minChunk; // left ≥ 2·minChunk here, so both parts stay ≥ minChunk
       const start = slot.start!;
       const end = start.plus({ minutes: len });
       if (item.dueBy && start >= item.dueBy && item.dueBy > input.now) {
         warnings.push(`“${item.title}” can only be scheduled after its deadline.`);
       }
+      const part = len < item.total ? `; this block: ${len} of ${item.total}m` : "";
       blocks.push({
         title: item.title,
         task_id: item.task_id,
@@ -216,19 +235,19 @@ export function scheduleDay(input: SchedulerInput): SchedulerOutput {
         starts_at: start.toISO()!,
         ends_at: end.toISO()!,
         is_flexible: true,
-        reason: item.reason,
+        reason: item.reason + part,
       });
       placedAny = true;
       left -= len;
-      const rest = end.plus({ minutes: buffer });
-      free.splice(slotIdx, 1, ...(rest < slot.end! ? [Interval.fromDateTimes(rest, slot.end!)] : []));
+      const after = end.plus({ minutes: buffer });
+      free.splice(slotIdx, 1, ...(after < slot.end! ? [Interval.fromDateTimes(after, slot.end!)] : []));
     }
     if (left > 0 && item.task_id) {
       unscheduled.push({
         task_id: item.task_id,
         title: item.title,
         remaining_minutes: left,
-        why: placedAny ? "Only part of it fits today" : "No free time left today",
+        why: placedAny ? "Only part of it fits today" : wholeNow() ? `No free ${left}-minute slot left today` : "No free time left today",
       });
       if (item.dueBy && item.dueBy.setZone(zone).toISODate()! <= date) {
         warnings.push(`“${item.title}” is due by today but ${left} min of work doesn't fit. Consider the recovery options.`);

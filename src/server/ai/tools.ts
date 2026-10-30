@@ -16,6 +16,7 @@ import { integrations } from "@/server/integrations";
 import type { CalendarEvent, PlanBlock, Proposal, Routine, Task } from "@/lib/types";
 import { buildDayAgenda, describeDayAgenda, type AgendaEntry } from "@/server/planner/agenda";
 import { proposalTitle } from "@/server/domain/proposals";
+import { fixWeekdayNumbering, guardInventedTimes } from "./time-guard";
 
 // The tools Navi can use. The same registry backs text chat, real-time voice
 // and onboarding, and every tool calls the same domain functions the
@@ -39,7 +40,7 @@ const ProposalItem = z.object({
   payload: z
     .record(z.string(), z.unknown())
     .describe(
-      "Fields for the item. workspace:{name,description}; goal:{title,why,measure,target_date,workspace_ref}; project:{name,objective,due_date,workspace_ref,goal_ref}; routine:{title,days[0-6],start_time HH:MM|null,duration_minutes,is_fixed,workspace_ref,goal_ref}; event:{title,starts_at,ends_at,recurrence{freq:'weekly',days,until}|null,location,workspace_ref}; task/reminder:{title,notes,priority 1-4,due_at,due_is_hard,estimate_minutes,workspace_ref,project_ref,goal_ref}; note:{title,body}; question:{question}; memory:{kind:profile|project|episodic|behavioral,content,origin:'stated'|'inferred'}; preference:{display_name (what the user wants to be called),timezone,quiet_hours_start,quiet_hours_end,morning_briefing_time,evening_review_time,availability[{days,start,end}]}. Use *_ref to point at another proposal's ref_key in the same call, or at an existing item's id.",
+      "Fields for the item. workspace:{name,description}; goal:{title,why,measure,target_date,workspace_ref}; project:{name,objective,due_date,workspace_ref,goal_ref}; routine:{title,days[0-6],start_time HH:MM|null,duration_minutes,is_fixed,workspace_ref,goal_ref}; event:{title,starts_at,ends_at,recurrence{freq:'weekly',days,until}|null,location,workspace_ref}; task/reminder:{title,notes,priority 1-4,due_at,due_is_hard,estimate_minutes,workspace_ref,project_ref,goal_ref}; note:{title,body}; question:{question}; memory:{kind:profile|project|episodic|behavioral,content,origin:'stated'|'inferred'}; preference:{display_name (what the user wants to be called),timezone,quiet_hours_start,quiet_hours_end,morning_briefing_time,evening_review_time,availability[{days,start,end}]}. Use *_ref to point at another proposal's ref_key in the same call, or at an existing item's id. Weekday numbers everywhere (days, recurrence.days, availability days): 0=Sunday, 1=Monday ... 6=Saturday; weekdays = [1,2,3,4,5]. Date-times are local wall-clock time with the user's UTC offset (8 AM in New York in winter = ...T08:00:00-05:00), never Z unless the user's time zone is UTC.",
     ),
   ref_key: z.string().max(60).nullish().describe("Short unique key so other proposals can reference this one, e.g. 'ws_school'"),
   source_excerpt: z.string().max(1000).nullish().describe("The user's exact words this came from"),
@@ -48,7 +49,7 @@ const ProposalItem = z.object({
   rationale: z.string().max(500).nullish().describe("Why you propose this, briefly"),
 });
 
-const ENTITY_TABLES = ["projects", "goals", "workspaces", "routines", "events", "milestones", "plan_blocks"] as const;
+const ENTITY_TABLES = ["projects", "goals", "workspaces", "routines", "events", "milestones", "plan_blocks", "notes"] as const;
 
 /** Everything that can appear on the local days from `first` to `last` (inclusive). */
 async function loadAgendaInputs(ctx: Ctx, zone: string, first: string, last: string) {
@@ -119,7 +120,9 @@ async function overview(ctx: Ctx): Promise<string> {
     }),
   );
   const lines: string[] = [];
-  lines.push(`Now: ${now.toFormat("cccc, LLL d yyyy, h:mm a")} (${zone}). Availability: ${JSON.stringify(profile.availability)}. Quiet hours: ${profile.quiet_hours_start ?? "not set"}–${profile.quiet_hours_end ?? "not set"}. Name: ${profile.display_name ?? "not set"}.`);
+  const later = now.plus({ days: 7 });
+  const offsets = `UTC offset ${now.toFormat("ZZ")}${later.offset !== now.offset ? `, ${later.toFormat("ZZ")} from ${week.find((d) => DateTime.fromISO(d, { zone }).endOf("day").offset !== now.offset) ?? later.toISODate()}` : ""}`;
+  lines.push(`Now: ${now.toFormat("cccc, LLL d yyyy, h:mm a")} (${zone}, ${offsets}). Availability: ${JSON.stringify(profile.availability)}. Quiet hours: ${profile.quiet_hours_start ?? "not set"}–${profile.quiet_hours_end ?? "not set"}. Name: ${profile.display_name ?? "not set"}.`);
   lines.push(`Workspaces: ${(workspaces.data ?? []).map((w) => `${w.name} [${w.id}]`).join("; ") || "none"}`);
   lines.push(`Active goals: ${(goals.data ?? []).map((g) => `${g.title}${g.target_date ? ` (by ${g.target_date})` : ""} [${g.id}]`).join("; ") || "none"}`);
   lines.push(`Active projects: ${(projects.data ?? []).map((p) => `${p.name}${p.due_date ? ` (due ${p.due_date})` : ""} [${p.id}]`).join("; ") || "none"}`);
@@ -228,24 +231,28 @@ export const TOOLS = [
   }),
   tool({
     name: "search_items",
-    description: "Find tasks (any status, including done), projects, goals, events, routines and review-inbox items whose title matches a query. Use it before creating a task to avoid duplicates, and to check an item's current status.",
+    description: "Find tasks (any status, including done), projects, goals, events, routines, saved notes (title or text) and review-inbox items matching a query. Use it before creating a task to avoid duplicates, to check an item's current status, and to look up what the user noted down.",
     schema: z.object({ query: z.string().min(1).max(200) }),
     run: async (ctx, { query }) => {
       const q = `%${query.replace(/[%_\\]/g, "\\$&")}%`;
-      const [t, p, g, e, r, inbox] = await Promise.all([
+      const [t, p, g, e, r, inbox, nt, nb] = await Promise.all([
         ctx.db.from("tasks").select("id,title,status,due_at,due_is_hard,priority").ilike("title", q).order("updated_at", { ascending: false }).limit(10),
         ctx.db.from("projects").select("id,name,status,objective").ilike("name", q).limit(5),
         ctx.db.from("goals").select("id,title,status").ilike("title", q).limit(5),
         ctx.db.from("events").select("id,title,starts_at,recurrence").ilike("title", q).limit(5),
         ctx.db.from("routines").select("id,title,days,start_time,is_fixed,active").ilike("title", q).limit(5),
         ctx.db.from("proposals").select("id,kind,payload,source_excerpt,status,created_at").in("status", ["pending", "deferred"]).order("created_at", { ascending: false }).limit(100),
+        ctx.db.from("notes").select("id,title,body,updated_at").ilike("title", q).order("updated_at", { ascending: false }).limit(10),
+        ctx.db.from("notes").select("id,title,body,updated_at").ilike("body", q).order("updated_at", { ascending: false }).limit(10),
       ]);
+      const noteRows = new Map([...(nt.data ?? []), ...(nb.data ?? [])].map((n) => [n.id, n]));
+      const notes = [...noteRows.values()].slice(0, 10).map((n) => ({ id: n.id, title: n.title, text: n.body.length > 400 ? `${n.body.slice(0, 400)}…` : n.body, updated_at: n.updated_at }));
       const needle = query.toLowerCase();
       const inboxHits = ((inbox.data ?? []) as Proposal[])
         .filter((x) => `${proposalTitle(x)} ${x.source_excerpt ?? ""}`.toLowerCase().includes(needle))
         .slice(0, 10)
         .map((x) => ({ id: x.id, kind: x.kind, title: proposalTitle(x), status: x.status }));
-      return { ok: true, summary: `Searched for “${query}”`, data: { tasks: t.data, projects: p.data, goals: g.data, events: e.data, routines: r.data, inbox_items_not_yet_accepted: inboxHits } };
+      return { ok: true, summary: `Searched for “${query}”`, data: { tasks: t.data, projects: p.data, goals: g.data, events: e.data, routines: r.data, notes, inbox_items_not_yet_accepted: inboxHits } };
     },
   }),
   tool({
@@ -253,10 +260,21 @@ export const TOOLS = [
     description:
       "Put NEW items you inferred from what the user said into their review inbox (they become real only when the user accepts them). Use this for anything from brain dumps, casual mentions, or onboarding. Preserve the user's words in source_excerpt and be honest about origin and confidence.",
     schema: z.object({ items: z.array(ProposalItem).min(1).max(40), batch: z.enum(["onboarding", "capture"]).nullish() }),
-    run: async (ctx, { items, batch }) => {
+    run: async (ctx, { items: proposed, batch }) => {
+      // A memory's origin is often given only once, on the item (Gemini Live did
+      // this and retried a dozen times); the item's own origin is the answer.
+      let items = fixWeekdayNumbering(
+        proposed.map((i) => (i.kind === "memory" ? { ...i, payload: { kind: "profile", ...i.payload, origin: i.payload.origin ?? i.origin } } : i)),
+        ctx.timezone,
+      );
+      if (ctx.captureId) {
+        // Captures: a time of day the user never said isn't invented (checked against their words).
+        const { data: capture } = await ctx.db.from("captures").select("raw_text").eq("id", ctx.captureId).maybeSingle();
+        if (capture?.raw_text) items = guardInventedTimes(items, { sourceText: capture.raw_text, zone: ctx.timezone, now: DateTime.now() });
+      }
       const problems = items.flatMap((i, n) => {
         const p = proposalProblem(i.kind, i.payload as Record<string, unknown>);
-        return p ? [`item ${n + 1} (${i.kind} “${String(i.payload.title ?? i.payload.name ?? "")}”): ${p}`] : [];
+        return p ? [`item ${n + 1} (${i.kind} “${proposalTitle({ kind: i.kind, payload: i.payload, source_excerpt: i.source_excerpt ?? null }).slice(0, 60)}”): ${p}`] : [];
       });
       if (problems.length) {
         return {
@@ -323,7 +341,7 @@ export const TOOLS = [
   }),
   tool({
     name: "update_item",
-    description: "Change an existing project, goal, workspace, routine, event, milestone or plan block by id. Moving fixed commitments, cancelling events, or dropping goals/projects is sent to the user for approval automatically.",
+    description: "Change an existing project, goal, workspace, routine, event, milestone, plan block or note (title, body) by id. Moving fixed commitments, cancelling events, or dropping goals/projects is sent to the user for approval automatically.",
     schema: z.object({ table: z.enum(ENTITY_TABLES), id: z.string().uuid(), patch: z.record(z.string(), z.unknown()) }),
     run: async (ctx, { table, id, patch }) => {
       const forbidden = ["id", "user_id", "created_at", "updated_at", "external_ref"];

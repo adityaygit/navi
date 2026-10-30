@@ -85,6 +85,13 @@ export const EventCreate = z.object({
     .describe("Weekly repetition for fixed commitments like classes"),
 });
 
+export const NoteCreate = z.object({
+  title: z.string().max(300).nullish(),
+  body: z.string().trim().min(1, "can't be empty").max(20000),
+  workspace_id: uuid.nullish(),
+  project_id: uuid.nullish(),
+});
+
 export const MemoryCreate = z.object({
   kind: z.enum(["profile", "project", "episodic", "behavioral"]),
   content: z.string().min(1).max(2000),

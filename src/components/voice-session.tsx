@@ -146,11 +146,27 @@ type Setters = {
   onTurnSaved: () => void;
 };
 
+/**
+ * How much of an interrupted reply was heard: the transcript up to the last
+ * piece whose audio had started playing by `playedTo` (approximate: it relies
+ * on the service sending each piece of transcript alongside its audio).
+ */
+function heardLength(marks: { len: number; at: number }[], playedTo: number): number {
+  let len = 0;
+  for (const m of marks) {
+    if (m.at > playedTo) break;
+    len = m.len;
+  }
+  return len;
+}
+
 function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTurnSaved, onUnavailable }: Setters & { kind: Kind; muted: boolean; setMuted: (m: boolean) => void; onUnavailable: (reason: string) => void }) {
   const sessionRef = useRef<{ close: () => void; sendRealtimeInput: (p: unknown) => void; sendToolResponse: (p: unknown) => void } | null>(null);
   const micRef = useRef<{ stream: MediaStream; ctx: AudioContext; node: AudioWorkletNode } | null>(null);
   const outRef = useRef<{ ctx: AudioContext; next: number; sources: Set<AudioBufferSourceNode> } | null>(null);
-  const turnRef = useRef({ user: "", navi: "", tools: [] as ToolEvent[], inSec: 0, outSec: 0 });
+  // `marks`: for each piece of Navi's transcript, when its audio starts playing
+  // (output-context time), so an interrupted turn saves only what was heard.
+  const turnRef = useRef({ user: "", navi: "", tools: [] as ToolEvent[], inSec: 0, outSec: 0, marks: [] as { len: number; at: number }[] });
   const convRef = useRef<string | null>(null);
   const handleRef = useRef<string | null>(null);
   const mutedRef = useRef(muted);
@@ -189,7 +205,7 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
   const saveTurn = useCallback(async (interrupted = false) => {
     const t = turnRef.current;
     if (!convRef.current || (!t.user.trim() && !t.navi.trim() && !t.tools.length && !t.inSec)) return true;
-    turnRef.current = { user: "", navi: "", tools: [], inSec: 0, outSec: 0 };
+    turnRef.current = { user: "", navi: "", tools: [], inSec: 0, outSec: 0, marks: [] };
     try {
       const res = await fetch("/api/voice/turn", {
         method: "POST",
@@ -213,6 +229,7 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
         tools: [...t.tools, ...now.tools],
         inSec: t.inSec + now.inSec,
         outSec: t.outSec + now.outSec,
+        marks: [],
       };
       return false;
     }
@@ -321,6 +338,22 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
             if (!sc) return;
             if (sc.interrupted) {
               // Barge-in: the user started talking, stop speaking immediately.
+              // The service sends the reply faster than it plays, so keep only
+              // the part of the transcript whose audio had started playing.
+              const out = outRef.current;
+              const t = turnRef.current;
+              if (out) {
+                const heard = heardLength(t.marks, out.ctx.currentTime);
+                const unheard = t.navi.slice(heard);
+                if (unheard.trim()) {
+                  t.navi = t.navi.slice(0, heard).trimEnd();
+                  setLines((l) => {
+                    const last = l.at(-1);
+                    if (last?.who !== "navi" || !last.text.endsWith(unheard)) return l;
+                    return [...l.slice(0, -1), { who: "navi", text: `${last.text.slice(0, -unheard.length).trimEnd()} …` }];
+                  });
+                }
+              }
               flushPlayback();
               setStatus("listening");
               void saveTurn(true);
@@ -331,6 +364,9 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
             }
             if (sc.outputTranscription?.text) {
               turnRef.current.navi += sc.outputTranscription.text;
+              const out = outRef.current;
+              // This text is spoken after the audio already queued.
+              turnRef.current.marks.push({ len: turnRef.current.navi.length, at: out ? Math.max(out.next, out.ctx.currentTime) : 0 });
               setLines((l) => (l.at(-1)?.who === "navi" ? [...l.slice(0, -1), { who: "navi", text: l.at(-1)!.text + sc.outputTranscription!.text }] : [...l, { who: "navi", text: sc.outputTranscription!.text! }]));
             }
             for (const part of sc.modelTurn?.parts ?? []) {

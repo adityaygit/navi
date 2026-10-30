@@ -83,6 +83,61 @@ describe("scheduleDay", () => {
   });
 });
 
+describe("scheduleDay chunking", () => {
+  const minutes = (b: { starts_at: string; ends_at: string }) => DateTime.fromISO(b.ends_at).diff(DateTime.fromISO(b.starts_at), "minutes").minutes;
+  const hm = (iso: string) => DateTime.fromISO(iso).setZone(zone).toFormat("HH:mm");
+  // A fixed 16:25–19:00 event leaves 16:00–16:15 and 19:10–20:00 free (10-minute buffers).
+  const practice = event({ starts_at: "2026-11-02T16:25:00-05:00", ends_at: "2026-11-02T19:00:00-05:00", title: "Practice" });
+
+  it("places a short task whole in a slot that fits instead of splitting it", () => {
+    const call = task({ id: "call", title: "Call mom", estimate_minutes: null });
+    const out = scheduleDay({ date: "2026-11-02", zone, now: morning, availability: weekdays, events: [practice], routines: [], tasks: [call], keptBlocks: [] });
+    expect(out.blocks).toHaveLength(1);
+    expect(hm(out.blocks[0].starts_at)).toBe("19:10");
+    expect(minutes(out.blocks[0])).toBe(30);
+    // The reason describes this block: the full assumed 30 minutes.
+    expect(out.blocks[0].reason).toMatch(/no estimate, 30m assumed/);
+    expect(out.blocks[0].reason).not.toMatch(/this block/);
+    expect(out.unscheduled).toHaveLength(0);
+  });
+
+  it("leaves a short task for another day rather than booking a sliver of it", () => {
+    const narrow = [{ days: [1], start: "16:00", end: "16:15" }];
+    const call = task({ id: "call", title: "Call mom", estimate_minutes: 30 });
+    const out = scheduleDay({ date: "2026-11-02", zone, now: morning, availability: narrow, events: [], routines: [], tasks: [call], keptBlocks: [] });
+    expect(out.blocks).toHaveLength(0);
+    expect(out.unscheduled[0]).toMatchObject({ task_id: "call", remaining_minutes: 30, why: "No free 30-minute slot left today" });
+  });
+
+  it("splits long work into blocks of at least 30 minutes and leaves no tiny remainder", () => {
+    const window = [{ days: [1], start: "16:00", end: "17:35" }];
+    const essay = task({ id: "essay", title: "Essay", estimate_minutes: 100 });
+    const out = scheduleDay({ date: "2026-11-02", zone, now: morning, availability: window, events: [], routines: [], tasks: [essay], keptBlocks: [] });
+    expect(out.blocks).toHaveLength(1);
+    expect(minutes(out.blocks[0])).toBe(70);
+    expect(out.blocks[0].reason).toMatch(/this block: 70 of 100m/);
+    expect(out.unscheduled[0].remaining_minutes).toBe(30);
+  });
+
+  it("never makes a block under 30 minutes for part of a longer task", () => {
+    // Free: 16:00–16:15, 19:10–20:00 (around practice) — the 15-minute gap is skipped.
+    const big = task({ id: "big", title: "Project", estimate_minutes: 120 });
+    const out = scheduleDay({ date: "2026-11-02", zone, now: morning, availability: weekdays, events: [practice], routines: [], tasks: [big], keptBlocks: [] });
+    expect(out.blocks.every((b) => minutes(b) >= 30)).toBe(true);
+    expect(out.blocks.map((b) => hm(b.starts_at))).toEqual(["19:10"]);
+    expect(minutes(out.blocks[0]) + out.unscheduled[0].remaining_minutes).toBe(120);
+    expect(out.unscheduled[0].remaining_minutes).toBeGreaterThanOrEqual(30);
+  });
+
+  it("books the remainder of work planned on earlier days in one block, saying which part it is", () => {
+    const essay = task({ id: "essay", title: "Essay", estimate_minutes: 100 });
+    const out = scheduleDay({ date: "2026-11-02", zone, now: morning, availability: weekdays, events: [], routines: [], tasks: [essay], keptBlocks: [], alreadyScheduledMinutes: { essay: 70 } });
+    expect(out.blocks).toHaveLength(1);
+    expect(minutes(out.blocks[0])).toBe(30);
+    expect(out.blocks[0].reason).toMatch(/this block: 30 of 100m/);
+  });
+});
+
 describe("learnedEstimateRatio", () => {
   it("requires at least five samples before adjusting", () => {
     expect(learnedEstimateRatio([{ estimate_minutes: 10, actual_minutes: 20 }]).ratio).toBe(1);

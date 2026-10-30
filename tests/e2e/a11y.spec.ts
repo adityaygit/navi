@@ -13,7 +13,7 @@ config({ path: ".env.local", quiet: true });
 assertLocalSupabase();
 const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
 
-const PAGES = ["/", "/chat", "/inbox", "/planner", "/tasks", "/projects", "/insights", "/memory", "/activity", "/settings", "/more"];
+const PAGES = ["/", "/chat", "/inbox", "/planner", "/tasks", "/projects", "/insights", "/memory", "/notes", "/activity", "/settings", "/more"];
 
 /** Elements sticking out past the right edge of the screen (sideways scrolling). */
 async function overflow(page: Page, label: string) {
@@ -89,6 +89,7 @@ test("main pages have no automatically detectable WCAG A/AA violations", async (
   const { data: goal } = await admin.from("goals").insert({ user_id: userId, title: "Finish the semester with a 3.5 GPA or better", workspace_id: ws!.id }).select("id").single();
   await admin.from("projects").insert({ user_id: userId, name: "Science fair volcano with working eruption", workspace_id: ws!.id, goal_id: goal!.id });
   await admin.from("memories").insert({ user_id: userId, kind: "behavioral", content: "Tends to underestimate essays", origin: "inferred", confidence: 0.6 });
+  await admin.from("notes").insert({ user_id: userId, title: "Locker", body: "Combination is on the back of my planner", source: "capture" });
   await admin.from("proposals").insert({ user_id: userId, kind: "task", payload: { title: "Buy cleats" }, source_excerpt: "buy cleats", origin: "inferred", confidence: 0.5 });
   await admin.from("approvals").insert({ user_id: userId, action_type: "external.gmail.send", summary: "Email coach about Saturday", details: { to: "coach@example.com" }, idempotency_key: `a11y-${Date.now()}:1` });
 

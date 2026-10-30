@@ -21,6 +21,7 @@ import {
   GoalCreate,
   MemoryCreate,
   MilestoneCreate,
+  NoteCreate,
   ProfileUpdate,
   ProjectCreate,
   RoutineCreate,
@@ -81,6 +82,7 @@ const CREATE_SCHEMAS: Partial<Record<EntityTable, z.ZodTypeAny>> = {
   milestones: MilestoneCreate,
   routines: RoutineCreate,
   events: EventCreate,
+  notes: NoteCreate,
 };
 export async function createItemAction(table: EntityTable, input: unknown) {
   return act(async (ctx) => {
@@ -93,7 +95,8 @@ export async function createItemAction(table: EntityTable, input: unknown) {
 export async function updateItemAction(table: EntityTable, id: string, patch: Record<string, unknown>) {
   return act(async (ctx) => {
     const forbidden = ["id", "user_id", "created_at", "updated_at"];
-    const clean = Object.fromEntries(Object.entries(patch).filter(([k]) => !forbidden.includes(k)));
+    let clean: Record<string, unknown> = Object.fromEntries(Object.entries(patch).filter(([k]) => !forbidden.includes(k)));
+    if (table === "notes") clean = compact(NoteCreate.partial().parse(clean));
     return updateEntity(ctx, table, id, clean);
   }, "Saved");
 }

@@ -183,6 +183,17 @@ export type Memory = {
   updated_at: string;
 };
 
+export type Note = {
+  id: string;
+  workspace_id: string | null;
+  project_id: string | null;
+  title: string | null;
+  body: string;
+  source: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Message = {
   id: string;
   conversation_id: string;

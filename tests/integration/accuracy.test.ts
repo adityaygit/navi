@@ -162,3 +162,95 @@ describe("accepted questions are kept", () => {
     expect(again!.status).toBe("accepted");
   });
 });
+
+describe("captures don't invent a time of day", () => {
+  it("tells the model the rule", () => {
+    expect(CHAT_SYSTEM).toMatch(/Never invent a time of day the user didn't say/);
+    expect(CHAT_SYSTEM).toMatch(/\("on Friday" said on a Friday\) is ambiguous/);
+  });
+
+  it("moves an invented time to the end of the named day, keeps stated times, and explains it", async () => {
+    const raw = "call mom on thursday. dentist thursday. pick up suit thursday at 3pm";
+    const { capture } = await saveCapture(ctx(), { client_id: crypto.randomUUID(), raw_text: raw, source: "text" });
+    const thu = now().plus({ days: 1 }).startOf("day"); // any date works: only the time of day is checked
+    const at = (h: number) => thu.set({ hour: h }).toISO()!;
+    const r = await runTool({ ...ctx(), actor: "navi", captureId: capture.id }, "propose_items", {
+      items: [
+        { kind: "task", payload: { title: "Call mom", due_at: at(18) }, source_excerpt: "call mom on thursday", origin: "stated", confidence: 0.9 },
+        { kind: "event", payload: { title: "Dentist", starts_at: at(18), ends_at: at(19) }, source_excerpt: "dentist thursday", origin: "stated", confidence: 0.8 },
+        { kind: "event", payload: { title: "Pick up suit", starts_at: at(15), ends_at: at(16) }, source_excerpt: "pick up suit thursday at 3pm", origin: "stated", confidence: 0.9 },
+      ],
+    });
+    expect(r.ok).toBe(true);
+    const { data } = await db.from("proposals").select("kind,payload,rationale").eq("capture_id", capture.id).order("created_at");
+    const byTitle = Object.fromEntries((data ?? []).map((p) => [p.payload.title, p]));
+    const local = (iso: string) => DateTime.fromISO(iso).setZone(zone).toFormat("yyyy-LL-dd HH:mm");
+    expect(local(byTitle["Call mom"].payload.due_at)).toBe(`${thu.toISODate()} 23:59`);
+    expect(byTitle["Call mom"].rationale).toMatch(/No time of day was given/);
+    expect(byTitle["Dentist"].kind).toBe("task");
+    expect(local(byTitle["Dentist"].payload.due_at)).toBe(`${thu.toISODate()} 23:59`);
+    expect(byTitle["Pick up suit"]).toMatchObject({ kind: "event", payload: { starts_at: at(15) } });
+  });
+});
+
+describe("notes are findable", () => {
+  it("search_items finds a saved note by its title or its text", async () => {
+    await db.from("notes").insert({ user_id: userId, title: "Passport", body: "Renewal form is in the blue folder" });
+    await db.from("notes").insert({ user_id: userId, body: "Locker combination hint: birthday backwards" });
+    const byTitle = await runTool(ctx(), "search_items", { query: "passport" });
+    const notes = (byTitle.data as { notes: { title: string | null; text: string }[] }).notes;
+    expect(notes).toEqual([expect.objectContaining({ title: "Passport", text: "Renewal form is in the blue folder" })]);
+    const byText = await runTool(ctx(), "search_items", { query: "locker" });
+    expect((byText.data as { notes: { text: string }[] }).notes.map((n) => n.text)).toEqual(["Locker combination hint: birthday backwards"]);
+  });
+});
+
+describe("proposing memories", () => {
+  it("accepts a memory whose origin is given on the item rather than in the payload", async () => {
+    // Gemini Live sent this shape and retried a dozen times against the old check.
+    const r = await runTool({ ...ctx(), actor: "navi" }, "propose_items", {
+      items: [{ kind: "memory", payload: { content: "Studies biology at college" }, origin: "stated", confidence: 1 }],
+    });
+    expect(r).toMatchObject({ ok: true, summary: "Added 1 item to the review inbox" });
+    const { data: p } = await db.from("proposals").select("id,payload").eq("kind", "memory").order("created_at", { ascending: false }).limit(1).single();
+    expect(p!.payload).toEqual({ kind: "profile", content: "Studies biology at college", origin: "stated" });
+    const accepted = await acceptProposal(ctx(), p!.id);
+    expect(accepted.result_table).toBe("memories");
+  });
+
+  it("names the broken item by its content when a problem is reported", async () => {
+    const r = await runTool({ ...ctx(), actor: "navi" }, "propose_items", {
+      items: [{ kind: "memory", payload: { kind: "nonsense", content: "Likes mornings" }, origin: "stated", confidence: 1 }],
+    });
+    expect(r.ok).toBe(false);
+    expect(JSON.stringify(r.data)).toContain("item 1 (memory “Likes mornings”)");
+  });
+});
+
+describe("weekday numbering in proposals", () => {
+  it("corrects a batch that counted Monday as 0, using the events' own dates", async () => {
+    await resetUser(userId);
+    // The shape Gemini Live sent in the real voice-onboarding run.
+    const r = await runTool({ ...ctx(), actor: "navi" }, "propose_items", {
+      batch: "onboarding",
+      items: [
+        { kind: "event", payload: { title: "Coffee shop job", starts_at: "2026-11-07T08:00:00-05:00", ends_at: "2026-11-07T14:00:00-05:00", recurrence: { freq: "weekly", days: [5] } }, origin: "stated", confidence: 1 },
+        { kind: "preference", payload: { display_name: "Sam", availability: [{ days: [0, 1, 2, 3, 4], start: "19:00", end: "22:00" }] }, origin: "stated", confidence: 1 },
+      ],
+    });
+    expect(r.ok).toBe(true);
+    const { data } = await db.from("proposals").select("kind,payload,rationale").eq("batch", "onboarding").order("created_at");
+    const ev = data!.find((p) => p.kind === "event")!;
+    const pref = data!.find((p) => p.kind === "preference")!;
+    expect(ev.payload.recurrence.days).toEqual([6]);
+    expect(pref.payload.availability[0].days).toEqual([1, 2, 3, 4, 5]);
+    expect(ev.rationale).toMatch(/off by one/);
+  });
+
+  it("tells the model the numbering and the UTC offset to use", async () => {
+    expect(CHAT_SYSTEM).toMatch(/Weekday numbers are 0 = Sunday, 1 = Monday \.\.\. 6 = Saturday/);
+    expect(CHAT_SYSTEM).toMatch(/never "Z" unless their time zone is UTC/);
+    const overview = String((await runTool(ctx(), "get_overview", {})).data);
+    expect(overview).toMatch(/\(America\/New_York, UTC offset [+-]\d\d:\d\d/);
+  });
+});

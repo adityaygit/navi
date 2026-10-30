@@ -143,15 +143,25 @@ test("voice streams the mic, runs tools for real, plays replies and saves the tu
     ]);
 
   // Barge-in: when the service reports an interruption, Navi stops speaking.
-  // A longer reply, streamed the way the service does: many short audio chunks.
-  send({ serverContent: { outputTranscription: { text: "Also, tomorrow you" } } });
-  for (let i = 0; i < 30; i++) {
-    send({ serverContent: { modelTurn: { parts: [{ inlineData: { mimeType: "audio/pcm;rate=24000", data: Buffer.alloc(24000 * 2 * 0.1).toString("base64") } }] } } });
-  }
+  // A longer reply, streamed the way the service does (faster than it plays):
+  // many short audio chunks, each piece of transcript alongside its audio.
   const status = voice.getByRole("status").first();
+  await expect(status).toContainText("Listening"); // the previous reply has finished playing
+  const chunk = { modelTurn: { parts: [{ inlineData: { mimeType: "audio/pcm;rate=24000", data: Buffer.alloc(24000 * 2 * 0.1).toString("base64") } }] } };
+  send({ serverContent: { outputTranscription: { text: "Also, tomorrow you have soccer at 4." }, ...chunk } });
+  for (let i = 0; i < 39; i++) send({ serverContent: chunk });
+  send({ serverContent: { outputTranscription: { text: " Then I planned your essay for 7 PM." }, ...chunk } });
+  for (let i = 0; i < 39; i++) send({ serverContent: chunk });
   await expect(status).toContainText("Navi is speaking");
+  await page.waitForTimeout(500); // part-way into the first sentence
   send({ serverContent: { interrupted: true } });
   await expect(status).toContainText("Listening");
+  // Only what was heard (the first 4 seconds of 8) is kept, on screen and in history.
+  await expect(voice.getByText("Also, tomorrow you have soccer at 4. …")).toBeVisible();
+  await expect(voice.getByText(/essay for 7 PM/)).toHaveCount(0);
+  await expect
+    .poll(async () => (await admin.from("messages").select("content").eq("conversation_id", conversation()).order("created_at", { ascending: false }).limit(1).single()).data?.content, { timeout: 15_000 })
+    .toBe("Also, tomorrow you have soccer at 4. …(interrupted)");
 
   // One session the whole time: saving a turn must not hang up.
   expect(seen).toMatchObject({ sockets: 1, closed: false });
