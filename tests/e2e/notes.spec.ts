@@ -27,6 +27,8 @@ test("an accepted inbox note shows in Notes, and notes can be added, edited and 
   await note.getByRole("button", { name: "Edit" }).click();
   await note.getByLabel("Note", { exact: true }).fill("Network BlueHouse, password is taped inside the cupboard");
   await note.getByRole("button", { name: "Save note" }).click();
+  // The editor closes once the save has finished; reloading earlier can beat it.
+  await expect(note.getByRole("button", { name: "Edit" })).toBeVisible();
   await page.reload();
   await expect(page.getByText("password is taped inside the cupboard")).toBeVisible();
 
