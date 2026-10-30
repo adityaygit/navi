@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { announceChange, flushQueue, newClientId, offlineQueue, type QueuedCapture } from "@/lib/offline-queue";
 
 const DRAFT_KEY = "navi:capture-draft";
@@ -14,6 +15,9 @@ export function QuickCapture() {
   const [queue, setQueue] = useState<QueuedCapture[]>([]);
   const [online, setOnline] = useState(true);
   const ref = useRef<HTMLTextAreaElement>(null);
+  // During setup the person is already talking to Navi, and the floating
+  // button would cover the review bar. Queued captures still show.
+  const hideFab = usePathname().startsWith("/onboarding") && queue.length === 0;
 
   useEffect(() => {
     // Restore an unsent draft from this device's storage (an external system).
@@ -68,14 +72,14 @@ export function QuickCapture() {
 
   return (
     <>
-      <button
+      {!hideFab && <button
         type="button"
         onClick={() => setOpen(true)}
         className="btn btn-primary fixed bottom-20 right-4 z-30 h-14 rounded-full px-5 shadow-lg md:bottom-6"
         aria-haspopup="dialog"
       >
         + Capture{queue.length > 0 && <span className="badge ml-1 border-accent-text text-accent-text">{queue.length}</span>}
-      </button>
+      </button>}
       {open && (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 md:items-center" onClick={() => setOpen(false)}>
           <div role="dialog" aria-modal="true" aria-labelledby="capture-title" className="w-full max-w-lg rounded-t-2xl bg-surface p-4 md:rounded-2xl safe-bottom" onClick={(e) => e.stopPropagation()}>

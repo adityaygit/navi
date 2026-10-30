@@ -15,7 +15,7 @@ async function signIn(page: Page, email: string) {
   await page.goto("/login");
   await page.getByRole("button", { name: "Use a password instead" }).click();
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill("e2e-password-123");
+  await page.getByLabel("Password").fill("test-password-123");
   await page.getByRole("button", { name: "Sign in" }).click();
 }
 
@@ -85,6 +85,8 @@ test("offline capture queues locally and syncs on reconnect", async ({ page, con
   const email = info.project.name === "iphone" ? "alice@navi.test" : "dev@navi.test";
   await signIn(page, email);
   await expect(page).toHaveURL(/\/$/);
+  // Let the page hydrate and load its scripts before the network goes away.
+  await page.waitForLoadState("networkidle");
   await context.setOffline(true);
   await page.getByRole("button", { name: /\+ Capture/ }).click();
   await page.getByLabel("What's on your mind?").fill("offline idea: reorganize closet");

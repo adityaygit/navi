@@ -144,11 +144,12 @@ export function extractAvailability(text: string): { days: number[]; start: stri
   const lower = text.toLowerCase();
   const out: { days: number[]; start: string; end: string }[] = [];
   const pad = (n: number) => String(n).padStart(2, "0");
-  for (const m of lower.matchAll(/free\s+(?:after|from)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?(?:\s*(?:to|until|till|-)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?)?([^.]*)/g)) {
+  for (const m of lower.matchAll(/free\s+(?:after|from)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?(?:\s*(?:to|until|till|-)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?)?((?:(?!\bfree\b)[^.;])*)/g)) {
     const s = parseClock(m[1], m[2], m[3]);
     const e = m[4] ? parseClock(m[4], m[5], m[6] ?? (Number(m[4]) < 12 ? "pm" : undefined)) : { hour: 21, minute: 0 };
     const tail = m[7] ?? "";
-    const days = /weekend/.test(tail) ? [0, 6] : /every ?day|daily/.test(tail) ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5];
+    // The tail stops at the next "free", so each window keeps its own days.
+    const days = /weekday/.test(tail) ? [1, 2, 3, 4, 5] : /weekend/.test(tail) ? [0, 6] : /every ?day|daily/.test(tail) ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5];
     out.push({ days, start: `${pad(s.hour)}:${pad(s.minute)}`, end: `${pad(e.hour)}:${pad(e.minute)}` });
   }
   return out;

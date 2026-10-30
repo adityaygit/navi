@@ -26,6 +26,10 @@ describe("rule-based extraction", () => {
   it("reads availability windows", () => {
     expect(extractAvailability("I'm free after 6pm on weekdays")).toEqual([{ days: [1, 2, 3, 4, 5], start: "18:00", end: "21:00" }]);
     expect(extractAvailability("free from 9am to 1pm on weekends")[0]).toEqual({ days: [0, 6], start: "09:00", end: "13:00" });
+    expect(extractAvailability("I'm free after 6pm on weekdays and free from 10am to 2pm on weekends. Quiet 10pm to 7am.")).toEqual([
+      { days: [1, 2, 3, 4, 5], start: "18:00", end: "21:00" },
+      { days: [0, 6], start: "10:00", end: "14:00" },
+    ]);
   });
 
   it("keeps unclassifiable text as a note rather than dropping it", () => {
