@@ -123,7 +123,7 @@ function ModePicker({ onLive, onBrowser, kind }: { onLive: () => void; onBrowser
           setChecking(false);
           if (res?.ok) return onLive();
           const body = res ? await res.json().catch(() => ({})) : { error: "You appear to be offline. Voice needs an internet connection." };
-          if (body.fallback === "browser") onBrowser(`Real-time voice isn't available (${body.error}). Using basic voice: your browser's speech recognition, one turn at a time, not real-time.`);
+          if (body.fallback === "browser") onBrowser(`Real-time voice isn't available (${String(body.error).replace(/\.$/, "")}). Using basic voice: your browser's speech recognition, one turn at a time, not real-time.`);
           else onBrowser(body.error ?? "Voice is unavailable right now.");
         }}
       >
@@ -222,7 +222,7 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
     if (!res) { setStatus("reconnect"); setError("You're offline. Voice needs an internet connection."); return; }
     const body = await res.json();
     if (!res.ok) {
-      if (body.fallback === "browser") return onUnavailable(`Real-time voice isn't available (${body.error}). Using basic voice instead.`);
+      if (body.fallback === "browser") return onUnavailable(`Real-time voice isn't available (${String(body.error).replace(/\.$/, "")}). Using basic voice instead.`);
       setStatus("error");
       setError(body.error ?? "Couldn't start voice");
       return;

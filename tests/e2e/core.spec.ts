@@ -100,3 +100,18 @@ test("offline capture queues locally and syncs on reconnect", async ({ page, con
   await page.goto("/inbox");
   await expect(page.getByText(/reorganize closet/i).first()).toBeVisible();
 });
+
+test("voice says plainly when real-time voice isn't available and offers basic voice", async ({ page }, info) => {
+  test.skip(!!process.env.GEMINI_API_KEY, "Real-time voice is configured; this checks the fallback path");
+  const email = info.project.name === "iphone" ? "alice@navi.test" : "dev@navi.test";
+  await signIn(page, email);
+  await expect(page).toHaveURL(/\/$/);
+  await page.goto("/chat");
+  await page.getByRole("button", { name: "Talk", exact: true }).click();
+  const voice = page.getByRole("region", { name: "Voice conversation" });
+  await expect(voice.getByText(/microphone turns on only after you tap/i)).toBeVisible();
+  await expect(voice.getByLabel("Microphone is on")).toHaveCount(0);
+  await voice.getByRole("button", { name: "Start talking" }).click();
+  await expect(voice.getByText(/Real-time voice isn't available .*Using basic voice/)).toBeVisible();
+  await page.screenshot({ path: `test-results/${info.project.name}-voice-fallback.png`, fullPage: true });
+});

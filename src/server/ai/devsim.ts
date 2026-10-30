@@ -62,7 +62,9 @@ export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
   } else if (req.mode === "chat" && /\b(plan|organi[sz]e|schedule)\b.*\b(day|today)\b/i.test(text)) {
     const r = await call("plan_day", {});
     const data = (await runTool(ctx, "get_overview", {})).data as string;
-    reply = `${r.summary}. ${data.split("\n").find((l) => l.startsWith("Today's plan")) ?? ""}`;
+    // The overview carries item IDs for the model; people don't need them.
+    const planLine = (data.split("\n").find((l) => l.startsWith("Today's plan")) ?? "").replace(/\s*\[[0-9a-f-]{36}\]/g, "");
+    reply = `${r.summary}. ${planLine}`;
   } else if (req.mode === "chat" && /\b(plan (broke|fell apart)|got interrupted|ran out of time|i'?m behind|sick|unexpected)\b/i.test(text)) {
     const category = /sick|tired|rest/i.test(text) ? "rest" : /estimate|took longer/i.test(text) ? "estimate" : "interruption";
     const r = await call("recover_plan", { description: text.slice(0, 400), category });
