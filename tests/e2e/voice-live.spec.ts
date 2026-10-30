@@ -92,6 +92,12 @@ test("voice streams the mic, runs tools for real, plays replies and saves the tu
   expect(seen.toolResponse).toMatchObject({ functionResponses: [{ id: "call-1", name: "create_task", response: { output: { ok: true } } }] });
   const { data: task } = await admin.from("tasks").select("title,priority").eq("user_id", userId).eq("title", "Call the dentist").single();
   expect(task).toEqual({ title: "Call the dentist", priority: 2 });
+  // The service sending the same call again gets the same answer; it doesn't run twice.
+  seen.toolResponse = null;
+  send({ toolCall: { functionCalls: [{ id: "call-1", name: "create_task", args: { title: "Call the dentist", priority: 2, user_command: "Add a task to call the dentist." } }] } });
+  await expect.poll(() => seen.toolResponse, { timeout: 15_000 }).toMatchObject({ functionResponses: [{ id: "call-1", response: { output: { ok: true } } }] });
+  const { count: copies } = await admin.from("tasks").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("title", "Call the dentist");
+  expect(copies).toBe(1);
 
   // Navi answers out loud (24 kHz PCM) with a transcript.
   const pcm = Buffer.alloc(24000 * 2 * 0.5); // half a second of silence

@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createSpeechRecognition, speechRecognitionSupported, type SpeechRec } from "@/lib/speech";
 import type { ToolEvent } from "@/lib/types";
 
+type ToolReply = { id?: string; name?: string; response: Record<string, unknown> };
+
 // Real-time two-way voice. Primary mode: Gemini Live over a WebSocket opened
 // directly from the browser with a single-use ephemeral token (16 kHz PCM up,
 // 24 kHz PCM down, server-side voice activity detection for natural turn
@@ -201,18 +203,28 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
   }, [onTurnSaved, setError, stopAll]);
 
 
-  const runTool = useCallback(async (fc: { id?: string; name?: string; args?: Record<string, unknown> }) => {
-    try {
-      const res = await fetch("/api/voice/tool", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ conversationId: convRef.current, name: fc.name, args: fc.args ?? {} }) });
-      const result = await res.json();
-      if (!["get_overview", "recall", "search_items"].includes(fc.name ?? "")) {
-        turnRef.current.tools.push({ name: fc.name ?? "tool", ok: Boolean(result.ok), summary: String(result.summary ?? result.error ?? "") });
+  // Results by call id: a call the service sends again (e.g. after resuming
+  // a session) gets the first result instead of running a second time.
+  const toolCalls = useRef(new Map<string, Promise<ToolReply>>());
+  const runTool = useCallback((fc: { id?: string; name?: string; args?: Record<string, unknown> }) => {
+    const seen = fc.id ? toolCalls.current.get(fc.id) : undefined;
+    if (seen) return seen;
+    const run = (async (): Promise<ToolReply> => {
+      try {
+        const res = await fetch("/api/voice/tool", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ conversationId: convRef.current, name: fc.name, args: fc.args ?? {} }) });
+        const result = await res.json();
+        if (!["get_overview", "recall", "search_items"].includes(fc.name ?? "")) {
+          turnRef.current.tools.push({ name: fc.name ?? "tool", ok: Boolean(result.ok), summary: String(result.summary ?? result.error ?? "") });
+        }
+        if (result.mutated) onTurnSaved();
+        return { id: fc.id, name: fc.name, response: { output: { ok: result.ok, summary: result.summary ?? result.error, data: result.data ?? null } } };
+      } catch {
+        // The request may have reached the server before the connection dropped.
+        return { id: fc.id, name: fc.name, response: { error: "The connection dropped during this action, so it may or may not have gone through. Check with get_overview before trying again." } };
       }
-      if (result.mutated) onTurnSaved();
-      return { id: fc.id, name: fc.name, response: { output: { ok: result.ok, summary: result.summary ?? result.error, data: result.data ?? null } } };
-    } catch {
-      return { id: fc.id, name: fc.name, response: { error: "The tool could not be reached (network). Nothing was changed." } };
-    }
+    })();
+    if (fc.id) toolCalls.current.set(fc.id, run);
+    return run;
   }, [onTurnSaved]);
 
   const connect = useCallback(async () => {
