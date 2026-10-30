@@ -231,6 +231,51 @@ describe("plan stays in step with tasks", () => {
   });
 });
 
+describe("recurring tasks", () => {
+  const successors = async (title: string) => {
+    const { data } = await db.from("tasks").select("due_at,status").eq("user_id", userId).eq("title", title).eq("status", "todo");
+    return data ?? [];
+  };
+
+  it("schedules the next occurrence after today even when finished late, not in the past", async () => {
+    const ctx = ctxFor(db, userId, zone);
+    const now = DateTime.now().setZone(zone);
+    const due = now.minus({ days: 5 }).set({ hour: 7, minute: 0, second: 0, millisecond: 0 });
+    const t = await createTask(ctx, { title: "Water plants", due_at: due.toISO()!, recurrence: { freq: "daily" } });
+    const { completeTask } = await import("@/server/domain/tasks");
+    await completeTask(ctx, t.id);
+    const next = await successors("Water plants");
+    expect(next).toHaveLength(1);
+    const nextDue = DateTime.fromISO(next[0].due_at!).setZone(zone);
+    expect(nextDue > now).toBe(true);
+    expect(nextDue.diff(now, "hours").hours).toBeLessThanOrEqual(24);
+    expect(nextDue.toFormat("HH:mm")).toBe("07:00");
+  });
+
+  it("lands weekly repeats on the chosen weekdays", async () => {
+    const ctx = ctxFor(db, userId, zone);
+    const now = DateTime.now().setZone(zone);
+    const due = now.minus({ days: 10 }).set({ hour: 18, minute: 0, second: 0, millisecond: 0 });
+    const t = await createTask(ctx, { title: "Gym", due_at: due.toISO()!, recurrence: { freq: "weekly", days: [1, 4] } });
+    const { completeTask } = await import("@/server/domain/tasks");
+    await completeTask(ctx, t.id);
+    const [next] = await successors("Gym");
+    const nextDue = DateTime.fromISO(next.due_at!).setZone(zone);
+    expect([1, 4]).toContain(nextDue.weekday % 7);
+    expect(nextDue > now).toBe(true);
+    expect(nextDue.diff(now, "days").days).toBeLessThanOrEqual(7);
+  });
+
+  it("finishing the same occurrence twice creates only one next one", async () => {
+    const ctx = ctxFor(db, userId, zone);
+    const t = await createTask(ctx, { title: "Take vitamins", recurrence: { freq: "daily" } });
+    const { completeTask } = await import("@/server/domain/tasks");
+    await completeTask(ctx, t.id);
+    await completeTask(ctx, t.id);
+    expect(await successors("Take vitamins")).toHaveLength(1);
+  });
+});
+
 describe("accountability", () => {
   it("scores only what was recorded, excuses rest and real blockers, and asks about avoidance", async () => {
     const day = DateTime.now().setZone(zone).minus({ days: 3 }).startOf("day");

@@ -2,7 +2,7 @@ import "server-only";
 import { DateTime } from "luxon";
 import type { Ctx } from "@/server/context";
 import type { Task } from "@/lib/types";
-import { createEntity, getEntity, updateEntity } from "./entities";
+import { createEntity, getEntity, updateEntity, type UpdateResult } from "./entities";
 import { logActivity } from "./activity";
 import { TaskCreate, TaskUpdate, compact } from "./schemas";
 
@@ -18,10 +18,15 @@ export async function updateTask(ctx: Ctx, id: string, input: TaskUpdate) {
   return updateEntity<Task>(ctx, "tasks", id, patch);
 }
 
-/** Completing a recurring task spawns its next occurrence. */
+/**
+ * Completing a recurring task spawns its next occurrence: the first one after
+ * now (so finishing late doesn't leave a backlog of overdue copies), at the
+ * same local time. Finishing an already-done task changes nothing.
+ */
 export async function completeTask(ctx: Ctx, id: string, actualMinutes?: number | null) {
   if (ctx.actor === "navi") throw new Error("Only you can mark a task done.");
   const task = await getEntity<Task>(ctx, "tasks", id);
+  if (task.status === "done") return { kind: "updated", row: task } satisfies UpdateResult<Task>;
   const patch: Record<string, unknown> = { status: "done", completed_at: new Date().toISOString() };
   if (actualMinutes != null) patch.actual_minutes = Math.max(task.actual_minutes, actualMinutes);
   const result = await updateEntity<Task>(ctx, "tasks", id, patch, { summary: `Completed “${task.title}”` });
@@ -29,13 +34,16 @@ export async function completeTask(ctx: Ctx, id: string, actualMinutes?: number 
   if (task.recurrence) {
     const { data: profile } = await ctx.db.from("profiles").select("timezone").eq("id", ctx.userId).single();
     const zone = profile?.timezone ?? "UTC";
-    const base = task.due_at ? DateTime.fromISO(task.due_at).setZone(zone) : DateTime.now().setZone(zone).endOf("day");
-    let next = base.plus({ days: 1 });
-    if (task.recurrence.freq === "weekly" && task.recurrence.days?.length) {
-      for (let i = 0; i < 8 && !task.recurrence.days.includes(next.weekday % 7); i++) next = next.plus({ days: 1 });
-    } else if (task.recurrence.freq === "weekly") {
-      next = base.plus({ weeks: 1 });
-    }
+    const now = DateTime.now().setZone(zone);
+    const rule = task.recurrence;
+    const advance = (d: DateTime) => {
+      if (rule.freq === "weekly" && !rule.days?.length) return d.plus({ weeks: 1 });
+      let n = d.plus({ days: 1 });
+      if (rule.freq === "weekly") for (let i = 0; i < 7 && !rule.days!.includes(n.weekday % 7); i++) n = n.plus({ days: 1 });
+      return n;
+    };
+    let next = advance(task.due_at ? DateTime.fromISO(task.due_at).setZone(zone) : now.endOf("day"));
+    for (let i = 0; i < 1000 && next <= now; i++) next = advance(next);
     await createEntity(ctx, "tasks", {
       title: task.title,
       notes: task.notes,
