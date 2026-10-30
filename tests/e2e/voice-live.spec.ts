@@ -21,7 +21,10 @@ test("voice streams the mic, runs tools for real, plays replies and saves the tu
   // Session start: what /api/voice/session returns once a Gemini key is
   // configured, pointing at the chat conversation that text and voice share.
   let conversationId = "";
+  const resumeHandles: (string | null)[] = [];
   await page.route("**/api/voice/session", async (route) => {
+    const req = route.request().postDataJSON() as { probe?: boolean; resumeHandle?: string | null };
+    if (!req.probe) resumeHandles.push(req.resumeHandle ?? null);
     const { data: conv } = await admin.from("conversations").select("id").eq("user_id", userId).eq("kind", "chat").single();
     conversationId = conv!.id as string;
     await route.fulfill({ json: { ok: true, token: "auth_tokens/test-token", model: "gemini-3.8-live", config: { responseModalities: ["AUDIO"] }, conversationId } });
@@ -34,7 +37,10 @@ test("voice streams the mic, runs tools for real, plays replies and saves the tu
   await page.routeWebSocket(/generativelanguage\.googleapis\.com/, (ws) => {
     socket = ws;
     seen.sockets++;
-    ws.onClose(() => (seen.closed = true));
+    const mine = seen.sockets;
+    ws.onClose(() => {
+      if (mine === seen.sockets) seen.closed = true; // only the current socket counts
+    });
     expect(ws.url()).toContain("BidiGenerateContentConstrained?access_token=auth_tokens/test-token");
     ws.onMessage((raw) => {
       const msg = JSON.parse(String(raw));
@@ -105,6 +111,15 @@ test("voice streams the mic, runs tools for real, plays replies and saves the tu
 
   // One session the whole time: saving a turn must not hang up.
   expect(seen).toMatchObject({ sockets: 1, closed: false });
+
+  // The service's session limit: it offers a resumption handle, then says it's
+  // going away. Navi reconnects by itself, resuming the same conversation.
+  send({ sessionResumptionUpdate: { resumable: true, newHandle: "resume-handle-1" } });
+  send({ goAway: { timeLeft: "5s" } });
+  await expect.poll(() => seen.sockets, { timeout: 15_000 }).toBe(2);
+  expect(resumeHandles).toEqual([null, "resume-handle-1"]);
+  seen.closed = false;
+  await expect(status).toContainText("Listening");
 
   // Back to text: ending voice hangs up, and the voice turn is in the chat history.
   await voice.getByRole("button", { name: "End voice" }).click();
