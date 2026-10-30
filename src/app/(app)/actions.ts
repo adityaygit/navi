@@ -200,7 +200,8 @@ export async function adoptBrowserTimezoneAction(zone: string) {
 }
 export async function approveBudgetOverrideAction(extraUsd: number) {
   return act(async (ctx) => {
-    await approveBudgetOverride(ctx.userId, extraUsd);
+    const { data } = await ctx.db.auth.getClaims();
+    await approveBudgetOverride(ctx.userId, data?.claims?.email as string | undefined, extraUsd);
     await logActivity(ctx, { action: "budget_override", summary: `Approved +$${extraUsd.toFixed(2)} AI testing budget for today` });
   }, "Override approved for today");
 }

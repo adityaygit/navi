@@ -97,6 +97,7 @@ Import the repo and set the environment variables from `.env.example`:
 | `NAVI_AI_PROVIDER` | `anthropic` in production |
 | `NAVI_MODEL_*` | Model roles; defaults are in `.env.example` |
 | `NAVI_DAILY_BUDGET_USD` | Aggregate daily AI cap (default 2) |
+| `NAVI_ADMIN_EMAILS` | Your sign-in email(s). Only these accounts can approve a one-day budget override; if empty, nobody can in production |
 | `CRON_SECRET` | Long random string shared with the scheduler |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web push. Generate with `npx web-push generate-vapid-keys` |
 
@@ -133,8 +134,8 @@ curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://<app>/api/cron/tick
 
 The app enforces `NAVI_DAILY_BUDGET_USD` across all users (default $2 per day,
 resetting at midnight in `NAVI_BUDGET_TIMEZONE`). It warns at 75%, then stops
-new AI calls, both text and voice, until the user approves a one-day override
-in Settings. Cost is estimated from token and audio-minute prices in
+new AI calls, both text and voice, until the budget owner (`NAVI_ADMIN_EMAILS`) approves a
+one-day override in Settings. Cost is estimated from token and audio-minute prices in
 `src/server/ai/config.ts`. Treat it as a guard, not billing. Also set hard
 spend limits in the Anthropic Console and Google AI Studio so a bug can't
 exceed them.

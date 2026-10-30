@@ -125,7 +125,19 @@ export async function recordUsage(entry: {
 }
 
 /** Owner-approved extra spend for today only (max $20). */
-export async function approveBudgetOverride(userId: string, extraUsd: number) {
+/**
+ * The cap is shared by every user, so only the budget owner may raise it:
+ * accounts listed in NAVI_ADMIN_EMAILS. With no list, development allows
+ * anyone (single local user) and production allows no one.
+ */
+export function canApproveBudgetOverride(email: string | null | undefined): boolean {
+  const admins = serverEnv.adminEmails();
+  if (admins.length === 0) return process.env.NODE_ENV !== "production";
+  return !!email && admins.includes(email.toLowerCase());
+}
+
+export async function approveBudgetOverride(userId: string, email: string | null | undefined, extraUsd: number) {
+  if (!canApproveBudgetOverride(email)) throw new Error("Only the budget owner can raise the daily AI budget (set NAVI_ADMIN_EMAILS).");
   if (!(extraUsd > 0 && extraUsd <= 20)) throw new Error("Override must be between $0 and $20");
   const admin = createSupabaseAdmin();
   const { error } = await admin

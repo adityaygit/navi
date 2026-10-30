@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireCtx, getProfile } from "@/server/context";
-import { getBudgetStatus } from "@/server/ai/budget";
+import { canApproveBudgetOverride, getBudgetStatus } from "@/server/ai/budget";
 import { aiAvailability, modelFor, voiceAvailability } from "@/server/ai/config";
 import { serverEnv } from "@/lib/env";
 import { integrations } from "@/server/integrations";
@@ -75,7 +75,11 @@ export default async function SettingsPage() {
             Costs are estimated locally from each provider response's token/audio counts at published prices, and can lag or differ from your actual bill. Navi warns at {Math.round(serverEnv.budgetWarnRatio() * 100)}% and stops new AI calls at the cap. This guard can't absolutely prevent charges: also set spend limits in the Anthropic Console and Google AI Studio / Cloud billing.
           </p>
         </div>
-        <BudgetOverride exceeded={budget.exceeded} />
+        {canApproveBudgetOverride(email) ? (
+          <BudgetOverride exceeded={budget.exceeded} />
+        ) : (
+          <p className="muted text-xs">The daily budget is shared by everyone on this Navi. Only the budget owner can raise it.</p>
+        )}
         <details>
           <summary className="cursor-pointer text-sm font-medium">Your recent AI calls</summary>
           <ul className="muted mt-2 text-xs">

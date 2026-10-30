@@ -37,6 +37,8 @@ export const serverEnv = {
   refusalFallbacks: () => (process.env.NAVI_REFUSAL_FALLBACKS ?? "default") !== "off",
   dailyBudgetUsd: () => Number(process.env.NAVI_DAILY_BUDGET_USD ?? "2") || 2,
   budgetWarnRatio: () => Number(process.env.NAVI_BUDGET_WARN_RATIO ?? "0.75") || 0.75,
+  /** Who may raise the shared daily AI budget. Empty in production means nobody. */
+  adminEmails: () => (process.env.NAVI_ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean),
   budgetTimezone: () => process.env.NAVI_BUDGET_TIMEZONE || "UTC",
   cronSecret: () => process.env.CRON_SECRET || null,
   vapidPrivateKey: () => process.env.VAPID_PRIVATE_KEY || null,
