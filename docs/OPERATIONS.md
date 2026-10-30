@@ -98,8 +98,13 @@ A personal access token is not a project key: in the app's
 
 Steps (each is a change to the hosted project; do them deliberately, once):
 
-1. Apply the schema. Both migrations are required:
-   `20261030000001_core_schema.sql` and `20261031000001_replace_day_plan.sql`.
+1. Apply the schema. All migrations in `supabase/migrations` are required, in
+   order. `20261101000001_api_privileges.sql` matters on hosted: newer
+   Supabase projects don't give the API roles access to new tables, so without
+   it even the secret key gets "permission denied". If you apply them through
+   the Management API or MCP, the recorded versions are the apply time; set
+   them back to the file versions in `supabase_migrations.schema_migrations`
+   so `supabase db push` doesn't re-run them.
    ```bash
    npx supabase link --project-ref gxfkumxjeemceoygtuod   # uses SUPABASE_ACCESS_TOKEN; asks for the DB password
    npx supabase db push                                   # applies supabase/migrations/*
@@ -203,8 +208,16 @@ In the Trigger.dev project, set `NAVI_APP_URL` (the app origin) and
 `CRON_SECRET`. The `navi-tick` task runs every 10 minutes.
 
 Any other scheduler that can send an authenticated POST every 5 to 15 minutes
-works too. Vercel Cron on the Hobby plan runs at most daily, so it can't
-deliver local-time briefings on its own.
+works too.
+
+**Current fallback: Vercel Cron.** `vercel.json` defines 24 daily cron jobs
+on `/api/cron/tick`, one per UTC hour. Hobby allows 100 jobs per project, each
+at most once a day and fired anywhere within its hour, so this gives roughly
+hourly ticks: briefings arrive within about two hours of 06:00/21:00, but
+"due in 2 hours" reminders can be up to an hour late. Vercel sends
+`Authorization: Bearer $CRON_SECRET` automatically. Once Trigger.dev is
+deployed (needs a personal access token `tr_pat_…` for `deploy`, a project ref,
+and a production secret key), remove the `crons` from `vercel.json`.
 
 Manual check:
 

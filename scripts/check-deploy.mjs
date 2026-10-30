@@ -79,7 +79,8 @@ async function checkDatabase() {
   const db = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
   const missing = [];
   for (const t of migrationTables()) {
-    const { error } = await db.from(t).select("*", { head: true, count: "exact" }).limit(1);
+    // Not a HEAD request: hosted PostgREST answers HEAD for a missing table with 204 and no error.
+    const { error } = await db.from(t).select("*").limit(0);
     if (error) missing.push(t);
   }
   check(!missing.length, "database schema", "all tables from migrations present", `not reachable or missing: ${missing.join(", ")} (run supabase db push)`);
