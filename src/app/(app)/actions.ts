@@ -55,7 +55,13 @@ export async function createTaskAction(input: unknown) {
   return act((ctx) => createTask(ctx, TaskCreate.parse(input)), "Task added");
 }
 export async function updateTaskAction(id: string, input: unknown) {
-  return act((ctx) => updateTask(ctx, id, TaskUpdate.parse(input)), "Saved");
+  return act(async (ctx) => {
+    const { status, ...rest } = TaskUpdate.parse(input);
+    const r = await updateTask(ctx, id, status === "done" ? rest : { ...rest, ...(status ? { status } : {}) });
+    // Completion goes through completeTask so recurring tasks spawn their next occurrence.
+    if (status === "done") return completeTask(ctx, id);
+    return r;
+  }, "Saved");
 }
 export async function completeTaskAction(id: string, actualMinutes?: number | null) {
   return act((ctx) => completeTask(ctx, id, actualMinutes), "Done");

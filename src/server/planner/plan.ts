@@ -15,10 +15,10 @@ const KEEP_STATUSES = ["in_progress", "done", "partial", "skipped", "missed", "r
 
 async function loadInputs(ctx: Ctx) {
   const [tasks, events, routines, done] = await Promise.all([
-    ctx.db.from("tasks").select("*").in("status", ["todo", "in_progress"]),
-    ctx.db.from("events").select("*").neq("status", "cancelled"),
-    ctx.db.from("routines").select("*").eq("active", true),
-    ctx.db.from("tasks").select("estimate_minutes,actual_minutes").eq("status", "done").not("estimate_minutes", "is", null).gt("actual_minutes", 0).order("completed_at", { ascending: false }).limit(40),
+    ctx.db.from("tasks").select("*").eq("user_id", ctx.userId).in("status", ["todo", "in_progress"]),
+    ctx.db.from("events").select("*").eq("user_id", ctx.userId).neq("status", "cancelled"),
+    ctx.db.from("routines").select("*").eq("user_id", ctx.userId).eq("active", true),
+    ctx.db.from("tasks").select("estimate_minutes,actual_minutes").eq("user_id", ctx.userId).eq("status", "done").not("estimate_minutes", "is", null).gt("actual_minutes", 0).order("completed_at", { ascending: false }).limit(40),
   ]);
   return {
     tasks: (tasks.data ?? []) as Task[],
@@ -37,7 +37,7 @@ export async function generateDayPlan(ctx: Ctx, date?: string, opts: { from?: Da
   const day = date ?? nowIn(zone).toISODate()!;
   const { tasks, events, routines, estimate } = await loadInputs(ctx);
 
-  const { data: existing } = await ctx.db.from("plan_blocks").select("*").eq("plan_date", day);
+  const { data: existing } = await ctx.db.from("plan_blocks").select("*").eq("user_id", ctx.userId).eq("plan_date", day);
   const existingBlocks = (existing ?? []) as PlanBlock[];
   const kept = existingBlocks.filter((b) => !b.is_flexible || b.created_by === "user" || KEEP_STATUSES.includes(b.status));
   const replaceable = existingBlocks.filter((b) => !kept.includes(b));
@@ -74,7 +74,7 @@ export async function generateDayPlan(ctx: Ctx, date?: string, opts: { from?: Da
   });
 
   if (replaceable.length) {
-    await ctx.db.from("plan_blocks").delete().in("id", replaceable.map((b) => b.id));
+    await ctx.db.from("plan_blocks").delete().eq("user_id", ctx.userId).in("id", replaceable.map((b) => b.id));
   }
   if (out.blocks.length) {
     const { error } = await ctx.db.from("plan_blocks").insert(
@@ -128,9 +128,9 @@ export async function setBlockOutcome(
   if (status === "done" && ctx.actor === "navi") {
     throw new Error("Navi can't mark scheduled work as completed; only you can.");
   }
-  const { data: block } = await ctx.db.from("plan_blocks").select("*").eq("id", blockId).single();
+  const { data: block } = await ctx.db.from("plan_blocks").select("*").eq("user_id", ctx.userId).eq("id", blockId).single();
   if (!block) throw new Error("Block not found");
-  const { error } = await ctx.db.from("plan_blocks").update({ status, outcome_reason: reason ?? null }).eq("id", blockId);
+  const { error } = await ctx.db.from("plan_blocks").update({ status, outcome_reason: reason ?? null }).eq("user_id", ctx.userId).eq("id", blockId);
   if (error) throw new Error(error.message);
   await logActivity(ctx, {
     action: "block_outcome",
@@ -166,7 +166,7 @@ export async function recoverPlan(
   const affected = ((blocks ?? []) as PlanBlock[]).filter((b) => b.is_flexible && DateTime.fromISO(b.starts_at) < from);
   const outcome = input.category === "rest" ? "rest" : "interrupted";
   for (const b of affected) {
-    await ctx.db.from("plan_blocks").update({ status: outcome, outcome_reason: input.description.slice(0, 300) }).eq("id", b.id);
+    await ctx.db.from("plan_blocks").update({ status: outcome, outcome_reason: input.description.slice(0, 300) }).eq("user_id", ctx.userId).eq("id", b.id);
   }
   const plan = await generateDayPlan(ctx, today, { from, reasonPrefix: "Replanned" });
   const summary = `${affected.length} block${affected.length === 1 ? "" : "s"} marked ${outcome}; ${plan.blocks.length} re-planned from ${from.toFormat("h:mm a")}${plan.unscheduled.length ? `; ${plan.unscheduled.length} task${plan.unscheduled.length === 1 ? "" : "s"} carried to later days` : ""}.`;
