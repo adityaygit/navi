@@ -18,26 +18,29 @@
 | Email auth (magic link + password) | verified (password) | e2e signs in via password (auto sign-up for invited emails). Magic link implemented; email delivery not exercised in tests. |
 | Google sign-in | blocked | Needs Google OAuth client + provider enabled in a Supabase project. Button hidden unless `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true`. |
 | Domain layer (entities, activity log + revert, approvals, proposals, memory, tasks, focus) | verified | flows.test: approval boundary (hard-deadline move + delete → approval, duplicate request reused, executes exactly once), Navi cannot mark work done. |
-| Conversational onboarding → reviewed setup → activation | verified (simulator) | flows.test + e2e (desktop & iPhone): greeting → questions → proposals (workspaces/events/tasks/preferences labelled inferred vs stated) → nothing active until approved → partial approve leaves rest in review → week plan generated. Real-model behaviour unverified (no key). |
+| Conversational onboarding → reviewed setup → activation | verified (simulator) | flows.test + e2e (desktop & iPhone): greeting → questions → proposals for areas, goals, projects (linked to areas/goals), fixed commitments, routines, tasks and preferences, each labelled stated vs inferred with source quote → nothing active until approved → partial approve leaves rest in review → week plan generated. Real-model behaviour unverified (no key). |
 | Text + voice share one onboarding history | verified (domain) | flows.test "shares one history between text and voice turns". |
-| Capture → review inbox → task | verified | flows.test (idempotent on client_id, raw words kept, nothing created until accept, edit-on-accept) + e2e quick capture → inbox → accept → /tasks. |
+| Capture → review inbox → task | verified | flows.test (idempotent on client_id, raw words kept, nothing created until accept, edit-on-accept) + e2e quick capture → inbox → accept → /tasks. Voice capture: "Dictate" in quick capture (browser speech recognition) saves `source=voice`; e2e with a stubbed recognizer. |
 | Offline capture queue + sync | verified (browser) | e2e: offline capture shows "Saved offline"/"Waiting to sync (1)", syncs after reconnect, appears in inbox. |
-| Planner (day/week, fixed vs flexible, DST) + recovery | verified | 10 scheduler unit tests incl. DST; flows.test recovery keeps unfinished work + records disruption; e2e "plan my day" via chat. |
-| Today / Chat / Planner / Tasks / Projects & Goals / Insights / Memory / Activity / Settings / More | implemented; core pages browser-tested | e2e covers Today, Onboarding, Inbox, Tasks, Projects, Planner, Chat. Memory/Activity/Insights/Settings render in prod build but have no dedicated e2e yet. |
-| Briefings 06:00/21:00, weekly review, deadline reminders, tick job | verified (local) | flows.test briefing once per local day. Manual: `/api/cron/tick` 401 without/with wrong secret; user at local 06:2x got exactly one morning briefing, second tick no-op; quiet hours 05–08 held the notification until 08:00 local. |
+| Planner (day/week, fixed vs flexible, DST) + recovery | verified | 10 scheduler unit tests incl. DST; flows.test recovery keeps unfinished work + records disruption; finishing/cancelling/deleting a task settles its open blocks (flows.test); e2e "plan my day" via chat, focus → finish, "My plan broke" dialog. |
+| Today / Chat / Planner / Tasks / Projects & Goals / Insights / Memory / Activity / Settings / More | verified (browser) | core.spec + manage.spec (desktop & iPhone): Today, Onboarding, Inbox, Tasks, Projects, Planner, Chat, focus, recovery, Memory add/correct/delete, Activity approve → executed, Settings save. a11y.spec: axe WCAG 2.1 A/AA clean on all pages + login, onboarding, capture dialog, light and dark. |
+| Persistent memory with provenance | verified | Memory UI e2e; flows.test: a project's memory is recalled in a brand-new conversation when the project is mentioned; rejected memories are not. |
+| Strict-but-fair accountability | verified | flows.test pins scoring: rest/interruptions/missing-info excluded, partial = half credit, unmarked counted and flagged, avoidance question asked. Only Navi-proof: Navi can't mark work done. |
+| Briefings 06:00/21:00, weekly review, deadline reminders, tick job | verified (local) | Unit: briefing windows across both US DST transitions, +05:30 zone, 3h catch-up, weekly day, custom times, disabled. flows.test: one briefing per local day; reminders held by quiet hours, dropped if they'd arrive after the deadline. Manual: `/api/cron/tick` 401 without/with wrong secret; second tick no-op. |
 | Web push | implemented | VAPID local keys; subscribe/unsubscribe/test routes; notifications recorded `no_subscription` honestly when no device subscribed. Real delivery to a device unverified. |
 | PWA manifest, service worker, icons | implemented | Prod build serves manifest/sw.js; offline page. Home-screen install on a real iPhone unverified. |
 | Real-time voice (Gemini Live) | implemented, **not delivered** | Ephemeral-token session, shared tools, transcripts saved to the same conversation. No `GEMINI_API_KEY` → never connected to Gemini. e2e verifies the honest fallback ("Real-time voice isn't available … Using basic voice") and that the mic stays off until tapped. Keep open until tested with a key on a device. |
-| AI runtime (roles, pricing, $2/day guard, shared tools, agent loop) | implemented; guard verified | flows.test "stops new AI calls at the daily cap". No `ANTHROPIC_API_KEY` → real model calls unverified. Dev simulator labelled, refused in prod unless `NAVI_ALLOW_DEVSIM=true`. |
+| AI runtime (roles, pricing, $2/day guard, shared tools, agent loop) | implemented; guard verified | flows.test "stops new AI calls at the daily cap"; only `NAVI_ADMIN_EMAILS` can approve an override (unit test; nobody in production if unset). No `ANTHROPIC_API_KEY` → real model calls unverified. Dev simulator labelled, refused in prod unless `NAVI_ALLOW_DEVSIM=true`. |
+| Secret protection / access control | verified (local) | No server secret in `.next/static` (checked service key, VAPID private key, cron secret); only `.env.example` tracked; every private API route returns 401 signed out; pages redirect to /login; X-Frame-Options DENY, nosniff, referrer policy, permissions policy (mic self only). No CSP yet. |
 | Build / typecheck / lint | verified | `npx tsc --noEmit`, `npm run lint`, `npm run build` clean (2026-10-30). |
 | Deployment (Vercel) / Trigger.dev | blocked | No Vercel/Trigger.dev credentials in the cloud env. Steps in `docs/OPERATIONS.md`. |
 | Physical iPhone verification | blocked | Needs owner device (install, push, mic). Emulated iPhone 13 viewport passes e2e. |
 | Calendar/Gmail/Drive/GitHub integrations | not started (out of V1 core) | Shown as "not connected"; external approvals fail honestly ("isn't connected"). |
 
 ## Test commands & latest results (2026-10-30)
-- `npx vitest run` → 4 files, 31 tests passed (unit + integration; needs local Supabase).
-- `npx next build && NAVI_ALLOW_DEVSIM=true npx next start -p 3000` then `E2E_BASE_URL=http://localhost:3000 npx playwright test` → desktop + iPhone 13: onboarding→plan→capture→inbox→task, offline capture sync, voice fallback all passed (6 tests).
-- e2e deletes/recreates seeded `dev@`/`alice@` users; all suites use password `test-password-123`.
+- `npx vitest run` → 6 files, 46 tests passed (unit + integration; needs local Supabase).
+- `npx next build && NAVI_ALLOW_DEVSIM=true npx next start -p 3000` then `E2E_BASE_URL=http://localhost:3000 npx playwright test` → desktop + iPhone 13, 14 tests: core.spec (onboarding→plan→capture→inbox→task, offline sync, voice fallback, dictated capture), manage.spec (focus, recovery, memory, approvals, settings), a11y.spec (axe, light + dark).
+- e2e deletes/recreates seeded `dev@`/`alice@` and its own `e2e-*`/`a11y-*@navi.test` users (added to the local allowlist by the tests); all use password `test-password-123`. Each test can run alone.
 - Screenshots land in `test-results/` (gitignored).
 
 ## Key decisions
@@ -57,6 +60,8 @@
 - `pkill -f "next start"` can kill the calling shell; use `fuser -k 3000/tcp`.
 - In dev mode, wait for `networkidle` before `context.setOffline(true)` or hydration chunks never load.
 - `scrollIntoView` returns a Promise in new Chromium; a concise-arrow effect returning it crashes React cleanup.
+- supabase-js bulk insert with rows that omit different keys sends NULL for the missing ones (column defaults don't apply) → insert rows separately in tests.
+- This Chromium ships an unprefixed `SpeechRecognition`; test stubs must replace both names.
 
 ## Local dev quickstart
 ```
@@ -68,7 +73,7 @@ npm run dev
 Seeded allowlist (local only): dev@navi.test, alice@navi.test, bob@navi.test.
 
 ## Commits
-`e400992` handoff docs · `05863b4` scaffold/schema/planner · `095bcc9` AI runtime/capture/auth/shell · `9207241` Today/onboarding/inbox/chat/planner · `361078b` tasks/projects/insights/briefings/tick/push · `92df02a` memory/activity/settings/PWA/voice · `5286be2` build fixes + RLS/flow tests · `967df64` ActionButton refactor + e2e suite · `8d28b26` availability parsing, capture FAB, e2e fixes · (next) ops guide, invite script, voice fallback e2e
+`e400992` handoff docs · `05863b4` scaffold/schema/planner · `095bcc9` AI runtime/capture/auth/shell · `9207241` Today/onboarding/inbox/chat/planner · `361078b` tasks/projects/insights/briefings/tick/push · `92df02a` memory/activity/settings/PWA/voice · `5286be2` build fixes + RLS/flow tests · `967df64` ActionButton refactor + e2e suite · `8d28b26` availability parsing, capture FAB, e2e fixes · `7d4e8f2` ops guide, invite script, voice fallback e2e · `dfea149` settle blocks on task finish/cancel/delete + manage e2e · `0016554` axe a11y + contrast · `6e128d7` owner-only budget override · `ef7992b` goals/projects/routines in setup · `c228123` dictated capture · `157b180` project memory recall · `e5b03bb` accountability tests · `95df9ca` reminder expiry · (next) briefing DST tests + this record
 
 ## True blockers (owner action needed)
 1. `ANTHROPIC_API_KEY` (and provider spend limit) to verify real chat/onboarding/capture/planning.
@@ -78,7 +83,7 @@ Seeded allowlist (local only): dev@navi.test, alice@navi.test, bob@navi.test.
 5. A physical iPhone for install, push and mic testing.
 
 ## Exact next action
-1. e2e coverage for Memory (edit/forget), Activity (approve/reject approval, revert), Settings (schedule save, budget override), Focus start/stop, "My plan broke" from Today.
-2. Accessibility pass (axe via Playwright) on core pages; fix violations.
-3. Weekly review UI polish + Insights checks; restrict budget override to an admin list (`NAVI_ADMIN_EMAILS`).
+1. Content-Security-Policy (nonce-based, compatible with Next inline scripts, Supabase, Gemini WebSocket) and verify app still works in e2e.
+2. Planner week view e2e (add a fixed commitment from /planner, drag/skip flows) and Projects detail page e2e (milestones, goal links).
+3. Push: e2e for the subscribe flow with a stubbed PushManager; verify sw.js notificationclick routing.
 4. When keys arrive: write and run a real-model smoke test against Anthropic/Gemini within the $2/day guard and record results here.
