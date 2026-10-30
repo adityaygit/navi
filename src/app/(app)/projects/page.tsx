@@ -58,7 +58,7 @@ export default async function ProjectsPage() {
                   <Link href={`/tasks?workspace=${w.id}`} className="font-medium hover:underline">{w.name}</Link>
                   {w.description && <span className="muted text-xs">{w.description}</span>}
                   <span className="muted text-xs">{projects.filter((x) => x.workspace_id === w.id && x.status === "active").length} active projects · {p.total - p.done} open tasks</span>
-                  <ActionButton className="btn btn-ghost btn-sm self-start" confirm={`Archive “${w.name}”? Its items stay but the area is hidden.`} action={() => updateItemAction("workspaces", w.id, { status: "archived" })}>Archive</ActionButton>
+                  <ActionButton className="btn btn-ghost btn-sm self-start" confirm={`Archive “${w.name}”? Its items stay but the area is hidden.`} action={updateItemAction} args={["workspaces", w.id, { status: "archived" }]}>Archive</ActionButton>
                 </li>
               );
             })}
@@ -90,12 +90,12 @@ export default async function ProjectsPage() {
                   <div className="flex flex-wrap gap-1">
                     {g.status === "active" ? (
                       <>
-                        <ActionButton action={() => updateItemAction("goals", g.id, { status: "achieved" })}>Mark achieved</ActionButton>
-                        <ActionButton action={() => updateItemAction("goals", g.id, { status: "paused" })}>Pause</ActionButton>
-                        <ActionButton className="btn btn-ghost btn-sm" confirm="Drop this goal?" action={() => updateItemAction("goals", g.id, { status: "dropped" })}>Drop</ActionButton>
+                        <ActionButton action={updateItemAction} args={["goals", g.id, { status: "achieved" }]}>Mark achieved</ActionButton>
+                        <ActionButton action={updateItemAction} args={["goals", g.id, { status: "paused" }]}>Pause</ActionButton>
+                        <ActionButton className="btn btn-ghost btn-sm" confirm="Drop this goal?" action={updateItemAction} args={["goals", g.id, { status: "dropped" }]}>Drop</ActionButton>
                       </>
                     ) : (
-                      <ActionButton action={() => updateItemAction("goals", g.id, { status: "active" })}>Reactivate</ActionButton>
+                      <ActionButton action={updateItemAction} args={["goals", g.id, { status: "active" }]}>Reactivate</ActionButton>
                     )}
                     <CreateItem kind="milestones" {...opts} parent={{ goal_id: g.id }} label="+ Milestone" />
                   </div>

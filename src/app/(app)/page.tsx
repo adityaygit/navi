@@ -59,7 +59,7 @@ export default async function TodayPage() {
           <p className="muted">{formatDay(today, zone)}</p>
         </div>
         <div className="ml-auto flex flex-wrap gap-2">
-          <ActionButton className="btn" action={() => planDayAction()}>Re-plan today</ActionButton>
+          <ActionButton className="btn" action={planDayAction}>Re-plan today</ActionButton>
           <RecoveryButton />
         </div>
       </header>
@@ -81,7 +81,7 @@ export default async function TodayPage() {
           </div>
           <p className="mt-2 whitespace-pre-wrap text-sm">{briefing.body}</p>
           <div className="mt-3 flex gap-2">
-            <ActionButton action={() => markBriefingReadAction(briefing.id)}>Got it</ActionButton>
+            <ActionButton action={markBriefingReadAction} args={[briefing.id]}>Got it</ActionButton>
             <Link href="/insights" className="btn btn-sm btn-ghost">All reviews</Link>
           </div>
         </section>
@@ -137,8 +137,8 @@ export default async function TodayPage() {
                       {overdue ? "overdue · " : ""}due {formatDue(t.due_at!, zone)}{t.due_is_hard ? " (hard)" : ""}
                     </span>
                   </span>
-                  {!focus && <ActionButton action={() => startFocusAction({ task_id: t.id, planned_minutes: t.estimate_minutes })}>Focus</ActionButton>}
-                  <ActionButton action={() => completeTaskAction(t.id)}>Done</ActionButton>
+                  {!focus && <ActionButton action={startFocusAction} args={[{ task_id: t.id, planned_minutes: t.estimate_minutes }]}>Focus</ActionButton>}
+                  <ActionButton action={completeTaskAction} args={[t.id]}>Done</ActionButton>
                 </li>
               );
             })}

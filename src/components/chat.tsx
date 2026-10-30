@@ -42,7 +42,10 @@ export function Chat({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     try { setText(localStorage.getItem(draftKey) ?? ""); } catch {}
   }, [draftKey]);
-  useEffect(() => endRef.current?.scrollIntoView({ block: "end" }), [messages.length]);
+  useEffect(() => {
+    // Braces matter: scrollIntoView returns a Promise in newer browsers, which must not be returned as a cleanup.
+    endRef.current?.scrollIntoView({ block: "end" });
+  }, [messages.length]);
 
   function setDraft(v: string) {
     setText(v);

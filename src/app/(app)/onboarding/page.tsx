@@ -36,9 +36,9 @@ export default async function OnboardingPage() {
         </div>
         <div className="ml-auto flex gap-2">
           {finished ? (
-            <ActionButton className="btn btn-sm" action={() => restartOnboardingAction()}>Continue setup conversation</ActionButton>
+            <ActionButton className="btn btn-sm" action={restartOnboardingAction}>Continue setup conversation</ActionButton>
           ) : (
-            <ActionButton className="btn btn-ghost btn-sm" confirm="Skip setup? You can come back to it from Settings." action={async () => { const r = await skipOnboardingAction(); return r; }}>
+            <ActionButton className="btn btn-ghost btn-sm" confirm="Skip setup? You can come back to it from Settings." action={skipOnboardingAction}>
               Skip for now
             </ActionButton>
           )}

@@ -107,6 +107,10 @@ export const TOOLS = [
       "Put NEW items you inferred from what the user said into their review inbox (they become real only when the user accepts them). Use this for anything from brain dumps, casual mentions, or onboarding. Preserve the user's words in source_excerpt and be honest about origin and confidence.",
     schema: z.object({ items: z.array(ProposalItem).min(1).max(40), batch: z.enum(["onboarding", "capture"]).nullish() }),
     run: async (ctx, { items, batch }) => {
+      if (batch === "onboarding") {
+        // A new onboarding draft replaces the previous unreviewed one instead of duplicating it.
+        await ctx.db.from("proposals").delete().eq("user_id", ctx.userId).eq("batch", "onboarding").eq("status", "pending");
+      }
       const created = await createProposals(ctx, items.map((i) => ({ ...i, payload: i.payload as Record<string, unknown> })), {
         conversationId: ctx.conversationId ?? null,
         captureId: ctx.captureId ?? null,

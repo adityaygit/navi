@@ -5,14 +5,18 @@ import { announceChange } from "@/lib/offline-queue";
 type Result = { ok: true; message?: string } | { ok: false; error: string };
 
 /** Button that runs a server action, shows progress and surfaces errors. */
-export function ActionButton({
+export function ActionButton<A extends unknown[]>({
   action,
+  args,
   children,
   className = "btn btn-sm",
   confirm,
   label,
 }: {
-  action: () => Promise<Result | unknown>;
+  /** A server action (or, in client components, any async function). */
+  action: (...args: A) => Promise<Result | unknown>;
+  /** Arguments for the action. Must be serializable when used from a server component. */
+  args?: A;
   children: React.ReactNode;
   className?: string;
   confirm?: string;
@@ -31,7 +35,7 @@ export function ActionButton({
           if (confirm && !window.confirm(confirm)) return;
           setError(null);
           start(async () => {
-            const r = (await action()) as Result;
+            const r = (await action(...((args ?? []) as A))) as Result;
             if (r && "ok" in r && !r.ok) setError(r.error);
             else announceChange();
           });

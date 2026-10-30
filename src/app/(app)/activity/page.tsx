@@ -36,8 +36,8 @@ export default async function ActivityPage() {
             <details className="text-xs"><summary className="muted cursor-pointer">Exactly what will happen</summary><pre className="mt-1 overflow-x-auto whitespace-pre-wrap rounded bg-surface-2 p-2">{a.action_type}{"\n"}{JSON.stringify(a.details, null, 2)}</pre></details>
             {a.action_type.startsWith("external.") && <p className="notice notice-warn text-xs">This affects an outside service. It only runs if that service is connected, and Navi will report the real result.</p>}
             <div className="flex gap-2">
-              <ActionButton className="btn btn-primary btn-sm" action={() => decideApprovalAction(a.id, "approve")}>Approve</ActionButton>
-              <ActionButton className="btn btn-sm" action={() => decideApprovalAction(a.id, "reject")}>Reject</ActionButton>
+              <ActionButton className="btn btn-primary btn-sm" action={decideApprovalAction} args={[a.id, "approve"]}>Approve</ActionButton>
+              <ActionButton className="btn btn-sm" action={decideApprovalAction} args={[a.id, "reject"]}>Reject</ActionButton>
             </div>
             <span className="muted text-xs">Requested {fmt(a.created_at)}</span>
           </article>
@@ -70,7 +70,7 @@ export default async function ActivityPage() {
                 <span className={`min-w-0 flex-1 ${e.reverted_at ? "muted line-through" : ""}`}>{e.summary}</span>
                 <span className="muted text-xs">{fmt(e.created_at)}</span>
                 {e.reversible && !e.reverted_at && (
-                  <ActionButton className="btn btn-ghost btn-sm" confirm={`Undo: ${e.summary}?`} action={() => revertActivityAction(e.id)}>Undo</ActionButton>
+                  <ActionButton className="btn btn-ghost btn-sm" confirm={`Undo: ${e.summary}?`} action={revertActivityAction} args={[e.id]}>Undo</ActionButton>
                 )}
               </li>
             ))}

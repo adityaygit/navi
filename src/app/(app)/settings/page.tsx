@@ -95,7 +95,7 @@ export default async function SettingsPage() {
         </ul>
         <div className="flex flex-wrap gap-2">
           <a className="btn btn-sm" href="/api/export">Export all my data (JSON)</a>
-          <ActionButton className="btn btn-sm" action={() => restartOnboardingAction()}>Redo setup conversation</ActionButton>
+          <ActionButton className="btn btn-sm" action={restartOnboardingAction}>Redo setup conversation</ActionButton>
           <Link className="btn btn-sm" href="/onboarding">Open setup</Link>
         </div>
       </section>

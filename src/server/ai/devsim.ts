@@ -41,12 +41,16 @@ export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
 
   if (req.mode === "onboarding") {
     const userTurns = req.history.filter((m) => m.role === "user").map((m) => m.content);
-    const wantsProposal = /\b(done|that's it|thats it|propose|set it up|go ahead|finish)\b/i.test(text);
-    if (userTurns.length < ONBOARDING_QUESTIONS.length - 1 && !wantsProposal) {
-      reply = ONBOARDING_QUESTIONS[Math.min(userTurns.length + 1, ONBOARDING_QUESTIONS.length - 1)];
-      if (userTurns.length === 0 && /^(start|hi|hello|hey)\b/i.test(text)) reply = ONBOARDING_QUESTIONS[0];
+    const greeting = /^(start|hi|hello|hey)\b[\s!.]*$/i;
+    // Answers so far, not counting greetings; the current message is the next answer.
+    const answers = userTurns.filter((t) => !greeting.test(t.trim())).length;
+    const wantsProposal = /\b(that'?s it|that is all|i'?m done|all done|propose|set (it|me) up|go ahead)\b/i.test(text);
+    if (greeting.test(text)) {
+      reply = ONBOARDING_QUESTIONS[0];
+    } else if (answers < ONBOARDING_QUESTIONS.length - 1 && !wantsProposal) {
+      reply = ONBOARDING_QUESTIONS[answers + 1];
     } else {
-      const all = [...userTurns, text].join("\n");
+      const all = [...userTurns.filter((t) => !greeting.test(t.trim())), text].join("\n");
       const items = buildOnboardingProposals(all, now);
       await call("propose_items", { items, batch: "onboarding" });
       await call("mark_onboarding_ready", { summary: `${items.length} items proposed` });

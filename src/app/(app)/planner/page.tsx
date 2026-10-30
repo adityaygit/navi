@@ -46,9 +46,11 @@ export default async function PlannerPage({ searchParams }: { searchParams: Prom
           <Link href={nav(today)} className="btn btn-sm">Today</Link>
           <Link href={nav(startDt.plus({ days: step }).toISODate()!)} className="btn btn-sm" aria-label="Next">→</Link>
         </div>
-        <ActionButton className="btn btn-primary btn-sm" action={() => (view === "day" ? planDayAction(start) : planWeekAction())}>
-          {view === "day" ? "Plan this day" : "Plan next 7 days"}
-        </ActionButton>
+        {view === "day" ? (
+          <ActionButton className="btn btn-primary btn-sm" action={planDayAction} args={[start]}>Plan this day</ActionButton>
+        ) : (
+          <ActionButton className="btn btn-primary btn-sm" action={planWeekAction}>Plan next 7 days</ActionButton>
+        )}
       </header>
       {profile.availability.length === 0 && (
         <p className="notice notice-warn text-sm">

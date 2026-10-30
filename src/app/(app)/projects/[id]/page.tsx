@@ -45,7 +45,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                 <span className={m.done_at ? "muted line-through" : ""}>{m.title}</span>
                 {m.due_date && <span className="muted text-xs">due {m.due_date}</span>}
                 <span className="ml-auto">
-                  <ActionButton action={() => updateItemAction("milestones", m.id, { done_at: m.done_at ? null : new Date().toISOString() })}>{m.done_at ? "Reopen" : "Done"}</ActionButton>
+                  <ActionButton action={updateItemAction} args={["milestones", m.id, { done_at: m.done_at ? null : new Date().toISOString() }]}>{m.done_at ? "Reopen" : "Done"}</ActionButton>
                 </span>
               </li>
             ))}

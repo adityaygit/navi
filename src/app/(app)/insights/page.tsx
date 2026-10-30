@@ -25,8 +25,8 @@ export default async function InsightsPage() {
           <h1 className="h1">Insights & reviews</h1>
           <p className="muted text-sm">Built only from what you actually planned, did and recorded. Rest, interruptions and missing information never count against you.</p>
         </div>
-        <ActionButton className="btn btn-sm" action={() => generateBriefingAction("evening")}>Review today now</ActionButton>
-        <ActionButton className="btn btn-sm" action={() => generateBriefingAction("weekly")}>Weekly review now</ActionButton>
+        <ActionButton className="btn btn-sm" action={generateBriefingAction} args={["evening"]}>Review today now</ActionButton>
+        <ActionButton className="btn btn-sm" action={generateBriefingAction} args={["weekly"]}>Weekly review now</ActionButton>
       </header>
 
       <section className="card" aria-labelledby="today-h">

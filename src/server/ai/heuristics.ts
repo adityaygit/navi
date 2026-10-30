@@ -71,7 +71,7 @@ export type ExtractedItem = {
 
 export function splitIntoItems(text: string): string[] {
   return text
-    .split(/\n+|(?<=[.!?;])\s+|\s*,\s*(?:and\s+)?(?=(?:i\s+)?(?:need|have|must|should|gotta|also|then|remember|don't)\b)|\s+(?:and also|also|plus)\s+/i)
+    .split(/\n+|(?<=[.!?;])\s+|\s*,\s*(?:and\s+)?(?=(?:i\s+)?(?:need|have|must|should|gotta|also|then|remember|don't)\b)|\s+(?:and also|also|plus)\s+|\s+and\s+(?=(?:email|call|text|buy|study|review|write|prepare|book|schedule|pay|send|fix|practice|read|start|apply|clean|plan|ask|meet|submit|finish)\b)/i)
     .map((s) => s.replace(/^[-*•\d.)\s]+/, "").trim())
     .filter((s) => s.length >= 3);
 }
