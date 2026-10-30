@@ -267,6 +267,41 @@ describe("briefings and budget", () => {
     expect(b).toBeNull();
   });
 
+  it("sends deadline reminders that still matter, holding or dropping them around quiet hours", async () => {
+    const a = admin();
+    const now = DateTime.now().setZone(zone);
+    const hhmm = (d: DateTime) => d.toFormat("HH:mm");
+    await a.from("notifications").delete().eq("user_id", userId);
+    const soon = await createTask(ctxFor(db, userId, zone), { title: "Soon thing", due_at: now.plus({ hours: 1 }).toISO() });
+    const hard = await createTask(ctxFor(db, userId, zone), { title: "Hard thing", due_at: now.plus({ hours: 10 }).toISO(), due_is_hard: true });
+    const { tickUser } = await import("@/server/jobs/tick");
+    const load = async () => {
+      const { data } = await a.from("profiles").select("*").eq("id", userId).single();
+      return data as Profile;
+    };
+    const reminders = async () => {
+      const { data } = await a.from("notifications").select("title,status,dedupe_key").eq("user_id", userId).like("dedupe_key", "due%");
+      return data!;
+    };
+
+    // Quiet for the next 3 hours: the 1-hour reminder would arrive too late, so it's dropped;
+    // the hard deadline 10 hours out is held until quiet hours end.
+    await a.from("profiles").update({ quiet_hours_start: hhmm(now.minus({ hours: 1 })), quiet_hours_end: hhmm(now.plus({ hours: 3 })) }).eq("id", userId);
+    await tickUser(a, await load());
+    let r = await reminders();
+    expect(r.find((n) => n.dedupe_key.startsWith(`due2h:${soon.id}`))).toBeUndefined();
+    const held = r.find((n) => n.dedupe_key.startsWith(`due24h:${hard.id}`))!;
+    expect(held.status).toBe("held_quiet_hours");
+    const dueLocal = DateTime.fromISO(hard.due_at!).setZone(zone);
+    expect(held.title).toBe(dueLocal.hasSame(now, "day") ? "Hard deadline today" : "Hard deadline tomorrow");
+
+    // Outside quiet hours the 1-hour reminder goes out.
+    await a.from("profiles").update({ quiet_hours_start: null, quiet_hours_end: null }).eq("id", userId);
+    await tickUser(a, await load());
+    r = await reminders();
+    expect(r.find((n) => n.dedupe_key.startsWith(`due2h:${soon.id}`))?.title).toBe("Due soon");
+  });
+
   it("stops new AI calls at the daily cap", async () => {
     const a = admin();
     const { data: row } = await a

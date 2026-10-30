@@ -64,9 +64,10 @@ export async function tickUser(db: SupabaseClient, profile: Profile, now = DateT
     if (hours < 0) {
       await queueNotification(db, profile, { kind: "overdue", title: "Overdue", body: `“${t.title}” was due ${local}. Do it, reschedule it, or drop it.`, url: "/tasks", dedupeKey: `overdue:${t.id}:${t.due_at}` });
     } else if (hours <= 2) {
-      await queueNotification(db, profile, { kind: "deadline", title: "Due soon", body: `“${t.title}” is due ${local}.`, url: "/tasks", dedupeKey: `due2h:${t.id}:${t.due_at}` });
+      await queueNotification(db, profile, { kind: "deadline", title: "Due soon", body: `“${t.title}” is due ${local}.`, url: "/tasks", dedupeKey: `due2h:${t.id}:${t.due_at}`, expiresAt: due });
     } else if (t.due_is_hard) {
-      await queueNotification(db, profile, { kind: "deadline", title: "Deadline tomorrow", body: `Hard deadline: “${t.title}” is due ${local}.`, url: "/tasks", dedupeKey: `due24h:${t.id}:${t.due_at}` });
+      const sameDay = due.setZone(profile.timezone).hasSame(now.setZone(profile.timezone), "day");
+      await queueNotification(db, profile, { kind: "deadline", title: sameDay ? "Hard deadline today" : "Hard deadline tomorrow", body: `Hard deadline: “${t.title}” is due ${local}.`, url: "/tasks", dedupeKey: `due24h:${t.id}:${t.due_at}`, expiresAt: due });
     }
   }
 

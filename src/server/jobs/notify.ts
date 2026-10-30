@@ -24,10 +24,13 @@ function ensureVapid() {
 export async function queueNotification(
   db: SupabaseClient,
   profile: Profile,
-  n: { kind: string; title: string; body: string; url: string; dedupeKey: string },
+  n: { kind: string; title: string; body: string; url: string; dedupeKey: string; expiresAt?: DateTime },
 ): Promise<boolean> {
   const now = DateTime.now().setZone(profile.timezone);
   const deliverAfter = endOfQuietHours(now, profile.quiet_hours_start, profile.quiet_hours_end);
+  // A reminder that quiet hours would hold until after it stops mattering
+  // (e.g. "due in 2 hours" delivered after the deadline) is not sent at all.
+  if (n.expiresAt && deliverAfter >= n.expiresAt) return false;
   const { error } = await db.from("notifications").insert({
     user_id: profile.id,
     kind: n.kind,
