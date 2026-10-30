@@ -1,0 +1,548 @@
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { DateTime } from "luxon";
+import { admin, ctxFor, resetUser, userClient } from "./helpers";
+import { handleTurn } from "@/server/ai/chat";
+import { runTool } from "@/server/ai/tools";
+import { acceptMany, acceptProposal, setProposalStatus } from "@/server/domain/proposals";
+import { generateDayPlan, generateWeekPlan, recoverPlan, setBlockOutcome } from "@/server/planner/plan";
+import { processCapture, saveCapture } from "@/server/domain/capture";
+import { createTask } from "@/server/domain/tasks";
+import { deleteEntity, updateEntity } from "@/server/domain/entities";
+import { decideApproval } from "@/server/domain/approvals";
+import { saveBriefing } from "@/server/jobs/briefings";
+import { assertBudget, budgetDay, BudgetExceededError } from "@/server/ai/budget";
+import type { Profile } from "@/lib/types";
+
+// Exercises the real domain layer against the local database with the
+// development simulator standing in for the model (no provider calls).
+
+let db: Awaited<ReturnType<typeof userClient>>["db"];
+let userId: string;
+const zone = "America/New_York";
+
+beforeAll(async () => {
+  ({ db, userId } = await userClient("dev@navi.test"));
+  await resetUser(userId);
+});
+
+describe("conversational onboarding", () => {
+  it("asks questions, then proposes a setup that only activates after review", async () => {
+    const ctx = ctxFor(db, userId, zone);
+    const first = await handleTurn(ctx, { kind: "onboarding", text: "hi", modality: "text" });
+    expect(first.assistantMessage.content).toMatch(/main areas of your life/i);
+    await handleTurn(ctx, { kind: "onboarding", text: "I'm in school and run a small startup. For my startup I'm working on an app called Tally. My goal is to get an A in chemistry class. I need to finish my history essay by friday and email investors tomorrow.", modality: "text" });
+    await handleTurn(ctx, { kind: "onboarding", text: "I have soccer practice mon and wed at 4pm. Classes weekdays at 8am. I go to the gym every morning at 7.", modality: "voice" });
+    const last = await handleTurn(ctx, { kind: "onboarding", text: "I'm free after 6pm on weekdays. Quiet 10pm to 7am. That's it.", modality: "text" });
+    expect(last.assistantMessage.tool_events.map((e) => e.name)).toContain("propose_items");
+
+    const { data: profile } = await db.from("profiles").select("*").eq("id", userId).single();
+    expect(profile.onboarding_status).toBe("reviewing");
+    const { data: proposals } = await db.from("proposals").select("*").eq("batch", "onboarding").eq("status", "pending");
+    const kinds = new Set(proposals!.map((p) => p.kind));
+    expect(kinds).toContain("workspace");
+    expect(kinds).toContain("event");
+    expect(kinds).toContain("task");
+    expect(kinds).toContain("preference");
+    expect(kinds).toContain("goal");
+    expect(kinds).toContain("project");
+    expect(kinds).toContain("routine");
+    // Nothing is active before review.
+    const { count: tasksBefore } = await db.from("tasks").select("id", { count: "exact", head: true });
+    expect(tasksBefore).toBe(0);
+
+    // The user approves everything except one task, which stays in review.
+    const keepForLater = proposals!.find((p) => p.kind === "task")!;
+    const results = await acceptMany(ctx, proposals!.filter((p) => p.id !== keepForLater.id).map((p) => p.id));
+    expect(results.filter((r) => !r.ok)).toEqual([]);
+    const week = await generateWeekPlan(ctx);
+
+    const [{ data: ws }, { data: events }, { data: tasks }, { data: prof2 }, { data: pending }] = await Promise.all([
+      db.from("workspaces").select("name"),
+      db.from("events").select("title,recurrence"),
+      db.from("tasks").select("title,workspace_id,source"),
+      db.from("profiles").select("availability,quiet_hours_start,quiet_hours_end").eq("id", userId).single(),
+      db.from("proposals").select("id").eq("id", keepForLater.id).eq("status", "pending"),
+    ]);
+    expect(ws!.map((w) => w.name)).toEqual(expect.arrayContaining(["School", "Startups", "Fitness"]));
+    expect(events!.some((e) => /soccer practice/i.test(e.title) && e.recurrence?.days?.join() === "1,3")).toBe(true);
+    expect(tasks!.length).toBeGreaterThan(0);
+    expect(tasks!.every((t) => t.source === "onboarding" && t.workspace_id)).toBe(true);
+    expect(prof2!.availability[0]).toMatchObject({ days: [1, 2, 3, 4, 5], start: "18:00" });
+    const [{ data: goals }, { data: projects }, { data: routines }] = await Promise.all([
+      db.from("goals").select("title,workspaces(name)"),
+      db.from("projects").select("name,workspaces(name)"),
+      db.from("routines").select("title,start_time,days,is_fixed"),
+    ]);
+    expect(goals).toEqual([{ title: "Get an A in chemistry class", workspaces: { name: "School" } }]);
+    expect(projects).toEqual([{ name: "Tally", workspaces: { name: "Startups" } }]);
+    expect(routines).toEqual([{ title: "Go to the gym", start_time: "07:00:00", days: [0, 1, 2, 3, 4, 5, 6], is_fixed: false }]);
+    expect(prof2!.quiet_hours_start).toBe("22:00:00");
+    expect(pending).toHaveLength(1);
+    expect(week.reduce((s, d) => s + d.blocks.length, 0)).toBeGreaterThan(0);
+  });
+
+  it("shares one history between text and voice turns", async () => {
+    const { data: p } = await db.from("profiles").select("onboarding_conversation_id").eq("id", userId).single();
+    const { data: msgs } = await db.from("messages").select("modality").eq("conversation_id", p!.onboarding_conversation_id);
+    expect(new Set(msgs!.map((m) => m.modality))).toEqual(new Set(["text", "voice"]));
+  });
+});
+
+describe("capture → review inbox", () => {
+  it("stores raw words once, proposes items, and creates nothing until accepted", async () => {
+    const ctx = ctxFor(db, userId, zone);
+    const clientId = `test-${Date.now()}`;
+    const raw = "need to buy running shoes tomorrow. call grandma on sunday";
+    const first = await saveCapture(ctx, { client_id: clientId, raw_text: raw, source: "offline" });
+    const again = await saveCapture(ctx, { client_id: clientId, raw_text: raw, source: "offline" });
+    expect(first.duplicate).toBe(false);
+    expect(again.duplicate).toBe(true);
+    expect(again.capture.id).toBe(first.capture.id);
+
+    const { count: before } = await db.from("tasks").select("id", { count: "exact", head: true });
+    await processCapture(ctx, first.capture.id);
+    const { data: proposals } = await db.from("proposals").select("*").eq("capture_id", first.capture.id);
+    expect(proposals!.length).toBe(2);
+    expect(proposals!.every((p) => p.status === "pending" && p.source_excerpt)).toBe(true);
+    const { count: mid } = await db.from("tasks").select("id", { count: "exact", head: true });
+    expect(mid).toBe(before);
+
+    const shoes = proposals!.find((p) => /shoes/i.test(p.source_excerpt))!;
+    const grandma = proposals!.find((p) => /grandma/i.test(p.source_excerpt))!;
+    const accepted = await acceptProposal(ctx, shoes.id, { estimate_minutes: 40 });
+    await setProposalStatus(ctx, grandma.id, "rejected");
+    const { data: task } = await db.from("tasks").select("*").eq("id", accepted.result_id).single();
+    expect(task.title).toMatch(/running shoes/i);
+    expect(task.estimate_minutes).toBe(40);
+    expect(task.source).toBe("capture");
+    const { data: cap } = await db.from("captures").select("raw_text").eq("id", first.capture.id).single();
+    expect(cap!.raw_text).toBe(raw);
+  });
+});
+
+describe("proposals from a real model", () => {
+  it("sends an incomplete proposal back to the model instead of saving one that can't be accepted", async () => {
+    const ctx = { ...ctxFor(db, userId, zone), actor: "navi" as const };
+    const r = await runTool(ctx, "propose_items", {
+      items: [
+        { kind: "event", payload: { title: "Dentist visit", starts_at: "2026-11-03T15:00:00-05:00" }, origin: "stated", confidence: 0.9 },
+        { kind: "task", payload: { title: "Renew passport by December" }, origin: "stated", confidence: 0.9 },
+      ],
+    });
+    expect(r.ok).toBe(false);
+    expect(JSON.stringify(r.data)).toMatch(/ends_at/);
+    const { count } = await db.from("proposals").select("id", { count: "exact", head: true }).in("payload->>title", ["Dentist visit", "Renew passport by December"]);
+    expect(count).toBe(0);
+  });
+
+  it("links a proposal that points at an existing project by id", async () => {
+    const ctx = ctxFor(db, userId, zone);
+    const { data: project } = await db.from("projects").insert({ user_id: userId, name: "Linkable project" }).select("id").single();
+    const { data: p } = await db.from("proposals").insert({ user_id: userId, kind: "task", payload: { title: "Linked login screen", project_ref: project!.id }, origin: "stated", confidence: 0.9 }).select("id").single();
+    await acceptProposal(ctx, p!.id);
+    const { data: task } = await db.from("tasks").select("project_id").eq("title", "Linked login screen").single();
+    expect(task!.project_id).toBe(project!.id);
+  });
+});
+
+describe("approval boundary", () => {
+  it("routes Navi's destructive and hard-deadline changes to approval and executes exactly once", async () => {
+    const user = ctxFor(db, userId, zone);
+    const navi = { ...user, actor: "navi" as const };
+    const t = await createTask(user, { title: "Submit application", due_at: DateTime.now().plus({ days: 3 }).toISO(), due_is_hard: true });
+
+    const moved = await updateEntity(navi, "tasks", t.id, { due_at: DateTime.now().plus({ days: 10 }).toISO() });
+    expect(moved.kind).toBe("approval_requested");
+    const del = await deleteEntity(navi, "tasks", t.id);
+    expect(del.kind).toBe("approval_requested");
+    const dup = await deleteEntity(navi, "tasks", t.id);
+    expect(dup).toEqual(del); // duplicate request reuses the pending approval
+
+    const { data: stillThere } = await db.from("tasks").select("id,due_at").eq("id", t.id).single();
+    expect(stillThere!.due_at).toBe(t.due_at);
+
+    const approvalId = (del as { approvalId: string }).approvalId;
+    const done = await decideApproval(user, approvalId, "approve", admin());
+    expect(done.status).toBe("executed");
+    await expect(decideApproval(user, approvalId, "approve", admin())).rejects.toThrow(/already decided/);
+    const { data: gone } = await db.from("tasks").select("id").eq("id", t.id);
+    expect(gone).toHaveLength(0);
+  });
+
+  it("never pretends an external action happened when the service isn't connected", async () => {
+    const user = ctxFor(db, userId, zone);
+    const { requestApproval } = await import("@/server/domain/approvals");
+    const a = await requestApproval({ ...user, actor: "navi" }, { actionType: "external.gmail.send", summary: "Email coach about Saturday", details: { to: "coach@example.com" } });
+    const r = await decideApproval(user, a.id, "approve", admin());
+    expect(r.status).toBe("failed");
+    expect(r.error).toMatch(/isn't connected/);
+  });
+
+  it("refuses to let Navi mark work completed", async () => {
+    const navi = { ...ctxFor(db, userId, zone), actor: "navi" as const };
+    const start = DateTime.now().setZone(zone);
+    const { data: block, error } = await db
+      .from("plan_blocks")
+      .insert({ user_id: userId, title: "Block", plan_date: start.toISODate(), starts_at: start.toISO(), ends_at: start.plus({ minutes: 30 }).toISO() })
+      .select("id")
+      .single();
+    expect(error).toBeNull();
+    await expect(setBlockOutcome(navi, block!.id, "done")).rejects.toThrow(/only you/i);
+    const { data: after } = await db.from("plan_blocks").select("status").eq("id", block!.id).single();
+    expect(after!.status).toBe("planned");
+  });
+
+  // Security review M3: each protection is judged against the row as it is,
+  // so Navi can't first remove it and then make the protected change.
+  const naviCtx = () => ({ ...ctxFor(db, userId, zone), actor: "navi" as const });
+  const sentForApproval = (r: { ok: boolean; summary: string }) => r.ok && /sent to the user for approval/.test(r.summary);
+
+  it("won't let Navi soften a hard deadline and then move it", async () => {
+    const user = ctxFor(db, userId, zone);
+    const due = DateTime.now().plus({ days: 3 }).toISO()!;
+    const t = await createTask(user, { title: "Scholarship form", due_at: due, due_is_hard: true });
+    expect(sentForApproval(await runTool(naviCtx(), "update_task", { id: t.id, due_is_hard: false }))).toBe(true);
+    expect(sentForApproval(await runTool(naviCtx(), "update_task", { id: t.id, due_at: DateTime.now().plus({ days: 9 }).toISO() }))).toBe(true);
+    const { data: still } = await db.from("tasks").select("due_at,due_is_hard").eq("id", t.id).single();
+    expect(still).toMatchObject({ due_is_hard: true });
+    expect(Date.parse(still!.due_at)).toBe(Date.parse(due));
+    // Navi can still make ordinary edits.
+    const ok = await runTool(naviCtx(), "update_task", { id: t.id, notes: "needs two references" });
+    expect(ok.summary).toMatch(/^Updated task/);
+  });
+
+  it("asks before changing fixed routines, fixed blocks and events (any time, repeat or status change)", async () => {
+    const start = DateTime.now().setZone(zone).plus({ days: 1 }).set({ hour: 16, minute: 0, second: 0, millisecond: 0 });
+    const { data: routine } = await db.from("routines").insert({ user_id: userId, title: "Practice", days: [1, 3], start_time: "16:00", duration_minutes: 90, is_fixed: true }).select().single();
+    const { data: block } = await db
+      .from("plan_blocks")
+      .insert({ user_id: userId, title: "Lab", plan_date: start.toISODate(), starts_at: start.toISO(), ends_at: start.plus({ hours: 1 }).toISO(), is_flexible: false })
+      .select()
+      .single();
+    const { data: event } = await db.from("events").insert({ user_id: userId, title: "Chemistry class", starts_at: start.toISO(), ends_at: start.plus({ hours: 1 }).toISO() }).select().single();
+
+    for (const patch of [{ start_time: "18:00" }, { is_fixed: false }, { active: false }, { days: [2] }, { duration_minutes: 30 }]) {
+      expect(sentForApproval(await runTool(naviCtx(), "update_item", { table: "routines", id: routine!.id, patch })), JSON.stringify(patch)).toBe(true);
+    }
+    for (const patch of [{ is_flexible: true }, { plan_date: start.plus({ days: 1 }).toISODate() }]) {
+      expect(sentForApproval(await runTool(naviCtx(), "update_item", { table: "plan_blocks", id: block!.id, patch })), JSON.stringify(patch)).toBe(true);
+    }
+    for (const patch of [{ recurrence: { freq: "weekly", days: [2, 4] } }, { status: "tentative" }, { ends_at: start.plus({ hours: 2 }).toISO() }]) {
+      expect(sentForApproval(await runTool(naviCtx(), "update_item", { table: "events", id: event!.id, patch })), JSON.stringify(patch)).toBe(true);
+    }
+    const { data: r } = await db.from("routines").select("start_time,is_fixed,active").eq("id", routine!.id).single();
+    expect(r).toMatchObject({ start_time: "16:00:00", is_fixed: true, active: true });
+    const { data: b } = await db.from("plan_blocks").select("is_flexible").eq("id", block!.id).single();
+    expect(b!.is_flexible).toBe(false);
+    const { data: e } = await db.from("events").select("recurrence,status").eq("id", event!.id).single();
+    expect(e).toMatchObject({ recurrence: null, status: "confirmed" });
+
+    // Renaming is fine, and the user's own edits never need approval.
+    expect((await runTool(naviCtx(), "update_item", { table: "routines", id: routine!.id, patch: { title: "Soccer practice" } })).summary).toMatch(/^Updated routine/);
+    const mine = await updateEntity(ctxFor(db, userId, zone), "routines", routine!.id, { start_time: "17:00", is_fixed: false });
+    expect(mine.kind).toBe("updated");
+  });
+
+  it("leaves finishing projects, goals and milestones to the user", async () => {
+    const { data: goal } = await db.from("goals").insert({ user_id: userId, title: "Run a 10k" }).select().single();
+    const { data: project } = await db.from("projects").insert({ user_id: userId, name: "Training plan", goal_id: goal!.id }).select().single();
+    const { data: ms } = await db.from("milestones").insert({ user_id: userId, title: "5k without stopping", goal_id: goal!.id }).select().single();
+    expect(sentForApproval(await runTool(naviCtx(), "update_item", { table: "projects", id: project!.id, patch: { status: "done" } }))).toBe(true);
+    expect(sentForApproval(await runTool(naviCtx(), "update_item", { table: "goals", id: goal!.id, patch: { status: "achieved" } }))).toBe(true);
+    expect(sentForApproval(await runTool(naviCtx(), "update_item", { table: "milestones", id: ms!.id, patch: { done_at: new Date().toISOString() } }))).toBe(true);
+    const [{ data: p }, { data: g }, { data: m }] = await Promise.all([
+      db.from("projects").select("status").eq("id", project!.id).single(),
+      db.from("goals").select("status").eq("id", goal!.id).single(),
+      db.from("milestones").select("done_at").eq("id", ms!.id).single(),
+    ]);
+    expect([p!.status, g!.status, m!.done_at]).toEqual(["active", "active", null]);
+  });
+
+  it("only lets update_item change known fields, and says which ones it can", async () => {
+    const { data: note } = await db.from("notes").insert({ user_id: userId, body: "Locker 214" }).select().single();
+    const other = await runTool(naviCtx(), "update_item", { table: "notes", id: note!.id, patch: { user_id: "00000000-0000-0000-0000-000000000000", body: "x" } });
+    expect(other.ok).toBe(false);
+    expect(other.summary).toMatch(/Can't change user_id on notes\. Fields you can change: .*body/);
+    const forged = await runTool(naviCtx(), "update_item", { table: "notes", id: note!.id, patch: { source: "user", created_at: "2020-01-01T00:00:00Z" } });
+    expect(forged.ok).toBe(false);
+    const bad = await runTool(naviCtx(), "update_item", { table: "notes", id: note!.id, patch: { body: "" } });
+    expect(bad.ok).toBe(false);
+    const fine = await runTool(naviCtx(), "update_item", { table: "notes", id: note!.id, patch: { body: "Locker 214, code 1234" } });
+    expect(fine.ok).toBe(true);
+    const { data: after } = await db.from("notes").select("body,source,user_id").eq("id", note!.id).single();
+    expect(after).toEqual({ body: "Locker 214, code 1234", source: "user", user_id: userId });
+  });
+
+  it("marks a task done only when the user's own message says so, otherwise asks them to confirm", async () => {
+    const user = ctxFor(db, userId, zone);
+    const t = await createTask(user, { title: "Essay draft" });
+    // What the user actually typed this turn is held by the server.
+    const said = await runTool({ ...naviCtx(), userMessage: "Good news, I finished the essay draft!" }, "complete_task", { id: t.id, user_statement: "I finished the essay draft" });
+    expect(said.summary).toMatch(/Marked “Essay draft” done/);
+    const { data: done } = await db.from("tasks").select("status").eq("id", t.id).single();
+    expect(done!.status).toBe("done");
+
+    // The model claims a statement the user never made.
+    const t2 = await createTask(user, { title: "Lab report" });
+    const claimed = await runTool({ ...naviCtx(), userMessage: "what's on my plate today?" }, "complete_task", { id: t2.id, user_statement: "I finished the lab report" });
+    expect(claimed.summary).toMatch(/Not marked done.*confirm with one tap/);
+    // Quoting the user but not saying it's finished doesn't count either.
+    const vague = await runTool({ ...naviCtx(), userMessage: "the lab report is hard" }, "complete_task", { id: t2.id, user_statement: "the lab report" });
+    expect(vague.summary).toMatch(/Not marked done/);
+    // No user message at all (e.g. a voice turn without a transcript): confirmation.
+    const none = await runTool(naviCtx(), "complete_task", { id: t2.id, user_statement: "I finished the lab report" });
+    expect(none.summary).toMatch(/Not marked done/);
+    const { data: open } = await db.from("tasks").select("status").eq("id", t2.id).single();
+    expect(open!.status).toBe("todo");
+
+    const { data: pending } = await db.from("approvals").select("id,status,action_type").eq("action_type", "internal.complete.tasks").eq("status", "pending");
+    expect(pending).toHaveLength(1); // the repeats reuse one request
+    const approved = await decideApproval(user, pending![0].id, "approve", admin());
+    expect(approved.status).toBe("executed");
+    const { data: finished } = await db.from("tasks").select("status,completed_at").eq("id", t2.id).single();
+    expect(finished!.status).toBe("done");
+    expect(finished!.completed_at).not.toBeNull();
+  });
+});
+
+describe("plan recovery", () => {
+  it("keeps unfinished work and records the disruption", async () => {
+    const ctx = ctxFor(db, userId, zone);
+    await db.from("profiles").update({ availability: [{ days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "23:59" }] }).eq("id", userId);
+    await createTask(ctx, { title: "Recovery test task", estimate_minutes: 30, priority: 1 });
+    await generateDayPlan(ctx);
+    const { count: openBefore } = await db.from("tasks").select("id", { count: "exact", head: true }).in("status", ["todo", "in_progress"]);
+    const r = await recoverPlan(ctx, { description: "Family emergency", category: "interruption", availableFrom: DateTime.now().plus({ hours: 1 }).toISO() });
+    const { count: openAfter } = await db.from("tasks").select("id", { count: "exact", head: true }).in("status", ["todo", "in_progress"]);
+    expect(openAfter).toBe(openBefore);
+    expect(r.summary).toMatch(/re-planned/);
+    const { data: dis } = await db.from("plan_disruptions").select("*");
+    expect(dis!.some((d) => d.description === "Family emergency")).toBe(true);
+  });
+});
+
+describe("memory across sessions", () => {
+  it("brings back a project's memories in a brand-new conversation, but not rejected ones", async () => {
+    const ctx = ctxFor(db, userId, zone);
+    const { data: project } = await db.from("projects").insert({ user_id: userId, name: "Robotics" }).select("id").single();
+    for (const row of [
+      { content: "Competition moved to March 14; drivetrain is the bottleneck", origin: "stated" },
+      { content: "Team wants to drop the arm design", origin: "inferred", confidence: 0.4, status: "rejected" },
+    ]) {
+      const { error } = await db.from("memories").insert({ user_id: userId, kind: "project", project_id: project!.id, ...row });
+      expect(error).toBeNull();
+    }
+    const { buildContext } = await import("@/server/ai/chat");
+    // A new conversation: nothing about the project is in its history.
+    const fresh = { ...ctx, conversationId: undefined };
+    const context = await buildContext(fresh, "how is robotics going?", "chat");
+    expect(context).toContain("[Robotics] Competition moved to March 14; drivetrain is the bottleneck");
+    expect(context).not.toContain("drop the arm design");
+  });
+});
+
+describe("plan stays in step with tasks", () => {
+  it("settles open blocks when a task is finished, cancelled or deleted", async () => {
+    const ctx = ctxFor(db, userId, zone);
+    const today = DateTime.now().setZone(zone);
+    const block = async (taskId: string, title: string, day: DateTime) => {
+      const start = day.set({ hour: 12, minute: 0 });
+      const { data } = await db.from("plan_blocks").insert({ user_id: userId, task_id: taskId, title, plan_date: day.toISODate(), starts_at: start.toISO(), ends_at: start.plus({ minutes: 30 }).toISO() }).select("id").single();
+      return data!.id as string;
+    };
+    const finished = await createTask(ctx, { title: "Finish me" });
+    const todayBlock = await block(finished.id, "Finish me", today);
+    const laterBlock = await block(finished.id, "Finish me", today.plus({ days: 2 }));
+    const { completeTask } = await import("@/server/domain/tasks");
+    await completeTask(ctx, finished.id);
+    const { data: afterDone } = await db.from("plan_blocks").select("id,status").in("id", [todayBlock, laterBlock]);
+    expect(afterDone).toEqual([{ id: todayBlock, status: "done" }]);
+
+    const cancelled = await createTask(ctx, { title: "Cancel me" });
+    const cBlock = await block(cancelled.id, "Cancel me", today);
+    await updateEntity(ctx, "tasks", cancelled.id, { status: "cancelled" });
+    const deleted = await createTask(ctx, { title: "Delete me" });
+    const dBlock = await block(deleted.id, "Delete me", today);
+    await deleteEntity(ctx, "tasks", deleted.id);
+    const { data: dropped } = await db.from("plan_blocks").select("id").in("id", [cBlock, dBlock]);
+    expect(dropped).toHaveLength(0);
+  });
+});
+
+describe("recurring tasks", () => {
+  const successors = async (title: string) => {
+    const { data } = await db.from("tasks").select("due_at,status").eq("user_id", userId).eq("title", title).eq("status", "todo");
+    return data ?? [];
+  };
+
+  it("schedules the next occurrence after today even when finished late, not in the past", async () => {
+    const ctx = ctxFor(db, userId, zone);
+    const now = DateTime.now().setZone(zone);
+    const due = now.minus({ days: 5 }).set({ hour: 7, minute: 0, second: 0, millisecond: 0 });
+    const t = await createTask(ctx, { title: "Water plants", due_at: due.toISO()!, recurrence: { freq: "daily" } });
+    const { completeTask } = await import("@/server/domain/tasks");
+    await completeTask(ctx, t.id);
+    const next = await successors("Water plants");
+    expect(next).toHaveLength(1);
+    const nextDue = DateTime.fromISO(next[0].due_at!).setZone(zone);
+    expect(nextDue > now).toBe(true);
+    expect(nextDue.diff(now, "hours").hours).toBeLessThanOrEqual(24);
+    expect(nextDue.toFormat("HH:mm")).toBe("07:00");
+  });
+
+  it("lands weekly repeats on the chosen weekdays", async () => {
+    const ctx = ctxFor(db, userId, zone);
+    const now = DateTime.now().setZone(zone);
+    const due = now.minus({ days: 10 }).set({ hour: 18, minute: 0, second: 0, millisecond: 0 });
+    const t = await createTask(ctx, { title: "Gym", due_at: due.toISO()!, recurrence: { freq: "weekly", days: [1, 4] } });
+    const { completeTask } = await import("@/server/domain/tasks");
+    await completeTask(ctx, t.id);
+    const [next] = await successors("Gym");
+    const nextDue = DateTime.fromISO(next.due_at!).setZone(zone);
+    expect([1, 4]).toContain(nextDue.weekday % 7);
+    expect(nextDue > now).toBe(true);
+    expect(nextDue.diff(now, "days").days).toBeLessThanOrEqual(7);
+  });
+
+  it("finishing the same occurrence twice creates only one next one", async () => {
+    const ctx = ctxFor(db, userId, zone);
+    const t = await createTask(ctx, { title: "Take vitamins", recurrence: { freq: "daily" } });
+    const { completeTask } = await import("@/server/domain/tasks");
+    await completeTask(ctx, t.id);
+    await completeTask(ctx, t.id);
+    expect(await successors("Take vitamins")).toHaveLength(1);
+  });
+});
+
+describe("simultaneous repeats", () => {
+  it("accepting the same proposal twice at once creates one item", async () => {
+    const ctx = ctxFor(db, userId, zone);
+    await db.from("tasks").delete().eq("title", "Return library books");
+    const { data: p } = await db.from("proposals").insert({ user_id: userId, kind: "task", payload: { title: "Return library books" }, source_excerpt: "return library books", origin: "stated", confidence: 0.9 }).select("id").single();
+    await Promise.allSettled([acceptProposal(ctx, p!.id), acceptProposal(ctx, p!.id)]);
+    const { count } = await db.from("tasks").select("id", { count: "exact", head: true }).eq("title", "Return library books");
+    expect(count).toBe(1);
+  });
+
+  it("planning the same day twice at once doesn't double-book it", async () => {
+    const ctx = ctxFor(db, userId, zone);
+    const day = DateTime.now().setZone(zone).plus({ days: 3 }).toISODate()!;
+    await db.from("plan_blocks").delete().eq("plan_date", day);
+    await db.from("tasks").delete().eq("title", "Draft cover letter");
+    await db.from("profiles").update({ availability: [{ days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "23:59" }] }).eq("id", userId);
+    const t = await createTask(ctx, { title: "Draft cover letter", estimate_minutes: 45 });
+    await Promise.all([generateDayPlan(ctx, day), generateDayPlan(ctx, day)]);
+    const { data } = await db.from("plan_blocks").select("starts_at,ends_at").eq("plan_date", day).eq("task_id", t.id);
+    const minutes = (data ?? []).reduce((m, b) => m + (Date.parse(b.ends_at) - Date.parse(b.starts_at)) / 60000, 0);
+    expect(minutes).toBeGreaterThan(0);
+    expect(minutes).toBeLessThanOrEqual(45 * 2); // one booking, even with the learned estimate ratio (max ×2)
+    const { data: once } = await db.from("plan_blocks").select("id").eq("plan_date", day);
+    await generateDayPlan(ctx, day);
+    const { data: again } = await db.from("plan_blocks").select("id").eq("plan_date", day);
+    expect(again!.length).toBe(once!.length);
+  });
+
+  it("finishing a recurring task twice at once creates one next occurrence", async () => {
+    const ctx = ctxFor(db, userId, zone);
+    await db.from("tasks").delete().eq("title", "Feed the cat");
+    const t = await createTask(ctx, { title: "Feed the cat", recurrence: { freq: "daily" } });
+    const { completeTask } = await import("@/server/domain/tasks");
+    await Promise.allSettled([completeTask(ctx, t.id), completeTask(ctx, t.id)]);
+    const { count } = await db.from("tasks").select("id", { count: "exact", head: true }).eq("title", "Feed the cat").eq("status", "todo");
+    expect(count).toBe(1);
+  });
+});
+
+describe("accountability", () => {
+  it("scores only what was recorded, excuses rest and real blockers, and asks about avoidance", async () => {
+    const day = DateTime.now().setZone(zone).minus({ days: 3 }).startOf("day");
+    const date = day.toISODate()!;
+    await db.from("plan_blocks").delete().eq("plan_date", date);
+    const outcomes: [string, string | null][] = [
+      ["done", null], ["partial", null], ["rest", null], ["interrupted", null],
+      ["skipped", "Blocked: missing the rubric"], ["skipped", null], ["planned", null],
+    ];
+    for (const [i, [status, reason]] of outcomes.entries()) {
+      const start = day.set({ hour: 9 + i });
+      const { error } = await db.from("plan_blocks").insert({ user_id: userId, title: `Block ${i}`, plan_date: date, starts_at: start.toISO(), ends_at: start.plus({ minutes: 45 }).toISO(), status, outcome_reason: reason });
+      expect(error).toBeNull();
+    }
+    const { dayReview } = await import("@/server/domain/insights");
+    const r = await dayReview(db, userId, zone, date);
+    // Counted: done, partial, skipped-without-reason, unmarked = 4. (1 + 0.5) / 4.
+    expect(r.completionRate).toBeCloseTo(0.375);
+    expect(r.explanation).toMatch(/1 done and 1 partly done out of 4 counted blocks .* = 38%/);
+    expect(r.explanation).toMatch(/3 blocks excluded/);
+    expect(r.explanation).toMatch(/1 wasn't marked; mark it/);
+    expect(r.findings.join(" ")).toMatch(/skipped 1 block without an outside reason/);
+    expect(r.findings.join(" ")).toMatch(/blocked on missing information/);
+  });
+});
+
+describe("briefings and budget", () => {
+  it("stores each briefing once per local day", async () => {
+    const { data: profile } = await db.from("profiles").select("*").eq("id", userId).single();
+    const date = DateTime.now().setZone(zone).toISODate()!;
+    const a = await saveBriefing(admin(), profile as Profile, "morning", date);
+    const b = await saveBriefing(admin(), profile as Profile, "morning", date);
+    expect(a?.body).toMatch(/Fixed today|No fixed commitments/);
+    expect(b).toBeNull();
+  });
+
+  it("sends deadline reminders that still matter, holding or dropping them around quiet hours", async () => {
+    const a = admin();
+    const now = DateTime.now().setZone(zone);
+    const hhmm = (d: DateTime) => d.toFormat("HH:mm");
+    await a.from("notifications").delete().eq("user_id", userId);
+    const soon = await createTask(ctxFor(db, userId, zone), { title: "Soon thing", due_at: now.plus({ hours: 1 }).toISO() });
+    const hard = await createTask(ctxFor(db, userId, zone), { title: "Hard thing", due_at: now.plus({ hours: 10 }).toISO(), due_is_hard: true });
+    const { tickUser } = await import("@/server/jobs/tick");
+    const load = async () => {
+      const { data } = await a.from("profiles").select("*").eq("id", userId).single();
+      return data as Profile;
+    };
+    const reminders = async () => {
+      const { data } = await a.from("notifications").select("title,status,dedupe_key").eq("user_id", userId).like("dedupe_key", "due%");
+      return data!;
+    };
+
+    // Quiet for the next 3 hours: the 1-hour reminder would arrive too late, so it's dropped;
+    // the hard deadline 10 hours out is held until quiet hours end.
+    await a.from("profiles").update({ quiet_hours_start: hhmm(now.minus({ hours: 1 })), quiet_hours_end: hhmm(now.plus({ hours: 3 })) }).eq("id", userId);
+    await tickUser(a, await load());
+    let r = await reminders();
+    expect(r.find((n) => n.dedupe_key.startsWith(`due2h:${soon.id}`))).toBeUndefined();
+    const held = r.find((n) => n.dedupe_key.startsWith(`due24h:${hard.id}`))!;
+    expect(held.status).toBe("held_quiet_hours");
+    const dueLocal = DateTime.fromISO(hard.due_at!).setZone(zone);
+    expect(held.title).toBe(dueLocal.hasSame(now, "day") ? "Hard deadline today" : "Hard deadline tomorrow");
+
+    // Outside quiet hours the 1-hour reminder goes out.
+    await a.from("profiles").update({ quiet_hours_start: null, quiet_hours_end: null }).eq("id", userId);
+    await tickUser(a, await load());
+    r = await reminders();
+    expect(r.find((n) => n.dedupe_key.startsWith(`due2h:${soon.id}`))?.title).toBe("Due soon");
+  });
+
+  it("stops new AI calls at the daily cap", async () => {
+    const a = admin();
+    // Fill today's budget to 1 cent below the cap, whatever was already spent.
+    const { getBudgetStatus } = await import("@/server/ai/budget");
+    const before = await getBudgetStatus();
+    const { data: row } = await a
+      .from("ai_usage")
+      .insert({ user_id: userId, provider: "anthropic", model: "claude-sonnet-5-5", role: "planner", purpose: "test", cost_usd: before.capUsd - before.spentUsd - 0.01, budget_day: budgetDay() })
+      .select()
+      .single();
+    try {
+      await expect(assertBudget(0.05)).rejects.toBeInstanceOf(BudgetExceededError);
+      await expect(assertBudget(0)).resolves.toBeTruthy();
+    } finally {
+      await a.from("ai_usage").delete().eq("id", row!.id);
+    }
+  });
+});
+
+afterAll(async () => {
+  await db.auth.signOut();
+});

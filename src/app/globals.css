@@ -1,0 +1,157 @@
+@import "tailwindcss";
+
+/* Navi's deliberately basic design system: system font, neutral surfaces,
+   one accent, clear focus rings, large touch targets. */
+
+:root {
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --surface-2: #f0f0ed;
+  --border: #e2e2dd;
+  --text: #1b1b1a;
+  --muted: #6b6b66;
+  --accent: #2f5bd3;
+  --accent-text: #ffffff;
+  --accent-soft: #e8eefc;
+  --danger: #b42318;
+  --danger-soft: #fdecea;
+  --warn: #7d5400;
+  --warn-soft: #fff4d6;
+  --ok: #1a7f37;
+  --ok-soft: #e6f4ea;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141414;
+    --surface: #1c1c1c;
+    --surface-2: #252525;
+    --border: #333331;
+    --text: #ededea;
+    --muted: #a3a39d;
+    --accent: #7c9cf5;
+    --accent-text: #0d1430;
+    --accent-soft: #1f2a4a;
+    --danger: #ff8a80;
+    --danger-soft: #3a1d1b;
+    --warn: #f2c14e;
+    --warn-soft: #3a2f12;
+    --ok: #6fdc8c;
+    --ok-soft: #173322;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-text: var(--accent-text);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  line-height: 1.45;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-border bg-surface p-4;
+  }
+  .btn {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3.5 text-sm font-medium text-text transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply border-accent bg-accent text-accent-text hover:bg-accent hover:opacity-90;
+  }
+  .btn-danger {
+    @apply border-danger text-danger hover:bg-danger-soft;
+  }
+  .btn-ghost {
+    @apply border-transparent bg-transparent hover:bg-surface-2;
+  }
+  .btn-sm {
+    @apply min-h-9 px-2.5 text-xs pointer-coarse:min-h-11;
+  }
+  .input {
+    @apply min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-base text-text placeholder:text-muted;
+  }
+  textarea.input {
+    @apply py-2;
+  }
+  .label {
+    @apply mb-1 block text-sm font-medium;
+  }
+  .muted {
+    @apply text-muted;
+  }
+  .h1 {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+  .h2 {
+    @apply text-lg font-semibold;
+  }
+  .badge {
+    @apply inline-flex items-center rounded-full border border-border px-2 py-0.5 text-xs font-medium text-muted;
+  }
+  .badge-accent {
+    @apply border-transparent bg-accent-soft text-accent;
+  }
+  .badge-warn {
+    @apply border-transparent bg-warn-soft text-warn;
+  }
+  .badge-danger {
+    @apply border-transparent bg-danger-soft text-danger;
+  }
+  .badge-ok {
+    @apply border-transparent bg-ok-soft text-ok;
+  }
+  .notice {
+    @apply rounded-lg border border-border bg-surface-2 p-3 text-sm;
+  }
+  .notice-warn {
+    @apply border-transparent bg-warn-soft text-text;
+  }
+  .notice-danger {
+    @apply border-transparent bg-danger-soft text-text;
+  }
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* Disclosure toggles get a full-size tap area on touch screens. */
+@media (pointer: coarse) {
+  summary {
+    min-height: 2.75rem;
+    padding-block: 0.625rem;
+  }
+}
