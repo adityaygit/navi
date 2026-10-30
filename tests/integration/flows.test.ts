@@ -276,6 +276,27 @@ describe("recurring tasks", () => {
   });
 });
 
+describe("simultaneous repeats", () => {
+  it("accepting the same proposal twice at once creates one item", async () => {
+    const ctx = ctxFor(db, userId, zone);
+    await db.from("tasks").delete().eq("title", "Return library books");
+    const { data: p } = await db.from("proposals").insert({ user_id: userId, kind: "task", payload: { title: "Return library books" }, source_excerpt: "return library books", origin: "stated", confidence: 0.9 }).select("id").single();
+    await Promise.allSettled([acceptProposal(ctx, p!.id), acceptProposal(ctx, p!.id)]);
+    const { count } = await db.from("tasks").select("id", { count: "exact", head: true }).eq("title", "Return library books");
+    expect(count).toBe(1);
+  });
+
+  it("finishing a recurring task twice at once creates one next occurrence", async () => {
+    const ctx = ctxFor(db, userId, zone);
+    await db.from("tasks").delete().eq("title", "Feed the cat");
+    const t = await createTask(ctx, { title: "Feed the cat", recurrence: { freq: "daily" } });
+    const { completeTask } = await import("@/server/domain/tasks");
+    await Promise.allSettled([completeTask(ctx, t.id), completeTask(ctx, t.id)]);
+    const { count } = await db.from("tasks").select("id", { count: "exact", head: true }).eq("title", "Feed the cat").eq("status", "todo");
+    expect(count).toBe(1);
+  });
+});
+
 describe("accountability", () => {
   it("scores only what was recorded, excuses rest and real blockers, and asks about avoidance", async () => {
     const day = DateTime.now().setZone(zone).minus({ days: 3 }).startOf("day");

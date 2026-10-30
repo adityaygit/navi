@@ -93,12 +93,16 @@ export type UpdateResult<T> =
   | { kind: "updated"; row: T }
   | { kind: "approval_requested"; approvalId: string; reason: string };
 
+/** The row already had the value an update was guarded against (`unless`). */
+export class AlreadyChangedError extends Error {}
+
 export async function updateEntity<T = Record<string, unknown>>(
   ctx: Ctx,
   table: EntityTable,
   id: string,
   patch: Record<string, unknown>,
-  opts: { summary?: string } = {},
+  /** `unless`: apply only if the row doesn't (still) have these values, atomically. */
+  opts: { summary?: string; unless?: Record<string, string> } = {},
 ): Promise<UpdateResult<T>> {
   const before = await getEntity<Record<string, unknown>>(ctx, table, id);
   if (ctx.actor === "navi") {
@@ -112,8 +116,14 @@ export async function updateEntity<T = Record<string, unknown>>(
       return { kind: "approval_requested", approvalId: approval.id, reason };
     }
   }
-  const { data, error } = await ctx.db.from(table).update(patch).eq("id", id).select().single();
+  let query = ctx.db.from(table).update(patch).eq("id", id);
+  for (const [k, v] of Object.entries(opts.unless ?? {})) query = query.neq(k, v);
+  const { data, error } = await query.select().maybeSingle();
   if (error) throw new Error(`Could not update ${LABEL[table]}: ${error.message}`);
+  if (!data) {
+    if (opts.unless) throw new AlreadyChangedError(`This ${LABEL[table]} was already updated.`);
+    throw new Error(`Could not update ${LABEL[table]}: not found`);
+  }
   const changedKeys = Object.keys(patch);
   const prior: Record<string, unknown> = {};
   for (const k of changedKeys) prior[k] = before[k];

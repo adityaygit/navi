@@ -110,6 +110,38 @@ export async function acceptProposal(ctx: Ctx, id: string, edits?: Record<string
   const proposal = p as Proposal;
   if (proposal.status === "accepted" || proposal.status === "merged") return proposal;
 
+  // Claim it first, so two simultaneous accepts (double tap, voice and screen)
+  // can't both create the item. Undone if creating the item fails.
+  const { data: claimed } = await ctx.db
+    .from("proposals")
+    .update({ status: "accepted", decided_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("status", proposal.status)
+    .select("id");
+  if (!claimed?.length) {
+    const { data: current } = await ctx.db.from("proposals").select("*").eq("id", id).single();
+    return current as Proposal;
+  }
+  let made: Awaited<ReturnType<typeof materialize>>;
+  try {
+    made = await materialize(ctx, proposal, edits);
+  } catch (err) {
+    await ctx.db.from("proposals").update({ status: proposal.status, decided_at: proposal.decided_at }).eq("id", id);
+    throw err;
+  }
+
+  const { data: updated, error: upErr } = await ctx.db
+    .from("proposals")
+    .update({ result_table: made.resultTable, result_id: made.resultId, payload: made.merged })
+    .eq("id", id)
+    .select()
+    .single();
+  if (upErr) throw new Error(upErr.message);
+  return updated as Proposal;
+}
+
+/** Create the real item a proposal describes, as the user. */
+async function materialize(ctx: Ctx, proposal: Proposal, edits?: Record<string, unknown>) {
   const merged = { ...proposal.payload, ...(edits ?? {}) };
   const payload = await resolveRefs(ctx, proposal, merged);
   // The user accepted it, so the resulting item is theirs, not Navi's.
@@ -156,15 +188,7 @@ export async function acceptProposal(ctx: Ctx, id: string, edits?: Record<string
     await logActivity(userCtx, { action: "update", entityType: "profiles", summary: `Updated settings from inbox (${Object.keys(parsed).join(", ")})` });
   }
   // "question" proposals have nothing to materialize: accepting marks them handled.
-
-  const { data: updated, error: upErr } = await ctx.db
-    .from("proposals")
-    .update({ status: "accepted", decided_at: new Date().toISOString(), result_table: resultTable, result_id: resultId, payload: merged })
-    .eq("id", id)
-    .select()
-    .single();
-  if (upErr) throw new Error(upErr.message);
-  return updated as Proposal;
+  return { merged, resultTable, resultId };
 }
 
 export async function setProposalStatus(ctx: Ctx, id: string, status: "rejected" | "deferred" | "pending") {

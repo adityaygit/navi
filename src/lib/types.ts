@@ -165,6 +165,7 @@ export type Proposal = {
   status: "pending" | "accepted" | "rejected" | "deferred" | "merged";
   result_table: string | null;
   result_id: string | null;
+  decided_at: string | null;
   created_at: string;
 };
 

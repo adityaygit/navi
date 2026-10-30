@@ -2,7 +2,7 @@ import "server-only";
 import { DateTime } from "luxon";
 import type { Ctx } from "@/server/context";
 import type { Task } from "@/lib/types";
-import { createEntity, getEntity, updateEntity, type UpdateResult } from "./entities";
+import { AlreadyChangedError, createEntity, getEntity, updateEntity, type UpdateResult } from "./entities";
 import { logActivity } from "./activity";
 import { TaskCreate, TaskUpdate, compact } from "./schemas";
 
@@ -29,7 +29,14 @@ export async function completeTask(ctx: Ctx, id: string, actualMinutes?: number 
   if (task.status === "done") return { kind: "updated", row: task } satisfies UpdateResult<Task>;
   const patch: Record<string, unknown> = { status: "done", completed_at: new Date().toISOString() };
   if (actualMinutes != null) patch.actual_minutes = Math.max(task.actual_minutes, actualMinutes);
-  const result = await updateEntity<Task>(ctx, "tasks", id, patch, { summary: `Completed “${task.title}”` });
+  let result: UpdateResult<Task>;
+  try {
+    // Guarded so two simultaneous completions can't both spawn a next occurrence.
+    result = await updateEntity<Task>(ctx, "tasks", id, patch, { summary: `Completed “${task.title}”`, unless: { status: "done" } });
+  } catch (err) {
+    if (err instanceof AlreadyChangedError) return { kind: "updated", row: { ...task, status: "done" } } satisfies UpdateResult<Task>;
+    throw err;
+  }
 
   if (task.recurrence) {
     const { data: profile } = await ctx.db.from("profiles").select("timezone").eq("id", ctx.userId).single();
