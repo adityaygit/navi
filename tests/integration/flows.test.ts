@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DateTime } from "luxon";
 import { admin, ctxFor, resetUser, userClient } from "./helpers";
 import { handleTurn } from "@/server/ai/chat";
+import { runTool } from "@/server/ai/tools";
 import { acceptMany, acceptProposal, setProposalStatus } from "@/server/domain/proposals";
 import { generateDayPlan, generateWeekPlan, recoverPlan, setBlockOutcome } from "@/server/planner/plan";
 import { processCapture, saveCapture } from "@/server/domain/capture";
@@ -116,6 +117,31 @@ describe("capture → review inbox", () => {
     expect(task.source).toBe("capture");
     const { data: cap } = await db.from("captures").select("raw_text").eq("id", first.capture.id).single();
     expect(cap!.raw_text).toBe(raw);
+  });
+});
+
+describe("proposals from a real model", () => {
+  it("sends an incomplete proposal back to the model instead of saving one that can't be accepted", async () => {
+    const ctx = { ...ctxFor(db, userId, zone), actor: "navi" as const };
+    const r = await runTool(ctx, "propose_items", {
+      items: [
+        { kind: "event", payload: { title: "Dentist visit", starts_at: "2026-11-03T15:00:00-05:00" }, origin: "stated", confidence: 0.9 },
+        { kind: "task", payload: { title: "Renew passport by December" }, origin: "stated", confidence: 0.9 },
+      ],
+    });
+    expect(r.ok).toBe(false);
+    expect(JSON.stringify(r.data)).toMatch(/ends_at/);
+    const { count } = await db.from("proposals").select("id", { count: "exact", head: true }).in("payload->>title", ["Dentist visit", "Renew passport by December"]);
+    expect(count).toBe(0);
+  });
+
+  it("links a proposal that points at an existing project by id", async () => {
+    const ctx = ctxFor(db, userId, zone);
+    const { data: project } = await db.from("projects").insert({ user_id: userId, name: "Linkable project" }).select("id").single();
+    const { data: p } = await db.from("proposals").insert({ user_id: userId, kind: "task", payload: { title: "Linked login screen", project_ref: project!.id }, origin: "stated", confidence: 0.9 }).select("id").single();
+    await acceptProposal(ctx, p!.id);
+    const { data: task } = await db.from("tasks").select("project_id").eq("title", "Linked login screen").single();
+    expect(task!.project_id).toBe(project!.id);
   });
 });
 

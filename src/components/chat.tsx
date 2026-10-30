@@ -7,6 +7,11 @@ import { VoiceSession } from "./voice-session";
 
 type AiStatus = { ready: boolean; mode: string; reason?: string };
 
+/** Models sometimes use **bold** despite being asked not to; show it as bold, not asterisks. */
+function withBold(text: string) {
+  return text.split(/\*\*(.+?)\*\*/g).map((part, i) => (i % 2 ? <strong key={i}>{part}</strong> : part));
+}
+
 export function Chat({
   kind,
   initialMessages,
@@ -108,7 +113,7 @@ export function Chat({
         {messages.map((m) => (
           <div key={m.id} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
             <div className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-[15px] ${m.role === "user" ? "bg-accent text-accent-text" : "border border-border bg-surface"}`}>
-              {m.content}
+              {withBold(m.content)}
             </div>
             <div className="mt-1 flex flex-wrap gap-1">
               {m.modality === "voice" && <span className="badge">voice</span>}

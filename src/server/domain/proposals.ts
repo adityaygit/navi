@@ -88,9 +88,33 @@ async function resolveRefs(ctx: Ctx, proposal: Proposal, payload: Record<string,
       .limit(1)
       .maybeSingle();
     const idField = field.replace("_ref", "_id");
-    if (data?.result_id && out[idField] == null) out[idField] = data.result_id;
+    if (out[idField] != null) continue;
+    if (data?.result_id) {
+      out[idField] = data.result_id;
+    } else if (UUID.test(ref)) {
+      // Models often point at an EXISTING item by its id rather than at another proposal.
+      const { data: existing } = await ctx.db.from(REF_TABLE[field]).select("id").eq("user_id", ctx.userId).eq("id", ref).maybeSingle();
+      if (existing) out[idField] = existing.id;
+    }
   }
   return out;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const REF_TABLE = { workspace_ref: "workspaces", project_ref: "projects", goal_ref: "goals" } as const;
+
+/**
+ * Why a proposed item couldn't be accepted as it stands, or null if it can.
+ * Checked when the AI proposes it, so the model fixes it instead of the user
+ * hitting a validation error on Accept. References are resolved on accept.
+ */
+export function proposalProblem(kind: ProposalKind, payload: Record<string, unknown>): string | null {
+  const schema = kind === "memory" ? MemoryCreate : kind === "preference" ? ProfileUpdate : KIND_TABLE[kind]?.schema;
+  if (!schema) return null;
+  const rest = { ...payload };
+  for (const f of REF_FIELDS) delete rest[f];
+  const parsed = schema.safeParse(rest);
+  return parsed.success ? null : parsed.error.issues.map((i) => `${i.path.join(".") || "payload"}: ${i.message}`).join("; ");
 }
 
 const KIND_TABLE: Partial<Record<ProposalKind, { table: EntityTable; schema: z.ZodTypeAny }>> = {

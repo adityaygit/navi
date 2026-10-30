@@ -3,7 +3,7 @@ import { z } from "zod";
 import { DateTime } from "luxon";
 import type { Ctx } from "@/server/context";
 import { getProfile } from "@/server/context";
-import { createProposals } from "@/server/domain/proposals";
+import { createProposals, proposalProblem } from "@/server/domain/proposals";
 import { createTask, completeTask, updateTask } from "@/server/domain/tasks";
 import { updateEntity, type EntityTable } from "@/server/domain/entities";
 import { addMemory, relevantMemories } from "@/server/domain/memory";
@@ -37,7 +37,7 @@ const ProposalItem = z.object({
   payload: z
     .record(z.string(), z.unknown())
     .describe(
-      "Fields for the item. workspace:{name,description}; goal:{title,why,measure,target_date,workspace_ref}; project:{name,objective,due_date,workspace_ref,goal_ref}; routine:{title,days[0-6],start_time HH:MM|null,duration_minutes,is_fixed,workspace_ref,goal_ref}; event:{title,starts_at,ends_at,recurrence{freq:'weekly',days,until}|null,location,workspace_ref}; task/reminder:{title,notes,priority 1-4,due_at,due_is_hard,estimate_minutes,workspace_ref,project_ref,goal_ref}; note:{title,body}; question:{question}; memory:{kind:profile|project|episodic|behavioral,content,origin:'stated'|'inferred'}; preference:{timezone,quiet_hours_start,quiet_hours_end,morning_briefing_time,evening_review_time,availability[{days,start,end}]}. Use *_ref to point at another proposal's ref_key in the same call.",
+      "Fields for the item. workspace:{name,description}; goal:{title,why,measure,target_date,workspace_ref}; project:{name,objective,due_date,workspace_ref,goal_ref}; routine:{title,days[0-6],start_time HH:MM|null,duration_minutes,is_fixed,workspace_ref,goal_ref}; event:{title,starts_at,ends_at,recurrence{freq:'weekly',days,until}|null,location,workspace_ref}; task/reminder:{title,notes,priority 1-4,due_at,due_is_hard,estimate_minutes,workspace_ref,project_ref,goal_ref}; note:{title,body}; question:{question}; memory:{kind:profile|project|episodic|behavioral,content,origin:'stated'|'inferred'}; preference:{timezone,quiet_hours_start,quiet_hours_end,morning_briefing_time,evening_review_time,availability[{days,start,end}]}. Use *_ref to point at another proposal's ref_key in the same call, or at an existing item's id.",
     ),
   ref_key: z.string().max(60).nullish().describe("Short unique key so other proposals can reference this one, e.g. 'ws_school'"),
   source_excerpt: z.string().max(1000).nullish().describe("The user's exact words this came from"),
@@ -107,6 +107,20 @@ export const TOOLS = [
       "Put NEW items you inferred from what the user said into their review inbox (they become real only when the user accepts them). Use this for anything from brain dumps, casual mentions, or onboarding. Preserve the user's words in source_excerpt and be honest about origin and confidence.",
     schema: z.object({ items: z.array(ProposalItem).min(1).max(40), batch: z.enum(["onboarding", "capture"]).nullish() }),
     run: async (ctx, { items, batch }) => {
+      const problems = items.flatMap((i, n) => {
+        const p = proposalProblem(i.kind, i.payload as Record<string, unknown>);
+        return p ? [`item ${n + 1} (${i.kind} “${String(i.payload.title ?? i.payload.name ?? "")}”): ${p}`] : [];
+      });
+      if (problems.length) {
+        return {
+          ok: false,
+          summary: `Nothing added yet: ${problems.length} item${problems.length === 1 ? "" : "s"} incomplete`,
+          data: {
+            problems,
+            fix: "Call propose_items again with ALL the items, these ones fixed. If a detail such as an end time is unknown, use a sensible default (e.g. 1 hour) and say it's assumed in rationale.",
+          },
+        };
+      }
       if (batch === "onboarding") {
         // A new onboarding draft replaces the previous unreviewed one instead of duplicating it.
         await ctx.db.from("proposals").delete().eq("user_id", ctx.userId).eq("batch", "onboarding").eq("status", "pending");
@@ -168,7 +182,10 @@ export const TOOLS = [
       const clean = Object.fromEntries(Object.entries(patch).filter(([k]) => !forbidden.includes(k)));
       const r = await updateEntity(ctx, table as EntityTable, id, clean);
       if (r.kind === "approval_requested") return { ok: true, mutated: true, summary: `That change ${r.reason}, so it was sent to the user for approval` };
-      return { ok: true, mutated: true, summary: `Updated ${table.replace(/s$/, "")}` };
+      // Say exactly what changed: the summary is all later turns see of this action.
+      const row = r.row as Record<string, unknown>;
+      const changes = Object.entries(clean).map(([k, v]) => `${k} → ${String(typeof v === "object" ? JSON.stringify(v) : v).slice(0, 40)}`).join(", ");
+      return { ok: true, mutated: true, summary: `Updated ${table.replace(/s$/, "").replace("_", " ")} “${String(row.title ?? row.name ?? "")}”: ${changes}` };
     },
   }),
   tool({
