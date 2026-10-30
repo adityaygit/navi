@@ -3,6 +3,9 @@
 // Offline capture queue in IndexedDB. Each item carries a client_id so the
 // server can deduplicate retries; items are removed only after the server
 // confirms it stored them. Nothing private is put in a shared cache.
+// Items are tagged with the signed-in person and only ever shown to or synced
+// for that person, so on a shared device one person's unsent captures can't
+// end up in someone else's account.
 
 export type QueuedCapture = {
   client_id: string;
@@ -11,7 +14,15 @@ export type QueuedCapture = {
   captured_at: string;
   attempts: number;
   last_error?: string;
+  owner?: string;
 };
+
+let owner: string | null = null;
+
+/** Who is signed in on this page. Set before the queue is read or written. */
+export function setQueueOwner(userId: string) {
+  owner = userId;
+}
 
 const DB = "navi-offline";
 const STORE = "captures";
@@ -36,11 +47,20 @@ async function tx<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBReq
 }
 
 export const offlineQueue = {
-  add: (item: QueuedCapture) => tx("readwrite", (s) => s.put(item)).then(notify),
-  all: () => tx<QueuedCapture[]>("readonly", (s) => s.getAll() as IDBRequest<QueuedCapture[]>),
+  add: (item: QueuedCapture) => {
+    if (!owner) return Promise.reject(new Error("Not signed in"));
+    return tx("readwrite", (s) => s.put({ ...item, owner: owner! })).then(notify);
+  },
+  /** The signed-in person's queued captures only. */
+  all: () => tx<QueuedCapture[]>("readonly", (s) => s.getAll() as IDBRequest<QueuedCapture[]>).then((items) => items.filter((i) => owner && i.owner === owner)),
   remove: (id: string) => tx("readwrite", (s) => s.delete(id)).then(notify),
   update: (item: QueuedCapture) => tx("readwrite", (s) => s.put(item)).then(notify),
 };
+
+/** Remove the signed-in person's unsent captures from this device (used when deleting the account). */
+export async function clearOwnQueue() {
+  for (const item of await offlineQueue.all()) await offlineQueue.remove(item.client_id);
+}
 
 function notify() {
   window.dispatchEvent(new Event("navi:queue"));

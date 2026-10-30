@@ -34,7 +34,7 @@ self.addEventListener("fetch", (event) => {
       caches.match(req).then((hit) => hit || fetch(req).then((res) => {
         if (res.ok) { const copy = res.clone(); caches.open(STATIC_CACHE).then((c) => c.put(req, copy)); }
         return res;
-      })),
+      }).catch(() => Response.error())),
     );
     return;
   }

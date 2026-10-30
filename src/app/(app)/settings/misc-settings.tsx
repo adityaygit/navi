@@ -1,5 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
+import { clearDeviceDataForDeletedAccount } from "@/lib/device-privacy";
 import { useRouter } from "next/navigation";
 import { approveBudgetOverrideAction } from "../actions";
 import { announceChange } from "@/lib/offline-queue";
@@ -50,7 +51,7 @@ export function DangerZone() {
           onClick={async () => {
             setBusy(true);
             const res = await fetch("/api/account", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirm: "DELETE" }) });
-            if (res.ok) { router.replace("/login"); router.refresh(); }
+            if (res.ok) { await clearDeviceDataForDeletedAccount(); router.replace("/login"); router.refresh(); }
             else { setMsg((await res.json()).error); setBusy(false); }
           }}
         >

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { announceChange, flushQueue, newClientId, offlineQueue, type QueuedCapture } from "@/lib/offline-queue";
+import { announceChange, flushQueue, newClientId, offlineQueue, setQueueOwner, type QueuedCapture } from "@/lib/offline-queue";
 import { createSpeechRecognition, speechRecognitionSupported, type SpeechRec } from "@/lib/speech";
 
 const DRAFT_KEY = "navi:capture-draft";
@@ -9,7 +9,9 @@ const DRAFT_KEY = "navi:capture-draft";
 // Global quick capture. Text is stored locally the moment it's submitted:
 // online it is sent immediately, offline (or on failure) it waits in a
 // visible queue and syncs on reconnect. The draft survives reloads.
-export function QuickCapture() {
+export function QuickCapture({ userId }: { userId: string }) {
+  // Set during render so every effect on the page (sync on load/online) sees it.
+  setQueueOwner(userId);
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [status, setStatus] = useState<string | null>(null);

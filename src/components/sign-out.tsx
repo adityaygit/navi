@@ -1,4 +1,5 @@
 "use client";
+import { clearDevicePrivateData } from "@/lib/device-privacy";
 
 /** Signs out and clears this device's cached private pages first. */
 export function SignOutButton({ className = "btn btn-ghost btn-sm w-full justify-start" }: { className?: string }) {
@@ -6,14 +7,9 @@ export function SignOutButton({ className = "btn btn-ghost btn-sm w-full justify
     <form
       action="/auth/signout"
       method="post"
-      onSubmit={() => {
-        navigator.serviceWorker?.controller?.postMessage("clear-private-cache");
-        try {
-          localStorage.removeItem("navi:capture-draft");
-          localStorage.removeItem("navi:chat-draft:chat");
-          localStorage.removeItem("navi:chat-draft:onboarding");
-        } catch {}
-      }}
+      // Unsent offline captures stay on the device, tagged as this person's,
+      // and sync when they sign in again; nobody else sees or sends them.
+      onSubmit={clearDevicePrivateData}
     >
       <button className={className}>Sign out</button>
     </form>

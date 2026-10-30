@@ -1,6 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createSupabaseBrowser } from "@/lib/supabase/client";
+import { clearDevicePrivateData } from "@/lib/device-privacy";
 
 export function LoginForm({ next, googleEnabled }: { next: string; googleEnabled: boolean }) {
   const [email, setEmail] = useState("");
@@ -9,6 +10,9 @@ export function LoginForm({ next, googleEnabled }: { next: string; googleEnabled
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const supabase = createSupabaseBrowser();
+  // Whoever signs in next shouldn't see pages cached for someone whose session
+  // ended without signing out (e.g. it expired).
+  useEffect(clearDevicePrivateData, []);
   const redirectTo = () => `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
 
   function explain(err: { message: string; status?: number }) {

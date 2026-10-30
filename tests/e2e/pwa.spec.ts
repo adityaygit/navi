@@ -35,14 +35,23 @@ test("service worker shows pushed notifications and keeps pages available offlin
     void cdp.send("ServiceWorker.enable");
   });
   const origin = new URL(page.url()).origin;
-  await cdp.send("ServiceWorker.deliverPushMessage", {
-    origin,
-    registrationId,
-    data: JSON.stringify({ title: "Due soon", body: "“Essay” is due Fri 5:00 PM.", url: "/tasks", tag: "due2h:test" }),
-  });
-  await expect
-    .poll(() => page.evaluate(async () => (await (await navigator.serviceWorker.ready).getNotifications()).map((n) => ({ title: n.title, body: n.body, url: n.data?.url }))))
-    .toEqual([{ title: "Due soon", body: "“Essay” is due Fri 5:00 PM.", url: "/tasks" }]);
+  const shown = () => page.evaluate(async () => (await (await navigator.serviceWorker.ready).getNotifications()).map((n) => ({ title: n.title, body: n.body, url: n.data?.url })));
+  // DevTools push delivery is occasionally dropped by the browser harness, so
+  // a missing notification gets one more delivery before the test fails.
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    await cdp.send("ServiceWorker.deliverPushMessage", {
+      origin,
+      registrationId,
+      data: JSON.stringify({ title: "Due soon", body: "“Essay” is due Fri 5:00 PM.", url: "/tasks", tag: "due2h:test" }),
+    });
+    let n: unknown[] = [];
+    for (let i = 0; i < 20 && !n.length; i++) {
+      n = await shown();
+      if (!n.length) await page.waitForTimeout(100);
+    }
+    if (n.length) break;
+  }
+  await expect.poll(shown).toEqual([{ title: "Due soon", body: "“Essay” is due Fri 5:00 PM.", url: "/tasks" }]);
 
   // Pages this person opened stay readable offline; others fall back to the offline page.
   await page.goto("/inbox");

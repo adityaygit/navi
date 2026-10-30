@@ -20,7 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {budget && (budget.warn || budget.exceeded) && <BudgetBanner spent={budget.spentUsd} cap={budget.capUsd} exceeded={budget.exceeded} />}
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-36 pt-4 safe-top md:px-8 md:pb-16 md:pt-8">{children}</main>
       </div>
-      <QuickCapture />
+      <QuickCapture userId={ctx.userId} />
       <LiveRefresh adoptTimezone={profile.timezone === "UTC" && profile.onboarding_status === "not_started"} />
     </div>
   );
