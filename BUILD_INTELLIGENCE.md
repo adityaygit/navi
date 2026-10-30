@@ -1,10 +1,18 @@
 # Navi Build Intelligence — Persistent Checkpoint
 
 **Purpose:** Development memory for Claude Code (not Navi's end-user memory). Reconcile with code before trusting it.
-**Repo:** `https://github.com/adityaygit/navi` · **Dev branch:** `claude/charming-darwin-erd78b` (all work is pushed here; no PR open).
+**Repo:** `https://github.com/adityaygit/navi` · **Latest work:** `claude/sharp-keller-moxx93` (session 2; contains all of `claude/charming-darwin-erd78b` plus newer commits; no PR open). Each new cloud session gets its own branch name: check out the latest branch, then push to the session's own designated branch.
 **Scope rule from owner:** The original cloud session also mounted `/home/user/fairylearn-ai` by mistake. **Never read, modify, or push anything in fairylearn.** Work only in the Navi repo.
 **Product source of truth:** `Navi_Product_Spec.md` · **Ops guide:** `docs/OPERATIONS.md` (local dev, tests, hosted Supabase, deploy, env vars, scheduler, spend limits).
-**Last checkpoint:** 2026-10-30 (handoff before moving to a new cloud session). The handoff commit is the branch head; see `git log -1`.
+**Last checkpoint:** 2026-10-30, end of session 2 (handoff before a new cloud session). See `git log -1`.
+
+## ▶ Job for the next session (owner-assigned, 2026-10-30)
+The owner is fixing the environment variables and will start a new session with "resume". Do this, in order:
+1. **Check credentials** (names/lengths/key types only, never values). Expected now: Supabase URL/anon/service/access token all correct (verified in session 2, see table); Anthropic key in **`NAVI_ANTHROPIC_API_KEY`** (the cloud environment reserves `ANTHROPIC_API_KEY` and never passes it to sessions; the app reads either name since commit "Accept NAVI_ANTHROPIC_API_KEY").
+2. **Run the full local test suite** (`scripts/local-only.sh` vitest, build, Playwright) — the key-name change passed typecheck + lint only; the full suite was not run in session 2.
+3. **Set up the hosted Supabase project `gxfkumxjeemceoygtuod` — the owner explicitly approved this ("start setup of supabase").** Follow `docs/OPERATIONS.md` → "Moving to hosted Supabase": apply both migrations (Supabase MCP `apply_migration`/`list_migrations` loads via `.mcp.json` now that `SUPABASE_ACCESS_TOKEN` is set, or `supabase link` + `supabase db push`); enable the Before-User-Created hook → `public.navi_before_user_created`; add the owner's email (the value in `NAVI_ADMIN_EMAILS`) to `allowed_emails`; never run `supabase/seed.sql` on hosted; never run tests against hosted. Verify with `npm run check:deploy` (read-only) and an uninvited sign-up attempt that must be rejected (clean up anything it creates). Site URL/redirects wait for the deploy URL.
+4. `npm run smoke:ai anthropic`, then continue with "Exact next steps" below (real-model app run, Vercel, Trigger.dev).
+
 
 ## How to resume in a fresh session ("resume")
 1. Clone/checkout `claude/charming-darwin-erd78b`; read `Navi_Product_Spec.md`, this file, then `git log --oneline -15` and `git status`.
@@ -24,21 +32,22 @@
    ```
 4. Re-check the credential table below (names/lengths only, never print values), then continue from **Exact next steps**.
 
-## Credentials & environment status (checked 2026-10-30 ~15:30 UTC, read-only)
+## Credentials & environment status (re-checked 2026-10-30 ~17:30 UTC, session 2, read-only)
 Secrets live only in the cloud environment's settings ("Unrestricted full autonomous" environment → Edit → environment variables). Never in chat, never committed. A session only sees variables set before it started.
 
 | Variable | State in the environment | Verified |
 |---|---|---|
-| `GEMINI_API_KEY` | set | **Works.** `GET models/gemini-3.8-live` → 200, "Gemini 3.8 Live", `bidiGenerateContent`. No live session opened yet (no spend). |
-| `SUPABASE_SERVICE_ROLE_KEY` | set, **but holds a personal access token (`sbp_…`), not the project secret key** | As a token it works: Management API → project "Navi" (`gxfkumxjeemceoygtuod`, us-east-2, ACTIVE_HEALTHY, Postgres 17); token sees 1 project. As a service key the project API rejects it (401). Owner must move it to `SUPABASE_ACCESS_TOKEN` and put the project's **secret key** here. |
-| `SUPABASE_ACCESS_TOKEN` | present but **empty** | — (needed by `.mcp.json` Supabase MCP and `check:deploy`) |
-| `NEXT_PUBLIC_SUPABASE_URL` | present but **empty** | should be `https://gxfkumxjeemceoygtuod.supabase.co` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | present but **empty** | the project's publishable key |
-| `NEXT_PUBLIC_SITE_URL`, `NAVI_ADMIN_EMAILS`, `VERCEL_TOKEN`, `TRIGGER_SECRET_KEY` | present but **empty** | — |
-| `ANTHROPIC_API_KEY` | **not set** | — real chat/onboarding/planning still unverified |
+| `GEMINI_API_KEY` | set | **Works, real Live session verified.** `npm run smoke:ai gemini` (session 2): ephemeral token minted, live session spoke "OK." in 1.7s, ≈$0.0002. SDK warns token connections are officially `v1alpha`-only; the default endpoint worked — consider `httpOptions: { apiVersion: 'v1alpha' }` in `voice-session.tsx` + smoke script (then update the e2e URL match in `voice-live.spec.ts`), verified with a real session. |
+| `SUPABASE_SERVICE_ROLE_KEY` | **fixed** | JWT role `service_role`, ref `gxfkumxjeemceoygtuod`; auth admin API → 200. |
+| `SUPABASE_ACCESS_TOKEN` | **fixed** (`sbp_…`) | Management API → 200. Supabase MCP tools load. |
+| `NEXT_PUBLIC_SUPABASE_URL` | **fixed** | `https://gxfkumxjeemceoygtuod.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | **fixed** | JWT role `anon`, same ref; auth settings → 200. |
+| `NAVI_ADMIN_EMAILS` | set | owner's email |
+| `NEXT_PUBLIC_SITE_URL`, `VERCEL_TOKEN`, `TRIGGER_SECRET_KEY` | present but **empty** | — |
+| `ANTHROPIC_API_KEY` / `NAVI_ANTHROPIC_API_KEY` | owner added `ANTHROPIC_API_KEY`, but the cloud environment reserves that name and doesn't pass it to sessions. Owner is re-adding it as **`NAVI_ANTHROPIC_API_KEY`** | — real chat/onboarding/planning still unverified |
 | `TZ` | `America/New_York` | Likely the owner's home timezone (confirm; use for `NAVI_BUDGET_TIMEZONE`). |
 
-**Hosted Supabase project state (read via Management API):** 0 migrations applied (no Navi tables yet); Before-User-Created (invite) hook **off**; Site URL set (value not checked); redirect allow-list empty; Google provider off. Nothing has been written to the hosted project.
+**Hosted Supabase project state (read via Management API, session 1; unchanged in session 2):** 0 migrations applied (no Navi tables yet); Before-User-Created (invite) hook **off**; Site URL set (value not checked); redirect allow-list empty; Google provider off. Nothing has been written to the hosted project.
 
 **Connectors:** no Supabase/Vercel connector in the account; Composio has no Supabase/Vercel account. `.mcp.json` (Supabase MCP) loads only when `SUPABASE_ACCESS_TOKEN` is set at session start.
 
@@ -122,6 +131,7 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 
 ## Learnings
 - Supabase auth hooks reload only on full `supabase stop --no-backup` + start.
+- Environment-variable edits can reach a running session (the container restarts); that restart also kills dockerd. A session's first credential check may predate the owner's edit — re-check before declaring a blocker.
 - Container resets kill dockerd. If `dockerd` says "process with PID … is still running" but nothing runs: `sudo rm -f /var/run/docker.pid /var/run/docker.sock` then start it again. `npm run db:start` may need a second run ("db not ready").
 - Session env vars that exist but are **empty** still block `.env.local` (dotenv and Next.js never override existing variables) → use `scripts/local-only.sh`.
 - `pkill -f "next start"` can kill the calling shell; use `fuser -k 3000/tcp`.
@@ -136,20 +146,18 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 - Concurrency fixes (each with a test that failed first): proposal accept claim, guarded task completion, recurring successor, push claim + retry, locked day plan, voice tool-call dedupe, chat partial-failure honesty, voice mic release on connection loss, voice turn kept on save failure.
 
 ## Commits (chronological)
-`e400992` handoff docs · `05863b4` scaffold/schema/planner · `095bcc9` AI runtime/capture/auth/shell · `9207241` Today/onboarding/inbox/chat/planner · `361078b` tasks/projects/insights/briefings/tick/push · `92df02a` memory/activity/settings/PWA/voice · `5286be2` build fixes + RLS/flow tests · `967df64` ActionButton refactor + e2e suite · `8d28b26` availability parsing, capture FAB · `7d4e8f2` ops guide, invite script, voice fallback e2e · `dfea149` settle blocks + manage e2e · `0016554` axe a11y + contrast · `6e128d7` owner-only budget override · `ef7992b` goals/projects/routines in setup · `c228123` dictated capture · `157b180` project memory recall · `e5b03bb` accountability tests · `95df9ca` reminder expiry · `4d30a13` briefing DST tests · `f2b7d88` CSP · `3acb55d` time-ordered day view + structure e2e · `afadb63` push delivery + SW tests · `277c611` voice hang-up fix + live voice e2e · `97561de` voice onboarding e2e · `3cbeaf8` phone layout fixes · `22fae22` smoke:ai · `6b83dd3` agent loop tests · `0100d5b` budget test fix · `4aeebff` voice server tests · `16c8aff` shared-device privacy + export/delete e2e · `cf6aac9` record · `df8c562` no-sideways-scroll check · `d0811f1`/`8cfc1d1` check:deploy · `bca0996` recurring-task fixes · `b429943` simultaneous accept/complete · `6d2ba09` push once + retry · `d41e03f` locked day plan (migration `20261031000001`) · `78f5d24` voice tool-call dedupe · `34546fb` chat partial-failure honesty · `8acf091` CI · `6beb342` touch targets · `bfb32f8` voice mic release + mute test · `9e76a96` offline actions don't crash · `0d5e9b9` voice turn kept; push/delete errors · `0151b43` Supabase MCP + agent skills · (handoff) test safety guard, UTC test browser, this record, hosted Supabase guide.
+`e400992` handoff docs · `05863b4` scaffold/schema/planner · `095bcc9` AI runtime/capture/auth/shell · `9207241` Today/onboarding/inbox/chat/planner · `361078b` tasks/projects/insights/briefings/tick/push · `92df02a` memory/activity/settings/PWA/voice · `5286be2` build fixes + RLS/flow tests · `967df64` ActionButton refactor + e2e suite · `8d28b26` availability parsing, capture FAB · `7d4e8f2` ops guide, invite script, voice fallback e2e · `dfea149` settle blocks + manage e2e · `0016554` axe a11y + contrast · `6e128d7` owner-only budget override · `ef7992b` goals/projects/routines in setup · `c228123` dictated capture · `157b180` project memory recall · `e5b03bb` accountability tests · `95df9ca` reminder expiry · `4d30a13` briefing DST tests · `f2b7d88` CSP · `3acb55d` time-ordered day view + structure e2e · `afadb63` push delivery + SW tests · `277c611` voice hang-up fix + live voice e2e · `97561de` voice onboarding e2e · `3cbeaf8` phone layout fixes · `22fae22` smoke:ai · `6b83dd3` agent loop tests · `0100d5b` budget test fix · `4aeebff` voice server tests · `16c8aff` shared-device privacy + export/delete e2e · `cf6aac9` record · `df8c562` no-sideways-scroll check · `d0811f1`/`8cfc1d1` check:deploy · `bca0996` recurring-task fixes · `b429943` simultaneous accept/complete · `6d2ba09` push once + retry · `d41e03f` locked day plan (migration `20261031000001`) · `78f5d24` voice tool-call dedupe · `34546fb` chat partial-failure honesty · `8acf091` CI · `6beb342` touch targets · `bfb32f8` voice mic release + mute test · `9e76a96` offline actions don't crash · `0d5e9b9` voice turn kept; push/delete errors · `0151b43` Supabase MCP + agent skills · `9b7c180` handoff (test safety guard, UTC test browser, record, hosted Supabase guide) · **session 2 (`claude/sharp-keller-moxx93`):** accept `NAVI_ANTHROPIC_API_KEY` · this checkpoint.
 
 ## True blockers (owner action needed)
-1. **Fix Supabase variables** (environment settings, "Unrestricted full autonomous"):
-   - Move the `sbp_…` value from `SUPABASE_SERVICE_ROLE_KEY` to `SUPABASE_ACCESS_TOKEN`.
-   - Set `NEXT_PUBLIC_SUPABASE_URL=https://gxfkumxjeemceoygtuod.supabase.co`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` = publishable key, `SUPABASE_SERVICE_ROLE_KEY` = secret key (Supabase → Project Settings → API Keys).
-2. `ANTHROPIC_API_KEY` (+ console spend limit).
+1. ~~Fix Supabase variables~~ — done (verified session 2).
+2. Anthropic key as **`NAVI_ANTHROPIC_API_KEY`** in the environment (+ console spend limit). Owner doing this now.
 3. Vercel: connect the repo or fill `VERCEL_TOKEN`; choose the URL → `NEXT_PUBLIC_SITE_URL`.
 4. Trigger.dev: fill `TRIGGER_SECRET_KEY` + project ref (or accept the Vercel Cron fallback).
 5. Google OAuth client (configured in Supabase Auth) for Google sign-in.
-6. Owner decisions: invite-list emails; `NAVI_ADMIN_EMAILS` (owner's email); confirm home timezone (environment says America/New_York).
+6. Owner decisions: further invite-list emails (owner's own email: use `NAVI_ADMIN_EMAILS`); confirm home timezone (environment says America/New_York).
 7. Physical iPhone check after deploy: install, push, mic/voice.
 
-## Exact next steps (in order; nothing below has been started)
+## Exact next steps (after the "Job for the next session" above)
 1. Re-check credentials (names/lengths only). If Supabase variables are fixed: run `npm run check:deploy` (read-only) to see the hosted gaps.
 2. Hosted Supabase setup (owner already asked for it; these are writes to the owner's project — follow `docs/OPERATIONS.md` → "Moving to hosted Supabase"): apply both migrations (`supabase link` + `supabase db push`, or MCP), enable the Before-User-Created hook → `public.navi_before_user_created`, set Site URL + redirect URLs once the app URL is known, add the owner's email to `allowed_emails`. Never run `supabase/seed.sql` on hosted. Verify with `check:deploy` and an uninvited sign-up attempt.
 3. `npm run smoke:ai gemini` (fraction of a cent, budget-checked) to open one real Gemini Live session; then `npm run smoke:ai anthropic` once the Anthropic key exists.
