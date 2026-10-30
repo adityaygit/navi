@@ -76,22 +76,25 @@ export default async function PlannerPage({ searchParams }: { searchParams: Prom
                 {view === "week" && <Link href={nav(d, "day")} className="btn btn-ghost btn-sm ml-auto">Open</Link>}
               </div>
               {fixed.length === 0 && dayBlocks.length === 0 && <p className="muted mt-2 text-sm">Nothing scheduled.</p>}
-              {fixed.length > 0 && (
-                <ul className="mt-2 flex flex-col gap-1">
-                  {fixed.map((f) => (
-                    <li key={f.id + f.start} className="flex gap-3 rounded-lg bg-surface-2 px-2 py-1.5 text-sm">
-                      <span className="w-32 shrink-0 tabular-nums">{formatTime(f.start, zone)}–{formatTime(f.end, zone)}</span>
-                      <span className="flex-1">{f.title}</span>
-                      <span className="badge">{f.external ? "external" : "fixed"}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {dayBlocks.length > 0 && (
-                <ul className="mt-1">
-                  {dayBlocks.map((b) => (
-                    <PlanBlockRow key={b.id} block={b} time={`${formatTime(b.starts_at, zone)}–${formatTime(b.ends_at, zone)}`} canFocus={!focusRes.data && d === today} />
-                  ))}
+              {(fixed.length > 0 || dayBlocks.length > 0) && (
+                // One timeline: fixed commitments and flexible blocks in time order.
+                <ul className="mt-2 flex flex-col">
+                  {[
+                    ...fixed.map((f) => ({ at: Date.parse(f.start), fixed: f, block: null })),
+                    ...dayBlocks.map((b) => ({ at: Date.parse(b.starts_at), fixed: null, block: b })),
+                  ]
+                    .sort((a, b) => a.at - b.at)
+                    .map(({ fixed: f, block: b }) =>
+                      f ? (
+                        <li key={f.id + f.start} className="my-1 flex gap-3 rounded-lg bg-surface-2 px-2 py-1.5 text-sm">
+                          <span className="w-32 shrink-0 tabular-nums">{formatTime(f.start, zone)}–{formatTime(f.end, zone)}</span>
+                          <span className="flex-1">{f.title}</span>
+                          <span className="badge">{f.external ? "external" : "fixed"}</span>
+                        </li>
+                      ) : (
+                        <PlanBlockRow key={b!.id} block={b!} time={`${formatTime(b!.starts_at, zone)}–${formatTime(b!.ends_at, zone)}`} canFocus={!focusRes.data && d === today} />
+                      ),
+                    )}
                 </ul>
               )}
             </section>

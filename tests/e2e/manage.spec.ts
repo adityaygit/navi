@@ -1,35 +1,9 @@
-import { test, expect, type Page } from "@playwright/test";
-import { createClient } from "@supabase/supabase-js";
-import { config } from "dotenv";
+import { test, expect } from "@playwright/test";
+import { admin, freshSetUpAccount } from "./helpers";
 
 // Day-to-day management flows on an already set-up account: focus, plan
 // recovery, memory correction, approvals and settings. Each device profile
 // gets its own invited account so runs don't interfere.
-
-config({ path: ".env.local", quiet: true });
-const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
-const PASSWORD = "test-password-123";
-
-async function freshSetUpAccount(page: Page, email: string) {
-  await admin.from("allowed_emails").upsert({ email, note: "e2e manage spec" });
-  const { data } = await admin.auth.admin.listUsers();
-  const old = data.users.find((u) => u.email === email);
-  if (old) await admin.auth.admin.deleteUser(old.id);
-  await page.goto("/login");
-  await page.getByRole("button", { name: "Use a password instead" }).click();
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/onboarding/);
-  const { data: after } = await admin.auth.admin.listUsers();
-  const userId = after.users.find((u) => u.email === email)!.id;
-  // Skip the setup conversation (covered by core.spec) with a known schedule.
-  await admin
-    .from("profiles")
-    .update({ onboarding_status: "completed", timezone: "UTC", availability: [{ days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "23:59" }] })
-    .eq("id", userId);
-  return userId;
-}
 
 test("focus, recovery, memory, approvals and settings", async ({ page }, info) => {
   page.on("dialog", (d) => d.accept());

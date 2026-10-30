@@ -40,8 +40,8 @@ export function AddCommitment({ zone, defaultDate }: { zone: string; defaultDate
         <label htmlFor="c-title" className="label">What</label>
         <input id="c-title" required className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Soccer practice" />
       </div>
-      <div className="grid grid-cols-3 gap-2">
-        <div><label htmlFor="c-date" className="label">Date</label><input id="c-date" type="date" required className="input" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="col-span-2 sm:col-span-1"><label htmlFor="c-date" className="label">Date</label><input id="c-date" type="date" required className="input" value={date} onChange={(e) => setDate(e.target.value)} /></div>
         <div><label htmlFor="c-start" className="label">Start</label><input id="c-start" type="time" required className="input" value={startT} onChange={(e) => setStartT(e.target.value)} /></div>
         <div><label htmlFor="c-end" className="label">End</label><input id="c-end" type="time" required className="input" value={endT} onChange={(e) => setEndT(e.target.value)} /></div>
       </div>

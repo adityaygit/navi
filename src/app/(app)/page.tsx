@@ -93,27 +93,31 @@ export default async function TodayPage() {
           {blocks.length > 0 && <span className="muted text-sm">{done}/{blocks.length} done</span>}
           <Link href="/planner" className="btn btn-ghost btn-sm ml-auto">Week view</Link>
         </div>
-        {fixedToday.length > 0 && (
-          <ul className="mt-2 flex flex-col gap-1">
-            {fixedToday.map((f, i) => (
-              <li key={i} className="flex gap-3 text-sm">
-                <span className="w-36 shrink-0 tabular-nums muted">{formatTime(f.start, zone)}–{formatTime(f.end, zone)}</span>
-                <span>{f.title}</span>
-                <span className="badge">fixed</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {blocks.length === 0 ? (
+        {blocks.length === 0 && (
           <p className="muted mt-3 text-sm">
             No flexible work is planned for today yet. Press “Re-plan today”, or tell Navi what you want to get done.
             {profile.availability.length === 0 && " Navi doesn't know when you're free yet, so set your availability in Settings or tell Navi."}
           </p>
-        ) : (
-          <ul className="mt-2">
-            {blocks.map((b) => (
-              <PlanBlockRow key={b.id} block={b} time={`${formatTime(b.starts_at, zone)}–${formatTime(b.ends_at, zone)}`} canFocus={!focus} />
-            ))}
+        )}
+        {(fixedToday.length > 0 || blocks.length > 0) && (
+          // One timeline: fixed commitments and flexible blocks in time order.
+          <ul className="mt-2 flex flex-col">
+            {[
+              ...fixedToday.map((f) => ({ at: Date.parse(f.start), fixed: f, block: null })),
+              ...blocks.map((b) => ({ at: Date.parse(b.starts_at), fixed: null, block: b })),
+            ]
+              .sort((a, b) => a.at - b.at)
+              .map(({ fixed: f, block: b }, i) =>
+                f ? (
+                  <li key={`f${i}`} className="my-1 flex gap-3 rounded-lg bg-surface-2 px-2 py-1.5 text-sm">
+                    <span className="w-36 shrink-0 tabular-nums">{formatTime(f.start, zone)}–{formatTime(f.end, zone)}</span>
+                    <span className="flex-1">{f.title}</span>
+                    <span className="badge">fixed</span>
+                  </li>
+                ) : (
+                  <PlanBlockRow key={b!.id} block={b!} time={`${formatTime(b!.starts_at, zone)}–${formatTime(b!.ends_at, zone)}`} canFocus={!focus} />
+                ),
+              )}
           </ul>
         )}
       </section>
