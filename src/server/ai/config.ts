@@ -57,7 +57,7 @@ export function aiAvailability(): AiAvailability {
   const provider = serverEnv.aiProvider();
   if (provider === "devsim") return { mode: "devsim", ready: true };
   if (serverEnv.anthropicApiKey()) return { mode: "anthropic", ready: true };
-  return { mode: "none", ready: false, reason: "No Anthropic API key is configured on the server (ANTHROPIC_API_KEY)." };
+  return { mode: "none", ready: false, reason: "No Anthropic API key is configured on the server (ANTHROPIC_API_KEY or NAVI_ANTHROPIC_API_KEY)." };
 }
 
 export function voiceAvailability(): { ready: boolean; reason?: string; model: string } {

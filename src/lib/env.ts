@@ -18,7 +18,9 @@ function required(name: string): string {
 
 export const serverEnv = {
   supabaseServiceRoleKey: () => required("SUPABASE_SERVICE_ROLE_KEY"),
-  anthropicApiKey: () => process.env.ANTHROPIC_API_KEY || null,
+  // Claude Code cloud environments reserve ANTHROPIC_API_KEY and don't pass it to sessions, so
+  // NAVI_ANTHROPIC_API_KEY is accepted as well.
+  anthropicApiKey: () => process.env.ANTHROPIC_API_KEY || process.env.NAVI_ANTHROPIC_API_KEY || null,
   geminiApiKey: () => process.env.GEMINI_API_KEY || null,
   aiProvider: (): "anthropic" | "devsim" => {
     const value = process.env.NAVI_AI_PROVIDER === "devsim" ? "devsim" : "anthropic";

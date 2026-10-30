@@ -50,9 +50,10 @@ async function record(db, row) {
 }
 
 async function anthropic(db) {
-  if (!env.ANTHROPIC_API_KEY) return fail("anthropic", "ANTHROPIC_API_KEY is not set");
+  const apiKey = env.ANTHROPIC_API_KEY || env.NAVI_ANTHROPIC_API_KEY;
+  if (!apiKey) return fail("anthropic", "ANTHROPIC_API_KEY (or NAVI_ANTHROPIC_API_KEY) is not set");
   const { default: Anthropic } = await import("@anthropic-ai/sdk");
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  const client = new Anthropic({ apiKey });
   for (const [role, model] of Object.entries(roles)) {
     try {
       const info = await client.models.retrieve(model);

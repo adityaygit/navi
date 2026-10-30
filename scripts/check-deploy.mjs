@@ -31,7 +31,6 @@ function checkEnv() {
     "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
     "NEXT_PUBLIC_SITE_URL",
-    "ANTHROPIC_API_KEY",
     "CRON_SECRET",
     "NEXT_PUBLIC_VAPID_PUBLIC_KEY",
     "VAPID_PRIVATE_KEY",
@@ -39,7 +38,8 @@ function checkEnv() {
     "NAVI_ADMIN_EMAILS",
   ];
   const missing = required.filter((k) => !env[k]);
-  check(!missing.length, "required settings", `${required.length} present`, `missing: ${missing.join(", ")}`);
+  if (!env.ANTHROPIC_API_KEY && !env.NAVI_ANTHROPIC_API_KEY) missing.push("ANTHROPIC_API_KEY");
+  check(!missing.length, "required settings", `${required.length + 1} present`, `missing: ${missing.join(", ")}`);
   check(env.GEMINI_API_KEY, "real-time voice key", "GEMINI_API_KEY present", "GEMINI_API_KEY missing: voice falls back to basic browser speech", warn);
 
   check(env.NAVI_AI_PROVIDER === "anthropic", "AI provider", "anthropic", `NAVI_AI_PROVIDER is "${env.NAVI_AI_PROVIDER ?? ""}", must be "anthropic" in production`);

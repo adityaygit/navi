@@ -155,7 +155,7 @@ Import the repo and set the environment variables from `.env.example`:
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Project URL and publishable key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Secret key. Server only, used by jobs and the account-deletion route |
 | `NEXT_PUBLIC_SITE_URL` | Public origin, used for auth redirects and push links |
-| `ANTHROPIC_API_KEY` | Text chat, onboarding, capture parsing, planning |
+| `ANTHROPIC_API_KEY` | Text chat, onboarding, capture parsing, planning. In a Claude Code cloud environment use `NAVI_ANTHROPIC_API_KEY` instead: the environment reserves `ANTHROPIC_API_KEY` and does not pass it to sessions |
 | `GEMINI_API_KEY` | Real-time voice. Without it, voice falls back to the browser's speech recognition and the same text pipeline |
 | `NAVI_AI_PROVIDER` | `anthropic` in production |
 | `NAVI_MODEL_*` | Model roles; defaults are in `.env.example` |
