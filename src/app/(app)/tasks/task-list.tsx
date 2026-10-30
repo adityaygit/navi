@@ -40,7 +40,7 @@ function TaskRow({ task, zone, children_, projectName, opts, depth = 0 }: { task
     <li className="border-b border-border last:border-0">
       <div className="flex flex-wrap items-center gap-2 px-4 py-3" style={{ paddingLeft: 16 + depth * 20 }}>
         {!done ? (
-          <ActionButton className="btn btn-sm h-8 min-h-8 w-8 rounded-full p-0" label={`Complete ${task.title}`} action={() => completeTaskAction(task.id)}>✓</ActionButton>
+          <ActionButton className="btn btn-sm h-8 min-h-8 w-8 rounded-full p-0 pointer-coarse:h-11 pointer-coarse:min-h-11 pointer-coarse:w-11" label={`Complete ${task.title}`} action={() => completeTaskAction(task.id)}>✓</ActionButton>
         ) : (
           <ActionButton className="btn btn-ghost btn-sm" label={`Reopen ${task.title}`} action={() => updateTaskAction(task.id, { status: "todo" })}>Reopen</ActionButton>
         )}
@@ -63,7 +63,7 @@ function TaskRow({ task, zone, children_, projectName, opts, depth = 0 }: { task
             {task.blocker && <span className="text-xs text-warn">Blocked: {task.blocker}</span>}
           </div>
         </div>
-        <div className="ml-10 flex flex-wrap gap-1 sm:ml-0">
+        <div className="ml-10 flex flex-wrap gap-1 pointer-coarse:ml-13 sm:ml-0 sm:pointer-coarse:ml-0">
           {!done && <ActionButton action={() => startFocusAction({ task_id: task.id, planned_minutes: task.estimate_minutes })}>Focus</ActionButton>}
           {!done && depth === 0 && <button type="button" className="btn btn-sm" onClick={() => setAddingSub((v) => !v)}>+ Sub</button>}
           <button type="button" className="btn btn-sm" onClick={() => setEditing((v) => !v)} aria-expanded={editing}>{editing ? "Close" : "Edit"}</button>

@@ -26,8 +26,18 @@ async function overflow(page: Page, label: string) {
   return wide.map((w) => `${label}: wider than the screen: ${w}`);
 }
 
+/** On a touch screen, buttons should be at least 44px tall (Apple's guidance). */
+async function smallTargets(page: Page, label: string) {
+  const small = await page.evaluate(() =>
+    [...document.querySelectorAll("button, a.btn, summary")]
+      .filter((el) => (el as HTMLElement).offsetParent && el.getBoundingClientRect().height < 43.5)
+      .map((el) => `${(el.textContent ?? "").trim().slice(0, 30)} (${Math.round(el.getBoundingClientRect().height)}px)`),
+  );
+  return small.length ? [`${label}: touch targets under 44px: ${[...new Set(small)].join(", ")}`] : [];
+}
+
 async function audit(page: Page, label: string) {
-  const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
   const problems = results.violations.map((v) => `${label}: [${v.impact}] ${v.id} — ${v.help} (${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join(", ")})`);
   return problems;
 }
@@ -87,6 +97,7 @@ test("main pages have no automatically detectable WCAG A/AA violations", async (
     await page.goto(path);
     await page.waitForLoadState("networkidle");
     problems.push(...(await audit(page, path)), ...(await cspViolations(path)), ...(await overflow(page, path)));
+    if (info.project.name === "iphone") problems.push(...(await smallTargets(page, path)));
     if (info.project.name === "iphone") await page.screenshot({ path: `test-results/phone${path === "/" ? "/today" : path}.png`, fullPage: true });
   }
   // The voice audio worklet must load under the CSP.

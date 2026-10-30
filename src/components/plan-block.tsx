@@ -28,7 +28,7 @@ export function PlanBlockRow({ block, time, canFocus }: { block: PlanBlock; time
           {block.status !== "planned" && <span className={`badge ${STATUS_BADGE[block.status] ?? ""}`}>{block.status.replace("_", " ")}</span>}
         </div>
         {block.reason && (
-          <button type="button" className="muted text-xs underline-offset-2 hover:underline" onClick={() => setWhy(!why)} aria-expanded={why}>
+          <button type="button" className="muted inline-flex items-center text-left text-xs underline-offset-2 hover:underline pointer-coarse:min-h-11" onClick={() => setWhy(!why)} aria-expanded={why}>
             {why ? block.reason : "Why here?"}
           </button>
         )}

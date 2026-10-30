@@ -95,7 +95,7 @@ body {
     @apply border-transparent bg-transparent hover:bg-surface-2;
   }
   .btn-sm {
-    @apply min-h-9 px-2.5 text-xs;
+    @apply min-h-9 px-2.5 text-xs pointer-coarse:min-h-11;
   }
   .input {
     @apply min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-base text-text placeholder:text-muted;
@@ -146,4 +146,12 @@ body {
 }
 .safe-top {
   padding-top: env(safe-area-inset-top);
+}
+
+/* Disclosure toggles get a full-size tap area on touch screens. */
+@media (pointer: coarse) {
+  summary {
+    min-height: 2.75rem;
+    padding-block: 0.625rem;
+  }
 }
