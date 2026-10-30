@@ -183,6 +183,26 @@ describe("plan recovery", () => {
   });
 });
 
+describe("memory across sessions", () => {
+  it("brings back a project's memories in a brand-new conversation, but not rejected ones", async () => {
+    const ctx = ctxFor(db, userId, zone);
+    const { data: project } = await db.from("projects").insert({ user_id: userId, name: "Robotics" }).select("id").single();
+    for (const row of [
+      { content: "Competition moved to March 14; drivetrain is the bottleneck", origin: "stated" },
+      { content: "Team wants to drop the arm design", origin: "inferred", confidence: 0.4, status: "rejected" },
+    ]) {
+      const { error } = await db.from("memories").insert({ user_id: userId, kind: "project", project_id: project!.id, ...row });
+      expect(error).toBeNull();
+    }
+    const { buildContext } = await import("@/server/ai/chat");
+    // A new conversation: nothing about the project is in its history.
+    const fresh = { ...ctx, conversationId: undefined };
+    const context = await buildContext(fresh, "how is robotics going?", "chat");
+    expect(context).toContain("[Robotics] Competition moved to March 14; drivetrain is the bottleneck");
+    expect(context).not.toContain("drop the arm design");
+  });
+});
+
 describe("plan stays in step with tasks", () => {
   it("settles open blocks when a task is finished, cancelled or deleted", async () => {
     const ctx = ctxFor(db, userId, zone);

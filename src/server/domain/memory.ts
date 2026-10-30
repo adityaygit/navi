@@ -109,16 +109,20 @@ export async function deleteMemory(ctx: Ctx, id: string): Promise<void> {
 export async function relevantMemories(ctx: Ctx, query: string, limit = 25): Promise<Memory[]> {
   const { data } = await ctx.db
     .from("memories")
-    .select("*")
+    .select("*, projects(name)")
     .eq("status", "active")
     .order("updated_at", { ascending: false })
     .limit(300);
-  const all = (data ?? []) as Memory[];
-  const words = query.toLowerCase().split(/\W+/).filter((w) => w.length > 3);
+  const all = (data ?? []) as (Memory & { projects: { name: string } | null })[];
+  const q = query.toLowerCase();
+  const words = q.split(/\W+/).filter((w) => w.length > 3);
   const scored = all.map((m) => {
     const text = m.content.toLowerCase();
     let score = m.kind === "profile" ? 2 : 0;
     for (const w of words) if (text.includes(w)) score += 1;
+    // Mentioning a project brings back what was decided about it.
+    const project = m.projects?.name.toLowerCase();
+    if (project && new RegExp(`\\b${project.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(q)) score += 3;
     if (m.origin === "stated") score += 0.5;
     return { m, score };
   });
@@ -126,5 +130,8 @@ export async function relevantMemories(ctx: Ctx, query: string, limit = 25): Pro
     .filter((s) => s.score > 0 || s.m.kind === "behavioral")
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
-    .map((s) => s.m);
+    .map(({ m }) => {
+      const { projects, ...rest } = m;
+      return projects ? { ...rest, content: `[${projects.name}] ${rest.content}` } : rest;
+    });
 }
