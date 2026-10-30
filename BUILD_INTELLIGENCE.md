@@ -1,21 +1,28 @@
 # Navi Build Intelligence — Persistent Checkpoint
 
 **Purpose:** Development memory for Claude Code (not Navi's end-user memory). Reconcile with code before trusting it.
-**Repo:** `https://github.com/adityaygit/navi` · **Latest work:** `claude/sharp-keller-moxx93` (session 2; contains all of `claude/charming-darwin-erd78b` plus newer commits; no PR open). Each new cloud session gets its own branch name: check out the latest branch, then push to the session's own designated branch.
+**Repo:** `https://github.com/adityaygit/navi` · **Latest work:** `claude/dazzling-cray-isusbm` (session 3; contains all of `claude/sharp-keller-moxx93` plus newer commits; no PR open). Each new cloud session gets its own branch name: check out the latest branch, then push to the session's own designated branch.
 **Scope rule from owner:** The original cloud session also mounted `/home/user/fairylearn-ai` by mistake. **Never read, modify, or push anything in fairylearn.** Work only in the Navi repo.
 **Product source of truth:** `Navi_Product_Spec.md` · **Ops guide:** `docs/OPERATIONS.md` (local dev, tests, hosted Supabase, deploy, env vars, scheduler, spend limits).
-**Last checkpoint:** 2026-10-30, end of session 2 (handoff before a new cloud session). See `git log -1`.
+**Last checkpoint:** 2026-10-30, session 3 (hosted Supabase + Vercel setup in progress). See `git log -1`.
 
-## ▶ Job for the next session (owner-assigned, 2026-10-30)
-The owner is fixing the environment variables and will start a new session with "resume". Do this, in order:
-1. **Check credentials** (names/lengths/key types only, never values). Expected now: Supabase URL/anon/service/access token all correct (verified in session 2, see table); Anthropic key in **`NAVI_ANTHROPIC_API_KEY`** (the cloud environment reserves `ANTHROPIC_API_KEY` and never passes it to sessions; the app reads either name since commit "Accept NAVI_ANTHROPIC_API_KEY").
-2. **Run the full local test suite** (`scripts/local-only.sh` vitest, build, Playwright) — the key-name change passed typecheck + lint only; the full suite was not run in session 2.
-3. **Set up the hosted Supabase project `gxfkumxjeemceoygtuod` — the owner explicitly approved this ("start setup of supabase").** Follow `docs/OPERATIONS.md` → "Moving to hosted Supabase": apply both migrations (Supabase MCP `apply_migration`/`list_migrations` loads via `.mcp.json` now that `SUPABASE_ACCESS_TOKEN` is set, or `supabase link` + `supabase db push`); enable the Before-User-Created hook → `public.navi_before_user_created`; add the owner's email (the value in `NAVI_ADMIN_EMAILS`) to `allowed_emails`; never run `supabase/seed.sql` on hosted; never run tests against hosted. Verify with `npm run check:deploy` (read-only) and an uninvited sign-up attempt that must be rejected (clean up anything it creates). Site URL/redirects wait for the deploy URL.
-4. `npm run smoke:ai anthropic`, then continue with "Exact next steps" below (real-model app run, Vercel, Trigger.dev).
+## ▶ Session 3 status and what's waiting on the owner (2026-10-30)
+Done in session 3 (owner approved hosted Supabase setup and Vercel env vars for Production + Preview):
+- Credentials re-checked: `NAVI_ANTHROPIC_API_KEY` set (sk-ant-, works), `VERCEL_TOKEN` set (project-scoped: reads/writes project `navi`, can't list teams), `TRIGGER_SECRET_KEY` set but a **dev** key (`tr_dev_`), no project ref.
+- `npm run smoke:ai anthropic` → PASS fast (`claude-haiku-5-5`) + planner (`claude-sonnet-5-5`), ≈$0.00008 (run without Supabase vars so nothing touched hosted).
+- Full local suite PASS (tsc, lint, vitest 9 files 66/66, build, Playwright 30/30), including after migration `20261101000001_api_privileges`.
+- **Hosted Supabase:** migrations `20261030000001` + `20261031000001` applied (Management API; recorded versions fixed to the file versions). Auth: Before-User-Created hook **on** → `navi_before_user_created`; Site URL `https://navi-sand.vercel.app`; redirects for `/auth/callback` + `/auth/confirm` on that domain and `https://navi-*-chairbook.vercel.app` previews.
+- **Found:** this hosted project gives `anon`/`authenticated`/`service_role` no SELECT/INSERT/UPDATE/DELETE on new tables (newer Supabase default; local grants them). Even the secret key got "permission denied" → the deployed app could not work. Fixed in repo by migration `20261101000001_api_privileges.sql` (explicit grants + 2 advisor fixes), verified locally. **Not yet applied to hosted** — the permission guard treated it as outside the approved "2 migrations"; waiting for the owner.
+- **Vercel:** project `navi` (team `chairbook`) was already Git-connected, production branch `main`, domain `navi-sand.vercel.app`. Builds were READY but every route 404'd: no framework preset. Fixed via `vercel.json` (`framework: nextjs`); preview of `1618f78` built with preset `nextjs` and 24 crons accepted. 14 env vars set for Production + Preview (Supabase URL/anon/service, `ANTHROPIC_API_KEY` from `NAVI_ANTHROPIC_API_KEY`, Gemini, `NAVI_AI_PROVIDER=anthropic`, `NEXT_PUBLIC_SITE_URL=https://navi-sand.vercel.app`, fresh `CRON_SECRET` + VAPID keys, `VAPID_SUBJECT=https://navi-sand.vercel.app`, budget $2, `NAVI_BUDGET_TIMEZONE=America/New_York`, admin emails). Secrets are "sensitive" (not readable back); the generated CRON_SECRET/VAPID exist only in Vercel.
+- Previews are behind Vercel Authentication (Standard Protection); only the production domain is public, and crons only run on production.
+- Scheduler: Trigger.dev can't be deployed from here (needs `tr_pat_` token + project ref + prod key). Owner chose the Vercel Cron fallback: 24 daily jobs, one per UTC hour (Hobby: 100 jobs/project, once/day each, ±59 min).
 
+Waiting on the owner:
+1. OK to apply `20261101000001_api_privileges.sql` to hosted. Then: invite the owner email (`node scripts/allow-email.mjs add …` via session env), uninvited sign-up must fail, `npm run check:deploy`.
+2. How to get this code onto production (`navi-sand.vercel.app` currently serves an old 404ing build from `claude/charming-darwin-erd78b`): merge to `main` via PR, or promote the preview deployment. Then `npm run check:deploy -- https://navi-sand.vercel.app`, a real sign-in, and a real-model run of onboarding/capture/planning/voice.
 
 ## How to resume in a fresh session ("resume")
-1. Check out the latest branch (`claude/sharp-keller-moxx93` as of session 2); read `Navi_Product_Spec.md`, this file, then `git log --oneline -15` and `git status`.
+1. Check out the latest branch (`claude/dazzling-cray-isusbm` as of session 3); read `Navi_Product_Spec.md`, this file, then `git log --oneline -15` and `git status`.
 2. Local stack (container resets kill Docker; see Learnings if `dockerd` complains about a stale pid):
    ```bash
    sudo nohup dockerd > /tmp/dockerd.log 2>&1 &
@@ -43,11 +50,13 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 | `NEXT_PUBLIC_SUPABASE_URL` | **fixed** | `https://gxfkumxjeemceoygtuod.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | **fixed** | JWT role `anon`, same ref; auth settings → 200. |
 | `NAVI_ADMIN_EMAILS` | set | owner's email |
-| `NEXT_PUBLIC_SITE_URL`, `VERCEL_TOKEN`, `TRIGGER_SECRET_KEY` | present but **empty** | — |
-| `ANTHROPIC_API_KEY` / `NAVI_ANTHROPIC_API_KEY` | owner added `ANTHROPIC_API_KEY`, but the cloud environment reserves that name and doesn't pass it to sessions. Owner is re-adding it as **`NAVI_ANTHROPIC_API_KEY`** | — real chat/onboarding/planning still unverified |
+| `VERCEL_TOKEN` | set (session 3) | Project-scoped: project `navi` read/write works; `/v2/user` and teams list refused. |
+| `TRIGGER_SECRET_KEY` | set (session 3), **dev** key `tr_dev_` | Can't deploy (needs `tr_pat_` + project ref). |
+| `NEXT_PUBLIC_SITE_URL` | empty in the session env | Set in Vercel to `https://navi-sand.vercel.app`. |
+| `NAVI_ANTHROPIC_API_KEY` | set, `sk-ant-` (session 3) | **Works:** `smoke:ai anthropic` PASS for haiku + sonnet. Real app flows still unverified. |
 | `TZ` | `America/New_York` | Likely the owner's home timezone (confirm; use for `NAVI_BUDGET_TIMEZONE`). |
 
-**Hosted Supabase project state (read via Management API, session 1; unchanged in session 2):** 0 migrations applied (no Navi tables yet); Before-User-Created (invite) hook **off**; Site URL set (value not checked); redirect allow-list empty; Google provider off. Nothing has been written to the hosted project.
+**Hosted Supabase project state (session 3):** migrations `20261030000001`, `20261031000001` applied; `20261101000001_api_privileges` **pending owner OK** (without it the API roles can't read/write tables). Invite hook on; Site URL + redirects set for `navi-sand.vercel.app`; Google provider off; invite list empty (insert blocked by the missing grants). Supabase MCP tools load in session 3.
 
 **Connectors:** no Supabase/Vercel connector in the account; Composio has no Supabase/Vercel account. `.mcp.json` (Supabase MCP) loads only when `SUPABASE_ACCESS_TOKEN` is set at session start.
 
@@ -82,8 +91,9 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 | Secret protection / access control | verified (local) | No server secret in `.next/static`; only `.env.example` tracked; private APIs 401 signed out; nonce CSP; security headers. Tests can't reach a hosted project (`tests/local-guard.ts`, `scripts/local-only.sh`). |
 | CI (`.github/workflows/ci.yml`) | verified | Green on GitHub for `8acf091`, `6beb342`, `bfb32f8` (typecheck, lint, unit, integration on local Supabase, build, Playwright desktop+iPhone with the simulator). |
 | Pre-deploy check (`npm run check:deploy`) | verified (local) | Read-only; not yet run against the hosted project (needs URL + keys). |
-| Hosted Supabase | **project exists, not set up** | See "Credentials" above and `docs/OPERATIONS.md` → "Moving to hosted Supabase". |
-| Deployment (Vercel) / scheduler (Trigger.dev) | blocked | Tokens present but empty. |
+| Hosted Supabase | in progress | Schema (2 of 3 migrations), invite hook, URLs done; grants migration + owner invite + sign-up rejection check pending owner OK. |
+| Deployment (Vercel) | in progress | Framework fix + 14 env vars + 24 hourly crons; preview `1618f78` READY (behind Vercel login). Production still the old 404 build until this branch reaches `main` / is promoted. |
+| Scheduler | implemented (Vercel Cron fallback) | Hourly via 24 daily jobs; runs only on production. Trigger.dev blocked (needs `tr_pat_` + ref + prod key). |
 | Physical iPhone verification | blocked | Needs owner device (install, push, mic). |
 | Calendar/Gmail/Drive/GitHub integrations | not started (out of V1 core) | Shown as "not connected"; external approvals fail honestly. |
 
@@ -103,7 +113,7 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 13. Persistence, secrets, access control, automated checks, mobile usability, deployed preview — all verified locally + CI; **no deployed preview yet**.
 14. Resume from repo + checkpoint — this file + `docs/OPERATIONS.md`.
 
-## Test commands & latest results (2026-10-30, handoff run, all via `scripts/local-only.sh`)
+## Test commands & latest results (2026-10-30, session 3 run with migration 20261101000001: same counts, all pass; below is the session 2 handoff run, all via `scripts/local-only.sh`)
 - `npx tsc --noEmit` → pass · `npm run lint` → pass.
 - `npx vitest run` → **9 files, 66/66 passed** (unit + integration on local Supabase; Claude and Gemini network calls mocked).
 - `npx next build` → pass.
@@ -131,6 +141,10 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 
 ## Learnings
 - Supabase auth hooks reload only on full `supabase stop --no-backup` + start.
+- Newer hosted Supabase projects don't grant API roles table privileges by default (local does) → grants must be explicit in migrations.
+- Hosted PostgREST answers HEAD for a missing table with 204 and no error → existence checks must use GET (`select().limit(0)`).
+- Management API `POST /database/migrations` records the apply time as the version; fix to the file version.
+- A Vercel project with no framework preset builds Next.js successfully but serves 404 for everything.
 - Environment-variable edits can reach a running session (the container restarts); that restart also kills dockerd. A session's first credential check may predate the owner's edit — re-check before declaring a blocker.
 - Container resets kill dockerd. If `dockerd` says "process with PID … is still running" but nothing runs: `sudo rm -f /var/run/docker.pid /var/run/docker.sock` then start it again. `npm run db:start` may need a second run ("db not ready").
 - Session env vars that exist but are **empty** still block `.env.local` (dotenv and Next.js never override existing variables) → use `scripts/local-only.sh`.
@@ -146,7 +160,7 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 - Concurrency fixes (each with a test that failed first): proposal accept claim, guarded task completion, recurring successor, push claim + retry, locked day plan, voice tool-call dedupe, chat partial-failure honesty, voice mic release on connection loss, voice turn kept on save failure.
 
 ## Commits (chronological)
-`e400992` handoff docs · `05863b4` scaffold/schema/planner · `095bcc9` AI runtime/capture/auth/shell · `9207241` Today/onboarding/inbox/chat/planner · `361078b` tasks/projects/insights/briefings/tick/push · `92df02a` memory/activity/settings/PWA/voice · `5286be2` build fixes + RLS/flow tests · `967df64` ActionButton refactor + e2e suite · `8d28b26` availability parsing, capture FAB · `7d4e8f2` ops guide, invite script, voice fallback e2e · `dfea149` settle blocks + manage e2e · `0016554` axe a11y + contrast · `6e128d7` owner-only budget override · `ef7992b` goals/projects/routines in setup · `c228123` dictated capture · `157b180` project memory recall · `e5b03bb` accountability tests · `95df9ca` reminder expiry · `4d30a13` briefing DST tests · `f2b7d88` CSP · `3acb55d` time-ordered day view + structure e2e · `afadb63` push delivery + SW tests · `277c611` voice hang-up fix + live voice e2e · `97561de` voice onboarding e2e · `3cbeaf8` phone layout fixes · `22fae22` smoke:ai · `6b83dd3` agent loop tests · `0100d5b` budget test fix · `4aeebff` voice server tests · `16c8aff` shared-device privacy + export/delete e2e · `cf6aac9` record · `df8c562` no-sideways-scroll check · `d0811f1`/`8cfc1d1` check:deploy · `bca0996` recurring-task fixes · `b429943` simultaneous accept/complete · `6d2ba09` push once + retry · `d41e03f` locked day plan (migration `20261031000001`) · `78f5d24` voice tool-call dedupe · `34546fb` chat partial-failure honesty · `8acf091` CI · `6beb342` touch targets · `bfb32f8` voice mic release + mute test · `9e76a96` offline actions don't crash · `0d5e9b9` voice turn kept; push/delete errors · `0151b43` Supabase MCP + agent skills · `9b7c180` handoff (test safety guard, UTC test browser, record, hosted Supabase guide) · **session 2 (`claude/sharp-keller-moxx93`):** accept `NAVI_ANTHROPIC_API_KEY` · this checkpoint.
+`e400992` handoff docs · `05863b4` scaffold/schema/planner · `095bcc9` AI runtime/capture/auth/shell · `9207241` Today/onboarding/inbox/chat/planner · `361078b` tasks/projects/insights/briefings/tick/push · `92df02a` memory/activity/settings/PWA/voice · `5286be2` build fixes + RLS/flow tests · `967df64` ActionButton refactor + e2e suite · `8d28b26` availability parsing, capture FAB · `7d4e8f2` ops guide, invite script, voice fallback e2e · `dfea149` settle blocks + manage e2e · `0016554` axe a11y + contrast · `6e128d7` owner-only budget override · `ef7992b` goals/projects/routines in setup · `c228123` dictated capture · `157b180` project memory recall · `e5b03bb` accountability tests · `95df9ca` reminder expiry · `4d30a13` briefing DST tests · `f2b7d88` CSP · `3acb55d` time-ordered day view + structure e2e · `afadb63` push delivery + SW tests · `277c611` voice hang-up fix + live voice e2e · `97561de` voice onboarding e2e · `3cbeaf8` phone layout fixes · `22fae22` smoke:ai · `6b83dd3` agent loop tests · `0100d5b` budget test fix · `4aeebff` voice server tests · `16c8aff` shared-device privacy + export/delete e2e · `cf6aac9` record · `df8c562` no-sideways-scroll check · `d0811f1`/`8cfc1d1` check:deploy · `bca0996` recurring-task fixes · `b429943` simultaneous accept/complete · `6d2ba09` push once + retry · `d41e03f` locked day plan (migration `20261031000001`) · `78f5d24` voice tool-call dedupe · `34546fb` chat partial-failure honesty · `8acf091` CI · `6beb342` touch targets · `bfb32f8` voice mic release + mute test · `9e76a96` offline actions don't crash · `0d5e9b9` voice turn kept; push/delete errors · `0151b43` Supabase MCP + agent skills · `9b7c180` handoff (test safety guard, UTC test browser, record, hosted Supabase guide) · **session 2 (`claude/sharp-keller-moxx93`):** accept `NAVI_ANTHROPIC_API_KEY` · `134bbec` checkpoint · **session 3 (`claude/dazzling-cray-isusbm`):** `1618f78` vercel.json (Next.js preset + hourly crons), API-privileges migration, check:deploy HEAD fix · this checkpoint.
 
 ## True blockers (owner action needed)
 1. ~~Fix Supabase variables~~ — done (verified session 2).
