@@ -170,3 +170,53 @@ export function detectAreas(text: string): string[] {
 export function areaFor(text: string): string | null {
   return AREAS.find(([, re]) => re.test(text))?.[0] ?? null;
 }
+
+const tidy = (s: string) => {
+  const t = s.replace(/^(?:a|an|my|the)\s+/i, "").replace(/[.,;!\s]+$/, "").trim();
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
+
+/** "my goal is to get an A in chemistry", "I want to run a half marathon" -> goals. */
+export function extractGoals(text: string): { title: string; excerpt: string }[] {
+  const out: { title: string; excerpt: string }[] = [];
+  for (const m of text.matchAll(/\b(?:my (?:main |big )?goal is to|i want to|i'd like to|i'm hoping to|i hope to|i aim to)\s+([^.;\n]{3,120})/gi)) {
+    // "I want to finish X by friday" is a task, not a goal.
+    if (/\b(by|due|tomorrow|today|tonight)\b/i.test(m[1]) || /^(?:finish|submit|email|call|text|buy|send|pay)\b/i.test(m[1])) continue;
+    out.push({ title: tidy(m[1]), excerpt: m[0].trim() });
+  }
+  return out;
+}
+
+/** "working on an app called Tally", "building a robot for the science fair" -> projects. */
+export function extractProjects(text: string): { name: string; excerpt: string }[] {
+  const out: { name: string; excerpt: string }[] = [];
+  for (const m of text.matchAll(/\b(?:i'?m |i am )?(?:working on|building|developing)\s+([^.,;\n]{3,80}?)(?=\s+(?:and|but|while|so)\b|[.,;\n]|$)/gi)) {
+    const called = m[1].match(/\bcalled\s+(.+)$/i);
+    const name = tidy(called ? called[1] : m[1]);
+    // "working on a startup" names an area of life, not a project.
+    if (name.split(/\s+/).length <= 2 && areaFor(name)) continue;
+    out.push({ name, excerpt: m[0].trim() });
+  }
+  return out;
+}
+
+/** "I go to the gym every morning at 7", "I read every night" -> flexible or fixed routines. */
+export function extractRoutines(text: string): { title: string; days: number[]; start_time: string | null; excerpt: string }[] {
+  const out: { title: string; days: number[]; start_time: string | null; excerpt: string }[] = [];
+  const re = /\b(?:i\s+)?([a-z][a-z' ]{2,40}?)\s+every\s+(day|morning|evening|night|weekday|weekend)s?(?:\s+at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?)?/gi;
+  for (const m of text.matchAll(re)) {
+    const when = m[2].toLowerCase();
+    const days = when === "weekday" ? [1, 2, 3, 4, 5] : when === "weekend" ? [0, 6] : [0, 1, 2, 3, 4, 5, 6];
+    let start: string | null = null;
+    if (m[3]) {
+      let { hour } = parseClock(m[3], m[4], m[5]);
+      const minute = m[4] ? Number(m[4]) : 0;
+      // parseClock assumes a bare "at 7" is pm; a morning routine means am.
+      if (!m[5] && when === "morning" && hour >= 12) hour -= 12;
+      start = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+    }
+    const title = m[1].replace(/^(?:also|and|usually|try to|like to)\s+/i, "").trim();
+    out.push({ title: title.charAt(0).toUpperCase() + title.slice(1), days, start_time: start, excerpt: m[0].trim() });
+  }
+  return out;
+}

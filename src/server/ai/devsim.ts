@@ -4,7 +4,7 @@ import type { ToolEvent } from "@/lib/types";
 import { getProfile } from "@/server/context";
 import { recordUsage } from "./budget";
 import { runTool } from "./tools";
-import { areaFor, detectAreas, extractAvailability, extractItems, extractWeeklyCommitments } from "./heuristics";
+import { areaFor, detectAreas, extractAvailability, extractGoals, extractItems, extractProjects, extractRoutines, extractWeeklyCommitments } from "./heuristics";
 import type { AgentRequest, AgentResult } from "./agent";
 
 // Development simulator: a deterministic stand-in for the model so the full
@@ -54,7 +54,7 @@ export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
       const items = buildOnboardingProposals(all, now);
       await call("propose_items", { items, batch: "onboarding" });
       await call("mark_onboarding_ready", { summary: `${items.length} items proposed` });
-      reply = `I've drafted your setup: ${items.filter((i) => i.kind === "workspace").length} areas, ${items.filter((i) => i.kind === "event").length} fixed commitments, ${items.filter((i) => i.kind === "task").length} tasks and your schedule preferences. Review it below: approve what's right, edit or reject the rest.`;
+      reply = `I've drafted your setup: ${items.filter((i) => i.kind === "workspace").length} areas, ${items.filter((i) => i.kind === "goal" || i.kind === "project").length} goals and projects, ${items.filter((i) => i.kind === "event" || i.kind === "routine").length} commitments and routines, ${items.filter((i) => i.kind === "task").length} tasks and your schedule preferences. Review it below: approve what's right, edit or reject the rest.`;
     }
   } else if (req.mode === "chat" && /\b(plan|organi[sz]e)\b.*\b(week)\b/i.test(text)) {
     const r = await call("plan_week", {});
@@ -139,6 +139,37 @@ export function buildOnboardingProposals(all: string, now: DateTime): Proposal[]
       rationale: "Weekly commitment you described; length assumed 90 minutes, adjust if needed.",
     });
   }
+  // The area of a phrase, falling back to the sentence it was said in.
+  const areaIn = (excerpt: string) => areaFor(excerpt) ?? areaFor(all.split(/(?<=[.!?\n])\s*/).find((sen) => sen.includes(excerpt)) ?? "");
+  const goals = extractGoals(all);
+  goals.forEach((g, i) => {
+    items.push({ kind: "goal", payload: { title: g.title, workspace_ref: refOf(areaIn(g.excerpt)) }, ref_key: `goal_${i}`, source_excerpt: g.excerpt, origin: "stated", confidence: 0.7, rationale: "A goal you described." });
+  });
+  for (const p of extractProjects(all)) {
+    const area = areaIn(p.excerpt);
+    // Link to a goal only when exactly one goal shares the project's area.
+    const sameArea = goals.map((g, i) => ({ g, i })).filter(({ g }) => areaIn(g.excerpt) === area);
+    items.push({
+      kind: "project",
+      payload: { name: p.name, workspace_ref: refOf(area), ...(area && sameArea.length === 1 ? { goal_ref: `goal_${sameArea[0].i}` } : {}) },
+      source_excerpt: p.excerpt,
+      origin: "stated",
+      confidence: 0.6,
+      rationale: "Something you said you're working on.",
+    });
+  }
+  const routines = extractRoutines(all);
+  for (const r of routines) {
+    items.push({
+      kind: "routine",
+      payload: { title: r.title, days: r.days, start_time: r.start_time, duration_minutes: 45, is_fixed: false, workspace_ref: refOf(areaIn(r.excerpt)) },
+      source_excerpt: r.excerpt,
+      origin: "stated",
+      confidence: 0.6,
+      rationale: "A habit you described; length assumed 45 minutes and the time can flex.",
+    });
+  }
+  const coveredElsewhere = [...goals, ...routines].map((x) => x.excerpt.toLowerCase());
   const availability = extractAvailability(all);
   const quiet = all.toLowerCase().match(/quiet\s+(?:from\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:to|until|-)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
   const pref: Record<string, unknown> = {};
@@ -159,6 +190,7 @@ export function buildOnboardingProposals(all: string, now: DateTime): Proposal[]
   }
   for (const t of extractItems(all, now).filter((i) => i.kind === "task" && !/\b(free|quiet)\b/i.test(i.excerpt))) {
     if (extractWeeklyCommitments(t.excerpt).length) continue;
+    if (coveredElsewhere.some((c) => t.excerpt.toLowerCase().includes(c) || c.includes(t.excerpt.toLowerCase()))) continue;
     items.push({
       kind: "task",
       payload: { title: t.title, due_at: t.due_at ?? null, priority: t.priority ?? 3, estimate_minutes: t.estimate_minutes ?? 45, workspace_ref: refOf(areaFor(t.excerpt)) },

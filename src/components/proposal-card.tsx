@@ -6,6 +6,15 @@ import { acceptProposalAction, editProposalAction, mergeProposalAction, setPropo
 import { announceChange } from "@/lib/offline-queue";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** [0..6] -> "every day", [1..5] -> "weekdays", otherwise "Mon, Wed". */
+function daysLabel(days: number[], sep = ", "): string {
+  const key = [...days].sort().join();
+  if (key === "0,1,2,3,4,5,6") return "every day";
+  if (key === "1,2,3,4,5") return "weekdays";
+  if (key === "0,6") return "weekends";
+  return days.map((d) => DAY_NAMES[d]).join(sep);
+}
 const KIND_LABEL: Record<string, string> = {
   workspace: "Area",
   project: "Project",
@@ -36,8 +45,11 @@ export function proposalSummary(p: Proposal, zone: string): string {
   if (pl.due_at) parts.push(`due ${DateTime.fromISO(String(pl.due_at)).setZone(zone).toFormat("ccc LLL d, h:mm a")}`);
   if (pl.starts_at) parts.push(DateTime.fromISO(String(pl.starts_at)).setZone(zone).toFormat("ccc h:mm a"));
   const rec = pl.recurrence as { days?: number[] } | null | undefined;
-  if (rec?.days) parts.push(`every ${rec.days.map((d) => DAY_NAMES[d]).join(", ")}`);
-  if (Array.isArray(pl.days)) parts.push(`${(pl.days as number[]).map((d) => DAY_NAMES[d]).join(", ")}${pl.start_time ? ` at ${pl.start_time}` : ""}`);
+  if (rec?.days) {
+    const d = daysLabel(rec.days);
+    parts.push(d === "every day" ? d : d === "weekdays" || d === "weekends" ? `on ${d}` : `every ${d}`);
+  }
+  if (Array.isArray(pl.days)) parts.push(`${daysLabel(pl.days as number[])}${pl.start_time ? ` at ${pl.start_time}` : ""}`);
   if (pl.estimate_minutes) parts.push(`~${pl.estimate_minutes} min`);
   if (pl.priority && pl.priority !== 3) parts.push(`P${pl.priority}`);
   if (pl.target_date) parts.push(`by ${pl.target_date}`);
@@ -46,7 +58,7 @@ export function proposalSummary(p: Proposal, zone: string): string {
     if (pl.timezone) parts.push(`time zone ${pl.timezone}`);
     if (pl.quiet_hours_start) parts.push(`quiet ${pl.quiet_hours_start}–${pl.quiet_hours_end}`);
     const av = pl.availability as { days: number[]; start: string; end: string }[] | undefined;
-    if (av?.length) parts.push(`free ${av.map((w) => `${w.days.map((d) => DAY_NAMES[d]).join("/")} ${w.start}–${w.end}`).join("; ")}`);
+    if (av?.length) parts.push(`free ${av.map((w) => `${daysLabel(w.days, "/")} ${w.start}–${w.end}`).join("; ")}`);
   }
   return parts.join(" · ");
 }

@@ -29,8 +29,8 @@ describe("conversational onboarding", () => {
     const ctx = ctxFor(db, userId, zone);
     const first = await handleTurn(ctx, { kind: "onboarding", text: "hi", modality: "text" });
     expect(first.assistantMessage.content).toMatch(/main areas of your life/i);
-    await handleTurn(ctx, { kind: "onboarding", text: "I'm in school and run a small startup. I need to finish my history essay by friday and email investors tomorrow.", modality: "text" });
-    await handleTurn(ctx, { kind: "onboarding", text: "I have soccer practice mon and wed at 4pm. Classes weekdays at 8am.", modality: "voice" });
+    await handleTurn(ctx, { kind: "onboarding", text: "I'm in school and run a small startup. For my startup I'm working on an app called Tally. My goal is to get an A in chemistry class. I need to finish my history essay by friday and email investors tomorrow.", modality: "text" });
+    await handleTurn(ctx, { kind: "onboarding", text: "I have soccer practice mon and wed at 4pm. Classes weekdays at 8am. I go to the gym every morning at 7.", modality: "voice" });
     const last = await handleTurn(ctx, { kind: "onboarding", text: "I'm free after 6pm on weekdays. Quiet 10pm to 7am. That's it.", modality: "text" });
     expect(last.assistantMessage.tool_events.map((e) => e.name)).toContain("propose_items");
 
@@ -42,6 +42,9 @@ describe("conversational onboarding", () => {
     expect(kinds).toContain("event");
     expect(kinds).toContain("task");
     expect(kinds).toContain("preference");
+    expect(kinds).toContain("goal");
+    expect(kinds).toContain("project");
+    expect(kinds).toContain("routine");
     // Nothing is active before review.
     const { count: tasksBefore } = await db.from("tasks").select("id", { count: "exact", head: true });
     expect(tasksBefore).toBe(0);
@@ -64,6 +67,14 @@ describe("conversational onboarding", () => {
     expect(tasks!.length).toBeGreaterThan(0);
     expect(tasks!.every((t) => t.source === "onboarding" && t.workspace_id)).toBe(true);
     expect(prof2!.availability[0]).toMatchObject({ days: [1, 2, 3, 4, 5], start: "18:00" });
+    const [{ data: goals }, { data: projects }, { data: routines }] = await Promise.all([
+      db.from("goals").select("title,workspaces(name)"),
+      db.from("projects").select("name,workspaces(name)"),
+      db.from("routines").select("title,start_time,days,is_fixed"),
+    ]);
+    expect(goals).toEqual([{ title: "Get an A in chemistry class", workspaces: { name: "School" } }]);
+    expect(projects).toEqual([{ name: "Tally", workspaces: { name: "Startups" } }]);
+    expect(routines).toEqual([{ title: "Go to the gym", start_time: "07:00:00", days: [0, 1, 2, 3, 4, 5, 6], is_fixed: false }]);
     expect(prof2!.quiet_hours_start).toBe("22:00:00");
     expect(pending).toHaveLength(1);
     expect(week.reduce((s, d) => s + d.blocks.length, 0)).toBeGreaterThan(0);

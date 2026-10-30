@@ -37,8 +37,8 @@ test("onboarding conversation → reviewed setup → plan → capture → inbox 
   await expect(page.getByText(/rule-based simulator, not a real AI model/)).toBeVisible();
   await say(page, "hi");
   await expect(page.getByText(/main areas of your life/)).toBeVisible();
-  await say(page, "I'm in school and work on a startup. I need to finish my history essay by friday and email investors tomorrow.");
-  await say(page, "I have soccer practice mon and wed at 4pm.");
+  await say(page, "I'm in school and work on a startup. For my startup I'm working on an app called Tally. My goal is to get an A in chemistry class. I need to finish my history essay by friday and email investors tomorrow.");
+  await say(page, "I have soccer practice mon and wed at 4pm. I go to the gym every morning at 7.");
   await say(page, "I'm free after 6pm on weekdays and free from 10am to 2pm on weekends. Quiet 10pm to 7am. That's it.");
 
   // Review screen: inferred vs stated is labelled; approve and activate.
@@ -46,6 +46,9 @@ test("onboarding conversation → reviewed setup → plan → capture → inbox 
   await expect(page.getByRole("heading", { name: "Review your setup" })).toBeVisible();
   await expect(page.getByText("Navi inferred").first()).toBeVisible();
   await expect(page.getByText("You said this").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Goals & projects" })).toBeVisible();
+  await expect(page.getByText("Get an A in chemistry class", { exact: true })).toBeVisible();
+  await expect(page.getByText("Go to the gym", { exact: true })).toBeVisible();
   await page.screenshot({ path: `test-results/${info.project.name}-review.png`, fullPage: true });
   await page.getByRole("button", { name: /Activate \d+ items? and plan my week/ }).click();
 
@@ -56,6 +59,8 @@ test("onboarding conversation → reviewed setup → plan → capture → inbox 
   await page.goto("/projects");
   await expect(page.getByRole("link", { name: "School" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Startups" })).toBeVisible();
+  await expect(page.getByText("Tally").first()).toBeVisible();
+  await expect(page.getByText("Get an A in chemistry class").first()).toBeVisible();
   await page.goto("/planner");
   await expect(page.getByText(/Soccer practice/i).first()).toBeVisible();
 

@@ -36,3 +36,28 @@ describe("rule-based extraction", () => {
     expect(extractItems("the sunset was nice", now)[0].kind).toBe("note");
   });
 });
+
+describe("goals, projects and routines", () => {
+  it("finds goals but leaves dated to-dos as tasks", async () => {
+    const { extractGoals } = await import("@/server/ai/heuristics");
+    expect(extractGoals("My goal is to get an A in chemistry. I want to finish the essay by friday.")).toEqual([
+      { title: "Get an A in chemistry", excerpt: "My goal is to get an A in chemistry" },
+    ]);
+  });
+
+  it("finds named projects but not areas of life", async () => {
+    const { extractProjects } = await import("@/server/ai/heuristics");
+    expect(extractProjects("I'm in school and work on a startup. I'm working on an app called Tally and building a robot for the science fair.").map((p) => p.name)).toEqual([
+      "Tally",
+      "Robot for the science fair",
+    ]);
+  });
+
+  it("finds routines with an optional time", async () => {
+    const { extractRoutines } = await import("@/server/ai/heuristics");
+    expect(extractRoutines("I go to the gym every morning at 7. I read every night.")).toEqual([
+      { title: "Go to the gym", days: [0, 1, 2, 3, 4, 5, 6], start_time: "07:00", excerpt: "I go to the gym every morning at 7" },
+      { title: "Read", days: [0, 1, 2, 3, 4, 5, 6], start_time: null, excerpt: "I read every night" },
+    ]);
+  });
+});
