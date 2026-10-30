@@ -1,4 +1,5 @@
 import "server-only";
+import { DateTime } from "luxon";
 import type { Ctx } from "@/server/context";
 import { logActivity } from "./activity";
 import { requestApproval } from "./approvals";
@@ -116,6 +117,10 @@ export async function updateEntity<T = Record<string, unknown>>(
   const changedKeys = Object.keys(patch);
   const prior: Record<string, unknown> = {};
   for (const k of changedKeys) prior[k] = before[k];
+  if (table === "tasks" && patch.status !== before.status) {
+    if (patch.status === "done") await settleTaskBlocks(ctx, id, "done");
+    else if (patch.status === "cancelled") await settleTaskBlocks(ctx, id, "drop");
+  }
   await logActivity(ctx, {
     action: "update",
     entityType: table,
@@ -140,6 +145,7 @@ export async function deleteEntity(ctx: Ctx, table: EntityTable, id: string): Pr
     });
     return { kind: "approval_requested", approvalId: approval.id };
   }
+  if (table === "tasks") await settleTaskBlocks(ctx, id, "drop");
   const { error } = await ctx.db.from(table).delete().eq("id", id);
   if (error) throw new Error(`Could not delete ${LABEL[table]}: ${error.message}`);
   await logActivity(ctx, {
@@ -151,4 +157,21 @@ export async function deleteEntity(ctx: Ctx, table: EntityTable, id: string): Pr
     reversible: false,
   });
   return { kind: "deleted" };
+}
+
+/**
+ * Keeps the plan in step with a task that is finished, cancelled or deleted:
+ * its still-open blocks no longer ask for work. Finished work counts as done
+ * today; later blocks for it, or any open block of a dropped task, are removed.
+ * Blocks with a recorded outcome stay as history.
+ */
+async function settleTaskBlocks(ctx: Ctx, taskId: string, outcome: "done" | "drop") {
+  const open = ["planned", "in_progress"];
+  if (outcome === "done") {
+    const today = DateTime.now().setZone(ctx.timezone).toISODate()!;
+    await ctx.db.from("plan_blocks").update({ status: "done" }).eq("user_id", ctx.userId).eq("task_id", taskId).in("status", open).lte("plan_date", today);
+    await ctx.db.from("plan_blocks").delete().eq("user_id", ctx.userId).eq("task_id", taskId).in("status", open).gt("plan_date", today);
+  } else {
+    await ctx.db.from("plan_blocks").delete().eq("user_id", ctx.userId).eq("task_id", taskId).in("status", open);
+  }
 }

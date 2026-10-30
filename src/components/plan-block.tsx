@@ -47,7 +47,9 @@ export function PlanBlockRow({ block, time, canFocus }: { block: PlanBlock; time
         </div>
       )}
       {!open && (
-        <ActionButton className="btn btn-ghost btn-sm" action={() => blockOutcomeAction(block.id, "planned")}>Undo</ActionButton>
+        <div className="self-start sm:self-auto">
+          <ActionButton className="btn btn-ghost btn-sm" action={() => blockOutcomeAction(block.id, "planned")}>Undo</ActionButton>
+        </div>
       )}
     </li>
   );

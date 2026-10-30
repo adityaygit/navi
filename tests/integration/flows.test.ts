@@ -172,6 +172,34 @@ describe("plan recovery", () => {
   });
 });
 
+describe("plan stays in step with tasks", () => {
+  it("settles open blocks when a task is finished, cancelled or deleted", async () => {
+    const ctx = ctxFor(db, userId, zone);
+    const today = DateTime.now().setZone(zone);
+    const block = async (taskId: string, title: string, day: DateTime) => {
+      const start = day.set({ hour: 12, minute: 0 });
+      const { data } = await db.from("plan_blocks").insert({ user_id: userId, task_id: taskId, title, plan_date: day.toISODate(), starts_at: start.toISO(), ends_at: start.plus({ minutes: 30 }).toISO() }).select("id").single();
+      return data!.id as string;
+    };
+    const finished = await createTask(ctx, { title: "Finish me" });
+    const todayBlock = await block(finished.id, "Finish me", today);
+    const laterBlock = await block(finished.id, "Finish me", today.plus({ days: 2 }));
+    const { completeTask } = await import("@/server/domain/tasks");
+    await completeTask(ctx, finished.id);
+    const { data: afterDone } = await db.from("plan_blocks").select("id,status").in("id", [todayBlock, laterBlock]);
+    expect(afterDone).toEqual([{ id: todayBlock, status: "done" }]);
+
+    const cancelled = await createTask(ctx, { title: "Cancel me" });
+    const cBlock = await block(cancelled.id, "Cancel me", today);
+    await updateEntity(ctx, "tasks", cancelled.id, { status: "cancelled" });
+    const deleted = await createTask(ctx, { title: "Delete me" });
+    const dBlock = await block(deleted.id, "Delete me", today);
+    await deleteEntity(ctx, "tasks", deleted.id);
+    const { data: dropped } = await db.from("plan_blocks").select("id").in("id", [cBlock, dBlock]);
+    expect(dropped).toHaveLength(0);
+  });
+});
+
 describe("briefings and budget", () => {
   it("stores each briefing once per local day", async () => {
     const { data: profile } = await db.from("profiles").select("*").eq("id", userId).single();
