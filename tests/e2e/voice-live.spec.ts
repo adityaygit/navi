@@ -1,4 +1,4 @@
-import { test, expect, type WebSocketRoute } from "@playwright/test";
+import { test, expect, type Page, type WebSocketRoute } from "@playwright/test";
 import { admin, freshSetUpAccount } from "./helpers";
 
 // Real-time voice, everything on Navi's side of the wire: fake microphone →
@@ -9,28 +9,27 @@ import { admin, freshSetUpAccount } from "./helpers";
 // GEMINI_API_KEY in this environment), so the provider's own behaviour is not
 // covered by this test.
 
-test.use({
-  channel: "chromium",
-  launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] },
-});
-
-test("voice streams the mic, runs tools for real, plays replies and saves the turn to shared history", async ({ page, context, baseURL }, info) => {
-  await context.grantPermissions(["microphone"], { origin: baseURL! });
-  const userId = await freshSetUpAccount(page, `voice-${info.project.name}@navi.test`);
-
-  // Session start: what /api/voice/session returns once a Gemini key is
-  // configured, pointing at the chat conversation that text and voice share.
+/**
+ * Stands in for Gemini Live: /api/voice/session answers as it would with a key
+ * configured (pointing at the user's real conversation of `kind`), and the
+ * Live API socket is served by the test. Register before loading the page.
+ */
+async function standInLiveApi(page: Page, userId: string, kind: "chat" | "onboarding") {
   let conversationId = "";
   const resumeHandles: (string | null)[] = [];
   await page.route("**/api/voice/session", async (route) => {
     const req = route.request().postDataJSON() as { probe?: boolean; resumeHandle?: string | null };
     if (!req.probe) resumeHandles.push(req.resumeHandle ?? null);
-    const { data: conv } = await admin.from("conversations").select("id").eq("user_id", userId).eq("kind", "chat").single();
-    conversationId = conv!.id as string;
+    if (kind === "chat") {
+      const { data } = await admin.from("conversations").select("id").eq("user_id", userId).eq("kind", "chat").single();
+      conversationId = data!.id as string;
+    } else {
+      const { data } = await admin.from("profiles").select("onboarding_conversation_id").eq("id", userId).single();
+      conversationId = data!.onboarding_conversation_id as string;
+    }
     await route.fulfill({ json: { ok: true, token: "auth_tokens/test-token", model: "gemini-3.8-live", config: { responseModalities: ["AUDIO"] }, conversationId } });
   });
 
-  // Stand-in for the Gemini Live socket.
   const seen = { setup: null as unknown, audioChunks: 0, toolResponse: null as unknown, sockets: 0, closed: false };
   let socket: WebSocketRoute | null = null;
   const send = (msg: unknown) => socket!.send(JSON.stringify(msg));
@@ -55,6 +54,19 @@ test("voice streams the mic, runs tools for real, plays replies and saves the tu
       }
     });
   });
+  return { seen, send, resumeHandles, conversation: () => conversationId };
+}
+
+test.use({
+  channel: "chromium",
+  launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] },
+});
+
+test("voice streams the mic, runs tools for real, plays replies and saves the turn to shared history", async ({ page, context, baseURL }, info) => {
+  await context.grantPermissions(["microphone"], { origin: baseURL! });
+  const userId = await freshSetUpAccount(page, `voice-${info.project.name}@navi.test`);
+
+  const { seen, send, resumeHandles, conversation } = await standInLiveApi(page, userId, "chat");
 
   // WebSocket routes apply to pages loaded after they're registered.
   await page.goto("/chat");
@@ -90,7 +102,7 @@ test("voice streams the mic, runs tools for real, plays replies and saves the tu
   // The turn lands in the same conversation as typed messages.
   await expect
     .poll(async () => {
-      const { data } = await admin.from("messages").select("role,content,modality,tool_events").eq("conversation_id", conversationId).order("created_at");
+      const { data } = await admin.from("messages").select("role,content,modality,tool_events").eq("conversation_id", conversation()).order("created_at");
       return data;
     }, { timeout: 15_000 })
     .toEqual([
@@ -128,4 +140,62 @@ test("voice streams the mic, runs tools for real, plays replies and saves the tu
   await page.reload();
   await expect(page.getByText("Add a task to call the dentist.")).toBeVisible();
   await expect(page.getByText(/Done\. I added “Call the dentist”\./)).toBeVisible();
+});
+
+test("setting Navi up by voice ends in the same reviewed setup as typing", async ({ page, context, baseURL }, info) => {
+  await context.grantPermissions(["microphone"], { origin: baseURL! });
+  const email = `voice-setup-${info.project.name}@navi.test`;
+  await admin.from("allowed_emails").upsert({ email, note: "e2e" });
+  const { data: users } = await admin.auth.admin.listUsers();
+  const old = users.users.find((u) => u.email === email);
+  if (old) await admin.auth.admin.deleteUser(old.id);
+  await page.goto("/login");
+  await page.getByRole("button", { name: "Use a password instead" }).click();
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill("test-password-123");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/onboarding/);
+  const { data: after } = await admin.auth.admin.listUsers();
+  const userId = after.users.find((u) => u.email === email)!.id;
+
+  const { seen, send } = await standInLiveApi(page, userId, "onboarding");
+  await page.reload();
+  await page.getByRole("button", { name: "Talk", exact: true }).click();
+  await page.getByRole("region", { name: "Voice conversation" }).getByRole("button", { name: "Start talking" }).click();
+  await expect.poll(() => seen.audioChunks, { timeout: 15_000 }).toBeGreaterThan(3);
+
+  send({ serverContent: { inputTranscription: { text: "I'm in school and I have chess club Tuesdays at 3." } } });
+  send({
+    toolCall: {
+      functionCalls: [
+        {
+          id: "p1",
+          name: "propose_items",
+          args: {
+            batch: "onboarding",
+            items: [
+              { kind: "workspace", payload: { name: "School" }, ref_key: "ws_school", origin: "stated", confidence: 0.9 },
+              { kind: "routine", payload: { title: "Chess club", days: [2], start_time: "15:00", duration_minutes: 60, is_fixed: true, workspace_ref: "ws_school" }, source_excerpt: "chess club Tuesdays at 3", origin: "stated", confidence: 0.9 },
+            ],
+          },
+        },
+      ],
+    },
+  });
+  await expect.poll(() => seen.toolResponse, { timeout: 15_000 }).toMatchObject({ functionResponses: [{ id: "p1", response: { output: { ok: true } } }] });
+  seen.toolResponse = null;
+  send({ toolCall: { functionCalls: [{ id: "r1", name: "mark_onboarding_ready", args: { summary: "School and chess club" } }] } });
+  await expect.poll(() => seen.toolResponse, { timeout: 15_000 }).toMatchObject({ functionResponses: [{ id: "r1", response: { output: { ok: true } } }] });
+
+  // The page switches to review on its own; nothing is active until approved.
+  await expect(page.getByRole("heading", { name: "Review your setup" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Chess club", { exact: true })).toBeVisible();
+  const { count } = await admin.from("routines").select("id", { count: "exact", head: true }).eq("user_id", userId);
+  expect(count).toBe(0);
+  // Leaving the conversation for the review hangs up the microphone.
+  await expect.poll(() => seen.closed).toBe(true);
+  await page.getByRole("button", { name: /Activate \d+ items? and plan my week/ }).click();
+  await expect(page).toHaveURL(/\/$/, { timeout: 30_000 });
+  const { data: routine } = await admin.from("routines").select("title,days,start_time,workspaces(name)").eq("user_id", userId).single();
+  expect(routine).toEqual({ title: "Chess club", days: [2], start_time: "15:00:00", workspaces: { name: "School" } });
 });
