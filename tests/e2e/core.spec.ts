@@ -19,6 +19,20 @@ async function signIn(page: Page, email: string) {
   await page.getByRole("button", { name: "Sign in" }).click();
 }
 
+/** Lets a test run on its own: skips the setup conversation for an existing account. */
+async function signInSetUp(page: Page, email: string) {
+  await signIn(page, email);
+  await page.waitForURL(/\/(onboarding)?$/);
+  const { data } = await admin.auth.admin.listUsers();
+  const u = data.users.find((x) => x.email === email)!;
+  const { data: p } = await admin.from("profiles").select("onboarding_status").eq("id", u.id).single();
+  if (!["completed", "skipped"].includes(p!.onboarding_status)) {
+    await admin.from("profiles").update({ onboarding_status: "skipped" }).eq("id", u.id);
+    await page.goto("/");
+  }
+  await expect(page).toHaveURL(/\/$/);
+}
+
 async function say(page: Page, text: string) {
   const box = page.getByLabel("Message Navi");
   await box.fill(text);
@@ -88,8 +102,7 @@ test("onboarding conversation → reviewed setup → plan → capture → inbox 
 
 test("offline capture queues locally and syncs on reconnect", async ({ page, context }, info) => {
   const email = info.project.name === "iphone" ? "alice@navi.test" : "dev@navi.test";
-  await signIn(page, email);
-  await expect(page).toHaveURL(/\/$/);
+  await signInSetUp(page, email);
   // Let the page hydrate and load its scripts before the network goes away.
   await page.waitForLoadState("networkidle");
   await context.setOffline(true);
@@ -109,8 +122,7 @@ test("offline capture queues locally and syncs on reconnect", async ({ page, con
 test("voice says plainly when real-time voice isn't available and offers basic voice", async ({ page }, info) => {
   test.skip(!!process.env.GEMINI_API_KEY, "Real-time voice is configured; this checks the fallback path");
   const email = info.project.name === "iphone" ? "alice@navi.test" : "dev@navi.test";
-  await signIn(page, email);
-  await expect(page).toHaveURL(/\/$/);
+  await signInSetUp(page, email);
   await page.goto("/chat");
   await page.getByRole("button", { name: "Talk", exact: true }).click();
   const voice = page.getByRole("region", { name: "Voice conversation" });
@@ -119,4 +131,36 @@ test("voice says plainly when real-time voice isn't available and offers basic v
   await voice.getByRole("button", { name: "Start talking" }).click();
   await expect(voice.getByText(/Real-time voice isn't available .*Using basic voice/)).toBeVisible();
   await page.screenshot({ path: `test-results/${info.project.name}-voice-fallback.png`, fullPage: true });
+});
+
+test("dictated capture keeps the spoken words and is marked as voice", async ({ page }, info) => {
+  // Stand-in for the browser's speech service: "hears" one phrase, then stops.
+  await page.addInitScript(() => {
+    class FakeRecognition {
+      lang = "en-US"; interimResults = false; continuous = false;
+      onresult: ((e: unknown) => void) | null = null; onend: (() => void) | null = null; onerror: ((e: unknown) => void) | null = null;
+      start() {
+        setTimeout(() => {
+          this.onresult?.({ resultIndex: 0, results: [{ 0: { transcript: "renew library card by saturday" }, isFinal: true, length: 1 }] });
+          this.onend?.();
+        }, 100);
+      }
+      stop() { this.onend?.(); }
+      abort() { this.onend?.(); }
+    }
+    const w = window as unknown as { SpeechRecognition: unknown; webkitSpeechRecognition: unknown };
+    w.SpeechRecognition = FakeRecognition; // newer Chromium ships the unprefixed name too
+    w.webkitSpeechRecognition = FakeRecognition;
+  });
+  const email = info.project.name === "iphone" ? "alice@navi.test" : "dev@navi.test";
+  await signInSetUp(page, email);
+  await page.getByRole("button", { name: /\+ Capture/ }).click();
+  await page.getByRole("button", { name: "Dictate" }).click();
+  await expect(page.getByLabel("What's on your mind?")).toHaveValue("renew library card by saturday");
+  await page.getByRole("dialog").getByRole("button", { name: "Capture", exact: true }).click();
+  await expect(page.getByText("Captured. Review it in your inbox.")).toBeVisible({ timeout: 30_000 });
+  const { data } = await admin.from("captures").select("source,raw_text").eq("raw_text", "renew library card by saturday").order("created_at", { ascending: false }).limit(1).single();
+  expect(data!.source).toBe("voice");
+  await page.goto("/inbox");
+  await expect(page.getByText(/renew library card/i).first()).toBeVisible();
 });

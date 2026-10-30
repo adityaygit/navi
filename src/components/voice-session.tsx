@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createSpeechRecognition, speechRecognitionSupported, type SpeechRec } from "@/lib/speech";
 import type { ToolEvent } from "@/lib/types";
 
 // Real-time two-way voice. Primary mode: Gemini Live over a WebSocket opened
@@ -375,24 +376,12 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
   );
 }
 
-type SpeechRec = {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-  onresult: ((e: { results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }>; resultIndex: number }) => void) | null;
-  onend: (() => void) | null;
-  onerror: ((e: { error: string }) => void) | null;
-};
-
 /** Basic voice: browser speech recognition, one turn at a time, through the text chat. */
 function BrowserVoice({ kind, setStatus, setError, setLines, onTurnSaved }: Setters & { kind: Kind }) {
   const recRef = useRef<SpeechRec | null>(null);
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState("");
-  const supported = typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+  const supported = speechRecognitionSupported();
 
   useEffect(() => () => { recRef.current?.abort(); window.speechSynthesis?.cancel(); }, []);
 
@@ -420,9 +409,8 @@ function BrowserVoice({ kind, setStatus, setError, setLines, onTurnSaved }: Sett
   function start() {
     if (!supported) return;
     window.speechSynthesis?.cancel(); // barge-in: stop Navi speaking when you start
-    const Ctor = (window as unknown as { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec }).SpeechRecognition ?? (window as unknown as { webkitSpeechRecognition: new () => SpeechRec }).webkitSpeechRecognition;
-    const rec = new Ctor();
-    rec.lang = navigator.language || "en-US";
+    const rec = createSpeechRecognition();
+    if (!rec) return;
     rec.interimResults = true;
     rec.continuous = false;
     let finalText = "";

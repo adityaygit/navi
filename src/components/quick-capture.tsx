@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { announceChange, flushQueue, newClientId, offlineQueue, type QueuedCapture } from "@/lib/offline-queue";
+import { createSpeechRecognition, speechRecognitionSupported, type SpeechRec } from "@/lib/speech";
 
 const DRAFT_KEY = "navi:capture-draft";
 
@@ -15,6 +16,9 @@ export function QuickCapture() {
   const [queue, setQueue] = useState<QueuedCapture[]>([]);
   const [online, setOnline] = useState(true);
   const ref = useRef<HTMLTextAreaElement>(null);
+  const recRef = useRef<SpeechRec | null>(null);
+  const [listening, setListening] = useState(false);
+  const [usedVoice, setUsedVoice] = useState(false);
   // During setup the person is already talking to Navi, and the floating
   // button would cover the review bar. Queued captures still show.
   const hideFab = usePathname().startsWith("/onboarding") && queue.length === 0;
@@ -45,6 +49,7 @@ export function QuickCapture() {
 
   useEffect(() => {
     if (open) setTimeout(() => ref.current?.focus(), 50);
+    else recRef.current?.abort(); // closing the sheet always turns the mic off
   }, [open]);
 
   function saveDraft(v: string) {
@@ -56,7 +61,10 @@ export function QuickCapture() {
     e.preventDefault();
     const raw = text.trim();
     if (!raw) return;
-    const item: QueuedCapture = { client_id: newClientId(), raw_text: raw, source: navigator.onLine ? "text" : "offline", captured_at: new Date().toISOString(), attempts: 0 };
+    recRef.current?.stop();
+    const source = !navigator.onLine ? "offline" : usedVoice ? "voice" : "text";
+    const item: QueuedCapture = { client_id: newClientId(), raw_text: raw, source, captured_at: new Date().toISOString(), attempts: 0 };
+    setUsedVoice(false);
     // Persist locally first so nothing is lost if the request or tab dies.
     await offlineQueue.add(item);
     saveDraft("");
@@ -68,6 +76,28 @@ export function QuickCapture() {
     const synced = await flushQueue();
     setStatus(synced ? "Captured. Review it in your inbox." : "Saved on this device; will retry syncing.");
     if (synced) announceChange();
+  }
+
+  /** Dictation: the browser turns speech into text, appended to the box for review before sending. */
+  function toggleDictation() {
+    if (listening) return recRef.current?.stop();
+    const rec = createSpeechRecognition();
+    if (!rec) return;
+    const before = text.trim();
+    rec.interimResults = true;
+    rec.continuous = true;
+    rec.onresult = (e) => {
+      let spoken = "";
+      for (let i = 0; i < e.results.length; i++) spoken += e.results[i][0].transcript;
+      saveDraft([before, spoken.trim()].filter(Boolean).join(before ? "\n" : ""));
+    };
+    rec.onerror = (e) => setStatus(e.error === "not-allowed" ? "Microphone permission was denied." : `Dictation stopped: ${e.error}`);
+    rec.onend = () => setListening(false);
+    recRef.current = rec;
+    setUsedVoice(true);
+    setStatus(null);
+    setListening(true);
+    rec.start();
   }
 
   return (
@@ -101,6 +131,12 @@ export function QuickCapture() {
               />
               <div className="flex items-center gap-2">
                 <button type="submit" className="btn btn-primary" disabled={!text.trim()}>Capture</button>
+                {online && speechRecognitionSupported() && (
+                  <button type="button" className={`btn ${listening ? "btn-danger" : ""}`} aria-pressed={listening} onClick={toggleDictation}>
+                    {listening ? "Stop dictating" : "Dictate"}
+                  </button>
+                )}
+                {listening && <span className="flex items-center gap-1 text-xs text-danger" aria-label="Microphone is on"><span className="h-2 w-2 animate-pulse rounded-full bg-danger" /> mic on</span>}
                 {!online && <span className="badge badge-warn">Offline</span>}
               </div>
               {status && <p role="status" className="text-sm">{status}</p>}
