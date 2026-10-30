@@ -16,6 +16,7 @@ import { confirmMemory, correctMemory, deleteMemory, rejectMemory, addMemory } f
 import { decideApproval } from "@/server/domain/approvals";
 import { revertActivity } from "@/server/domain/activity";
 import { generateDayPlan, generateWeekPlan, recoverPlan, setBlockOutcome } from "@/server/planner/plan";
+import { summarizeDayPlan, summarizeWeekPlan } from "@/lib/plan-summary";
 import {
   EventCreate,
   GoalCreate,
@@ -39,12 +40,12 @@ import { isValidZone } from "@/lib/time";
 
 export type ActionResult<T = unknown> = { ok: true; data?: T; message?: string } | { ok: false, error: string };
 
-async function act<T>(fn: (ctx: Ctx) => Promise<T>, message?: string): Promise<ActionResult<T>> {
+async function act<T>(fn: (ctx: Ctx) => Promise<T>, message?: string | ((data: T, ctx: Ctx) => string)): Promise<ActionResult<T>> {
   try {
     const ctx = await requireApiCtx();
     const data = await fn(ctx);
     revalidatePath("/", "layout");
-    return { ok: true, data, message };
+    return { ok: true, data, message: typeof message === "function" ? message(data, ctx) : message };
   } catch (err) {
     const error = err instanceof z.ZodError ? err.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") : err instanceof Error ? err.message : String(err);
     return { ok: false, error };
@@ -70,8 +71,16 @@ export async function completeTaskAction(id: string, actualMinutes?: number | nu
 export async function startFocusAction(input: { task_id?: string | null; block_id?: string | null; planned_minutes?: number | null }) {
   return act((ctx) => startFocus(ctx, input));
 }
-export async function endFocusAction(id: string, outcome: "completed" | "progress" | "interrupted" | "abandoned", note?: string | null) {
-  return act((ctx) => endFocus(ctx, id, outcome, note));
+const FocusEnd = z.object({
+  outcome: z.enum(["completed", "progress", "interrupted", "abandoned"]),
+  note: z.string().max(300).nullish(),
+  reason: z.enum(["rest", "missing_info", "estimate"]).nullish(),
+});
+export async function endFocusAction(id: string, outcome: "completed" | "progress" | "interrupted" | "abandoned", note?: string | null, reason?: "rest" | "missing_info" | "estimate" | null) {
+  return act((ctx) => {
+    const v = FocusEnd.parse({ outcome, note, reason });
+    return endFocus(ctx, id, v.outcome, v.note, v.reason);
+  });
 }
 
 // ---- structure -------------------------------------------------------------
@@ -146,17 +155,32 @@ export async function restartOnboardingAction() {
 }
 
 // ---- planner ---------------------------------------------------------------
-export async function planDayAction(date?: string) {
-  return act((ctx) => generateDayPlan(ctx, date));
+const PlanDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish();
+// Planning results are summarized for the person (placed / moved / didn't fit / warnings).
+export async function planDayAction(date?: string | null) {
+  return act((ctx) => generateDayPlan(ctx, PlanDate.parse(date) ?? undefined), (r, ctx) => summarizeDayPlan(r, ctx.timezone));
 }
-export async function planWeekAction() {
-  return act((ctx) => generateWeekPlan(ctx));
+export async function planWeekAction(start?: string | null) {
+  return act((ctx) => generateWeekPlan(ctx, PlanDate.parse(start)), (rs, ctx) => summarizeWeekPlan(rs, ctx.timezone));
 }
+const BlockOutcome = z.object({
+  status: z.enum(["done", "partial", "skipped", "missed", "rest", "interrupted", "planned"]),
+  reason: z.string().max(300).nullish(),
+});
 export async function blockOutcomeAction(id: string, status: "done" | "partial" | "skipped" | "missed" | "rest" | "interrupted" | "planned", reason?: string | null) {
-  return act((ctx) => setBlockOutcome(ctx, id, status, reason));
+  return act((ctx) => {
+    const v = BlockOutcome.parse({ status, reason });
+    return setBlockOutcome(ctx, id, v.status, v.reason);
+  });
 }
-export async function recoverPlanAction(input: { description: string; category: "interruption" | "rest" | "missing_info" | "estimate" | "external" | "other"; availableFrom?: string | null }) {
-  return act((ctx) => recoverPlan(ctx, input));
+const Recovery = z.object({
+  description: z.string().min(1).max(500),
+  category: z.enum(["interruption", "rest", "missing_info", "estimate", "external", "other"]),
+  availableFrom: z.string().max(40).nullish(),
+  since: z.string().max(40).nullish(),
+});
+export async function recoverPlanAction(input: { description: string; category: "interruption" | "rest" | "missing_info" | "estimate" | "external" | "other"; availableFrom?: string | null; since?: string | null }) {
+  return act((ctx) => recoverPlan(ctx, Recovery.parse(input)));
 }
 
 // ---- memory ----------------------------------------------------------------
@@ -223,11 +247,15 @@ export async function generateBriefingAction(kind: "morning" | "evening" | "week
     const profile = await getProfile(ctx);
     const date = nowIn(profile.timezone).toISODate()!;
     const b = await buildBriefing(ctx.db, profile, kind, date);
+    if ("week" in b && b.week) {
+      const { learnFromWeek } = await import("@/server/domain/patterns");
+      await learnFromWeek(ctx.db, ctx.userId, b.week);
+    }
     // On-demand reviews replace today's stored one of the same kind (data may have changed).
     const { error } = await ctx.db
       .from("briefings")
       .upsert({ user_id: ctx.userId, kind, local_date: date, title: b.title, body: b.body, data: b.data, generated_by: "rules", read_at: null }, { onConflict: "user_id,kind,local_date" });
     if (error) throw new Error(error.message);
-    return b;
+    return { title: b.title, body: b.body };
   });
 }

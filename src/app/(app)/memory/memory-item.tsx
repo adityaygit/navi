@@ -11,6 +11,29 @@ const ORIGIN: Record<Memory["origin"], [string, string]> = {
   observed: ["Observed from your activity", "badge-accent"],
 };
 
+type EvidenceEntry = { pattern?: string; week_end?: string; supports?: boolean; summary?: string; corrected_from?: string; at?: string };
+
+/** The recorded evidence behind a memory, so an observed pattern can be checked, not just trusted. */
+function Evidence({ evidence }: { evidence: unknown[] }) {
+  const entries = (evidence ?? []).filter((e): e is EvidenceEntry => !!e && typeof e === "object");
+  const lines = entries
+    .map((e) =>
+      e.summary
+        ? `${e.week_end ? `Week ending ${e.week_end}: ` : ""}${e.supports === false ? "against: " : ""}${e.summary}`
+        : e.corrected_from
+          ? `Corrected from: “${e.corrected_from}”`
+          : null,
+    )
+    .filter((l): l is string => !!l);
+  if (!lines.length) return null;
+  return (
+    <details className="text-xs">
+      <summary className="muted inline-flex cursor-pointer items-center pointer-coarse:min-h-11">Evidence ({lines.length})</summary>
+      <ul className="mt-1 list-disc pl-5">{lines.map((l, i) => <li key={i}>{l}</li>)}</ul>
+    </details>
+  );
+}
+
 export function MemoryItem({ memory, projectName }: { memory: Memory; projectName: string | null }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(memory.content);
@@ -34,8 +57,9 @@ export function MemoryItem({ memory, projectName }: { memory: Memory; projectNam
         {memory.origin !== "stated" && <span className="badge">{Math.round(memory.confidence * 100)}% confident</span>}
         {projectName && <span className="badge">{projectName}</span>}
         {memory.status !== "active" && <span className="badge">{memory.status}</span>}
-        <span className="muted">Saved {new Date(memory.created_at).toLocaleDateString()}{memory.last_confirmed_at ? ` · confirmed ${new Date(memory.last_confirmed_at).toLocaleDateString()}` : ""}</span>
+        <span className="muted">Saved {new Date(memory.created_at).toLocaleDateString()}{new Date(memory.updated_at).toLocaleDateString() !== new Date(memory.created_at).toLocaleDateString() ? ` · updated ${new Date(memory.updated_at).toLocaleDateString()}` : ""}{memory.last_confirmed_at ? ` · confirmed ${new Date(memory.last_confirmed_at).toLocaleDateString()}` : ""}</span>
       </div>
+      <Evidence evidence={memory.evidence} />
       {memory.status === "active" && !editing && (
         <div className="flex flex-wrap gap-1">
           {memory.origin !== "stated" && <ActionButton action={() => confirmMemoryAction(memory.id)}>That's right</ActionButton>}

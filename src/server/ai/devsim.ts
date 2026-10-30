@@ -60,6 +60,12 @@ export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
     // Questions about state are answered from a fresh read, never from history.
     const r = await runTool(ctx, "get_plan", { date: "tomorrow" });
     reply = String(r.data ?? r.summary).replace(/\s*\[[0-9a-f-]{36}\]/g, "");
+  } else if (req.mode === "chat" && /\bhow (did|have) i (do|done)\b|\bhow was my (day|week)\b/i.test(text)) {
+    // "How did I do" comes from the computed review, never from the model's arithmetic.
+    const kind = /\bweek\b/i.test(text) ? "week" : "day";
+    const r = await runTool(ctx, "get_review", { kind, date: /\byesterday\b/i.test(text) ? "yesterday" : "today" });
+    const d = r.data as { review?: { explanation: string; findings: string[] }; week?: { findings: string[]; average_completion_percent: number | null } } | undefined;
+    reply = d?.review ? [d.review.explanation, ...d.review.findings].join(" ") : d?.week ? d.week.findings.join(" ") : r.summary;
   } else if (req.mode === "chat" && /\b(just captured|did i (just )?capture|in my inbox|what changed)\b/i.test(text)) {
     const r = await runTool(ctx, "get_inbox", {});
     reply = String(r.data ?? r.summary).replace(/\s*\[[0-9a-f-]{36}\]/g, "");
@@ -71,7 +77,7 @@ export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
     const data = (await runTool(ctx, "get_overview", {})).data as string;
     // The overview carries item IDs for the model; people don't need them.
     const planLine = (data.split("\n").find((l) => l.startsWith("Today's plan")) ?? "").replace(/\s*\[[0-9a-f-]{36}\]/g, "");
-    reply = `${r.summary}. ${planLine}`;
+    reply = `${r.summary.replace(/\.$/, "")}. ${planLine}`;
   } else if (req.mode === "chat" && /\b(plan (broke|fell apart)|got interrupted|ran out of time|i'?m behind|sick|unexpected)\b/i.test(text)) {
     const category = /sick|tired|rest/i.test(text) ? "rest" : /estimate|took longer/i.test(text) ? "estimate" : "interruption";
     const r = await call("recover_plan", { description: text.slice(0, 400), category });

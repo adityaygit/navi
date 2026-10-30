@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ActionButton } from "./action-button";
 import { blockOutcomeAction, startFocusAction } from "@/app/(app)/client-actions";
 import type { PlanBlock } from "@/lib/types";
+import { OUTCOMES } from "@/lib/outcomes";
 
 const STATUS_BADGE: Record<string, string> = {
   done: "badge-ok",
@@ -61,10 +62,11 @@ function SkipButton({ id }: { id: string }) {
   // Asking why keeps accountability fair: rest and interruptions aren't failures.
   return (
     <span className="flex flex-wrap gap-1" role="group" aria-label="Why skip?">
-      <ActionButton action={() => blockOutcomeAction(id, "rest", "Chose to rest")}>Resting</ActionButton>
-      <ActionButton action={() => blockOutcomeAction(id, "interrupted", "Interrupted")}>Interrupted</ActionButton>
-      <ActionButton action={() => blockOutcomeAction(id, "skipped", "Missing information")}>Blocked/missing info</ActionButton>
-      <ActionButton action={() => blockOutcomeAction(id, "skipped", "Avoided it")}>Just didn't</ActionButton>
+      <ActionButton action={() => blockOutcomeAction(id, OUTCOMES.rest.status, OUTCOMES.rest.reason)}>Resting</ActionButton>
+      <ActionButton action={() => blockOutcomeAction(id, OUTCOMES.interrupted.status, OUTCOMES.interrupted.reason)}>Interrupted</ActionButton>
+      <ActionButton action={() => blockOutcomeAction(id, OUTCOMES.missing_info.status, OUTCOMES.missing_info.reason)}>Blocked/missing info</ActionButton>
+      <ActionButton action={() => blockOutcomeAction(id, OUTCOMES.estimate.status, OUTCOMES.estimate.reason)}>Took longer than estimated</ActionButton>
+      <ActionButton action={() => blockOutcomeAction(id, OUTCOMES.avoided.status, OUTCOMES.avoided.reason)}>Just didn't</ActionButton>
       <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(false)}>Cancel</button>
     </span>
   );

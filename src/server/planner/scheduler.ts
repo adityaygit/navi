@@ -42,12 +42,16 @@ export type PlannedBlock = {
 export type SchedulerOutput = {
   blocks: PlannedBlock[];
   fixed: { title: string; starts_at: string; ends_at: string; kind: "event" | "routine" | "block" }[];
-  unscheduled: { task_id: string; title: string; why: string; remaining_minutes: number }[];
+  unscheduled: { task_id: string; title: string; why: string; remaining_minutes: number; due_at: string | null }[];
+  /** Work that only fits after its deadline (placed anyway, so the user can see and decide). */
+  afterDeadline: { task_id: string; title: string; due_at: string }[];
   warnings: string[];
   freeMinutes: number;
 };
 
 const DEFAULT_ESTIMATE = 30;
+/** Block outcomes in which the task's work didn't happen (so it still needs planning). */
+const UNWORKED_STATUSES = ["skipped", "missed", "rest", "interrupted"];
 export const MIN_CHUNK_MINUTES = 30;
 export const WHOLE_UP_TO_MINUTES = 60;
 
@@ -131,7 +135,8 @@ export function scheduleDay(input: SchedulerInput): SchedulerOutput {
   for (const b of input.keptBlocks) {
     const iv = Interval.fromDateTimes(DateTime.fromISO(b.starts_at).setZone(zone), DateTime.fromISO(b.ends_at).setZone(zone));
     if (iv.isValid) busy.push(iv);
-    if (b.task_id && b.status !== "skipped" && b.status !== "missed") {
+    // Time in a block counts as work on its task unless nothing was done in it.
+    if (b.task_id && !UNWORKED_STATUSES.includes(b.status)) {
       keptTaskMinutes[b.task_id] = (keptTaskMinutes[b.task_id] ?? 0) + iv.length("minutes");
     }
   }
@@ -208,6 +213,7 @@ export function scheduleDay(input: SchedulerInput): SchedulerOutput {
   // never leaves a sliver smaller than that for later.
   const blocks: PlannedBlock[] = [];
   const unscheduled: SchedulerOutput["unscheduled"] = [];
+  const afterDeadline: SchedulerOutput["afterDeadline"] = [];
   for (const item of queue) {
     let left = item.minutes;
     let placedAny = false;
@@ -224,8 +230,9 @@ export function scheduleDay(input: SchedulerInput): SchedulerOutput {
       if (rest > 0 && rest < minChunk) len = left - minChunk; // left ≥ 2·minChunk here, so both parts stay ≥ minChunk
       const start = slot.start!;
       const end = start.plus({ minutes: len });
-      if (item.dueBy && start >= item.dueBy && item.dueBy > input.now) {
+      if (item.dueBy && start >= item.dueBy && item.dueBy > input.now && item.task_id && !afterDeadline.some((a) => a.task_id === item.task_id)) {
         warnings.push(`“${item.title}” can only be scheduled after its deadline.`);
+        afterDeadline.push({ task_id: item.task_id, title: item.title, due_at: item.dueBy.toISO()! });
       }
       const part = len < item.total ? `; this block: ${len} of ${item.total}m` : "";
       blocks.push({
@@ -247,6 +254,7 @@ export function scheduleDay(input: SchedulerInput): SchedulerOutput {
         task_id: item.task_id,
         title: item.title,
         remaining_minutes: left,
+        due_at: item.dueBy?.toISO() ?? null,
         why: placedAny ? "Only part of it fits today" : wholeNow() ? `No free ${left}-minute slot left today` : "No free time left today",
       });
       if (item.dueBy && item.dueBy.setZone(zone).toISODate()! <= date) {
@@ -255,7 +263,7 @@ export function scheduleDay(input: SchedulerInput): SchedulerOutput {
     }
   }
   blocks.sort((a, b) => a.starts_at.localeCompare(b.starts_at));
-  return { blocks, fixed: fixed.sort((a, b) => a.starts_at.localeCompare(b.starts_at)), unscheduled, warnings, freeMinutes };
+  return { blocks, fixed: fixed.sort((a, b) => a.starts_at.localeCompare(b.starts_at)), unscheduled, afterDeadline, warnings, freeMinutes };
 }
 
 /**

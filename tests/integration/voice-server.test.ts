@@ -118,7 +118,9 @@ describe("voice budget is enforced server-side", () => {
     // Reported token usage beyond the reserve: the session costs what was reported, not reserve + reported.
     const big = await budget.recordVoiceTurn({ userId, sessionId: id, model, inputAudioSeconds: 0, outputAudioSeconds: 0, inputTokens: 100_000, outputTokens: 50_000, price: price(model) });
     expect(big.costUsd).toBeCloseTo(tokenCost(model, { input: 100_000, output: 50_000 }).usd, 6);
-    expect(await sessionTotal(id)).toBeCloseTo(inflated.costUsd + big.costUsd, 6);
+    // ai_usage.cost_usd is numeric(12,6): each of the two rows is rounded to a
+    // micro-dollar, so their sum can differ from the unrounded total by up to 1e-6.
+    expect(Math.abs((await sessionTotal(id)) - (inflated.costUsd + big.costUsd))).toBeLessThanOrEqual(1.01e-6);
     const { data: reservation } = await admin().from("ai_usage").select("cost_usd").eq("id", id).single();
     expect(Number(reservation!.cost_usd)).toBe(0);
     // Someone else's session id is ignored (no reconciling against it).

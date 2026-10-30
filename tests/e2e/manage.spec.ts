@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { admin, freshSetUpAccount } from "./helpers";
+import { admin, freshSetUpAccount, middayTimezone } from "./helpers";
 
 // Day-to-day management flows on an already set-up account: focus, plan
 // recovery, memory correction, approvals and settings. Each device profile
@@ -8,6 +8,8 @@ import { admin, freshSetUpAccount } from "./helpers";
 test("focus, recovery, memory, approvals and settings", async ({ page }, info) => {
   page.on("dialog", (d) => d.accept());
   const userId = await freshSetUpAccount(page, `e2e-${info.project.name}@navi.test`);
+  // Midday in the account's zone, so there's free time left to plan today whenever the suite runs.
+  await admin.from("profiles").update({ timezone: middayTimezone() }).eq("id", userId);
   const { data: task } = await admin.from("tasks").insert({ user_id: userId, title: "Write lab report", estimate_minutes: 30, priority: 2 }).select("id").single();
   const { data: doomed } = await admin.from("tasks").insert({ user_id: userId, title: "Old errand", estimate_minutes: 15 }).select("id").single();
 

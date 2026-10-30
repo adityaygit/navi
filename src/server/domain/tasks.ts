@@ -5,6 +5,24 @@ import type { Task } from "@/lib/types";
 import { AlreadyChangedError, createEntity, getEntity, updateEntity, type UpdateResult } from "./entities";
 import { logActivity } from "./activity";
 import { TaskCreate, TaskUpdate, compact } from "./schemas";
+import { OUTCOMES, STOPPED_NO_REASON, withNote } from "@/lib/outcomes";
+import { refreshStoredReview } from "@/server/jobs/briefings";
+
+/** Why a focus session was stopped early, if the user said. */
+export type StopReason = "rest" | "missing_info" | "estimate";
+
+/**
+ * The block outcome a focus session leaves behind. Stopping without a reason
+ * is an unexcused skip (it counts), not an interruption: only the user can say
+ * it was rest, an interruption, missing information or a bad estimate.
+ */
+export function focusBlockOutcome(outcome: "completed" | "progress" | "interrupted" | "abandoned", note?: string | null, reason?: StopReason | null): { status: "done" | "partial" | "interrupted" | "rest" | "skipped"; reason: string | null } {
+  if (outcome === "completed") return { status: "done", reason: note?.trim() || null };
+  if (outcome === "progress") return { status: "partial", reason: note?.trim() || null };
+  if (outcome === "interrupted") return { status: "interrupted", reason: withNote(OUTCOMES.interrupted.reason, note) };
+  if (reason) return { status: OUTCOMES[reason].status, reason: withNote(OUTCOMES[reason].reason, note) };
+  return { status: "skipped", reason: withNote(STOPPED_NO_REASON, note) };
+}
 
 export async function createTask(ctx: Ctx, input: TaskCreate): Promise<Task> {
   const values = compact(TaskCreate.parse(input));
@@ -89,6 +107,7 @@ export async function endFocus(
   sessionId: string,
   outcome: "completed" | "progress" | "interrupted" | "abandoned",
   note?: string | null,
+  reason?: StopReason | null,
 ) {
   const { data: s } = await ctx.db.from("focus_sessions").select("*").eq("id", sessionId).single();
   if (!s) throw new Error("Focus session not found");
@@ -101,10 +120,12 @@ export async function endFocus(
     await ctx.db.from("tasks").update({ actual_minutes: task.actual_minutes + minutes }).eq("id", s.task_id);
     if (outcome === "completed") await completeTask({ ...ctx, actor: "user" }, s.task_id);
   }
+  let block: { status: string; reason: string | null } | null = null;
   if (s.block_id) {
-    const blockStatus = outcome === "completed" ? "done" : outcome === "progress" ? "partial" : "interrupted";
-    await ctx.db.from("plan_blocks").update({ status: blockStatus, outcome_reason: note ?? null }).eq("id", s.block_id);
+    block = focusBlockOutcome(outcome, note, reason);
+    const { data: b } = await ctx.db.from("plan_blocks").update({ status: block.status, outcome_reason: block.reason }).eq("id", s.block_id).select("plan_date").maybeSingle();
+    if (b) await refreshStoredReview(ctx.db, ctx.userId, b.plan_date);
   }
-  await logActivity(ctx, { action: "focus_ended", summary: `Focus session ended after ${minutes} min (${outcome})` });
+  await logActivity(ctx, { action: "focus_ended", summary: `Focus session ended after ${minutes} min (${outcome}${block?.reason ? `: ${block.reason}` : ""})` });
   return { ...s, actual_minutes: minutes, outcome };
 }

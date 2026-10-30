@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireCtx, getProfile } from "@/server/context";
 import type { Briefing, PlanBlock, Task } from "@/lib/types";
-import { formatDay, formatDue, formatTime, nowIn } from "@/lib/time";
+import { atLocalTime, formatDay, formatDue, formatTime, nowIn } from "@/lib/time";
 import { PlanBlockRow } from "@/components/plan-block";
 import { FocusCard } from "@/components/focus";
 import { RecoveryButton } from "@/components/recovery";
@@ -21,7 +21,8 @@ export default async function TodayPage() {
   const zone = profile.timezone;
   const now = nowIn(zone);
   const today = now.toISODate()!;
-  const [blocksRes, tasksRes, focusRes, briefingRes, inboxRes, approvalsRes, eventsRes, routinesRes] = await Promise.all([
+  const yesterday = now.minus({ days: 1 }).toISODate()!;
+  const [blocksRes, tasksRes, focusRes, briefingRes, inboxRes, approvalsRes, eventsRes, routinesRes, yesterdayRes] = await Promise.all([
     ctx.db.from("plan_blocks").select("*").eq("plan_date", today).order("starts_at"),
     ctx.db.from("tasks").select("*").in("status", ["todo", "in_progress", "blocked"]).not("due_at", "is", null).lte("due_at", now.plus({ days: 3 }).toISO()!).order("due_at"),
     ctx.db.from("focus_sessions").select("id,started_at,planned_minutes,task_id,tasks(title)").is("ended_at", null).maybeSingle(),
@@ -30,7 +31,11 @@ export default async function TodayPage() {
     ctx.db.from("approvals").select("id", { count: "exact", head: true }).eq("status", "pending"),
     ctx.db.from("events").select("*").neq("status", "cancelled"),
     ctx.db.from("routines").select("*").eq("active", true),
+    // Yesterday's blocks nobody said anything about: one compact prompt to mark them.
+    ctx.db.from("plan_blocks").select("id", { count: "exact", head: true }).eq("plan_date", yesterday).in("status", ["planned", "in_progress"]),
   ]);
+  const unmarkedYesterday = yesterdayRes.count ?? 0;
+  const eveningNow = now >= atLocalTime(today, profile.evening_review_time, zone);
   const blocks = (blocksRes.data ?? []) as PlanBlock[];
   const dueSoon = (tasksRes.data ?? []) as Task[];
   const focus = focusRes.data as { id: string; started_at: string; planned_minutes: number | null; tasks: { title: string } | null } | null;
@@ -51,7 +56,7 @@ export default async function TodayPage() {
           <p className="muted">{formatDay(today, zone)}</p>
         </div>
         <div className="ml-auto flex flex-wrap gap-2">
-          <ActionButton className="btn" action={planDayAction}>Re-plan today</ActionButton>
+          <ActionButton className="btn" action={planDayAction} showResult>Re-plan today</ActionButton>
           <RecoveryButton />
         </div>
       </header>
@@ -65,6 +70,20 @@ export default async function TodayPage() {
         </div>
       )}
 
+      {unmarkedYesterday > 0 && (
+        <p className="notice flex flex-wrap items-center gap-2 text-sm">
+          <span className="flex-1">{unmarkedYesterday} block{unmarkedYesterday === 1 ? "" : "s"} from yesterday {unmarkedYesterday === 1 ? "isn't" : "aren't"} marked yet, so yesterday's review can't count {unmarkedYesterday === 1 ? "it" : "them"} fairly.</span>
+          <Link href={`/review?date=${yesterday}`} className="btn btn-sm">Mark yesterday</Link>
+        </p>
+      )}
+
+      {eveningNow && (
+        <p className="notice flex flex-wrap items-center gap-2 text-sm">
+          <span className="flex-1">Evening review: say how today went, then plan tomorrow.</span>
+          <Link href={`/review?date=${today}`} className="btn btn-sm">Review today</Link>
+        </p>
+      )}
+
       {briefing && !briefing.read_at && (
         <section className="card" aria-labelledby="briefing-title">
           <div className="flex items-start gap-2">
@@ -74,6 +93,8 @@ export default async function TodayPage() {
           <p className="mt-2 whitespace-pre-wrap text-sm">{briefing.body}</p>
           <div className="mt-3 flex gap-2">
             <ActionButton action={markBriefingReadAction} args={[briefing.id]}>Got it</ActionButton>
+            {briefing.kind === "evening" && <Link href={`/review?date=${briefing.local_date}`} className="btn btn-sm">Open evening review</Link>}
+            {briefing.kind === "weekly" && <Link href="/insights" className="btn btn-sm">Plan next week</Link>}
             <Link href="/insights" className="btn btn-sm btn-ghost">All reviews</Link>
           </div>
         </section>

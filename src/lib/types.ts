@@ -178,6 +178,7 @@ export type Memory = {
   confidence: number;
   status: "active" | "superseded" | "rejected";
   evidence: unknown[];
+  superseded_by?: string | null;
   last_confirmed_at: string | null;
   created_at: string;
   updated_at: string;
