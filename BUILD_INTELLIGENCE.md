@@ -15,7 +15,7 @@ The owner is fixing the environment variables and will start a new session with 
 
 
 ## How to resume in a fresh session ("resume")
-1. Clone/checkout `claude/charming-darwin-erd78b`; read `Navi_Product_Spec.md`, this file, then `git log --oneline -15` and `git status`.
+1. Check out the latest branch (`claude/sharp-keller-moxx93` as of session 2); read `Navi_Product_Spec.md`, this file, then `git log --oneline -15` and `git status`.
 2. Local stack (container resets kill Docker; see Learnings if `dockerd` complains about a stale pid):
    ```bash
    sudo nohup dockerd > /tmp/dockerd.log 2>&1 &
