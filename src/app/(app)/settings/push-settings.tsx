@@ -1,4 +1,5 @@
 "use client";
+import { connectionError } from "@/lib/connection";
 import { useEffect, useState } from "react";
 import { publicEnv } from "@/lib/env";
 
@@ -51,22 +52,36 @@ export function PushSettings({ configured }: { configured: boolean }) {
 
   async function disable() {
     setBusy(true);
-    const reg = await navigator.serviceWorker.getRegistration();
-    const sub = await reg?.pushManager.getSubscription();
-    if (sub) {
-      await fetch("/api/push/subscribe", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ endpoint: sub.endpoint }) });
-      await sub.unsubscribe();
+    setMsg(null);
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      const sub = await reg?.pushManager.getSubscription();
+      if (sub) {
+        // Tell the server first, so it stops sending even if this device can't unsubscribe.
+        const res = await fetch("/api/push/subscribe", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ endpoint: sub.endpoint }) });
+        if (!res.ok) throw new Error("Couldn't turn off notifications on the server");
+        await sub.unsubscribe();
+      }
+      setState("off");
+    } catch (err) {
+      setMsg(err instanceof TypeError ? connectionError() : err instanceof Error ? err.message : connectionError());
+    } finally {
+      setBusy(false);
     }
-    setState("off");
-    setBusy(false);
   }
 
   async function test() {
     setBusy(true);
-    const res = await fetch("/api/push/test", { method: "POST" });
-    const body = await res.json();
-    setMsg(res.ok ? `Test sent to ${body.sent} device(s)${body.failed ? `, ${body.failed} failed` : ""}.` : body.error);
-    setBusy(false);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/push/test", { method: "POST" });
+      const body = await res.json();
+      setMsg(res.ok ? `Test sent to ${body.sent} device(s)${body.failed ? `, ${body.failed} failed` : ""}.` : body.error);
+    } catch {
+      setMsg(connectionError());
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (!configured) return <p className="notice notice-warn text-sm">Push isn't configured on this server yet (VAPID keys missing). Briefings still appear in the app.</p>;

@@ -245,3 +245,26 @@ test("setting Navi up by voice ends in the same reviewed setup as typing", async
   const { data: routine } = await admin.from("routines").select("title,days,start_time,workspaces(name)").eq("user_id", userId).single();
   expect(routine).toEqual({ title: "Chess club", days: [2], start_time: "15:00:00", workspaces: { name: "School" } });
 });
+
+test("words from a voice turn that can't be saved at the end are kept as a capture", async ({ page, context, baseURL }, info) => {
+  await context.grantPermissions(["microphone"], { origin: baseURL! });
+  const userId = await freshSetUpAccount(page, `voice-keep-${info.project.name}@navi.test`);
+  const { seen, send } = await standInLiveApi(page, userId, "chat");
+  await page.goto("/chat");
+  await page.getByRole("button", { name: "Talk", exact: true }).click();
+  const voice = page.getByRole("region", { name: "Voice conversation" });
+  await voice.getByRole("button", { name: "Start talking" }).click();
+  await expect.poll(() => seen.audioChunks, { timeout: 15_000 }).toBeGreaterThan(3);
+
+  send({ serverContent: { inputTranscription: { text: "Remind me to renew my passport." } } });
+  await expect(voice.getByText("Remind me to renew my passport.")).toBeVisible();
+  // Saving the turn fails (e.g. the network blips) just as the person ends voice.
+  await page.route("**/api/voice/turn", (r) => r.abort());
+  await voice.getByRole("button", { name: "End voice" }).click();
+  await expect(voice.getByText(/kept as a capture and will sync to your inbox/)).toBeVisible();
+  await page.unroute("**/api/voice/turn");
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await expect
+    .poll(async () => (await admin.from("captures").select("raw_text,source").eq("user_id", userId)).data, { timeout: 30_000 })
+    .toEqual([{ raw_text: "Remind me to renew my passport.", source: "voice" }]);
+});

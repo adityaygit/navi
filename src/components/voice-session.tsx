@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createSpeechRecognition, speechRecognitionSupported, type SpeechRec } from "@/lib/speech";
 import type { ToolEvent } from "@/lib/types";
+import { newClientId, offlineQueue } from "@/lib/offline-queue";
 
 type ToolReply = { id?: string; name?: string; response: Record<string, unknown> };
 
@@ -183,9 +184,10 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
     outRef.current = null;
   }, [flushPlayback, releaseMic]);
 
+  /** Saves the turn so far; false if it couldn't be saved (it's kept for the next try). */
   const saveTurn = useCallback(async (interrupted = false) => {
     const t = turnRef.current;
-    if (!convRef.current || (!t.user.trim() && !t.navi.trim() && !t.tools.length && !t.inSec)) return;
+    if (!convRef.current || (!t.user.trim() && !t.navi.trim() && !t.tools.length && !t.inSec)) return true;
     turnRef.current = { user: "", navi: "", tools: [], inSec: 0, outSec: 0 };
     try {
       const res = await fetch("/api/voice/turn", {
@@ -199,10 +201,19 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
         setError("Today's AI testing budget is used up, so voice was stopped. Your transcript is saved.");
         stopAll();
       }
+      return true;
     } catch {
       setError("Couldn't save the last voice turn (network). Keep talking; it will retry with the next turn.");
-      turnRef.current.user = t.user + " " + turnRef.current.user;
-      turnRef.current.navi = t.navi + " " + turnRef.current.navi;
+      // Put the whole turn back, including tool results and audio time (which counts toward the budget).
+      const now = turnRef.current;
+      turnRef.current = {
+        user: `${t.user} ${now.user}`.trim(),
+        navi: `${t.navi} ${now.navi}`.trim(),
+        tools: [...t.tools, ...now.tools],
+        inSec: t.inSec + now.inSec,
+        outSec: t.outSec + now.outSec,
+      };
+      return false;
     }
   }, [onTurnSaved, setError, stopAll]);
 
@@ -397,9 +408,16 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
         className="btn btn-danger"
         onClick={async () => {
           endedByUser.current = true;
-          await saveTurn();
+          const saved = await saveTurn();
           stopAll();
           setStatus("ended");
+          if (!saved && turnRef.current.user.trim()) {
+            // Nothing left to retry with: keep the spoken words as a capture so they reach the inbox.
+            await offlineQueue
+              .add({ client_id: newClientId(), raw_text: turnRef.current.user.trim(), source: "voice", captured_at: new Date().toISOString(), attempts: 0 })
+              .then(() => setError("Couldn't save the last voice turn. Your words were kept as a capture and will sync to your inbox."))
+              .catch(() => {});
+          }
         }}
       >
         End voice

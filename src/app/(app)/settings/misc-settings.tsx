@@ -1,4 +1,5 @@
 "use client";
+import { connectionError } from "@/lib/connection";
 import { useState, useTransition } from "react";
 import { clearDeviceDataForDeletedAccount } from "@/lib/device-privacy";
 import { useRouter } from "next/navigation";
@@ -50,9 +51,9 @@ export function DangerZone() {
           disabled={confirmText !== "DELETE" || busy}
           onClick={async () => {
             setBusy(true);
-            const res = await fetch("/api/account", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirm: "DELETE" }) });
-            if (res.ok) { await clearDeviceDataForDeletedAccount(); router.replace("/login"); router.refresh(); }
-            else { setMsg((await res.json()).error); setBusy(false); }
+            const res = await fetch("/api/account", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirm: "DELETE" }) }).catch(() => null);
+            if (res?.ok) { await clearDeviceDataForDeletedAccount(); router.replace("/login"); router.refresh(); }
+            else { setMsg(res ? (await res.json().catch(() => ({}))).error ?? "Couldn't delete the account." : connectionError()); setBusy(false); }
           }}
         >
           Delete everything
