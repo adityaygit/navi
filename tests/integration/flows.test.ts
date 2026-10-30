@@ -304,9 +304,12 @@ describe("briefings and budget", () => {
 
   it("stops new AI calls at the daily cap", async () => {
     const a = admin();
+    // Fill today's budget to 1 cent below the cap, whatever was already spent.
+    const { getBudgetStatus } = await import("@/server/ai/budget");
+    const before = await getBudgetStatus();
     const { data: row } = await a
       .from("ai_usage")
-      .insert({ user_id: userId, provider: "anthropic", model: "claude-sonnet-5-5", role: "planner", purpose: "test", cost_usd: 1.99, budget_day: budgetDay() })
+      .insert({ user_id: userId, provider: "anthropic", model: "claude-sonnet-5-5", role: "planner", purpose: "test", cost_usd: before.capUsd - before.spentUsd - 0.01, budget_day: budgetDay() })
       .select()
       .single();
     try {
