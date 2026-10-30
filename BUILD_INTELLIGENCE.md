@@ -84,4 +84,4 @@ Seeded allowlist (local only): dev@navi.test, alice@navi.test, bob@navi.test.
 
 ## Exact next action
 1. Review remaining UI for phone-width issues (Tasks filters, Settings, Inbox bulk actions) with screenshots; fix.
-2. When keys arrive: write and run a real-model smoke test against Anthropic/Gemini within the $2/day guard and record results here.
+2. When keys arrive: run `npm run smoke:ai` (written, fails cleanly without keys; budget-checked, records usage), then run the app with `NAVI_AI_PROVIDER=anthropic` and repeat the core e2e flows manually with the real model; record results here.

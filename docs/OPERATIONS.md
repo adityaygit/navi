@@ -130,6 +130,21 @@ Manual check:
 curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://<app>/api/cron/tick
 ```
 
+## Checking the AI providers
+
+Once `ANTHROPIC_API_KEY` and/or `GEMINI_API_KEY` are set (in `.env.local`, or
+exported), run:
+
+```bash
+npm run smoke:ai
+```
+
+It confirms each configured Claude model role is accessible and answers, mints
+a Gemini Live ephemeral token, and has a short live voice exchange using that
+token, the way the browser does. Total cost is well under one cent, it's
+recorded against the daily budget, and it refuses to run if the budget is used
+up. Use `npm run smoke:ai -- anthropic` or `-- gemini` to check one provider.
+
 ## Spend controls
 
 The app enforces `NAVI_DAILY_BUDGET_USD` across all users (default $2 per day,
