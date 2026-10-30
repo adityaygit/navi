@@ -79,9 +79,58 @@ describe("row level security", () => {
     expect(allow ?? []).toHaveLength(0);
   });
 
+  it("lets a user mark their own notification read, but change nothing else about it", async () => {
+    const a = admin();
+    const { data: n } = await a
+      .from("notifications")
+      .insert({ user_id: alice.userId, kind: "deadline", title: "Due soon", body: "Essay", url: "/tasks", dedupe_key: `rls-${Date.now()}` })
+      .select("id")
+      .single();
+    try {
+      // Rewriting what a notification says or where it links is refused.
+      await alice.db.from("notifications").update({ url: "https://evil.example", title: "Click me" }).eq("id", n!.id);
+      await alice.db.from("notifications").update({ status: "queued" }).eq("id", n!.id);
+      const { data: same } = await a.from("notifications").select("url,title,status").eq("id", n!.id).single();
+      expect(same).toEqual({ url: "/tasks", title: "Due soon", status: "queued" });
+      const { error } = await alice.db.from("notifications").update({ status: "read" }).eq("id", n!.id);
+      expect(error).toBeNull();
+      const { data: read } = await a.from("notifications").select("status").eq("id", n!.id).single();
+      expect(read!.status).toBe("read");
+      // And never someone else's.
+      await a.from("notifications").update({ status: "queued" }).eq("id", n!.id);
+      await bob.db.from("notifications").update({ status: "read" }).eq("id", n!.id);
+      const { data: notBob } = await a.from("notifications").select("status").eq("id", n!.id).single();
+      expect(notBob!.status).toBe("queued");
+    } finally {
+      await a.from("notifications").delete().eq("id", n!.id);
+    }
+  });
+
   it("rejects sign-ups that are not on the invite list", async () => {
     const anon = createClient(URL_, ANON, { auth: { persistSession: false } });
     const { error } = await anon.auth.signUp({ email: `stranger-${Date.now()}@example.com`, password: "whatever-123456" });
-    expect(error?.message).toMatch(/invite-only|access list/i);
+    // Refused either by public sign-up being off or by the invite hook.
+    expect(error?.message).toMatch(/invite-only|access list|signups? not allowed/i);
+  });
+
+  it("won't let anyone register an invited email from the client (accounts are created server-side)", async () => {
+    // An attacker who knows an invited address tries to claim it with their own password.
+    const email = `invited-${Date.now()}@navi.test`;
+    const a = admin();
+    await a.from("allowed_emails").upsert({ email, note: "rls test" });
+    try {
+      const anon = createClient(URL_, ANON, { auth: { persistSession: false } });
+      const up = await anon.auth.signUp({ email, password: "attacker-password-1" });
+      expect(up.error?.message).toMatch(/signups? not allowed/i);
+      // Nor through an email link: links never create accounts.
+      const otp = await anon.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+      expect(otp.error).not.toBeNull();
+      const { data } = await a.auth.admin.listUsers({ perPage: 1000 });
+      expect(data.users.find((u) => u.email === email)).toBeUndefined();
+      const signIn = await anon.auth.signInWithPassword({ email, password: "attacker-password-1" });
+      expect(signIn.error).not.toBeNull();
+    } finally {
+      await a.from("allowed_emails").delete().eq("email", email);
+    }
   });
 });

@@ -22,7 +22,7 @@ const ONBOARDING_QUESTIONS = [
 ];
 
 export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
-  const ctx = { ...req.ctx, actor: "navi" as const };
+  const ctx = { ...req.ctx, actor: "navi" as const, userMessage: req.userText };
   const events: ToolEvent[] = [];
   let mutated = false;
   const call = async (name: string, input: unknown) => {

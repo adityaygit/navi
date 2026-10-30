@@ -80,6 +80,23 @@ describe("web push delivery", () => {
     await a.from("push_subscriptions").delete().eq("user_id", userId);
   });
 
+  it("never sends to an endpoint that isn't a push service, and keeps no provider error text", async () => {
+    const device = createECDH("prime256v1");
+    device.generateKeys();
+    const a = admin();
+    const keys = { p256dh: device.getPublicKey().toString("base64url"), auth: randomBytes(16).toString("base64url") };
+    // E.g. a row saved before endpoints were checked, pointing into the server's network.
+    await a.from("push_subscriptions").insert({ user_id: userId, endpoint: "https://169.254.169.254/latest/meta-data/", ...keys });
+    await a.from("push_subscriptions").insert({ user_id: userId, endpoint: `https://127.0.0.1:${port}/down`, ...keys });
+    const before = received.length;
+    const r = await sendToSubscriptions(a, userId, { title: "t", body: "b", url: "/", tag: "ssrf" });
+    expect(r).toMatchObject({ sent: 0, failed: 2 });
+    expect(received.length - before).toBe(1); // only the local test service was contacted
+    const { data: left } = await a.from("push_subscriptions").select("endpoint,last_error").eq("user_id", userId);
+    expect(left).toEqual([{ endpoint: `https://127.0.0.1:${port}/down`, last_error: "push service answered HTTP 503" }]);
+    await a.from("push_subscriptions").delete().eq("user_id", userId);
+  });
+
   it("sends a due notification once even when two scheduler runs overlap", async () => {
     const device = createECDH("prime256v1");
     device.generateKeys();

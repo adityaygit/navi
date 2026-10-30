@@ -1,16 +1,13 @@
 import { test, expect, type Page } from "@playwright/test";
-import { admin, freshSetUpAccount, PASSWORD } from "./helpers";
+import { admin, ensureAccount, freshSetUpAccount, signInWithPassword } from "./helpers";
 
 // The person's control over their own data: a full export, a shared device
 // where one person's unsent offline captures never reach someone else's
 // account, and account deletion that removes everything.
 
 async function signIn(page: Page, email: string) {
-  await page.goto("/login");
-  await page.getByRole("button", { name: "Use a password instead" }).click();
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await ensureAccount(email);
+  await signInWithPassword(page, email);
   await expect(page).not.toHaveURL(/\/login/);
 }
 
@@ -66,7 +63,8 @@ test("unsent offline captures stay with the person who made them on a shared dev
 });
 
 test("export contains the person's data and deleting the account removes it", async ({ page }, info) => {
-  const userId = await freshSetUpAccount(page, `account-${info.project.name}@navi.test`);
+  const EMAIL_FOR_DELETE = `account-${info.project.name}@navi.test`;
+  const userId = await freshSetUpAccount(page, EMAIL_FOR_DELETE);
   await admin.from("tasks").insert({ user_id: userId, title: "Renew passport" });
   await admin.from("memories").insert({ user_id: userId, kind: "profile", content: "Works best in the morning", origin: "stated" });
 
@@ -88,6 +86,9 @@ test("export contains the person's data and deleting the account removes it", as
   const button = zone.getByRole("button", { name: "Delete everything" });
   await expect(button).toBeDisabled();
   await zone.getByLabel("Type DELETE").fill("DELETE");
+  // The typed word alone isn't enough: the account's email is needed too.
+  await expect(button).toBeDisabled();
+  await zone.getByLabel("Your email").fill(EMAIL_FOR_DELETE);
   await button.click();
   await expect(page).toHaveURL(/\/login/, { timeout: 15_000 });
 

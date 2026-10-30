@@ -132,6 +132,12 @@ async function executeApproved(ctx: Ctx, approval: Approval): Promise<Record<str
       const r = await updateEntity(userCtx, table, String(d.id), d.patch as Record<string, unknown>, { summary: approval.summary });
       return { ok: true, kind: r.kind };
     }
+    if (d.op === "complete" && table === "tasks") {
+      // The user confirmed it's done: same path as ticking it off themselves.
+      const { completeTask } = await import("./tasks");
+      const r = await completeTask(userCtx, String(d.id), typeof d.actual_minutes === "number" ? d.actual_minutes : null);
+      return { ok: true, kind: r.kind };
+    }
     if (d.op === "delete") {
       await deleteEntity(userCtx, table, String(d.id));
       return { ok: true, kind: "deleted" };

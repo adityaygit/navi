@@ -33,25 +33,29 @@ export function BudgetOverride({ exceeded }: { exceeded: boolean }) {
   );
 }
 
-export function DangerZone() {
+export function DangerZone({ email }: { email: string }) {
   const router = useRouter();
   const [confirmText, setConfirmText] = useState("");
+  const [confirmEmail, setConfirmEmail] = useState("");
+  const emailMatches = confirmEmail.trim().toLowerCase() === email.toLowerCase() && email !== "";
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   return (
     <section className="card flex flex-col gap-2 border-danger" aria-labelledby="dz-h">
       <h2 id="dz-h" className="h2 text-danger">Delete account</h2>
-      <p className="text-sm">Permanently deletes your account and everything in Navi. Export first if you want a copy. Type DELETE to confirm.</p>
+      <p className="text-sm">Permanently deletes your account and everything in Navi. Export first if you want a copy. To confirm, type DELETE and your account's email.</p>
       <div className="flex flex-wrap gap-2">
         <label htmlFor="dz" className="sr-only">Type DELETE</label>
         <input id="dz" className="input w-40" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} />
+        <label htmlFor="dz-email" className="sr-only">Your email</label>
+        <input id="dz-email" type="email" autoComplete="off" placeholder="your email" className="input w-56" value={confirmEmail} onChange={(e) => setConfirmEmail(e.target.value)} />
         <button
           type="button"
           className="btn btn-danger"
-          disabled={confirmText !== "DELETE" || busy}
+          disabled={confirmText !== "DELETE" || !emailMatches || busy}
           onClick={async () => {
             setBusy(true);
-            const res = await fetch("/api/account", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirm: "DELETE" }) }).catch(() => null);
+            const res = await fetch("/api/account", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirm: "DELETE", email: confirmEmail.trim() }) }).catch(() => null);
             if (res?.ok) { await clearDeviceDataForDeletedAccount(); router.replace("/login"); router.refresh(); }
             else { setMsg(res ? (await res.json().catch(() => ({}))).error ?? "Couldn't delete the account." : connectionError()); setBusy(false); }
           }}

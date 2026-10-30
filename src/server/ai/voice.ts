@@ -6,6 +6,7 @@ import { buildContext, getOrCreateConversation, listMessages } from "./chat";
 import { CHAT_SYSTEM, ONBOARDING_SYSTEM } from "./prompts";
 import { jsonSchemaFor, toolsFor } from "./tools";
 import { modelFor } from "./config";
+import { VOICE_TOKEN_MINUTES } from "./budget";
 
 // Real-time voice through the Gemini Live API. The browser connects directly
 // to Gemini with a short-lived, single-use ephemeral token whose model,
@@ -66,7 +67,9 @@ export async function mintVoiceToken(config: LiveConnectConfig, resumeHandle?: s
   const token = await client.authTokens.create({
     config: {
       uses: 1,
-      expireTime: new Date(now + 30 * 60 * 1000).toISOString(),
+      // The token (and so any session on it) stops working after the window its
+      // budget reservation covers; goAway/resume mints a fresh one.
+      expireTime: new Date(now + VOICE_TOKEN_MINUTES * 60 * 1000).toISOString(),
       newSessionExpireTime: new Date(now + 60 * 1000).toISOString(),
       // Lock model, instructions and tools so the client can't change them.
       liveConnectConstraints: { model, config: lockedConfig },

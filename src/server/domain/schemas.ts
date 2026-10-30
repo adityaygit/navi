@@ -116,6 +116,32 @@ export const ProfileUpdate = z.object({
     .describe("When flexible work may be scheduled"),
 });
 
+// What an edit (update_item) may change on each table. Strict: unknown keys
+// such as user_id, external_ref or created_by are rejected, not ignored.
+const planBlockStatus = z.enum(["planned", "in_progress", "done", "partial", "skipped", "missed", "rest", "interrupted"]);
+export const ENTITY_PATCHES = {
+  projects: ProjectCreate.partial().extend({ status: z.enum(["active", "paused", "done", "archived"]).optional() }).strict(),
+  goals: GoalCreate.partial().extend({ status: z.enum(["active", "paused", "achieved", "dropped"]).optional() }).strict(),
+  workspaces: WorkspaceCreate.partial().extend({ status: z.enum(["active", "archived"]).optional(), color: z.string().max(32).nullish(), sort_order: z.number().int().optional() }).strict(),
+  routines: RoutineCreate.partial().extend({ active: z.boolean().optional() }).strict(),
+  events: EventCreate.partial().extend({ status: z.enum(["confirmed", "tentative", "cancelled"]).optional() }).strict(),
+  milestones: MilestoneCreate.partial().extend({ done_at: isoDateTime.nullish(), sort_order: z.number().int().optional() }).strict(),
+  plan_blocks: z
+    .object({
+      title: z.string().min(1).max(300),
+      plan_date: isoDate,
+      starts_at: isoDateTime,
+      ends_at: isoDateTime,
+      is_flexible: z.boolean(),
+      status: planBlockStatus,
+      outcome_reason: z.string().max(500).nullish(),
+      reason: z.string().max(500).nullish(),
+    })
+    .partial()
+    .strict(),
+  notes: NoteCreate.partial().strict(),
+} as const;
+
 /** Drop undefined/null-ish keys the caller didn't intend to set (nullish -> omit). */
 export function compact<T extends Record<string, unknown>>(obj: T): Partial<T> {
   const out: Record<string, unknown> = {};

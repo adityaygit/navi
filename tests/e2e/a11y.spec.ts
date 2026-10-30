@@ -3,6 +3,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
 import { assertLocalSupabase } from "../local-guard";
+import { ensureAccount, PASSWORD } from "./helpers";
 
 // Automated WCAG 2.1 A/AA checks (axe) on every main page, with real data on
 // screen, plus a check that no page scrolls sideways (on the iPhone profile
@@ -46,10 +47,7 @@ async function audit(page: Page, label: string) {
 
 test("main pages have no automatically detectable WCAG A/AA violations", async ({ page }, info) => {
   const email = `a11y-${info.project.name}@navi.test`;
-  await admin.from("allowed_emails").upsert({ email, note: "e2e a11y spec" });
-  const { data } = await admin.auth.admin.listUsers();
-  const old = data.users.find((u) => u.email === email);
-  if (old) await admin.auth.admin.deleteUser(old.id);
+  const userId = await ensureAccount(email, { fresh: true });
 
   const problems: string[] = [];
   // Record any Content-Security-Policy violation on every page visited.
@@ -67,13 +65,11 @@ test("main pages have no automatically detectable WCAG A/AA violations", async (
   problems.push(...(await audit(page, "/login")));
   await page.getByRole("button", { name: "Use a password instead" }).click();
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill("test-password-123");
+  await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/onboarding/);
   problems.push(...(await audit(page, "/onboarding")));
 
-  const { data: after } = await admin.auth.admin.listUsers();
-  const userId = after.users.find((u) => u.email === email)!.id;
   await admin.from("profiles").update({ onboarding_status: "completed", timezone: "UTC", availability: [{ days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "23:59" }] }).eq("id", userId);
   const { data: ws } = await admin.from("workspaces").insert({ user_id: userId, name: "School" }).select("id").single();
   // Separate inserts: a bulk insert sends NULL for keys a row leaves out.

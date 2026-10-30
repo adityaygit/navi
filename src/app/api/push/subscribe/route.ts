@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { requireApiCtx } from "@/server/context";
 import { apiError } from "@/server/http";
+import { pushEndpointAllowed } from "@/lib/push-endpoint";
 
 const Body = z.object({
   endpoint: z.string().url().max(2000),
@@ -12,6 +13,9 @@ export async function POST(request: NextRequest) {
   try {
     const ctx = await requireApiCtx();
     const sub = Body.parse(await request.json());
+    if (!pushEndpointAllowed(sub.endpoint)) {
+      return NextResponse.json({ error: "That isn't a supported browser push service." }, { status: 400 });
+    }
     // Endpoint is globally unique; re-subscribing on the same device replaces the old row.
     await ctx.db.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
     const { error } = await ctx.db.from("push_subscriptions").insert({

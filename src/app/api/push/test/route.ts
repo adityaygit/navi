@@ -10,7 +10,8 @@ export async function POST() {
     if (!pushConfigured()) return NextResponse.json({ ok: false, error: "Push isn't configured on the server (VAPID keys missing)." }, { status: 503 });
     const r = await sendToSubscriptions(ctx.db, ctx.userId, { title: "Navi test notification", body: "Push notifications are working on this device.", url: "/settings", tag: `test:${Date.now()}` });
     if (r.none) return NextResponse.json({ ok: false, error: "No devices are subscribed. Enable notifications on this device first." }, { status: 400 });
-    return NextResponse.json({ ok: r.sent > 0, ...r });
+    // Counts only: what a push service answered is never echoed to the client.
+    return NextResponse.json({ ok: r.sent > 0, sent: r.sent, failed: r.failed });
   } catch (err) {
     return apiError(err);
   }

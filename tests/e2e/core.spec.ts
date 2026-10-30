@@ -2,23 +2,17 @@ import { test, expect, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
 import { assertLocalSupabase } from "../local-guard";
+import { ensureAccount, signInWithPassword } from "./helpers";
 
 config({ path: ".env.local", quiet: true });
 assertLocalSupabase();
 const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
 
-async function resetAccount(email: string) {
-  const { data } = await admin.auth.admin.listUsers();
-  const u = data.users.find((x) => x.email === email);
-  if (u) await admin.auth.admin.deleteUser(u.id);
-}
+const resetAccount = (email: string) => ensureAccount(email, { fresh: true });
 
 async function signIn(page: Page, email: string) {
-  await page.goto("/login");
-  await page.getByRole("button", { name: "Use a password instead" }).click();
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill("test-password-123");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await ensureAccount(email);
+  await signInWithPassword(page, email);
 }
 
 /** Lets a test run on its own: skips the setup conversation for an existing account. */

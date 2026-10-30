@@ -8,6 +8,7 @@ import { pushConfigured } from "@/server/jobs/notify";
 import { ScheduleSettings } from "./schedule-settings";
 import { PushSettings } from "./push-settings";
 import { BudgetOverride, DangerZone } from "./misc-settings";
+import { PasswordSettings } from "./password-settings";
 import { ActionButton } from "@/components/action-button";
 import { restartOnboardingAction } from "../actions";
 
@@ -110,7 +111,9 @@ export default async function SettingsPage() {
         <ul className="text-sm">{integrations.map((i) => <li key={i.id} className="flex gap-2"><span className="flex-1">{i.name} <span className="muted">— {i.description}</span></span><span className="badge">{i.isConnected() ? "connected" : "not connected"}</span></li>)}</ul>
       </section>
 
-      <DangerZone />
+      <PasswordSettings />
+
+      <DangerZone email={email} />
     </div>
   );
 }

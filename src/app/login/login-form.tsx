@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { createSupabaseBrowser } from "@/lib/supabase/client";
 import { clearDevicePrivateData } from "@/lib/device-privacy";
+import { LOGIN_ERRORS, safeNext } from "@/lib/safe-next";
 
 export function LoginForm({ next, googleEnabled }: { next: string; googleEnabled: boolean }) {
   const [email, setEmail] = useState("");
@@ -15,11 +16,13 @@ export function LoginForm({ next, googleEnabled }: { next: string; googleEnabled
   useEffect(clearDevicePrivateData, []);
   const redirectTo = () => `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
 
-  function explain(err: { message: string; status?: number }) {
-    if (err.status === 403 || /invite-only|access list/i.test(err.message)) {
-      return "This email isn't on Navi's access list yet. Ask the owner to invite you.";
+  // Fixed messages only: provider error text is never shown as-is.
+  function explain(err: { message: string; status?: number; code?: string }) {
+    if (err.status === 403 || /invite-only|access list|signups? not allowed|user not found/i.test(`${err.code ?? ""} ${err.message}`)) {
+      return LOGIN_ERRORS.not_invited;
     }
-    return err.message;
+    if (err.status === 429 || /rate limit|too many/i.test(err.message)) return "Too many attempts. Wait a minute and try again.";
+    return "Sign-in didn't work. Check your connection and try again.";
   }
 
   async function submit(e: React.FormEvent) {
@@ -27,22 +30,19 @@ export function LoginForm({ next, googleEnabled }: { next: string; googleEnabled
     setBusy(true);
     setMessage(null);
     if (mode === "link") {
-      const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo() } });
+      // Existing (invited) accounts only: accounts are created by the owner,
+      // server-side (scripts/allow-email.mjs add), never from this page.
+      const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo(), shouldCreateUser: false } });
       setMessage(error ? { kind: "error", text: explain(error) } : { kind: "ok", text: "Check your email for a sign-in link." });
     } else {
-      let { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error && /invalid login credentials/i.test(error.message)) {
-        // First time with a password: create the account (still gated by the invite list).
-        const signUp = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: redirectTo() } });
-        error = signUp.error;
-        if (!error && !signUp.data.session) {
-          setMessage({ kind: "ok", text: "Account created. Confirm it from the email we sent, then sign in." });
-          setBusy(false);
-          return;
-        }
+        setMessage({ kind: "error", text: "Wrong email or password. No password yet? Sign in with an email link, then set one in Settings." });
+      } else if (error) {
+        setMessage({ kind: "error", text: explain(error) });
+      } else {
+        window.location.assign(safeNext(next, window.location.origin));
       }
-      if (error) setMessage({ kind: "error", text: explain(error) });
-      else window.location.assign(next);
     }
     setBusy(false);
   }

@@ -191,6 +191,118 @@ describe("approval boundary", () => {
     const { data: after } = await db.from("plan_blocks").select("status").eq("id", block!.id).single();
     expect(after!.status).toBe("planned");
   });
+
+  // Security review M3: each protection is judged against the row as it is,
+  // so Navi can't first remove it and then make the protected change.
+  const naviCtx = () => ({ ...ctxFor(db, userId, zone), actor: "navi" as const });
+  const sentForApproval = (r: { ok: boolean; summary: string }) => r.ok && /sent to the user for approval/.test(r.summary);
+
+  it("won't let Navi soften a hard deadline and then move it", async () => {
+    const user = ctxFor(db, userId, zone);
+    const due = DateTime.now().plus({ days: 3 }).toISO()!;
+    const t = await createTask(user, { title: "Scholarship form", due_at: due, due_is_hard: true });
+    expect(sentForApproval(await runTool(naviCtx(), "update_task", { id: t.id, due_is_hard: false }))).toBe(true);
+    expect(sentForApproval(await runTool(naviCtx(), "update_task", { id: t.id, due_at: DateTime.now().plus({ days: 9 }).toISO() }))).toBe(true);
+    const { data: still } = await db.from("tasks").select("due_at,due_is_hard").eq("id", t.id).single();
+    expect(still).toMatchObject({ due_is_hard: true });
+    expect(Date.parse(still!.due_at)).toBe(Date.parse(due));
+    // Navi can still make ordinary edits.
+    const ok = await runTool(naviCtx(), "update_task", { id: t.id, notes: "needs two references" });
+    expect(ok.summary).toMatch(/^Updated task/);
+  });
+
+  it("asks before changing fixed routines, fixed blocks and events (any time, repeat or status change)", async () => {
+    const start = DateTime.now().setZone(zone).plus({ days: 1 }).set({ hour: 16, minute: 0, second: 0, millisecond: 0 });
+    const { data: routine } = await db.from("routines").insert({ user_id: userId, title: "Practice", days: [1, 3], start_time: "16:00", duration_minutes: 90, is_fixed: true }).select().single();
+    const { data: block } = await db
+      .from("plan_blocks")
+      .insert({ user_id: userId, title: "Lab", plan_date: start.toISODate(), starts_at: start.toISO(), ends_at: start.plus({ hours: 1 }).toISO(), is_flexible: false })
+      .select()
+      .single();
+    const { data: event } = await db.from("events").insert({ user_id: userId, title: "Chemistry class", starts_at: start.toISO(), ends_at: start.plus({ hours: 1 }).toISO() }).select().single();
+
+    for (const patch of [{ start_time: "18:00" }, { is_fixed: false }, { active: false }, { days: [2] }, { duration_minutes: 30 }]) {
+      expect(sentForApproval(await runTool(naviCtx(), "update_item", { table: "routines", id: routine!.id, patch })), JSON.stringify(patch)).toBe(true);
+    }
+    for (const patch of [{ is_flexible: true }, { plan_date: start.plus({ days: 1 }).toISODate() }]) {
+      expect(sentForApproval(await runTool(naviCtx(), "update_item", { table: "plan_blocks", id: block!.id, patch })), JSON.stringify(patch)).toBe(true);
+    }
+    for (const patch of [{ recurrence: { freq: "weekly", days: [2, 4] } }, { status: "tentative" }, { ends_at: start.plus({ hours: 2 }).toISO() }]) {
+      expect(sentForApproval(await runTool(naviCtx(), "update_item", { table: "events", id: event!.id, patch })), JSON.stringify(patch)).toBe(true);
+    }
+    const { data: r } = await db.from("routines").select("start_time,is_fixed,active").eq("id", routine!.id).single();
+    expect(r).toMatchObject({ start_time: "16:00:00", is_fixed: true, active: true });
+    const { data: b } = await db.from("plan_blocks").select("is_flexible").eq("id", block!.id).single();
+    expect(b!.is_flexible).toBe(false);
+    const { data: e } = await db.from("events").select("recurrence,status").eq("id", event!.id).single();
+    expect(e).toMatchObject({ recurrence: null, status: "confirmed" });
+
+    // Renaming is fine, and the user's own edits never need approval.
+    expect((await runTool(naviCtx(), "update_item", { table: "routines", id: routine!.id, patch: { title: "Soccer practice" } })).summary).toMatch(/^Updated routine/);
+    const mine = await updateEntity(ctxFor(db, userId, zone), "routines", routine!.id, { start_time: "17:00", is_fixed: false });
+    expect(mine.kind).toBe("updated");
+  });
+
+  it("leaves finishing projects, goals and milestones to the user", async () => {
+    const { data: goal } = await db.from("goals").insert({ user_id: userId, title: "Run a 10k" }).select().single();
+    const { data: project } = await db.from("projects").insert({ user_id: userId, name: "Training plan", goal_id: goal!.id }).select().single();
+    const { data: ms } = await db.from("milestones").insert({ user_id: userId, title: "5k without stopping", goal_id: goal!.id }).select().single();
+    expect(sentForApproval(await runTool(naviCtx(), "update_item", { table: "projects", id: project!.id, patch: { status: "done" } }))).toBe(true);
+    expect(sentForApproval(await runTool(naviCtx(), "update_item", { table: "goals", id: goal!.id, patch: { status: "achieved" } }))).toBe(true);
+    expect(sentForApproval(await runTool(naviCtx(), "update_item", { table: "milestones", id: ms!.id, patch: { done_at: new Date().toISOString() } }))).toBe(true);
+    const [{ data: p }, { data: g }, { data: m }] = await Promise.all([
+      db.from("projects").select("status").eq("id", project!.id).single(),
+      db.from("goals").select("status").eq("id", goal!.id).single(),
+      db.from("milestones").select("done_at").eq("id", ms!.id).single(),
+    ]);
+    expect([p!.status, g!.status, m!.done_at]).toEqual(["active", "active", null]);
+  });
+
+  it("only lets update_item change known fields, and says which ones it can", async () => {
+    const { data: note } = await db.from("notes").insert({ user_id: userId, body: "Locker 214" }).select().single();
+    const other = await runTool(naviCtx(), "update_item", { table: "notes", id: note!.id, patch: { user_id: "00000000-0000-0000-0000-000000000000", body: "x" } });
+    expect(other.ok).toBe(false);
+    expect(other.summary).toMatch(/Can't change user_id on notes\. Fields you can change: .*body/);
+    const forged = await runTool(naviCtx(), "update_item", { table: "notes", id: note!.id, patch: { source: "user", created_at: "2020-01-01T00:00:00Z" } });
+    expect(forged.ok).toBe(false);
+    const bad = await runTool(naviCtx(), "update_item", { table: "notes", id: note!.id, patch: { body: "" } });
+    expect(bad.ok).toBe(false);
+    const fine = await runTool(naviCtx(), "update_item", { table: "notes", id: note!.id, patch: { body: "Locker 214, code 1234" } });
+    expect(fine.ok).toBe(true);
+    const { data: after } = await db.from("notes").select("body,source,user_id").eq("id", note!.id).single();
+    expect(after).toEqual({ body: "Locker 214, code 1234", source: "user", user_id: userId });
+  });
+
+  it("marks a task done only when the user's own message says so, otherwise asks them to confirm", async () => {
+    const user = ctxFor(db, userId, zone);
+    const t = await createTask(user, { title: "Essay draft" });
+    // What the user actually typed this turn is held by the server.
+    const said = await runTool({ ...naviCtx(), userMessage: "Good news, I finished the essay draft!" }, "complete_task", { id: t.id, user_statement: "I finished the essay draft" });
+    expect(said.summary).toMatch(/Marked “Essay draft” done/);
+    const { data: done } = await db.from("tasks").select("status").eq("id", t.id).single();
+    expect(done!.status).toBe("done");
+
+    // The model claims a statement the user never made.
+    const t2 = await createTask(user, { title: "Lab report" });
+    const claimed = await runTool({ ...naviCtx(), userMessage: "what's on my plate today?" }, "complete_task", { id: t2.id, user_statement: "I finished the lab report" });
+    expect(claimed.summary).toMatch(/Not marked done.*confirm with one tap/);
+    // Quoting the user but not saying it's finished doesn't count either.
+    const vague = await runTool({ ...naviCtx(), userMessage: "the lab report is hard" }, "complete_task", { id: t2.id, user_statement: "the lab report" });
+    expect(vague.summary).toMatch(/Not marked done/);
+    // No user message at all (e.g. a voice turn without a transcript): confirmation.
+    const none = await runTool(naviCtx(), "complete_task", { id: t2.id, user_statement: "I finished the lab report" });
+    expect(none.summary).toMatch(/Not marked done/);
+    const { data: open } = await db.from("tasks").select("status").eq("id", t2.id).single();
+    expect(open!.status).toBe("todo");
+
+    const { data: pending } = await db.from("approvals").select("id,status,action_type").eq("action_type", "internal.complete.tasks").eq("status", "pending");
+    expect(pending).toHaveLength(1); // the repeats reuse one request
+    const approved = await decideApproval(user, pending![0].id, "approve", admin());
+    expect(approved.status).toBe("executed");
+    const { data: finished } = await db.from("tasks").select("status,completed_at").eq("id", t2.id).single();
+    expect(finished!.status).toBe("done");
+    expect(finished!.completed_at).not.toBeNull();
+  });
 });
 
 describe("plan recovery", () => {

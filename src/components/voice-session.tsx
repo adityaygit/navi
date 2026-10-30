@@ -166,8 +166,10 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
   const outRef = useRef<{ ctx: AudioContext; next: number; sources: Set<AudioBufferSourceNode> } | null>(null);
   // `marks`: for each piece of Navi's transcript, when its audio starts playing
   // (output-context time), so an interrupted turn saves only what was heard.
-  const turnRef = useRef({ user: "", navi: "", tools: [] as ToolEvent[], inSec: 0, outSec: 0, marks: [] as { len: number; at: number }[] });
+  const turnRef = useRef({ user: "", navi: "", tools: [] as ToolEvent[], inSec: 0, outSec: 0, inTok: 0, outTok: 0, marks: [] as { len: number; at: number }[] });
   const convRef = useRef<string | null>(null);
+  // The server's budget reservation for the token in use; turns are reconciled against it.
+  const voiceSessionRef = useRef<string | null>(null);
   const handleRef = useRef<string | null>(null);
   const mutedRef = useRef(muted);
   const endedByUser = useRef(false);
@@ -204,13 +206,13 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
   /** Saves the turn so far; false if it couldn't be saved (it's kept for the next try). */
   const saveTurn = useCallback(async (interrupted = false) => {
     const t = turnRef.current;
-    if (!convRef.current || (!t.user.trim() && !t.navi.trim() && !t.tools.length && !t.inSec)) return true;
-    turnRef.current = { user: "", navi: "", tools: [], inSec: 0, outSec: 0, marks: [] };
+    if (!convRef.current || (!t.user.trim() && !t.navi.trim() && !t.tools.length && !t.inSec && !t.inTok)) return true;
+    turnRef.current = { user: "", navi: "", tools: [], inSec: 0, outSec: 0, inTok: 0, outTok: 0, marks: [] };
     try {
       const res = await fetch("/api/voice/turn", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ conversationId: convRef.current, userText: t.user, assistantText: t.navi, toolEvents: t.tools, inputAudioSeconds: t.inSec, outputAudioSeconds: t.outSec, interrupted }),
+        body: JSON.stringify({ conversationId: convRef.current, voiceSessionId: voiceSessionRef.current, userText: t.user, assistantText: t.navi, toolEvents: t.tools, inputAudioSeconds: t.inSec, outputAudioSeconds: t.outSec, inputTokens: t.inTok, outputTokens: t.outTok, interrupted }),
       });
       const body = await res.json();
       onTurnSaved();
@@ -229,6 +231,8 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
         tools: [...t.tools, ...now.tools],
         inSec: t.inSec + now.inSec,
         outSec: t.outSec + now.outSec,
+        inTok: t.inTok + now.inTok,
+        outTok: t.outTok + now.outTok,
         marks: [],
       };
       return false;
@@ -244,7 +248,7 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
     if (seen) return seen;
     const run = (async (): Promise<ToolReply> => {
       try {
-        const res = await fetch("/api/voice/tool", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ conversationId: convRef.current, name: fc.name, args: fc.args ?? {} }) });
+        const res = await fetch("/api/voice/tool", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ conversationId: convRef.current, name: fc.name, args: fc.args ?? {}, userTranscript: turnRef.current.user }) });
         const result = await res.json();
         if (!READ_ONLY_TOOLS.includes(fc.name ?? "")) {
           turnRef.current.tools.push({ name: fc.name ?? "tool", ok: Boolean(result.ok), summary: String(result.summary ?? result.error ?? "") });
@@ -274,6 +278,7 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
       return;
     }
     convRef.current = body.conversationId;
+    voiceSessionRef.current = body.voiceSessionId ?? null;
 
     // Mic first, so a permission denial is reported before connecting.
     if (!micRef.current) {
@@ -325,6 +330,12 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
         callbacks: {
           onopen: () => setStatus("listening"),
           onmessage: (msg) => {
+            // Token counts, when the service reports them, are priced alongside audio time.
+            const usage = msg.usageMetadata;
+            if (usage) {
+              turnRef.current.inTok += (usage.promptTokenCount ?? 0) + (usage.toolUsePromptTokenCount ?? 0);
+              turnRef.current.outTok += (usage.responseTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0);
+            }
             if (msg.sessionResumptionUpdate?.resumable && msg.sessionResumptionUpdate.newHandle) handleRef.current = msg.sessionResumptionUpdate.newHandle;
             if (msg.goAway) {
               // The service is about to close this session (e.g. ~10 min limit): resume seamlessly.

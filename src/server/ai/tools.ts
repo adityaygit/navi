@@ -10,6 +10,7 @@ import { addMemory, relevantMemories } from "@/server/domain/memory";
 import { requestApproval } from "@/server/domain/approvals";
 import { generateDayPlan, generateWeekPlan, recoverPlan } from "@/server/planner/plan";
 import { ProfileUpdate, TaskCreate, TaskUpdate, compact } from "@/server/domain/schemas";
+import { ENTITY_PATCHES } from "@/server/domain/schemas";
 import { logActivity } from "@/server/domain/activity";
 import { formatDue, formatTime, nowIn } from "@/lib/time";
 import { integrations } from "@/server/integrations";
@@ -49,7 +50,42 @@ const ProposalItem = z.object({
   rationale: z.string().max(500).nullish().describe("Why you propose this, briefly"),
 });
 
+/** Lowercase letters and digits only, single-spaced: quoting differences don't matter. */
+function normalizeWords(text: string): string {
+  return text.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+const DONE_WORDS = /\b(done|finish\w*|complet\w*|submit\w*|sent|did|handed in|turned in|wrapped up|paid|booked|called|emailed|texted|bought|fixed|cleaned|check\w* (it )?off|tick\w* (it )?off|\w{3,}ed)\b/;
+
+/**
+ * Did the person's own message this turn say the work is finished? The
+ * quoted statement must appear in it (ignoring case, spacing and punctuation)
+ * and read like a completion.
+ */
+export function userSaidItsDone(userMessage: string | undefined, statement: string): boolean {
+  if (!userMessage) return false;
+  const said = normalizeWords(userMessage);
+  const quoted = normalizeWords(statement);
+  if (quoted.length < 3 || !` ${said} `.includes(` ${quoted} `)) return false;
+  return DONE_WORDS.test(quoted);
+}
+
 const ENTITY_TABLES = ["projects", "goals", "workspaces", "routines", "events", "milestones", "plan_blocks", "notes"] as const;
+
+/** The columns update_item may change, per table; anything else is refused with the allowed list. */
+function parseEntityPatch(table: (typeof ENTITY_TABLES)[number], patch: Record<string, unknown>): { ok: true; patch: Record<string, unknown> } | { ok: false; summary: string } {
+  const schema = ENTITY_PATCHES[table];
+  const allowed = Object.keys(schema.shape);
+  const unknown = Object.keys(patch).filter((k) => !allowed.includes(k));
+  if (unknown.length) {
+    return { ok: false, summary: `Can't change ${unknown.join(", ")} on ${table}. Fields you can change: ${allowed.join(", ")}.` };
+  }
+  const parsed = schema.safeParse(patch);
+  if (!parsed.success) return { ok: false, summary: `Invalid change: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}` };
+  const clean = Object.fromEntries(Object.entries(parsed.data).filter(([, v]) => v !== undefined));
+  if (!Object.keys(clean).length) return { ok: false, summary: "Nothing to change: the patch was empty." };
+  return { ok: true, patch: clean };
+}
 
 /** Everything that can appear on the local days from `first` to `last` (inclusive). */
 async function loadAgendaInputs(ctx: Ctx, zone: string, first: string, last: string) {
@@ -330,10 +366,27 @@ export const TOOLS = [
   }),
   tool({
     name: "complete_task",
-    description: "Mark a task done ONLY when the user explicitly says they finished it. Quote what they said. Never infer completion.",
+    description:
+      "Mark a task done ONLY when the user explicitly says, in their latest message, that they finished it. user_statement must quote their own words from that message exactly (e.g. 'I finished the essay'). Never infer completion. If their message doesn't say it, the user gets a one-tap confirmation instead.",
     schema: z.object({ id: z.string().uuid(), user_statement: z.string().min(3).max(300), actual_minutes: z.number().int().min(1).max(1440).nullish() }),
     run: async (ctx, { id, user_statement, actual_minutes }) => {
-      // The user's own statement is the authority here, so it runs as the user.
+      // The authority is what the user actually said this turn (held by the
+      // server), not the model's claim about it.
+      if (ctx.actor === "navi" && !userSaidItsDone(ctx.userMessage, user_statement)) {
+        const { data: task } = await ctx.db.from("tasks").select("title,status").eq("id", id).maybeSingle();
+        if (!task) return { ok: false, summary: "That task doesn't exist (or isn't yours)" };
+        if (task.status === "done") return { ok: true, summary: `“${task.title}” is already done` };
+        const approval = await requestApproval(ctx, {
+          actionType: "internal.complete.tasks",
+          summary: `Mark “${String(task.title).slice(0, 80)}” done`,
+          details: { op: "complete", table: "tasks", id, actual_minutes: actual_minutes ?? null },
+        });
+        return {
+          ok: true,
+          mutated: true,
+          summary: `Not marked done: the user's message doesn't say they finished it, so they were asked to confirm with one tap (request ${approval.id.slice(0, 8)}). Tell them it's waiting for their OK.`,
+        };
+      }
       const r = await completeTask({ ...ctx, actor: "user" }, id, actual_minutes);
       await logActivity(ctx, { action: "explicit_command", entityType: "tasks", entityId: id, summary: `Marked done because you said: “${user_statement.slice(0, 120)}”` });
       return { ok: true, mutated: true, summary: r.kind === "updated" ? `Marked “${r.row.title}” done` : "Sent for approval" };
@@ -341,11 +394,15 @@ export const TOOLS = [
   }),
   tool({
     name: "update_item",
-    description: "Change an existing project, goal, workspace, routine, event, milestone, plan block or note (title, body) by id. Moving fixed commitments, cancelling events, or dropping goals/projects is sent to the user for approval automatically.",
+    description:
+      "Change an existing project, goal, workspace, routine, event, milestone, plan block or note by id. Only these fields can be patched: " +
+      Object.entries(ENTITY_PATCHES).map(([t, sch]) => `${t}: ${Object.keys(sch.shape).join(", ")}`).join("; ") +
+      ". Changing events, fixed routines or fixed blocks, marking a project done / goal achieved / milestone done, or dropping goals/projects is sent to the user for approval automatically.",
     schema: z.object({ table: z.enum(ENTITY_TABLES), id: z.string().uuid(), patch: z.record(z.string(), z.unknown()) }),
     run: async (ctx, { table, id, patch }) => {
-      const forbidden = ["id", "user_id", "created_at", "updated_at", "external_ref"];
-      const clean = Object.fromEntries(Object.entries(patch).filter(([k]) => !forbidden.includes(k)));
+      const checked = parseEntityPatch(table, patch);
+      if (!checked.ok) return { ok: false, summary: checked.summary };
+      const clean = checked.patch;
       const r = await updateEntity(ctx, table as EntityTable, id, clean);
       if (r.kind === "approval_requested") return { ok: true, mutated: true, summary: `That change ${r.reason}, so it was sent to the user for approval` };
       // Say exactly what changed: the summary is all later turns see of this action.

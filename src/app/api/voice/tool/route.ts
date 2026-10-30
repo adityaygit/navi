@@ -4,7 +4,18 @@ import { requireApiCtx } from "@/server/context";
 import { apiError } from "@/server/http";
 import { runTool, toolsFor } from "@/server/ai/tools";
 
-const Body = z.object({ conversationId: z.string().uuid(), name: z.string().max(64), args: z.record(z.string(), z.unknown()).nullish() });
+const Body = z.object({
+  conversationId: z.string().uuid(),
+  name: z.string().max(64),
+  args: z.record(z.string(), z.unknown()).nullish(),
+  /**
+   * What the person said this turn: the provider's transcription of their
+   * speech, relayed by their own browser. The model can't write this, and the
+   * person could make the same change themselves, so it may authorise
+   * actions taken on their say-so (complete_task).
+   */
+  userTranscript: z.string().max(8000).nullish(),
+});
 
 // Executes a voice tool call server-side with the user's own permissions,
 // through exactly the same tool registry as text chat.
@@ -22,7 +33,7 @@ export async function POST(request: NextRequest) {
       const { data: p } = await ctx.db.from("profiles").select("onboarding_conversation_id").eq("id", ctx.userId).single();
       if (p?.onboarding_conversation_id !== body.conversationId) return NextResponse.json({ ok: false, summary: "Not in onboarding" });
     }
-    const result = await runTool({ ...ctx, actor: "navi", conversationId: body.conversationId }, body.name, body.args ?? {});
+    const result = await runTool({ ...ctx, actor: "navi", conversationId: body.conversationId, userMessage: body.userTranscript ?? undefined }, body.name, body.args ?? {});
     return NextResponse.json(result);
   } catch (err) {
     return apiError(err);

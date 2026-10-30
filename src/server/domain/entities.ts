@@ -67,25 +67,60 @@ export async function getEntity<T = Record<string, unknown>>(ctx: Ctx, table: En
   return data as T;
 }
 
-/** Changes that Navi must not make on its own. Returns a reason or null. */
+/** Same value, allowing for equivalent spellings of times and timestamps. */
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a == null || b == null) return a == null && b == null;
+  if (typeof a === "string" && typeof b === "string") {
+    const time = /^\d{2}:\d{2}(:\d{2})?$/;
+    if (time.test(a) && time.test(b)) return a.padEnd(8, ":00").slice(0, 8) === b.padEnd(8, ":00").slice(0, 8);
+    if (a.includes("T") && b.includes("T")) {
+      const ta = Date.parse(a);
+      const tb = Date.parse(b);
+      if (!Number.isNaN(ta) && !Number.isNaN(tb)) return ta === tb;
+    }
+    return false;
+  }
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/** Does the patch actually change any of these columns? (Unknown spellings count as a change.) */
+function changes(before: Record<string, unknown>, patch: Record<string, unknown>, keys: string[]): boolean {
+  return keys.some((k) => k in patch && !sameValue(patch[k], before[k]));
+}
+
+/**
+ * Changes that Navi must not make on its own. Returns a reason or null.
+ * Judged against the row as it is now, so a protection can't be removed in
+ * one step and the protected value changed in the next (e.g. first clearing
+ * due_is_hard, then moving the deadline): touching the protection itself
+ * needs approval too.
+ */
 function needsApproval(table: EntityTable, before: Record<string, unknown>, patch: Record<string, unknown>): string | null {
-  if (table === "tasks" && before.due_is_hard && "due_at" in patch && patch.due_at !== before.due_at) {
-    return "changes a hard deadline";
+  if (table === "tasks") {
+    if (before.due_is_hard && changes(before, patch, ["due_at", "due_is_hard"])) return "changes a hard deadline";
   }
   if (table === "events") {
     if (before.external_ref) return "modifies an event owned by a connected external calendar";
-    if (patch.status === "cancelled") return "cancels a commitment";
-    if ("starts_at" in patch || "ends_at" in patch) return "moves a fixed commitment";
+    if (patch.status === "cancelled" && before.status !== "cancelled") return "cancels a commitment";
+    // Events are fixed commitments: their times, repetition and status are the user's call.
+    if (changes(before, patch, ["starts_at", "ends_at", "recurrence", "status"])) return "changes a fixed commitment";
   }
-  if (table === "plan_blocks" && before.is_flexible === false && ("starts_at" in patch || "ends_at" in patch)) {
-    return "moves a fixed block";
+  if (table === "routines" && before.is_fixed && changes(before, patch, ["start_time", "days", "duration_minutes", "active", "is_fixed"])) {
+    return "changes a fixed routine";
   }
-  if (table === "plan_blocks" && patch.status === "done" && before.status !== "done") {
-    return "marks scheduled work as completed";
+  if (table === "plan_blocks") {
+    if (before.is_flexible === false && changes(before, patch, ["starts_at", "ends_at", "plan_date", "is_flexible"])) return "moves a fixed block";
+    if (patch.status === "done" && before.status !== "done") return "marks scheduled work as completed";
   }
-  if ((table === "projects" || table === "goals") && (patch.status === "archived" || patch.status === "dropped")) {
+  // Only the user decides that work is finished.
+  if (table === "projects" && patch.status === "done" && before.status !== "done") return "marks a project as done";
+  if (table === "goals" && patch.status === "achieved" && before.status !== "achieved") return "marks a goal as achieved";
+  if (table === "milestones" && changes(before, patch, ["done_at"])) return "changes whether a milestone is done";
+  if ((table === "projects" || table === "goals") && (patch.status === "archived" || patch.status === "dropped") && patch.status !== before.status) {
     return "drops a project or goal";
   }
+  if (table === "workspaces" && patch.status === "archived" && before.status !== "archived") return "archives a workspace";
   return null;
 }
 
@@ -106,6 +141,7 @@ export async function updateEntity<T = Record<string, unknown>>(
 ): Promise<UpdateResult<T>> {
   const before = await getEntity<Record<string, unknown>>(ctx, table, id);
   if (ctx.actor === "navi") {
+    if (table === "tasks" && patch.status === "done" && before.status !== "done") throw new Error("Only you can mark a task done.");
     const reason = needsApproval(table, before, patch);
     if (reason) {
       const approval = await requestApproval(ctx, {

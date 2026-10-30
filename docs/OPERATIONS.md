@@ -25,14 +25,21 @@ CI (`.github/workflows/ci.yml`) runs the same steps on every push to `main` or
 against a throwaway local Supabase, a production build, and the browser tests.
 
 Seeded invite list (local only): `dev@navi.test`, `alice@navi.test`,
-`bob@navi.test`. Sign in with "Use a password instead"; the first sign-in
-creates the account. Magic-link emails land in Mailpit at http://127.0.0.1:54324.
+`bob@navi.test`. Public sign-up is off locally too (`[auth] enable_signup =
+false`, as on hosted), so the sign-in page never creates accounts. Create one
+with `node scripts/allow-email.mjs add <email>` (passwordless: sign in with an
+email link, then set a password in Settings); the test helpers create theirs
+with the admin API and a password. Magic-link emails land in Mailpit at
+http://127.0.0.1:54324.
 
 Without an `ANTHROPIC_API_KEY`, set `NAVI_AI_PROVIDER=devsim` to use the
 development simulator: a rule-based stand-in whose every reply is labelled
 "[Simulated AI — development mode]". Production builds refuse it unless
 `NAVI_ALLOW_DEVSIM=true` is set, which is meant only for running the browser
 tests against `next start`.
+
+Don't set `[auth.email] enable_signup = false` in `config.toml`: in the CLI it
+turns off the whole email provider (password and email-link sign-in too).
 
 If you change `[auth.hook.*]` in `supabase/config.toml`, run
 `npx supabase stop --no-backup && npm run db:start`; a plain restart does not
@@ -101,7 +108,12 @@ Steps (each is a change to the hosted project; do them deliberately, once):
 1. Apply the schema. All migrations in `supabase/migrations` are required, in
    order. `20261101000001_api_privileges.sql` matters on hosted: newer
    Supabase projects don't give the API roles access to new tables, so without
-   it even the secret key gets "permission denied". If you apply them through
+   it even the secret key gets "permission denied".
+   `20261102000001_security_hardening.sql` (security review, session 3) adds
+   the atomic budget reservation functions the app now calls before every AI
+   request and voice token (`ai_reserve`, `ai_voice_settle`, `ai_usage.session_id`)
+   and limits notification updates to `status`; **the app's AI calls fail
+   without it**, so apply it before deploying this code. If you apply them through
    the Management API or MCP, the recorded versions are the apply time; set
    them back to the file versions in `supabase_migrations.schema_migrations`
    so `supabase db push` doesn't re-run them.
@@ -113,13 +125,21 @@ Steps (each is a change to the hosted project; do them deliberately, once):
    Do **not** run `supabase/seed.sql` against the hosted project (it invites
    test accounts). With the Supabase MCP server loaded, its migration tools
    can do the same; apply the files exactly as they are in the repo.
-2. Enable the invite check (Auth → Hooks, below). Until then anyone could sign up.
+2. **Auth → Sign In / Providers:** turn **"Allow new users to sign up" OFF**
+   and keep **"Confirm email" ON** (email provider stays enabled). Accounts are
+   created only server-side by the invite script, so nobody can register an
+   invited email with their own password before its owner does. Keep the
+   invite check (Auth → Hooks, below) on as a second layer.
 3. Set Site URL and redirect URLs once the app's URL is known (below).
 4. Invite the owner: `node scripts/allow-email.mjs add <email> "owner"` with the
-   hosted URL and secret key in the environment.
+   hosted URL and secret key in the environment. This adds the email to the
+   invite list **and creates a confirmed, passwordless account** (no email is
+   sent; `--invite` sends Supabase's invite email instead). The owner signs in
+   with "Email me a sign-in link", then can set a password in Settings →
+   Password.
 5. Verify: `npm run check:deploy` (read-only; checks schema tables, invite
    list, hook, redirects with `SUPABASE_ACCESS_TOKEN`), then try signing up
-   with an uninvited email and expect "Navi is invite-only right now".
+   with an uninvited email and expect "Signups not allowed".
 
 General steps:
 
@@ -131,12 +151,21 @@ General steps:
    could sign up. Check it by trying to sign up with an email that isn't
    invited: you should get "Navi is invite-only right now".
 3. **Auth → URL configuration:** set the Site URL to the app origin and add
-   `https://<app>/auth/callback` and `https://<app>/auth/confirm` as redirect URLs.
-4. Invite people:
+   `https://<app>/auth/callback**` and `https://<app>/auth/confirm**` as
+   redirect URLs. The trailing `**` matters: the callback carries `?next=…`,
+   and an exact entry doesn't match a query string, so Supabase would fall back
+   to the Site URL and the email link wouldn't sign anyone in.
+   **Auth → Sign In / Providers:** "Allow new users to sign up" **off**,
+   "Confirm email" **on**.
+4. Invite people (adds them to the invite list and creates their account
+   server-side; idempotent, and never sets a password):
    ```bash
    NEXT_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co SUPABASE_SERVICE_ROLE_KEY=<secret> \
-     node scripts/allow-email.mjs add person@example.com "note"
+     node scripts/allow-email.mjs add person@example.com "note"            # no email sent
+   NEXT_PUBLIC_SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
+     node scripts/allow-email.mjs add person@example.com "note" --invite   # Supabase emails an invite link
    ```
+   They sign in with an email link and can add a password in Settings.
    `list` and `remove` work the same way. Removing someone blocks new sign-ups
    only; it doesn't delete their account.
 
@@ -147,7 +176,9 @@ General steps:
 2. In Supabase **Auth → Providers → Google**, paste the client ID and secret.
 3. Set `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true` in the app environment.
 
-Google sign-in still goes through the invite hook. Signing in with Google does
+With sign-up off, Google sign-in works only for accounts the invite script
+already created (Supabase links the Google identity to the existing
+confirmed email); it can't create new ones. It still goes through the invite hook. Signing in with Google does
 not give Navi access to Calendar, Gmail or Drive; those integrations are not
 built yet and show as "not connected".
 
@@ -169,7 +200,11 @@ Import the repo and set the environment variables from `.env.example`:
 | `CRON_SECRET` | Long random string shared with the scheduler |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web push. Generate with `npx web-push generate-vapid-keys` |
 
-Leave `NAVI_ALLOW_DEVSIM` unset in production.
+Leave `NAVI_ALLOW_DEVSIM` and `NAVI_ALLOW_LOCAL_PUSH` unset in production.
+(`NAVI_ALLOW_LOCAL_PUSH=true` lets a production build accept push
+subscriptions on localhost, for tests only; otherwise only the browsers' push
+services are accepted: `fcm.googleapis.com`, `*.push.apple.com`,
+`updates.push.services.mozilla.com`, `*.notify.windows.com`.)
 
 ### Pre-deploy check
 
@@ -246,7 +281,16 @@ The app enforces `NAVI_DAILY_BUDGET_USD` across all users (default $2 per day,
 resetting at midnight in `NAVI_BUDGET_TIMEZONE`). It warns at 75%, then stops
 new AI calls, both text and voice, until the budget owner (`NAVI_ADMIN_EMAILS`) approves a
 one-day override in Settings. Cost is estimated from token and audio-minute prices in
-`src/server/ai/config.ts`. Treat it as a guard, not billing. Also set hard
+`src/server/ai/config.ts`. Treat it as a guard, not billing.
+
+How it holds: every Claude call first reserves its worst case (full output
+budget) in one locked database step (`ai_reserve`), so simultaneous calls
+can't all slip under the cap, then the row is settled to the real usage.
+Every Gemini Live token reserves $0.25 (its 10-minute lifetime of two-way
+audio) before it is minted, and each person can mint at most 6 per 10
+minutes. Voice turns the browser reports are clamped to what the session
+could have used and reconciled with the reservation, so a session costs
+max(reserved, reported): a client that never reports is still charged. Also set hard
 spend limits in the Anthropic Console and Google AI Studio so a bug can't
 exceed them.
 

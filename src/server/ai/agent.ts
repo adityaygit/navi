@@ -4,7 +4,7 @@ import type { Ctx } from "@/server/context";
 import type { ToolEvent } from "@/lib/types";
 import { serverEnv } from "@/lib/env";
 import { aiAvailability, modelFor, tokenCost, type ModelRole } from "./config";
-import { assertBudget, BudgetExceededError, recordUsage } from "./budget";
+import { BudgetExceededError, reserveBudget, settleUsage } from "./budget";
 import { jsonSchemaFor, runTool, toolsFor } from "./tools";
 import { runDevSim } from "./devsim";
 import { READ_ONLY_TOOLS } from "@/lib/tool-names";
@@ -102,31 +102,38 @@ async function runAnthropic(req: AgentRequest, model: string, allowServerFallbac
 
   try {
     for (let i = 0; i < MAX_ITERATIONS; i++) {
-      await assertBudget(reserve);
-      const response = await client.beta.messages.create({
-        model,
-        max_tokens: MAX_TOKENS,
-        system: [
-          { type: "text", text: req.system, cache_control: { type: "ephemeral" } },
-          { type: "text", text: req.context },
-        ],
-        tools,
-        messages,
-        output_config: { effort: req.role === "fast" ? "low" : "medium" },
-        ...(useFallbacks ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
-      });
+      // Hold back the worst case for this call atomically, then settle to the real usage.
+      const reservation = await reserveBudget({ userId: req.ctx.userId, provider: "anthropic", model, role: req.role, purpose: req.purpose, amountUsd: reserve });
+      let response: Anthropic.Beta.BetaMessage;
+      try {
+        response = await client.beta.messages.create({
+          model,
+          max_tokens: MAX_TOKENS,
+          system: [
+            { type: "text", text: req.system, cache_control: { type: "ephemeral" } },
+            { type: "text", text: req.context },
+          ],
+          tools,
+          messages,
+          output_config: { effort: req.role === "fast" ? "low" : "medium" },
+          ...(useFallbacks ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
+        });
+      } catch (err) {
+        await settleUsage(reservation, { costUsd: 0, ok: false }, model);
+        throw err;
+      }
       const u = response.usage;
-      costUsd += await recordUsage({
-        userId: req.ctx.userId,
-        provider: "anthropic",
-        model: response.model ?? model,
-        role: req.role,
-        purpose: req.purpose,
-        inputTokens: u.input_tokens,
-        outputTokens: u.output_tokens,
-        cacheReadTokens: u.cache_read_input_tokens ?? 0,
-        cacheWriteTokens: u.cache_creation_input_tokens ?? 0,
-      });
+      costUsd += await settleUsage(
+        reservation,
+        {
+          model: response.model ?? model,
+          inputTokens: u.input_tokens,
+          outputTokens: u.output_tokens,
+          cacheReadTokens: u.cache_read_input_tokens ?? 0,
+          cacheWriteTokens: u.cache_creation_input_tokens ?? 0,
+        },
+        model,
+      );
 
       const text = response.content
         .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
@@ -154,7 +161,8 @@ async function runAnthropic(req: AgentRequest, model: string, allowServerFallbac
       const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
       // Run sequentially: tools mutate shared state and later calls may depend on earlier ones.
       for (const use of toolUses) {
-        const result = await runTool({ ...req.ctx, actor: "navi" }, use.name, use.input);
+        // userMessage: the person's own words this turn, held by the server (see complete_task).
+        const result = await runTool({ ...req.ctx, actor: "navi", userMessage: req.userText }, use.name, use.input);
         if (result.mutated) mutated = true;
         if (!READ_ONLY_TOOLS.includes(use.name)) {
           toolEvents.push({ name: use.name, ok: result.ok, summary: result.summary });

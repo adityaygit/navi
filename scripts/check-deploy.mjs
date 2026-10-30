@@ -108,11 +108,15 @@ async function checkAuthConfig() {
   if (auth.hook_before_user_created_enabled === undefined) warn("invite hook", "this API version doesn't report the hook; check Auth → Hooks by hand");
   else if (auth.hook_before_user_created_enabled && /navi_before_user_created/.test(auth.hook_before_user_created_uri ?? "")) pass("invite hook", "Before User Created → navi_before_user_created");
   else fail("invite hook", "Before User Created hook is off or not pointing at navi_before_user_created: anyone could sign up");
+  // Accounts are created server-side only (scripts/allow-email.mjs add).
+  check(auth.disable_signup === true, "public sign-up", "off", "\"Allow new users to sign up\" is ON: anyone who knows an invited email could register it first");
+  check(auth.mailer_autoconfirm === false, "confirm email", "on", "\"Confirm email\" is off");
   const site = env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
   if (site) {
     check(auth.site_url?.replace(/\/$/, "") === site, "auth site URL", "matches NEXT_PUBLIC_SITE_URL", "Supabase Site URL doesn't match NEXT_PUBLIC_SITE_URL");
     const allow = String(auth.uri_allow_list ?? "");
-    check(allow.includes(`${site}/auth/callback`), "auth redirects", "callback allowed", `add ${site}/auth/callback and ${site}/auth/confirm to redirect URLs`);
+    check(allow.includes(`${site}/auth/callback`), "auth redirects", "callback allowed", `add ${site}/auth/callback** and ${site}/auth/confirm** to redirect URLs`);
+    check(allow.includes(`${site}/auth/callback*`) || allow.includes(`${site}/**`), "auth redirect query", "callback with ?next= allowed", `use ${site}/auth/callback** (an exact entry doesn't match ?next=, so email links fall back to the Site URL)`);
   }
 }
 

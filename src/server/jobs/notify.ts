@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { publicEnv, serverEnv } from "@/lib/env";
 import { endOfQuietHours, inQuietHours } from "@/lib/time";
 import type { Profile } from "@/lib/types";
+import { pushEndpointAllowed } from "@/lib/push-endpoint";
 
 // Notifications are deduplicated by (user, dedupe_key), held during the
 // user's quiet hours, and delivered by web push to opted-in devices. Every
@@ -55,6 +56,13 @@ export async function sendToSubscriptions(db: SupabaseClient, userId: string, pa
   let failed = 0;
   const errors: string[] = [];
   for (const s of subs as Sub[]) {
+    // Never send to anything but a real push service (rows can predate the check).
+    if (!pushEndpointAllowed(s.endpoint)) {
+      failed++;
+      errors.push("unsupported push service");
+      await db.from("push_subscriptions").delete().eq("id", s.id);
+      continue;
+    }
     try {
       await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload), { TTL: 60 * 60 * 6, urgency: "normal" });
       sent++;
@@ -62,7 +70,8 @@ export async function sendToSubscriptions(db: SupabaseClient, userId: string, pa
     } catch (err) {
       failed++;
       const statusCode = (err as { statusCode?: number }).statusCode;
-      const msg = `${statusCode ?? ""} ${(err as Error).message}`.trim();
+      // A short, fixed description: the service's own response text isn't kept.
+      const msg = statusCode ? `push service answered HTTP ${statusCode}` : "couldn't reach the push service";
       errors.push(msg);
       if (statusCode === 404 || statusCode === 410) {
         // The browser revoked this subscription; forget it.

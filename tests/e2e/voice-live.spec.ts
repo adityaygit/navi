@@ -1,5 +1,5 @@
 import { test, expect, type Page, type WebSocketRoute } from "@playwright/test";
-import { admin, freshSetUpAccount } from "./helpers";
+import { admin, ensureAccount, freshSetUpAccount, signInWithPassword } from "./helpers";
 
 // Real-time voice, everything on Navi's side of the wire: fake microphone →
 // audio worklet → 16 kHz PCM streamed over the Live API socket; transcripts on
@@ -201,18 +201,9 @@ test("voice streams the mic, runs tools for real, plays replies and saves the tu
 test("setting Navi up by voice ends in the same reviewed setup as typing", async ({ page, context, baseURL }, info) => {
   await context.grantPermissions(["microphone"], { origin: baseURL! });
   const email = `voice-setup-${info.project.name}@navi.test`;
-  await admin.from("allowed_emails").upsert({ email, note: "e2e" });
-  const { data: users } = await admin.auth.admin.listUsers();
-  const old = users.users.find((u) => u.email === email);
-  if (old) await admin.auth.admin.deleteUser(old.id);
-  await page.goto("/login");
-  await page.getByRole("button", { name: "Use a password instead" }).click();
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill("test-password-123");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  const userId = await ensureAccount(email, { fresh: true });
+  await signInWithPassword(page, email);
   await expect(page).toHaveURL(/\/onboarding/);
-  const { data: after } = await admin.auth.admin.listUsers();
-  const userId = after.users.find((u) => u.email === email)!.id;
 
   const { seen, send } = await standInLiveApi(page, userId, "onboarding");
   await page.reload();

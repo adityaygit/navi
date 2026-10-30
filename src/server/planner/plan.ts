@@ -49,6 +49,7 @@ export async function generateDayPlan(ctx: Ctx, date?: string, opts: { from?: Da
     const { data: earlier } = await ctx.db
       .from("plan_blocks")
       .select("task_id,starts_at,ends_at")
+      .eq("user_id", ctx.userId)
       .gte("plan_date", today)
       .lt("plan_date", day)
       .in("status", ["planned", "in_progress"])
@@ -155,6 +156,7 @@ export async function recoverPlan(
   const { data: blocks } = await ctx.db
     .from("plan_blocks")
     .select("*")
+    .eq("user_id", ctx.userId)
     .eq("plan_date", today)
     .in("status", ["planned", "in_progress"]);
   const affected = ((blocks ?? []) as PlanBlock[]).filter((b) => b.is_flexible && DateTime.fromISO(b.starts_at) < from);

@@ -12,13 +12,17 @@ export function admin(): SupabaseClient {
   return createClient(URL_, SERVICE, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-/** Signs in (creating the account on first use) and returns an RLS-scoped client. */
+/**
+ * Signs in and returns an RLS-scoped client. On first use the account is
+ * created server-side with the admin API (public sign-up is off, as in
+ * production), then signed in with its password like the app does.
+ */
 export async function userClient(email: string, password = "test-password-123"): Promise<{ db: SupabaseClient; userId: string }> {
   const db = createClient(URL_, ANON, { auth: { persistSession: false, autoRefreshToken: false } });
   let { data, error } = await db.auth.signInWithPassword({ email, password });
   if (error) {
-    const up = await db.auth.signUp({ email, password });
-    if (up.error) throw up.error;
+    const made = await admin().auth.admin.createUser({ email, password, email_confirm: true });
+    if (made.error) throw made.error;
     ({ data, error } = await db.auth.signInWithPassword({ email, password }));
     if (error) throw error;
   }

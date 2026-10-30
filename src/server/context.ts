@@ -18,6 +18,13 @@ export type Ctx = {
   /** Set while handling a chat turn / capture so proposals link back to their source. */
   conversationId?: string;
   captureId?: string;
+  /**
+   * The person's own words in the current turn, as held by the server (the
+   * chat message, or the voice transcript of this turn). Tools that act on the
+   * user's say-so (complete_task) check against this, never against text the
+   * model wrote.
+   */
+  userMessage?: string;
 };
 
 export class AuthError extends Error {}
