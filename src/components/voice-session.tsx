@@ -15,16 +15,6 @@ type Kind = "chat" | "onboarding";
 type Status = "idle" | "connecting" | "listening" | "speaking" | "reconnect" | "ended" | "error";
 
 // Inline AudioWorklet: forwards mic frames to the main thread.
-const WORKLET = `
-class Capture extends AudioWorkletProcessor {
-  process(inputs) {
-    const ch = inputs[0] && inputs[0][0];
-    if (ch) this.port.postMessage(ch.slice(0));
-    return true;
-  }
-}
-registerProcessor("navi-capture", Capture);
-`;
 
 function downsampleTo16k(input: Float32Array, rate: number): Int16Array {
   const ratio = rate / 16000;
@@ -235,7 +225,7 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
         const ctx = new AudioContext();
-        await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET], { type: "application/javascript" })));
+        await ctx.audioWorklet.addModule("/pcm-worklet.js");
         const src = ctx.createMediaStreamSource(stream);
         const node = new AudioWorkletNode(ctx, "navi-capture");
         src.connect(node);

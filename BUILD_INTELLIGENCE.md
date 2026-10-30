@@ -31,7 +31,7 @@
 | PWA manifest, service worker, icons | implemented | Prod build serves manifest/sw.js; offline page. Home-screen install on a real iPhone unverified. |
 | Real-time voice (Gemini Live) | implemented, **not delivered** | Ephemeral-token session, shared tools, transcripts saved to the same conversation. No `GEMINI_API_KEY` → never connected to Gemini. e2e verifies the honest fallback ("Real-time voice isn't available … Using basic voice") and that the mic stays off until tapped. Keep open until tested with a key on a device. |
 | AI runtime (roles, pricing, $2/day guard, shared tools, agent loop) | implemented; guard verified | flows.test "stops new AI calls at the daily cap"; only `NAVI_ADMIN_EMAILS` can approve an override (unit test; nobody in production if unset). No `ANTHROPIC_API_KEY` → real model calls unverified. Dev simulator labelled, refused in prod unless `NAVI_ALLOW_DEVSIM=true`. |
-| Secret protection / access control | verified (local) | No server secret in `.next/static` (checked service key, VAPID private key, cron secret); only `.env.example` tracked; every private API route returns 401 signed out; pages redirect to /login; X-Frame-Options DENY, nosniff, referrer policy, permissions policy (mic self only). No CSP yet. |
+| Secret protection / access control | verified (local) | No server secret in `.next/static` (checked service key, VAPID private key, cron secret); only `.env.example` tracked; every private API route returns 401 signed out; pages redirect to /login; X-Frame-Options DENY, nosniff, referrer policy, permissions policy (mic self only). Nonce-based CSP from `src/proxy.ts` (scripts self+nonce, connect only to app/Supabase/Gemini Live, no framing); a11y.spec asserts zero CSP violations on every page and that the voice worklet loads. |
 | Build / typecheck / lint | verified | `npx tsc --noEmit`, `npm run lint`, `npm run build` clean (2026-10-30). |
 | Deployment (Vercel) / Trigger.dev | blocked | No Vercel/Trigger.dev credentials in the cloud env. Steps in `docs/OPERATIONS.md`. |
 | Physical iPhone verification | blocked | Needs owner device (install, push, mic). Emulated iPhone 13 viewport passes e2e. |
@@ -39,7 +39,7 @@
 
 ## Test commands & latest results (2026-10-30)
 - `npx vitest run` → 6 files, 46 tests passed (unit + integration; needs local Supabase).
-- `npx next build && NAVI_ALLOW_DEVSIM=true npx next start -p 3000` then `E2E_BASE_URL=http://localhost:3000 npx playwright test` → desktop + iPhone 13, 14 tests: core.spec (onboarding→plan→capture→inbox→task, offline sync, voice fallback, dictated capture), manage.spec (focus, recovery, memory, approvals, settings), a11y.spec (axe, light + dark).
+- `npx next build && NAVI_ALLOW_DEVSIM=true npx next start -p 3000` then `E2E_BASE_URL=http://localhost:3000 npx playwright test` → desktop + iPhone 13, 12 tests: core.spec (onboarding→plan→capture→inbox→task, offline sync, voice fallback, dictated capture), manage.spec (focus, recovery, memory, approvals, settings), a11y.spec (axe, light + dark).
 - e2e deletes/recreates seeded `dev@`/`alice@` and its own `e2e-*`/`a11y-*@navi.test` users (added to the local allowlist by the tests); all use password `test-password-123`. Each test can run alone.
 - Screenshots land in `test-results/` (gitignored).
 
@@ -73,7 +73,7 @@ npm run dev
 Seeded allowlist (local only): dev@navi.test, alice@navi.test, bob@navi.test.
 
 ## Commits
-`e400992` handoff docs · `05863b4` scaffold/schema/planner · `095bcc9` AI runtime/capture/auth/shell · `9207241` Today/onboarding/inbox/chat/planner · `361078b` tasks/projects/insights/briefings/tick/push · `92df02a` memory/activity/settings/PWA/voice · `5286be2` build fixes + RLS/flow tests · `967df64` ActionButton refactor + e2e suite · `8d28b26` availability parsing, capture FAB, e2e fixes · `7d4e8f2` ops guide, invite script, voice fallback e2e · `dfea149` settle blocks on task finish/cancel/delete + manage e2e · `0016554` axe a11y + contrast · `6e128d7` owner-only budget override · `ef7992b` goals/projects/routines in setup · `c228123` dictated capture · `157b180` project memory recall · `e5b03bb` accountability tests · `95df9ca` reminder expiry · (next) briefing DST tests + this record
+`e400992` handoff docs · `05863b4` scaffold/schema/planner · `095bcc9` AI runtime/capture/auth/shell · `9207241` Today/onboarding/inbox/chat/planner · `361078b` tasks/projects/insights/briefings/tick/push · `92df02a` memory/activity/settings/PWA/voice · `5286be2` build fixes + RLS/flow tests · `967df64` ActionButton refactor + e2e suite · `8d28b26` availability parsing, capture FAB, e2e fixes · `7d4e8f2` ops guide, invite script, voice fallback e2e · `dfea149` settle blocks on task finish/cancel/delete + manage e2e · `0016554` axe a11y + contrast · `6e128d7` owner-only budget override · `ef7992b` goals/projects/routines in setup · `c228123` dictated capture · `157b180` project memory recall · `e5b03bb` accountability tests · `95df9ca` reminder expiry · `4d30a13` briefing DST tests + record · (next) CSP
 
 ## True blockers (owner action needed)
 1. `ANTHROPIC_API_KEY` (and provider spend limit) to verify real chat/onboarding/capture/planning.
@@ -83,7 +83,6 @@ Seeded allowlist (local only): dev@navi.test, alice@navi.test, bob@navi.test.
 5. A physical iPhone for install, push and mic testing.
 
 ## Exact next action
-1. Content-Security-Policy (nonce-based, compatible with Next inline scripts, Supabase, Gemini WebSocket) and verify app still works in e2e.
-2. Planner week view e2e (add a fixed commitment from /planner, drag/skip flows) and Projects detail page e2e (milestones, goal links).
-3. Push: e2e for the subscribe flow with a stubbed PushManager; verify sw.js notificationclick routing.
-4. When keys arrive: write and run a real-model smoke test against Anthropic/Gemini within the $2/day guard and record results here.
+1. Planner week view e2e (add a fixed commitment from /planner, drag/skip flows) and Projects detail page e2e (milestones, goal links).
+2. Push: e2e for the subscribe flow with a stubbed PushManager; verify sw.js notificationclick routing.
+3. When keys arrive: write and run a real-model smoke test against Anthropic/Gemini within the $2/day guard and record results here.

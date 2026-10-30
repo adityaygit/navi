@@ -26,6 +26,17 @@ test("main pages have no automatically detectable WCAG A/AA violations", async (
   if (old) await admin.auth.admin.deleteUser(old.id);
 
   const problems: string[] = [];
+  // Record any Content-Security-Policy violation on every page visited.
+  await page.addInitScript(() => {
+    document.addEventListener("securitypolicyviolation", (e) => {
+      const w = window as unknown as { __csp?: string[] };
+      (w.__csp ??= []).push(`${e.violatedDirective} ${e.blockedURI}`);
+    });
+  });
+  const cspViolations = async (label: string) => {
+    const v = await page.evaluate(() => (window as unknown as { __csp?: string[] }).__csp ?? []);
+    return v.map((x) => `${label}: CSP blocked ${x}`);
+  };
   await page.goto("/login");
   problems.push(...(await audit(page, "/login")));
   await page.getByRole("button", { name: "Use a password instead" }).click();
@@ -57,8 +68,18 @@ test("main pages have no automatically detectable WCAG A/AA violations", async (
   for (const path of PAGES) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
-    problems.push(...(await audit(page, path)));
+    problems.push(...(await audit(page, path)), ...(await cspViolations(path)));
   }
+  // The voice audio worklet must load under the CSP.
+  const worklet = await page.evaluate(async () => {
+    try {
+      await new AudioContext().audioWorklet.addModule("/pcm-worklet.js");
+      return "ok";
+    } catch (e) {
+      return String(e);
+    }
+  });
+  if (worklet !== "ok") problems.push(`voice worklet: ${worklet}`);
   // Dark theme uses different color tokens; check contrast there as well.
   await page.emulateMedia({ colorScheme: "dark" });
   for (const path of ["/", "/inbox", "/memory", "/activity", "/settings"]) {
