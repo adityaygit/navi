@@ -99,6 +99,13 @@ export function VoiceSession({ kind, onClose, onTurnSaved }: { kind: Kind; onClo
   );
 }
 
+let primedOutput: AudioContext | null = null;
+function primeOutputAudio() {
+  if (primedOutput || typeof AudioContext === "undefined") return;
+  primedOutput = new AudioContext({ sampleRate: 24000 });
+  void primedOutput.resume().catch(() => {});
+}
+
 function ModePicker({ onLive, onBrowser, kind }: { onLive: () => void; onBrowser: (reason: string) => void; kind: Kind }) {
   const [checking, setChecking] = useState(false);
   return (
@@ -108,6 +115,9 @@ function ModePicker({ onLive, onBrowser, kind }: { onLive: () => void; onBrowser
         className="btn btn-primary"
         disabled={checking}
         onClick={async () => {
+          // Create the speaker output inside the tap itself: iOS Safari keeps an
+          // AudioContext created later (after awaits) suspended, i.e. silent.
+          primeOutputAudio();
           // Probe availability without opening the mic yet.
           setChecking(true);
           const res = await fetch("/api/voice/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, probe: true }) }).catch(() => null);
@@ -254,7 +264,9 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
       }
     }
     if (!outRef.current) {
-      const ctx = new AudioContext({ sampleRate: 24000 });
+      const ctx = primedOutput ?? new AudioContext({ sampleRate: 24000 });
+      primedOutput = null;
+      if (ctx.state === "suspended") await ctx.resume().catch(() => {});
       outRef.current = { ctx, next: ctx.currentTime, sources: new Set() };
     }
 
@@ -337,7 +349,16 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
   useEffect(() => {
     connectRef.current = connect;
   }, [connect]);
-  useEffect(() => () => { endedByUser.current = true; void saveTurn(); stopAll(); }, [saveTurn, stopAll]);
+  // Hang up only when this component unmounts. saveTurn/stopAll change
+  // identity whenever the parent re-renders (e.g. after a saved turn), so the
+  // cleanup reads the latest ones from refs instead of depending on them.
+  const saveTurnRef = useRef(saveTurn);
+  const stopAllRef = useRef(stopAll);
+  useEffect(() => {
+    saveTurnRef.current = saveTurn;
+    stopAllRef.current = stopAll;
+  }, [saveTurn, stopAll]);
+  useEffect(() => () => { endedByUser.current = true; void saveTurnRef.current(); stopAllRef.current(); }, []);
   useEffect(() => {
     // The user already tapped "Start talking" to get here, so connect once on mount.
     if (startedRef.current) return;
