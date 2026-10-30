@@ -220,3 +220,12 @@ export function extractRoutines(text: string): { title: string; days: number[]; 
   }
   return out;
 }
+
+const NOT_NAMES = new Set(["Free", "Busy", "Done", "Fine", "Good", "Here", "Back", "Not", "Just", "Also", "So", "Usually", "Always", "Really", "Working", "Going", "Trying", "Taking", "Doing", "Ready", "Happy", "Sure", "Okay", "Ok", "In", "On", "At", "A", "An", "The"]);
+
+/** "I'm Alex", "my name is Alex", "call me Alex" -> "Alex" (capitalized word only, so "I'm in school" isn't a name). */
+export function extractName(text: string): string | null {
+  const m = text.match(/(?:\b[Mm]y name is|\b[Cc]all me|\bI'm|\bI am|\b[Tt]his is)\s+([A-Z][a-zA-Z'-]{1,30})\b/);
+  if (!m || NOT_NAMES.has(m[1])) return null;
+  return m[1];
+}

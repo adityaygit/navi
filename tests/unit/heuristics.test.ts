@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DateTime } from "luxon";
-import { extractAvailability, extractItems, extractWeeklyCommitments, parseDue } from "@/server/ai/heuristics";
+import { extractAvailability, extractItems, extractName, extractWeeklyCommitments, parseDue } from "@/server/ai/heuristics";
 
 const now = DateTime.fromISO("2026-10-30T10:00", { zone: "America/New_York" }); // Friday
 
@@ -59,5 +59,13 @@ describe("goals, projects and routines", () => {
       { title: "Go to the gym", days: [0, 1, 2, 3, 4, 5, 6], start_time: "07:00", excerpt: "I go to the gym every morning at 7" },
       { title: "Read", days: [0, 1, 2, 3, 4, 5, 6], start_time: null, excerpt: "I read every night" },
     ]);
+  });
+
+  it("finds the name people introduce themselves with, and nothing else", () => {
+    expect(extractName("Hi, I'm Alex. I'm in school.")).toBe("Alex");
+    expect(extractName("my name is Priya and I run a startup")).toBe("Priya");
+    expect(extractName("Call me Sam")).toBe("Sam");
+    expect(extractName("I'm in school and I'm free after 6pm")).toBeNull();
+    expect(extractName("I'm Free after six")).toBeNull();
   });
 });

@@ -13,7 +13,9 @@ import { ProfileUpdate, TaskCreate, TaskUpdate, compact } from "@/server/domain/
 import { logActivity } from "@/server/domain/activity";
 import { formatDue, formatTime, nowIn } from "@/lib/time";
 import { integrations } from "@/server/integrations";
-import type { Task } from "@/lib/types";
+import type { CalendarEvent, PlanBlock, Proposal, Routine, Task } from "@/lib/types";
+import { buildDayAgenda, describeDayAgenda, type AgendaEntry } from "@/server/planner/agenda";
+import { proposalTitle } from "@/server/domain/proposals";
 
 // The tools Navi can use. The same registry backs text chat, real-time voice
 // and onboarding, and every tool calls the same domain functions the
@@ -37,7 +39,7 @@ const ProposalItem = z.object({
   payload: z
     .record(z.string(), z.unknown())
     .describe(
-      "Fields for the item. workspace:{name,description}; goal:{title,why,measure,target_date,workspace_ref}; project:{name,objective,due_date,workspace_ref,goal_ref}; routine:{title,days[0-6],start_time HH:MM|null,duration_minutes,is_fixed,workspace_ref,goal_ref}; event:{title,starts_at,ends_at,recurrence{freq:'weekly',days,until}|null,location,workspace_ref}; task/reminder:{title,notes,priority 1-4,due_at,due_is_hard,estimate_minutes,workspace_ref,project_ref,goal_ref}; note:{title,body}; question:{question}; memory:{kind:profile|project|episodic|behavioral,content,origin:'stated'|'inferred'}; preference:{timezone,quiet_hours_start,quiet_hours_end,morning_briefing_time,evening_review_time,availability[{days,start,end}]}. Use *_ref to point at another proposal's ref_key in the same call, or at an existing item's id.",
+      "Fields for the item. workspace:{name,description}; goal:{title,why,measure,target_date,workspace_ref}; project:{name,objective,due_date,workspace_ref,goal_ref}; routine:{title,days[0-6],start_time HH:MM|null,duration_minutes,is_fixed,workspace_ref,goal_ref}; event:{title,starts_at,ends_at,recurrence{freq:'weekly',days,until}|null,location,workspace_ref}; task/reminder:{title,notes,priority 1-4,due_at,due_is_hard,estimate_minutes,workspace_ref,project_ref,goal_ref}; note:{title,body}; question:{question}; memory:{kind:profile|project|episodic|behavioral,content,origin:'stated'|'inferred'}; preference:{display_name (what the user wants to be called),timezone,quiet_hours_start,quiet_hours_end,morning_briefing_time,evening_review_time,availability[{days,start,end}]}. Use *_ref to point at another proposal's ref_key in the same call, or at an existing item's id.",
     ),
   ref_key: z.string().max(60).nullish().describe("Short unique key so other proposals can reference this one, e.g. 'ws_school'"),
   source_excerpt: z.string().max(1000).nullish().describe("The user's exact words this came from"),
@@ -48,57 +50,202 @@ const ProposalItem = z.object({
 
 const ENTITY_TABLES = ["projects", "goals", "workspaces", "routines", "events", "milestones", "plan_blocks"] as const;
 
+/** Everything that can appear on the local days from `first` to `last` (inclusive). */
+async function loadAgendaInputs(ctx: Ctx, zone: string, first: string, last: string) {
+  const from = DateTime.fromISO(first, { zone }).startOf("day").toUTC().toISO()!;
+  const to = DateTime.fromISO(last, { zone }).endOf("day").toUTC().toISO()!;
+  const [events, routines, blocks, tasks] = await Promise.all([
+    // Weekly events are stored once with their first occurrence, so they're expanded per date.
+    ctx.db.from("events").select("*").neq("status", "cancelled").limit(500),
+    ctx.db.from("routines").select("*").eq("active", true),
+    ctx.db.from("plan_blocks").select("*").gte("plan_date", first).lte("plan_date", last).order("starts_at"),
+    ctx.db.from("tasks").select("*").in("status", ["todo", "in_progress", "blocked"]).gte("due_at", from).lte("due_at", to).order("due_at"),
+  ]);
+  return {
+    events: (events.data ?? []) as CalendarEvent[],
+    routines: (routines.data ?? []) as Routine[],
+    blocks: (blocks.data ?? []) as PlanBlock[],
+    tasks: (tasks.data ?? []) as Task[],
+  };
+}
+
+function dates(zone: string, first: string, days: number): string[] {
+  const start = DateTime.fromISO(first, { zone });
+  return Array.from({ length: days }, (_, i) => start.plus({ days: i }).toISODate()!);
+}
+
+function entryLine(e: AgendaEntry, zone: string): string {
+  const time = e.start ? `${formatTime(e.start, zone)}–${formatTime(e.end!, zone)}` : "any time";
+  const kind = e.kind === "block" ? `${e.status}${e.fixed ? ", fixed" : ""}` : e.kind === "routine" ? (e.fixed ? "routine, fixed" : "routine, can move") : e.label === "external" ? "external event" : "fixed event";
+  return `${time} ${e.title} (${kind}) [${e.id}]`;
+}
+
+/** The plan for one or more local dates, as text for the model. */
+async function planText(ctx: Ctx, date: string | null | undefined, days: number): Promise<string> {
+  const profile = await getProfile(ctx);
+  const zone = profile.timezone;
+  const today = nowIn(zone).toISODate()!;
+  const first = !date || date === "today" ? today : date === "tomorrow" ? DateTime.fromISO(today, { zone }).plus({ days: 1 }).toISODate()! : date;
+  if (!DateTime.fromISO(first, { zone }).isValid) throw new Error(`Not a valid date: ${first}`);
+  const list = dates(zone, first, days);
+  const inputs = await loadAgendaInputs(ctx, zone, list[0], list[list.length - 1]);
+  const body = list.map((d) => describeDayAgenda(buildDayAgenda({ date: d, zone, ...inputs }), zone, today)).join("\n");
+  const noAvailability = profile.availability.length === 0 ? " No availability is set, so Navi hasn't scheduled flexible work." : "";
+  return `Times are in ${zone}. Today is ${DateTime.fromISO(today, { zone }).toFormat("cccc, LLL d yyyy")}.${noAvailability}\n${body}`;
+}
+
 async function overview(ctx: Ctx): Promise<string> {
   const profile = await getProfile(ctx);
   const zone = profile.timezone;
   const now = nowIn(zone);
   const today = now.toISODate()!;
-  const [tasks, blocks, inbox, projects, goals, approvals, workspaces, routines, events] = await Promise.all([
+  const week = dates(zone, today, 7);
+  const [tasks, inbox, projects, goals, approvals, workspaces, routines, agendaInputs] = await Promise.all([
     ctx.db.from("tasks").select("id,title,status,priority,due_at,due_is_hard,estimate_minutes,project_id,blocker").in("status", ["todo", "in_progress", "blocked"]).order("due_at", { ascending: true, nullsFirst: false }).limit(40),
-    ctx.db.from("plan_blocks").select("id,title,starts_at,ends_at,status,is_flexible,task_id").eq("plan_date", today).order("starts_at"),
-    ctx.db.from("proposals").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    ctx.db.from("proposals").select("kind,payload,source_excerpt", { count: "exact" }).eq("status", "pending").order("created_at", { ascending: false }).limit(8),
     ctx.db.from("projects").select("id,name,status,due_date").eq("status", "active"),
     ctx.db.from("goals").select("id,title,status,target_date").eq("status", "active"),
     ctx.db.from("approvals").select("id,summary").eq("status", "pending"),
     ctx.db.from("workspaces").select("id,name").eq("status", "active"),
-    ctx.db.from("routines").select("id,title,days,start_time,duration_minutes").eq("active", true),
-    ctx.db.from("events").select("id,title,starts_at,ends_at,recurrence").neq("status", "cancelled").gte("ends_at", now.minus({ days: 1 }).toISO()!).lte("starts_at", now.plus({ days: 7 }).toISO()!).limit(30),
+    ctx.db.from("routines").select("id,title,days,start_time,duration_minutes,is_fixed").eq("active", true),
+    loadAgendaInputs(ctx, zone, today, week[1]),
   ]);
+  const agenda = (d: string) => buildDayAgenda({ date: d, zone, ...agendaInputs });
+  const dayLine = (d: string) => agenda(d).entries.map((e) => entryLine(e, zone)).join("; ") || "nothing planned";
+  const weekEvents = week.flatMap((d) =>
+    agendaInputs.events.flatMap((e) => {
+      const a = buildDayAgenda({ date: d, zone, events: [e], routines: [], blocks: [], tasks: [] }).entries[0];
+      return a ? [`${e.title} ${DateTime.fromISO(a.start!).setZone(zone).toFormat("ccc LLL d h:mm a")}${e.recurrence ? " (weekly)" : ""} [${e.id}]`] : [];
+    }),
+  );
   const lines: string[] = [];
-  lines.push(`Now: ${now.toFormat("cccc, LLL d yyyy, h:mm a")} (${zone}). Availability: ${JSON.stringify(profile.availability)}. Quiet hours: ${profile.quiet_hours_start ?? "not set"}–${profile.quiet_hours_end ?? "not set"}.`);
+  lines.push(`Now: ${now.toFormat("cccc, LLL d yyyy, h:mm a")} (${zone}). Availability: ${JSON.stringify(profile.availability)}. Quiet hours: ${profile.quiet_hours_start ?? "not set"}–${profile.quiet_hours_end ?? "not set"}. Name: ${profile.display_name ?? "not set"}.`);
   lines.push(`Workspaces: ${(workspaces.data ?? []).map((w) => `${w.name} [${w.id}]`).join("; ") || "none"}`);
   lines.push(`Active goals: ${(goals.data ?? []).map((g) => `${g.title}${g.target_date ? ` (by ${g.target_date})` : ""} [${g.id}]`).join("; ") || "none"}`);
   lines.push(`Active projects: ${(projects.data ?? []).map((p) => `${p.name}${p.due_date ? ` (due ${p.due_date})` : ""} [${p.id}]`).join("; ") || "none"}`);
-  lines.push(`Routines: ${(routines.data ?? []).map((r) => `${r.title} days=${r.days.join(",")} ${r.start_time ?? "flexible"} ${r.duration_minutes}m [${r.id}]`).join("; ") || "none"}`);
-  lines.push(`Upcoming events (7d): ${(events.data ?? []).map((e) => `${e.title} ${formatTime(e.starts_at, zone)} ${DateTime.fromISO(e.starts_at).setZone(zone).toFormat("ccc LLL d")}${e.recurrence ? " (weekly)" : ""} [${e.id}]`).join("; ") || "none"}`);
-  lines.push(`Today's plan: ${(blocks.data ?? []).map((b) => `${formatTime(b.starts_at, zone)}–${formatTime(b.ends_at, zone)} ${b.title} (${b.status}${b.is_flexible ? "" : ", fixed"}) [${b.id}]`).join("; ") || "nothing planned"}`);
+  lines.push(`Routines: ${(routines.data ?? []).map((r) => `${r.title} days=${r.days.join(",")} ${r.start_time ? `${r.start_time}${r.is_fixed ? " fixed" : " preferred, can move"}` : "no set time"} ${r.duration_minutes}m [${r.id}]`).join("; ") || "none"}`);
+  lines.push(`Fixed events, next 7 days: ${weekEvents.slice(0, 30).join("; ") || "none"}`);
+  lines.push(`Today's plan: ${dayLine(today)}`);
+  lines.push(`Tomorrow's plan (${week[1]}): ${dayLine(week[1])}. For any other date, call get_plan.`);
   lines.push(
-    `Open tasks: ${((tasks.data ?? []) as Task[]).map((t) => `${t.title} (P${t.priority}, ${t.status}${t.due_at ? `, due ${formatDue(t.due_at, zone)}${t.due_is_hard ? " HARD" : ""}` : ""}${t.estimate_minutes ? `, ~${t.estimate_minutes}m` : ""}${t.blocker ? `, blocked: ${t.blocker}` : ""}) [${t.id}]`).join("; ") || "none"}`,
+    `Open tasks: ${((tasks.data ?? []) as Task[]).map((t) => `${t.title} (P${t.priority}, ${t.status}${t.due_at ? `, due ${formatDue(t.due_at, zone)}${t.due_is_hard ? " HARD" : ""}` : ", no due date"}${t.estimate_minutes ? `, ~${t.estimate_minutes}m` : ""}${t.blocker ? `, blocked: ${t.blocker}` : ""}) [${t.id}]`).join("; ") || "none"}`,
   );
-  lines.push(`Review inbox: ${inbox.count ?? 0} pending. Pending approvals: ${(approvals.data ?? []).map((a) => a.summary).join("; ") || "none"}.`);
+  const pending = (inbox.data ?? []) as Pick<Proposal, "kind" | "payload" | "source_excerpt">[];
+  lines.push(
+    `Review inbox: ${inbox.count ?? 0} pending${pending.length ? ` (newest: ${pending.map((p) => `${proposalTitle(p).slice(0, 60)} (${p.kind})`).join("; ")})` : ""}; get_inbox has details and recent captures. Pending approvals: ${(approvals.data ?? []).map((a) => a.summary).join("; ") || "none"}.`,
+  );
+  return lines.join("\n");
+}
+
+const DAY_WORDS = /\b(today|tonight|tomorrow|mon(day)?|tue(s|sday)?|wed(nesday)?|thu(rs|rsday)?|fri(day)?|sat(urday)?|sun(day)?|weekend|next week)\b/i;
+
+/** Exactly what a created task's dates are, so the reply can't overstate it. */
+function taskDateSummary(t: Pick<Task, "due_at" | "due_is_hard">, zone: string, userCommand: string): string {
+  if (t.due_at) {
+    const due = DateTime.fromISO(t.due_at).setZone(zone);
+    const when = due.hour === 23 && due.minute === 59 ? due.toFormat("cccc LLL d") : due.toFormat("cccc LLL d, h:mm a");
+    return `${t.due_is_hard ? "hard deadline" : "soft due date"} ${when}. It is not scheduled at a set time; tasks have no do-date, only a due date (plan_day can place it in that day's free time)`;
+  }
+  const said = userCommand.match(DAY_WORDS)?.[0];
+  return `no due date${said ? `. The request mentions “${said}” but no date was set, so don't say it's on ${said}; set due_at with update_task if they meant that day` : ""}`;
+}
+
+/** A task's due date plus the work blocks already planned for it, stated exactly. */
+async function taskScheduleSummary(ctx: Ctx, t: Pick<Task, "id" | "due_at" | "due_is_hard">): Promise<string> {
+  const zone = ctx.timezone;
+  const due = t.due_at
+    ? (() => {
+        const d = DateTime.fromISO(t.due_at).setZone(zone);
+        return `${t.due_is_hard ? "hard deadline" : "soft due date"} ${d.hour === 23 && d.minute === 59 ? d.toFormat("cccc LLL d") : d.toFormat("cccc LLL d, h:mm a")}`;
+      })()
+    : "no due date";
+  const { data } = await ctx.db.from("plan_blocks").select("starts_at").eq("task_id", t.id).in("status", ["planned", "in_progress"]).gte("ends_at", new Date().toISOString()).order("starts_at").limit(5);
+  const blocks = (data ?? []).map((b) => DateTime.fromISO(b.starts_at).setZone(zone).toFormat("ccc LLL d h:mm a"));
+  return `${due}; ${blocks.length ? `work already planned in blocks at ${blocks.join(", ")}` : "no work block planned yet"}`;
+}
+
+async function inboxText(ctx: Ctx): Promise<string> {
+  const zone = ctx.timezone;
+  const [pending, captures, activity] = await Promise.all([
+    ctx.db.from("proposals").select("*").in("status", ["pending", "deferred"]).order("created_at", { ascending: false }).limit(30),
+    ctx.db.from("captures").select("id,raw_text,source,status,captured_at").order("captured_at", { ascending: false }).limit(5),
+    ctx.db.from("activity_log").select("actor,summary,created_at").order("created_at", { ascending: false }).limit(12),
+  ]);
+  const caps = captures.data ?? [];
+  const { data: fromCaptures } = caps.length ? await ctx.db.from("proposals").select("*").in("capture_id", caps.map((c) => c.id)) : { data: [] };
+  const made = ((fromCaptures ?? []) as Proposal[]).filter((p) => p.result_table === "tasks" && p.result_id).map((p) => p.result_id!);
+  const { data: madeTasks } = made.length ? await ctx.db.from("tasks").select("id,title,status").in("id", made) : { data: [] };
+  const taskById = new Map((madeTasks ?? []).map((t) => [t.id, t]));
+  const when = (iso: string) => DateTime.fromISO(iso).setZone(zone).toFormat("ccc LLL d, h:mm a");
+  const describe = (p: Proposal) => {
+    const pl = p.payload as Record<string, unknown>;
+    const due = typeof pl.due_at === "string" ? `, due ${formatDue(pl.due_at, zone)}` : "";
+    let state: string = p.status;
+    if (p.status === "accepted" || p.status === "merged") {
+      const t = p.result_id ? taskById.get(p.result_id) : undefined;
+      state = `${p.status}${p.result_table ? ` → ${p.result_table.replace(/s$/, "")}${t ? ` “${t.title}” (now ${t.status})` : ""}` : ""}${p.result_id ? ` [${p.result_id}]` : ""}`;
+    }
+    return `${p.kind} “${proposalTitle(p).slice(0, 100)}”${due} — ${state}`;
+  };
+  const lines: string[] = [];
+  const list = (pending.data ?? []) as Proposal[];
+  lines.push(`Review inbox (pending/deferred, newest first): ${list.length ? "" : "empty"}`);
+  for (const p of list) lines.push(`  - ${describe(p)}${p.batch === "onboarding" ? " (setup review)" : ""}, added ${when(p.created_at)} [${p.id}]`);
+  lines.push(`Recent captures (newest first): ${caps.length ? "" : "none"}`);
+  for (const c of caps) {
+    const items = ((fromCaptures ?? []) as Proposal[]).filter((p) => p.capture_id === c.id);
+    lines.push(`  - ${when(c.captured_at)} via ${c.source}, ${c.status}: “${c.raw_text.slice(0, 300)}”`);
+    lines.push(items.length ? items.map((p) => `      · ${describe(p)}`).join("\n") : "      · no items extracted yet");
+  }
+  lines.push("Recent activity (newest first):");
+  for (const a of activity.data ?? []) lines.push(`  - ${when(a.created_at)} by ${a.actor}: ${a.summary}`);
   return lines.join("\n");
 }
 
 export const TOOLS = [
   tool({
     name: "get_overview",
-    description: "Read the user's current state: time, availability, workspaces, goals, projects, routines, upcoming events, today's plan, open tasks (with ids), inbox and approvals. Call this before acting on existing items.",
+    description: "Read the user's current state: time, availability, workspaces, goals, projects, routines, fixed events for the next 7 days, today's and tomorrow's plan, open tasks (with ids), inbox and approvals. Call this before acting on existing items.",
     schema: z.object({}),
     run: async (ctx) => ({ ok: true, summary: "Read overview", data: await overview(ctx) }),
   }),
   tool({
+    name: "get_plan",
+    description:
+      "Read what's on any day or range of days, in the user's time zone: fixed events (weekly ones included), routines that occur that day, planned work blocks with their status, and tasks due that day. Read-only. Use for questions like 'what's on tomorrow?', 'am I free Saturday?', 'what's my week look like?'.",
+    schema: z.object({
+      date: z.string().regex(/^(\d{4}-\d{2}-\d{2}|today|tomorrow)$/, "YYYY-MM-DD, 'today' or 'tomorrow'").nullish().describe("First local date: YYYY-MM-DD, 'today' or 'tomorrow' (default today)"),
+      days: z.number().int().min(1).max(14).nullish().describe("Number of days starting at date (default 1, max 14)"),
+    }),
+    run: async (ctx, { date, days }) => ({ ok: true, summary: `Read the plan for ${date ?? "today"}${days && days > 1 ? ` (+${days - 1} days)` : ""}`, data: await planText(ctx, date, days ?? 1) }),
+  }),
+  tool({
+    name: "get_inbox",
+    description:
+      "Read the review inbox (pending and deferred items), the user's most recent quick captures with what became of each extracted item (pending, accepted into a task, rejected, merged), and the recent activity log (what changed and who did it). Read-only. Quick captures and dashboard edits are NOT in chat history, so call this for questions about captures, the inbox, or what changed.",
+    schema: z.object({}),
+    run: async (ctx) => ({ ok: true, summary: "Read the inbox, recent captures and activity", data: await inboxText(ctx) }),
+  }),
+  tool({
     name: "search_items",
-    description: "Find tasks, projects, goals or events whose title matches a query. Includes done items.",
+    description: "Find tasks (any status, including done), projects, goals, events, routines and review-inbox items whose title matches a query. Use it before creating a task to avoid duplicates, and to check an item's current status.",
     schema: z.object({ query: z.string().min(1).max(200) }),
     run: async (ctx, { query }) => {
       const q = `%${query.replace(/[%_\\]/g, "\\$&")}%`;
-      const [t, p, g, e] = await Promise.all([
-        ctx.db.from("tasks").select("id,title,status,due_at,priority").ilike("title", q).limit(10),
+      const [t, p, g, e, r, inbox] = await Promise.all([
+        ctx.db.from("tasks").select("id,title,status,due_at,due_is_hard,priority").ilike("title", q).order("updated_at", { ascending: false }).limit(10),
         ctx.db.from("projects").select("id,name,status,objective").ilike("name", q).limit(5),
         ctx.db.from("goals").select("id,title,status").ilike("title", q).limit(5),
-        ctx.db.from("events").select("id,title,starts_at").ilike("title", q).limit(5),
+        ctx.db.from("events").select("id,title,starts_at,recurrence").ilike("title", q).limit(5),
+        ctx.db.from("routines").select("id,title,days,start_time,is_fixed,active").ilike("title", q).limit(5),
+        ctx.db.from("proposals").select("id,kind,payload,source_excerpt,status,created_at").in("status", ["pending", "deferred"]).order("created_at", { ascending: false }).limit(100),
       ]);
-      return { ok: true, summary: `Searched for “${query}”`, data: { tasks: t.data, projects: p.data, goals: g.data, events: e.data } };
+      const needle = query.toLowerCase();
+      const inboxHits = ((inbox.data ?? []) as Proposal[])
+        .filter((x) => `${proposalTitle(x)} ${x.source_excerpt ?? ""}`.toLowerCase().includes(needle))
+        .slice(0, 10)
+        .map((x) => ({ id: x.id, kind: x.kind, title: proposalTitle(x), status: x.status }));
+      return { ok: true, summary: `Searched for “${query}”`, data: { tasks: t.data, projects: p.data, goals: g.data, events: e.data, routines: r.data, inbox_items_not_yet_accepted: inboxHits } };
     },
   }),
   tool({
@@ -136,13 +283,13 @@ export const TOOLS = [
   tool({
     name: "create_task",
     description:
-      "Create a committed task immediately. ONLY when the user directly and explicitly commands it right now (e.g. 'add a task to email Ms. Lee'). For anything inferred or mentioned in passing, use propose_items instead.",
+      "Create a committed task immediately. ONLY when the user directly and explicitly commands it right now (e.g. 'add a task to email Ms. Lee'). For anything inferred or mentioned in passing, use propose_items instead. Check search_items first so you don't duplicate an existing task or inbox item. Tasks have no 'do on' date, only a due date: if the user names a day ('call mom on Sunday'), set due_at to the end of that day (23:59 local) with due_is_hard=false unless they say it's a real deadline. Don't write dates into notes. Tell the user exactly what the result says was set (e.g. 'due Sunday, not a hard deadline'); never say it's scheduled or planned for a day unless a plan block was actually made.",
     schema: TaskCreate.extend({ user_command: z.string().min(3).max(300).describe("The user's explicit instruction, quoted") }),
     run: async (ctx, input) => {
       const { user_command, ...task } = input;
       const t = await createTask(ctx, task);
       await logActivity(ctx, { action: "explicit_command", entityType: "tasks", entityId: t.id, summary: `Added at your request: “${user_command.slice(0, 120)}”` });
-      return { ok: true, mutated: true, summary: `Created task “${t.title}”`, data: { id: t.id } };
+      return { ok: true, mutated: true, summary: `Created task “${t.title}”: ${taskDateSummary(t, ctx.timezone, user_command)}`, data: { id: t.id, due_at: t.due_at, due_is_hard: t.due_is_hard } };
     },
   }),
   tool({
@@ -159,7 +306,8 @@ export const TOOLS = [
       }
       const r = await updateTask(ctx, id, patch);
       if (r.kind === "approval_requested") return { ok: true, mutated: true, summary: `That change ${r.reason}, so it was sent to the user for approval` };
-      return { ok: true, mutated: true, summary: `Updated task “${r.row.title}”` };
+      const dates = "due_at" in patch || "due_is_hard" in patch ? `: ${await taskScheduleSummary(ctx, r.row)}` : "";
+      return { ok: true, mutated: true, summary: `Updated task “${r.row.title}”${dates}` };
     },
   }),
   tool({
@@ -255,7 +403,7 @@ export const TOOLS = [
   }),
   tool({
     name: "update_settings",
-    description: "Change the user's settings when they explicitly ask: timezone (IANA), quiet hours, briefing times, weekly review day, availability windows for flexible work.",
+    description: "Change the user's settings when they explicitly ask or tell you: display_name (what to call them, e.g. 'I'm Alex'), timezone (IANA), quiet hours, briefing times, weekly review day, availability windows for flexible work.",
     schema: ProfileUpdate,
     run: async (ctx, input) => {
       const patch = compact(ProfileUpdate.parse(input));
@@ -331,7 +479,7 @@ export async function runTool(ctx: Ctx, name: string, rawInput: unknown): Promis
 
 export function toolsFor(mode: "chat" | "onboarding" | "capture" | "voice"): NaviTool[] {
   const all = TOOLS as readonly NaviTool[];
-  if (mode === "capture") return all.filter((t) => ["get_overview", "propose_items"].includes(t.name));
+  if (mode === "capture") return all.filter((t) => ["get_overview", "get_plan", "propose_items"].includes(t.name));
   if (mode === "onboarding") return all.filter((t) => ["get_overview", "propose_items", "remember", "mark_onboarding_ready", "update_settings"].includes(t.name));
   return all.filter((t) => t.name !== "mark_onboarding_ready");
 }

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { DateTime } from "luxon";
 import { requireCtx, getProfile } from "@/server/context";
 import type { CalendarEvent, PlanBlock, Routine } from "@/lib/types";
-import { eventOccurrence } from "@/server/planner/scheduler";
+import { buildDayAgenda } from "@/server/planner/agenda";
 import { formatTime, nowIn } from "@/lib/time";
 import { ActionButton } from "@/components/action-button";
 import { PlanBlockRow } from "@/components/plan-block";
@@ -61,13 +61,10 @@ export default async function PlannerPage({ searchParams }: { searchParams: Prom
       <div className={view === "week" ? "grid gap-3 lg:grid-cols-2" : ""}>
         {days.map((d) => {
           const dt = DateTime.fromISO(d, { zone });
-          const fixed = [
-            ...events.map((e) => ({ e, iv: eventOccurrence(e, d, zone) })).filter((x) => x.iv).map((x) => ({ id: x.e.id, title: x.e.title, start: x.iv!.start!.toISO()!, end: x.iv!.end!.toISO()!, external: Boolean(x.e.external_ref) })),
-            ...routines.filter((r) => r.start_time && r.days.includes(dt.weekday % 7)).map((r) => {
-              const s = dt.set({ hour: Number(r.start_time!.slice(0, 2)), minute: Number(r.start_time!.slice(3, 5)) });
-              return { id: r.id, title: r.title, start: s.toISO()!, end: s.plus({ minutes: r.duration_minutes }).toISO()!, external: false };
-            }),
-          ].sort((a, b) => a.start.localeCompare(b.start));
+          // Events and timed routines; a routine's badge says whether its time is really fixed.
+          const fixed = buildDayAgenda({ date: d, zone, events, routines, blocks: [], tasks: [] })
+            .entries.filter((e) => e.start)
+            .map((e) => ({ id: e.id, title: e.title, start: e.start!, end: e.end!, label: e.label }));
           const dayBlocks = blocks.filter((b) => b.plan_date === d);
           return (
             <section key={d} className="card" aria-label={dt.toFormat("cccc LLL d")}>
@@ -89,7 +86,7 @@ export default async function PlannerPage({ searchParams }: { searchParams: Prom
                         <li key={f.id + f.start} className="my-1 flex gap-3 rounded-lg bg-surface-2 px-2 py-1.5 text-sm">
                           <span className="w-32 shrink-0 tabular-nums">{formatTime(f.start, zone)}–{formatTime(f.end, zone)}</span>
                           <span className="flex-1">{f.title}</span>
-                          <span className="badge">{f.external ? "external" : "fixed"}</span>
+                          <span className="badge">{f.label}</span>
                         </li>
                       ) : (
                         <PlanBlockRow key={b!.id} block={b!} time={`${formatTime(b!.starts_at, zone)}–${formatTime(b!.ends_at, zone)}`} canFocus={!focusRes.data && d === today} />

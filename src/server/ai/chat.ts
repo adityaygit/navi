@@ -75,7 +75,7 @@ export async function buildContext(ctx: Ctx, query: string, mode: AgentMode | "v
     : "(none yet)";
   return [
     `Mode: ${mode}.`,
-    "Current state:",
+    `Current state (a snapshot taken at the start of this ${mode === "voice" ? "voice session" : "turn"}; call the read tools for other dates or anything that may have changed since):`,
     String(overview.data ?? ""),
     "",
     "What you remember about the user:",

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createSpeechRecognition, speechRecognitionSupported, type SpeechRec } from "@/lib/speech";
 import type { ToolEvent } from "@/lib/types";
 import { newClientId, offlineQueue } from "@/lib/offline-queue";
+import { READ_ONLY_TOOLS } from "@/lib/tool-names";
 
 type ToolReply = { id?: string; name?: string; response: Record<string, unknown> };
 
@@ -228,14 +229,14 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
       try {
         const res = await fetch("/api/voice/tool", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ conversationId: convRef.current, name: fc.name, args: fc.args ?? {} }) });
         const result = await res.json();
-        if (!["get_overview", "recall", "search_items"].includes(fc.name ?? "")) {
+        if (!READ_ONLY_TOOLS.includes(fc.name ?? "")) {
           turnRef.current.tools.push({ name: fc.name ?? "tool", ok: Boolean(result.ok), summary: String(result.summary ?? result.error ?? "") });
         }
         if (result.mutated) onTurnSaved();
         return { id: fc.id, name: fc.name, response: { output: { ok: result.ok, summary: result.summary ?? result.error, data: result.data ?? null } } };
       } catch {
         // The request may have reached the server before the connection dropped.
-        return { id: fc.id, name: fc.name, response: { error: "The connection dropped during this action, so it may or may not have gone through. Check with get_overview before trying again." } };
+        return { id: fc.id, name: fc.name, response: { error: "The connection dropped during this action, so it may or may not have gone through. Check with get_overview or get_inbox before trying again." } };
       }
     })();
     if (fc.id) toolCalls.current.set(fc.id, run);

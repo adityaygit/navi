@@ -210,8 +210,15 @@ async function materialize(ctx: Ctx, proposal: Proposal, edits?: Record<string, 
     const { error: upErr } = await ctx.db.from("profiles").update(parsed).eq("id", ctx.userId);
     if (upErr) throw new Error(upErr.message);
     await logActivity(userCtx, { action: "update", entityType: "profiles", summary: `Updated settings from inbox (${Object.keys(parsed).join(", ")})` });
+  } else if (proposal.kind === "question") {
+    // An open question the user wants to keep: saved where they can see it
+    // (Memory) and where Navi recalls it later, instead of vanishing.
+    const question = String(payload.question ?? payload.title ?? proposal.source_excerpt ?? "").trim();
+    if (!question) throw new Error("This question is empty; edit it or reject it.");
+    const mem = await addMemory(userCtx, { kind: "episodic", content: `Open question: ${question}`, origin: "stated", confidence: 1 });
+    resultTable = "memories";
+    resultId = mem.id;
   }
-  // "question" proposals have nothing to materialize: accepting marks them handled.
   return { merged, resultTable, resultId };
 }
 

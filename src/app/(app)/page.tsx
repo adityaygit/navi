@@ -8,7 +8,7 @@ import { FocusCard } from "@/components/focus";
 import { RecoveryButton } from "@/components/recovery";
 import { ActionButton } from "@/components/action-button";
 import { completeTaskAction, markBriefingReadAction, planDayAction, startFocusAction } from "./actions";
-import { eventOccurrence } from "@/server/planner/scheduler";
+import { buildDayAgenda } from "@/server/planner/agenda";
 import type { CalendarEvent, Routine } from "@/lib/types";
 
 export const metadata = { title: "Today · Navi" };
@@ -35,18 +35,10 @@ export default async function TodayPage() {
   const dueSoon = (tasksRes.data ?? []) as Task[];
   const focus = focusRes.data as { id: string; started_at: string; planned_minutes: number | null; tasks: { title: string } | null } | null;
   const briefing = briefingRes.data as Briefing | null;
-  const fixedToday = [
-    ...((eventsRes.data ?? []) as CalendarEvent[])
-      .map((e) => ({ e, iv: eventOccurrence(e, today, zone) }))
-      .filter((x) => x.iv)
-      .map((x) => ({ title: x.e.title, start: x.iv!.start!.toISO()!, end: x.iv!.end!.toISO()!, kind: "event" })),
-    ...((routinesRes.data ?? []) as Routine[])
-      .filter((r) => r.start_time && r.days.includes(now.weekday % 7))
-      .map((r) => {
-        const s = now.set({ hour: Number(r.start_time!.slice(0, 2)), minute: Number(r.start_time!.slice(3, 5)), second: 0 });
-        return { title: r.title, start: s.toISO()!, end: s.plus({ minutes: r.duration_minutes }).toISO()!, kind: "routine" };
-      }),
-  ].sort((a, b) => a.start.localeCompare(b.start));
+  // Events and timed routines; a routine's badge says whether its time is really fixed.
+  const fixedToday = buildDayAgenda({ date: today, zone, events: (eventsRes.data ?? []) as CalendarEvent[], routines: (routinesRes.data ?? []) as Routine[], blocks: [], tasks: [] })
+    .entries.filter((e) => e.start)
+    .map((e) => ({ title: e.title, start: e.start!, end: e.end!, label: e.label }));
   const done = blocks.filter((b) => b.status === "done").length;
   const hour = now.hour;
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
@@ -112,7 +104,7 @@ export default async function TodayPage() {
                   <li key={`f${i}`} className="my-1 flex gap-3 rounded-lg bg-surface-2 px-2 py-1.5 text-sm">
                     <span className="w-36 shrink-0 tabular-nums">{formatTime(f.start, zone)}–{formatTime(f.end, zone)}</span>
                     <span className="flex-1">{f.title}</span>
-                    <span className="badge">fixed</span>
+                    <span className="badge">{f.label}</span>
                   </li>
                 ) : (
                   <PlanBlockRow key={b!.id} block={b!} time={`${formatTime(b!.starts_at, zone)}–${formatTime(b!.ends_at, zone)}`} canFocus={!focus} />

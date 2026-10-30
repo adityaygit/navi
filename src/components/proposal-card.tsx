@@ -55,6 +55,7 @@ export function proposalSummary(p: Proposal, zone: string): string {
   if (pl.target_date) parts.push(`by ${pl.target_date}`);
   if (pl.due_date) parts.push(`due ${pl.due_date}`);
   if (p.kind === "preference") {
+    if (pl.display_name) parts.push(`call you ${pl.display_name}`);
     if (pl.timezone) parts.push(`time zone ${pl.timezone}`);
     if (pl.quiet_hours_start) parts.push(`quiet ${pl.quiet_hours_start}–${pl.quiet_hours_end}`);
     const av = pl.availability as { days: number[]; start: string; end: string }[] | undefined;
@@ -199,6 +200,9 @@ export function ProposalCard({
           )}
           {proposal.source_excerpt && <blockquote className="muted mt-2 border-l-2 border-border pl-2 text-sm">“{proposal.source_excerpt}”</blockquote>}
           {proposal.rationale && <p className="muted mt-1 text-xs">Why: {proposal.rationale}</p>}
+          {proposal.kind === "question" && (
+            <p className="muted mt-1 text-xs">{selectable ? "If kept, it's saved" : "Saving keeps it"} in Memory as an open question, so you can find it there and Navi can bring it up or help answer it in chat.</p>
+          )}
         </div>
       </div>
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}
@@ -206,7 +210,7 @@ export function ProposalCard({
         <div className="flex flex-wrap gap-1.5">
           {!selectable && (
             <button type="button" className="btn btn-primary btn-sm" disabled={pending} onClick={() => run(() => acceptProposalAction(proposal.id, editing ? payload : undefined))}>
-              {proposal.kind === "question" ? "Mark handled" : "Accept"}
+              {proposal.kind === "question" ? "Save to memory" : "Accept"}
             </button>
           )}
           {editing ? (
@@ -214,7 +218,7 @@ export function ProposalCard({
               Save edits
             </button>
           ) : (
-            proposal.kind !== "question" && <button type="button" className="btn btn-sm" onClick={() => setEditing(true)}>Edit</button>
+            <button type="button" className="btn btn-sm" onClick={() => setEditing(true)}>Edit</button>
           )}
           {!selectable && (
             <>

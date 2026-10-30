@@ -7,6 +7,7 @@ import { aiAvailability, modelFor, tokenCost, type ModelRole } from "./config";
 import { assertBudget, BudgetExceededError, recordUsage } from "./budget";
 import { jsonSchemaFor, runTool, toolsFor } from "./tools";
 import { runDevSim } from "./devsim";
+import { READ_ONLY_TOOLS } from "@/lib/tool-names";
 
 export type AgentMode = "chat" | "onboarding" | "capture";
 
@@ -155,7 +156,7 @@ async function runAnthropic(req: AgentRequest, model: string, allowServerFallbac
       for (const use of toolUses) {
         const result = await runTool({ ...req.ctx, actor: "navi" }, use.name, use.input);
         if (result.mutated) mutated = true;
-        if (use.name !== "get_overview" && use.name !== "recall" && use.name !== "search_items") {
+        if (!READ_ONLY_TOOLS.includes(use.name)) {
           toolEvents.push({ name: use.name, ok: result.ok, summary: result.summary });
         }
         results.push({

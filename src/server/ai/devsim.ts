@@ -4,7 +4,7 @@ import type { ToolEvent } from "@/lib/types";
 import { getProfile } from "@/server/context";
 import { recordUsage } from "./budget";
 import { runTool } from "./tools";
-import { areaFor, detectAreas, extractAvailability, extractGoals, extractItems, extractProjects, extractRoutines, extractWeeklyCommitments } from "./heuristics";
+import { areaFor, detectAreas, extractAvailability, extractGoals, extractItems, extractName, extractProjects, extractRoutines, extractWeeklyCommitments } from "./heuristics";
 import type { AgentRequest, AgentResult } from "./agent";
 
 // Development simulator: a deterministic stand-in for the model so the full
@@ -56,6 +56,13 @@ export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
       await call("mark_onboarding_ready", { summary: `${items.length} items proposed` });
       reply = `I've drafted your setup: ${items.filter((i) => i.kind === "workspace").length} areas, ${items.filter((i) => i.kind === "goal" || i.kind === "project").length} goals and projects, ${items.filter((i) => i.kind === "event" || i.kind === "routine").length} commitments and routines, ${items.filter((i) => i.kind === "task").length} tasks and your schedule preferences. Review it below: approve what's right, edit or reject the rest.`;
     }
+  } else if (req.mode === "chat" && /\b(on my plate|on (for )?tomorrow|tomorrow look|schedule for tomorrow|what'?s (on )?tomorrow)\b/i.test(text)) {
+    // Questions about state are answered from a fresh read, never from history.
+    const r = await runTool(ctx, "get_plan", { date: "tomorrow" });
+    reply = String(r.data ?? r.summary).replace(/\s*\[[0-9a-f-]{36}\]/g, "");
+  } else if (req.mode === "chat" && /\b(just captured|did i (just )?capture|in my inbox|what changed)\b/i.test(text)) {
+    const r = await runTool(ctx, "get_inbox", {});
+    reply = String(r.data ?? r.summary).replace(/\s*\[[0-9a-f-]{36}\]/g, "");
   } else if (req.mode === "chat" && /\b(plan|organi[sz]e)\b.*\b(week)\b/i.test(text)) {
     const r = await call("plan_week", {});
     reply = r.summary;
@@ -173,6 +180,8 @@ export function buildOnboardingProposals(all: string, now: DateTime): Proposal[]
   const availability = extractAvailability(all);
   const quiet = all.toLowerCase().match(/quiet\s+(?:from\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:to|until|-)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
   const pref: Record<string, unknown> = {};
+  const name = extractName(all);
+  if (name) pref.display_name = name;
   if (availability.length) pref.availability = availability;
   if (quiet) {
     const to24 = (h: string, m: string | undefined, ap: string | undefined, def: "am" | "pm") => {
@@ -186,7 +195,7 @@ export function buildOnboardingProposals(all: string, now: DateTime): Proposal[]
     pref.quiet_hours_end = to24(quiet[4], quiet[5], quiet[6], "am");
   }
   if (Object.keys(pref).length) {
-    items.push({ kind: "preference", payload: pref, origin: "stated", confidence: 0.7, rationale: "Your availability and quiet hours." });
+    items.push({ kind: "preference", payload: pref, origin: "stated", confidence: 0.7, rationale: name ? "Your name, availability and quiet hours." : "Your availability and quiet hours." });
   }
   for (const t of extractItems(all, now).filter((i) => i.kind === "task" && !/\b(free|quiet)\b/i.test(i.excerpt))) {
     if (extractWeeklyCommitments(t.excerpt).length) continue;

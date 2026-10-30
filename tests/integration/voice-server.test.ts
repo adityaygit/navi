@@ -47,7 +47,11 @@ describe("voice session setup", () => {
     expect(system).toContain("Prefers short answers");
     expect(config).toMatchObject({ inputAudioTranscription: {}, outputAudioTranscription: {}, sessionResumption: {} });
     const names = declaredNames(config.tools);
-    expect(names).toEqual(expect.arrayContaining(["propose_items", "create_task", "plan_day", "recover_plan", "remember", "request_external_action"]));
+    expect(names).toEqual(expect.arrayContaining(["propose_items", "create_task", "plan_day", "recover_plan", "remember", "request_external_action", "get_plan", "get_inbox", "search_items"]));
+    // The session's state is a snapshot; voice is told to read other days and the inbox with tools.
+    expect(system).toContain(`call get_plan with date "tomorrow"`);
+    expect(system).toMatch(/Current state \(a snapshot taken at the start of this voice session/);
+    expect(system).toMatch(/Tomorrow's plan \(/);
     expect(names).not.toContain("mark_onboarding_ready");
 
     const before = Date.now();

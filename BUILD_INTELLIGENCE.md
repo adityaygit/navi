@@ -117,10 +117,12 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 ## Real-model run (session 3, local app + local Supabase, real Claude + Gemini Live)
 - PASS: text onboarding; planner respects fixed items/availability, invents nothing; voice round trip + tool call; capture → inbox (after fix).
 - Fixed (commit `3d72b03`, tests added): incomplete proposals (event without `ends_at`) failed on Accept → now validated at propose time; `*_ref` to an existing id was dropped; vague `update_item` summaries made later turns misremember; literal `**bold**`.
-- Open (fix pass in progress): AI can only see today's plan ("tomorrow" answers miss blocks, chat + voice); Haiku answers state questions from history without tools (wrong inbox/duplicate claims); "task on Sunday" overstated (tasks have no do-date); non-fixed routine labelled fixed; display_name not captured; accepted question items vanish; 30-min call split 15+15.
+- Fixed in the accuracy pass (uncommitted working tree at time of writing; tests in `tests/integration/accuracy.test.ts`, `tests/unit/agenda.test.ts`, `tests/e2e/accuracy.spec.ts`, each failing on the old code): new read-only tools `get_plan` (any date/range: events incl. weekly, routines, blocks, tasks due) and `get_inbox` (pending inbox, recent captures + what became of each item, recent activity), offered to chat and voice; overview shows tomorrow too and expands weekly events (it used to drop weekly events whose first date was >1 day ago); prompts: "check, don't recall" + tool result beats history; `create_task`/`update_task` results state the exact due date and planned blocks; routine badge says "routine" unless `is_fixed`; onboarding asks the name → `display_name` in the preference item; accepted questions saved to Memory ("Open question: …").
+- Real-model re-check after the fixes (≈$0.015): chat "what's on my plate tomorrow?" → Call mom 9:00–9:15 + reading 9:00–9:20 PM (matches DB); "what did I just capture?" after a quick capture → exact words + both items pending (matches DB; first try also recapped false claims from old history → prompt tightened, re-run clean); "add a task to call mom on Sunday" → found the existing task and set a soft due date Sun 23:59 instead of duplicating; Gemini Live "what's on my plate tomorrow?" → called `get_plan({date:"tomorrow"})`, answered correctly.
+- Still open: a 30-min task split into 15+15 blocks; capture model turned "on friday" (said on a Friday) into today 6:00 PM (reviewable proposal, time invented); accepted `note` proposals go to a `notes` table with no UI view.
 - Scripts/screenshots were in the session scratchpad (not in the repo).
 
-## Test commands & latest results (2026-10-30, session 3 run with migration 20261101000001: same counts, all pass; below is the session 2 handoff run, all via `scripts/local-only.sh`)
+## Test commands & latest results (2026-10-30, session 3 accuracy pass: tsc + lint pass, vitest 11 files 81/81, build pass, Playwright 34/34; below is the session 2 handoff run, all via `scripts/local-only.sh`)
 - `npx tsc --noEmit` → pass · `npm run lint` → pass.
 - `npx vitest run` → **9 files, 66/66 passed** (unit + integration on local Supabase; Claude and Gemini network calls mocked).
 - `npx next build` → pass.
@@ -145,6 +147,8 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 - Client components import server actions from `@/app/(app)/client-actions` (network failures return `{ ok:false }` instead of crashing the page); server components pass originals to `ActionButton`.
 - Scheduler: one idempotent `/api/cron/tick`; Trigger.dev task every 10 min calls it (Vercel Hobby cron is daily only).
 - Tests run only against local Supabase (guard + wrapper); browser tests run in UTC.
+- AI answers about state come from read tools (`get_plan`, `get_inbox`, `search_items`, `get_overview`), never chat history; one pure day-agenda builder (`src/server/planner/agenda.ts`) backs Planner, Today and `get_plan`. Read-only tool names live in `src/lib/tool-names.ts` (not shown as "actions taken").
+- Tasks have no do-date (no migration): "on Sunday" = soft `due_at` Sunday 23:59, reported as a due date, never as "scheduled". Accepted inbox questions become episodic memories.
 
 ## Learnings
 - Supabase auth hooks reload only on full `supabase stop --no-backup` + start.
