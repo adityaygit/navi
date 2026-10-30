@@ -12,14 +12,15 @@ Done in session 3 (owner approved hosted Supabase setup and Vercel env vars for 
 - `npm run smoke:ai anthropic` → PASS fast (`claude-haiku-5-5`) + planner (`claude-sonnet-5-5`), ≈$0.00008 (run without Supabase vars so nothing touched hosted).
 - Full local suite PASS (tsc, lint, vitest 9 files 66/66, build, Playwright 30/30), including after migration `20261101000001_api_privileges`.
 - **Hosted Supabase:** migrations `20261030000001` + `20261031000001` applied (Management API; recorded versions fixed to the file versions). Auth: Before-User-Created hook **on** → `navi_before_user_created`; Site URL `https://navi-sand.vercel.app`; redirects for `/auth/callback` + `/auth/confirm` on that domain and `https://navi-*-chairbook.vercel.app` previews.
-- **Found:** this hosted project gives `anon`/`authenticated`/`service_role` no SELECT/INSERT/UPDATE/DELETE on new tables (newer Supabase default; local grants them). Even the secret key got "permission denied" → the deployed app could not work. Fixed in repo by migration `20261101000001_api_privileges.sql` (explicit grants + 2 advisor fixes), verified locally. **Not yet applied to hosted** — the permission guard treated it as outside the approved "2 migrations"; waiting for the owner.
+- **Found:** this hosted project gives `anon`/`authenticated`/`service_role` no SELECT/INSERT/UPDATE/DELETE on new tables (newer Supabase default; local grants them). Even the secret key got "permission denied" → the deployed app could not work. Fixed in repo by migration `20261101000001_api_privileges.sql` (explicit grants + 2 advisor fixes), verified locally, then applied to hosted after the owner approved it separately (version fixed to `20261101000001`).
+- Hosted verified: owner email on the invite list (1 email); uninvited sign-up (`…@example.com`) rejected with "Navi is invite-only right now…", 0 users created; anon read of `tasks` → 42501; service role reads tables. `check:deploy` hosted checks all PASS (schema, invite list, admin invited, hook); the only FAILs are this session's local values (`NEXT_PUBLIC_SITE_URL` empty, `.env.local` devsim), both set correctly in Vercel. Security advisor: only Supabase's own `rls_auto_enable` (template event trigger) and the intentional no-policy server-only tables remain.
 - **Vercel:** project `navi` (team `chairbook`) was already Git-connected, production branch `main`, domain `navi-sand.vercel.app`. Builds were READY but every route 404'd: no framework preset. Fixed via `vercel.json` (`framework: nextjs`); preview of `1618f78` built with preset `nextjs` and 24 crons accepted. 14 env vars set for Production + Preview (Supabase URL/anon/service, `ANTHROPIC_API_KEY` from `NAVI_ANTHROPIC_API_KEY`, Gemini, `NAVI_AI_PROVIDER=anthropic`, `NEXT_PUBLIC_SITE_URL=https://navi-sand.vercel.app`, fresh `CRON_SECRET` + VAPID keys, `VAPID_SUBJECT=https://navi-sand.vercel.app`, budget $2, `NAVI_BUDGET_TIMEZONE=America/New_York`, admin emails). Secrets are "sensitive" (not readable back); the generated CRON_SECRET/VAPID exist only in Vercel.
 - Previews are behind Vercel Authentication (Standard Protection); only the production domain is public, and crons only run on production.
 - Scheduler: Trigger.dev can't be deployed from here (needs `tr_pat_` token + project ref + prod key). Owner chose the Vercel Cron fallback: 24 daily jobs, one per UTC hour (Hobby: 100 jobs/project, once/day each, ±59 min).
 
 Waiting on the owner:
-1. OK to apply `20261101000001_api_privileges.sql` to hosted. Then: invite the owner email (`node scripts/allow-email.mjs add …` via session env), uninvited sign-up must fail, `npm run check:deploy`.
-2. How to get this code onto production (`navi-sand.vercel.app` currently serves an old 404ing build from `claude/charming-darwin-erd78b`): merge to `main` via PR, or promote the preview deployment. Then `npm run check:deploy -- https://navi-sand.vercel.app`, a real sign-in, and a real-model run of onboarding/capture/planning/voice.
+1. ~~Apply the grants migration~~ — done.
+2. Owner chose a PR to `main`: review and merge it. How the code gets onto production (`navi-sand.vercel.app` currently serves an old 404ing build from `claude/charming-darwin-erd78b`): merge to `main` via PR, or promote the preview deployment. Then `npm run check:deploy -- https://navi-sand.vercel.app`, a real sign-in, and a real-model run of onboarding/capture/planning/voice.
 
 ## How to resume in a fresh session ("resume")
 1. Check out the latest branch (`claude/dazzling-cray-isusbm` as of session 3); read `Navi_Product_Spec.md`, this file, then `git log --oneline -15` and `git status`.
@@ -56,7 +57,7 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 | `NAVI_ANTHROPIC_API_KEY` | set, `sk-ant-` (session 3) | **Works:** `smoke:ai anthropic` PASS for haiku + sonnet. Real app flows still unverified. |
 | `TZ` | `America/New_York` | Likely the owner's home timezone (confirm; use for `NAVI_BUDGET_TIMEZONE`). |
 
-**Hosted Supabase project state (session 3):** migrations `20261030000001`, `20261031000001` applied; `20261101000001_api_privileges` **pending owner OK** (without it the API roles can't read/write tables). Invite hook on; Site URL + redirects set for `navi-sand.vercel.app`; Google provider off; invite list empty (insert blocked by the missing grants). Supabase MCP tools load in session 3.
+**Hosted Supabase project state (session 3):** all 3 migrations applied (versions match the files). Invite hook on; Site URL + redirects set for `navi-sand.vercel.app`; Google provider off; invite list = owner email only; 0 auth users. Supabase MCP tools load in session 3.
 
 **Connectors:** no Supabase/Vercel connector in the account; Composio has no Supabase/Vercel account. `.mcp.json` (Supabase MCP) loads only when `SUPABASE_ACCESS_TOKEN` is set at session start.
 
@@ -91,7 +92,7 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 | Secret protection / access control | verified (local) | No server secret in `.next/static`; only `.env.example` tracked; private APIs 401 signed out; nonce CSP; security headers. Tests can't reach a hosted project (`tests/local-guard.ts`, `scripts/local-only.sh`). |
 | CI (`.github/workflows/ci.yml`) | verified | Green on GitHub for `8acf091`, `6beb342`, `bfb32f8` (typecheck, lint, unit, integration on local Supabase, build, Playwright desktop+iPhone with the simulator). |
 | Pre-deploy check (`npm run check:deploy`) | verified (local) | Read-only; not yet run against the hosted project (needs URL + keys). |
-| Hosted Supabase | in progress | Schema (2 of 3 migrations), invite hook, URLs done; grants migration + owner invite + sign-up rejection check pending owner OK. |
+| Hosted Supabase | verified | All 3 migrations, invite hook, Site URL/redirects, owner invited; uninvited sign-up rejected; check:deploy hosted checks pass. |
 | Deployment (Vercel) | in progress | Framework fix + 14 env vars + 24 hourly crons; preview `1618f78` READY (behind Vercel login). Production still the old 404 build until this branch reaches `main` / is promoted. |
 | Scheduler | implemented (Vercel Cron fallback) | Hourly via 24 daily jobs; runs only on production. Trigger.dev blocked (needs `tr_pat_` + ref + prod key). |
 | Physical iPhone verification | blocked | Needs owner device (install, push, mic). |
