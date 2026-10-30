@@ -74,7 +74,7 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 | Email auth (magic link + password) | verified (password) | e2e signs in via password (auto sign-up for invited emails). Magic link implemented; email delivery not exercised. |
 | Google sign-in | blocked | Needs Google OAuth client + provider enabled in Supabase. Button hidden unless `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true`. |
 | Domain layer (entities, activity log + revert, approvals, proposals, memory, tasks, focus) | verified | flows.test: approval boundary (hard-deadline move + delete → approval, duplicate request reused, executes exactly once), Navi cannot mark work done; simultaneous accept/complete create one item. |
-| Conversational onboarding → reviewed setup → activation | verified (simulator) | flows.test + e2e (desktop & iPhone): questions → proposals for areas, goals, projects, fixed commitments, routines, tasks, preferences (stated vs inferred, source quote) → nothing active until approved → week plan. Voice onboarding e2e against a stand-in Live socket. **Real-model behaviour unverified (no Anthropic key).** |
+| Conversational onboarding → reviewed setup → activation | verified (simulator + **real Claude**, text) | flows.test + e2e (desktop & iPhone). Real run (session 3, Sonnet 5.5): 3 turns → 14 proposals with source quotes/stated-vs-inferred, 0 active rows before approval, activation 2.1 s → week plan. Turn latency 3–4 s, proposal turn ~20 s. Voice onboarding only against the stand-in. |
 | Text + voice share one history | verified | flows.test (onboarding), voice-live.spec (chat: voice turn appears in text history). |
 | Capture → review inbox → task | verified | flows.test (idempotent on client_id, raw words kept, nothing created until accept, edit-on-accept) + e2e. Dictated capture saves `source=voice`. |
 | Offline capture queue + sync | verified (browser) | e2e offline capture → "Waiting to sync" → syncs on reconnect. account.spec: shared browser keeps each person's queue private; cached offline pages cleared on sign-out. offline-actions.spec: buttons offline say they didn't go through, page survives. |
@@ -86,8 +86,8 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 | Briefings 06:00/21:00, weekly review, reminders, tick | verified (local) | Unit tests across US DST, +05:30, catch-up; one briefing per local day; reminders respect quiet hours/expiry; overlapping ticks send a push once; failed pushes retry ×2. **No scheduler deployed.** |
 | Web push | verified (local), device pending | push.test (real encryption to a local endpoint, VAPID, TTL, 410 cleanup, overlap, retry); pwa.spec (push → notification + deep link). Real push service + iPhone unverified. |
 | PWA manifest, service worker, icons | verified (Chromium), device pending | pwa.spec. Home-screen install on a real iPhone unverified. |
-| Real-time voice (Gemini Live) | client + server verified against stand-ins; **key now works; live session not yet tested — not delivered** | voice-live.spec (fake mic → 16 kHz PCM, transcripts, tool calls run by the real server, duplicate call ids run once, playback, barge-in, mute, goAway resume, connection loss turns mic off + Reconnect, turn saved to shared history, failed save kept as capture, voice onboarding). voice-server.test (locked single-use ephemeral token, shared history/memory/tools). `GEMINI_API_KEY` verified 2026-10-30 (model lookup). Next: `npm run smoke:ai gemini`, then a real device. |
-| AI runtime (roles, pricing, $2/day guard, tools, agent loop) | loop verified with mocked network; real calls pending | agent.test (request shape, tool execution + results, served-model usage, refusal, fallback only when nothing ran yet, partial-failure reporting, budget stop). Real Claude calls unverified (no `ANTHROPIC_API_KEY`). |
+| Real-time voice (Gemini Live) | **verified with a real Live session (local)**; device + barge-in pending | Session 3: flite speech via Chromium fake mic → real Live socket (v1beta, ephemeral token OK), audio + transcript reply in ~3–4 s, turn saved to shared history, real `create_task` tool call ran once. Not yet: real barge-in/reconnect, physical iPhone. Stand-in coverage: voice-live.spec + voice-server.test. |
+| AI runtime (roles, pricing, $2/day guard, tools, agent loop) | verified with real calls (local) | agent.test (mocked) + session 3 real run: usage recorded per call in ai_usage ($0.123 for the full run: Sonnet onboarding $0.057, Sonnet chat $0.051, Haiku $0.006, Gemini $0.009). |
 | Data export + account deletion | verified (browser) | account.spec. |
 | Secret protection / access control | verified (local) | No server secret in `.next/static`; only `.env.example` tracked; private APIs 401 signed out; nonce CSP; security headers. Tests can't reach a hosted project (`tests/local-guard.ts`, `scripts/local-only.sh`). |
 | CI (`.github/workflows/ci.yml`) | verified | Green on GitHub for `8acf091`, `6beb342`, `bfb32f8` (typecheck, lint, unit, integration on local Supabase, build, Playwright desktop+iPhone with the simulator). |
@@ -100,7 +100,7 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 
 ## Acceptance gates (spec §7) — where each stands
 1. Google + email sign-in in a configured environment — email verified locally; **Google blocked; hosted not configured**.
-2. Conversational onboarding (text or voice) → review → saved — verified with simulator and voice stand-in; **real models pending**.
+2. Conversational onboarding (text or voice) → review → saved — verified with simulator and **real Claude (text)**; voice onboarding only with stand-in.
 3. Capture → proposals → review, survives reload, syncs — verified.
 4. Real views with working controls and honest empty states — verified (browser, emulated iPhone).
 5. Fixed/flexible blocks, focus, recovery, nothing lost — verified.
@@ -108,11 +108,17 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 7. Saved 06:00/21:00 briefings, reminders, TZ/DST, quiet hours — verified locally; **no deployed scheduler**.
 8. Accountability grounded in real events — verified.
 9. Internal autonomy + external approval boundary, failure + duplicate protection — verified.
-10. Working real-time voice, interrupt, back to text with tools — verified against stand-in; **real Gemini Live + device pending (key works)**.
+10. Working real-time voice, interrupt, back to text with tools — **real Gemini Live round trip + tool call verified locally**; real barge-in and device pending.
 11. iPhone install, push, offline capture — offline verified; **install/push on a real iPhone pending**.
-12. Usage recorded, $2/day guard — verified (mocked providers); **real usage numbers pending**.
+12. Usage recorded, $2/day guard — verified; real usage recorded in session 3 ($0.12 for a full real-model run).
 13. Persistence, secrets, access control, automated checks, mobile usability, deployed preview — all verified locally + CI; **no deployed preview yet**.
 14. Resume from repo + checkpoint — this file + `docs/OPERATIONS.md`.
+
+## Real-model run (session 3, local app + local Supabase, real Claude + Gemini Live)
+- PASS: text onboarding; planner respects fixed items/availability, invents nothing; voice round trip + tool call; capture → inbox (after fix).
+- Fixed (commit `3d72b03`, tests added): incomplete proposals (event without `ends_at`) failed on Accept → now validated at propose time; `*_ref` to an existing id was dropped; vague `update_item` summaries made later turns misremember; literal `**bold**`.
+- Open (fix pass in progress): AI can only see today's plan ("tomorrow" answers miss blocks, chat + voice); Haiku answers state questions from history without tools (wrong inbox/duplicate claims); "task on Sunday" overstated (tasks have no do-date); non-fixed routine labelled fixed; display_name not captured; accepted question items vanish; 30-min call split 15+15.
+- Scripts/screenshots were in the session scratchpad (not in the repo).
 
 ## Test commands & latest results (2026-10-30, session 3 run with migration 20261101000001: same counts, all pass; below is the session 2 handoff run, all via `scripts/local-only.sh`)
 - `npx tsc --noEmit` → pass · `npm run lint` → pass.
