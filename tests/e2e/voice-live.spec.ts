@@ -54,7 +54,9 @@ async function standInLiveApi(page: Page, userId: string, kind: "chat" | "onboar
       }
     });
   });
-  return { seen, send, resumeHandles, conversation: () => conversationId };
+  // The service dropping the connection unexpectedly.
+  const drop = () => socket!.close({ code: 1011, reason: "Internal error" });
+  return { seen, send, drop, resumeHandles, conversation: () => conversationId };
 }
 
 test.use({
@@ -66,7 +68,19 @@ test("voice streams the mic, runs tools for real, plays replies and saves the tu
   await context.grantPermissions(["microphone"], { origin: baseURL! });
   const userId = await freshSetUpAccount(page, `voice-${info.project.name}@navi.test`);
 
-  const { seen, send, resumeHandles, conversation } = await standInLiveApi(page, userId, "chat");
+  const { seen, send, drop, resumeHandles, conversation } = await standInLiveApi(page, userId, "chat");
+  // Keep hold of every microphone track so the test can tell if it's really off.
+  await page.addInitScript(() => {
+    const w = window as unknown as { __mic: MediaStreamTrack[] };
+    w.__mic = [];
+    const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = async (c) => {
+      const stream = await original(c);
+      w.__mic.push(...stream.getAudioTracks());
+      return stream;
+    };
+  });
+  const micStates = () => page.evaluate(() => (window as unknown as { __mic: MediaStreamTrack[] }).__mic.map((t) => t.readyState));
 
   // WebSocket routes apply to pages loaded after they're registered.
   await page.goto("/chat");
@@ -78,6 +92,18 @@ test("voice streams the mic, runs tools for real, plays replies and saves the tu
   // The microphone is really streaming PCM.
   await expect.poll(() => seen.audioChunks, { timeout: 15_000 }).toBeGreaterThan(5);
   expect(seen.setup).toMatchObject({ model: "models/gemini-3.8-live" });
+
+  // Mute really stops sending microphone audio, and says so.
+  await voice.getByRole("button", { name: "Mute mic" }).click();
+  await expect(voice.getByRole("status").first()).toContainText("Muted");
+  await expect(voice.getByLabel("Microphone is on")).toHaveCount(0);
+  await page.waitForTimeout(300); // let chunks already in flight arrive
+  const atMute = seen.audioChunks;
+  await page.waitForTimeout(1000);
+  expect(seen.audioChunks).toBe(atMute);
+  await voice.getByRole("button", { name: "Unmute mic" }).click();
+  await expect(voice.getByLabel("Microphone is on")).toBeVisible();
+  await expect.poll(() => seen.audioChunks, { timeout: 10_000 }).toBeGreaterThan(atMute);
 
   // The user speaks; the model asks for a tool; the real server runs it.
   send({ serverContent: { inputTranscription: { text: "Add a task to call the dentist." } } });
@@ -138,6 +164,20 @@ test("voice streams the mic, runs tools for real, plays replies and saves the tu
   expect(resumeHandles).toEqual([null, "resume-handle-1"]);
   seen.closed = false;
   await expect(status).toContainText("Listening");
+
+  // The connection drops unexpectedly: the microphone turns off and Navi says so.
+  drop();
+  await expect(status).toContainText("Connection lost");
+  await expect(voice.getByText(/microphone is off; tap Reconnect/)).toBeVisible();
+  await expect(voice.getByLabel("Microphone is on")).toHaveCount(0);
+  await expect.poll(micStates).not.toContain("live");
+  // Reconnect picks up where it left off, with the microphone back on.
+  await voice.getByRole("button", { name: "Reconnect" }).click();
+  await expect.poll(() => seen.sockets, { timeout: 15_000 }).toBe(3);
+  await expect(status).toContainText("Listening");
+  await expect(voice.getByLabel("Microphone is on")).toBeVisible();
+  expect(await micStates()).toContain("live");
+  seen.closed = false;
 
   // Back to text: ending voice hangs up, and the voice turn is in the chat history.
   await voice.getByRole("button", { name: "End voice" }).click();

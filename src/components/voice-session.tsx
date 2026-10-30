@@ -167,17 +167,21 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
     out.next = out.ctx.currentTime;
   }, []);
 
-  const stopAll = useCallback(() => {
-    sessionRef.current?.close();
-    sessionRef.current = null;
+  const releaseMic = useCallback(() => {
     micRef.current?.node.disconnect();
     micRef.current?.stream.getTracks().forEach((t) => t.stop());
     void micRef.current?.ctx.close();
     micRef.current = null;
+  }, []);
+
+  const stopAll = useCallback(() => {
+    sessionRef.current?.close();
+    sessionRef.current = null;
+    releaseMic();
     flushPlayback();
     void outRef.current?.ctx.close();
     outRef.current = null;
-  }, [flushPlayback]);
+  }, [flushPlayback, releaseMic]);
 
   const saveTurn = useCallback(async (interrupted = false) => {
     const t = turnRef.current;
@@ -282,6 +286,7 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
       outRef.current = { ctx, next: ctx.currentTime, sources: new Set() };
     }
 
+    let mine: unknown = null;
     try {
       const { GoogleGenAI } = await import("@google/genai");
       const ai = new GoogleGenAI({ apiKey: body.token });
@@ -343,20 +348,24 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
           },
           onerror: () => setError("Voice connection error."),
           onclose: () => {
+            // Closed on purpose (ended, or replaced when resuming): nothing to do.
+            if (!mine || sessionRef.current !== mine) return;
+            // Lost unexpectedly: don't leave the microphone open while not connected.
             sessionRef.current = null;
-            if (!endedByUser.current) {
-              setStatus("reconnect");
-              void saveTurn();
-            }
+            releaseMic();
+            setStatus("reconnect");
+            setError("Voice connection lost. The microphone is off; tap Reconnect to continue.");
+            void saveTurn();
           },
         },
       });
+      mine = session;
       sessionRef.current = session as unknown as typeof sessionRef.current;
     } catch (err) {
       setStatus("error");
       setError(`Couldn't connect to the voice service: ${err instanceof Error ? err.message : String(err)}`);
     }
-  }, [kind, onUnavailable, runTool, saveTurn, flushPlayback, setError, setLines, setStatus]);
+  }, [kind, onUnavailable, runTool, saveTurn, flushPlayback, releaseMic, setError, setLines, setStatus]);
 
   useEffect(() => {
     connectRef.current = connect;
@@ -382,7 +391,7 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
     <div className="flex flex-wrap gap-2">
       <button type="button" className="btn" aria-pressed={muted} onClick={() => setMuted(!muted)}>{muted ? "Unmute mic" : "Mute mic"}</button>
       <button type="button" className="btn" onClick={() => { flushPlayback(); }}>Stop Navi talking</button>
-      <button type="button" className="btn" onClick={() => { endedByUser.current = false; sessionRef.current?.close(); void connect(); }}>Reconnect</button>
+      <button type="button" className="btn" onClick={() => { endedByUser.current = false; const old = sessionRef.current; sessionRef.current = null; old?.close(); void connect(); }}>Reconnect</button>
       <button
         type="button"
         className="btn btn-danger"
