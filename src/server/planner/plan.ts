@@ -73,27 +73,21 @@ export async function generateDayPlan(ctx: Ctx, date?: string, opts: { from?: Da
     estimateRatio: estimate.ratio,
   });
 
-  if (replaceable.length) {
-    await ctx.db.from("plan_blocks").delete().eq("user_id", ctx.userId).in("id", replaceable.map((b) => b.id));
-  }
-  if (out.blocks.length) {
-    const { error } = await ctx.db.from("plan_blocks").insert(
-      out.blocks.map((b) => ({
-        user_id: ctx.userId,
-        task_id: b.task_id,
-        routine_id: b.routine_id,
-        title: b.title,
-        plan_date: day,
-        starts_at: b.starts_at,
-        ends_at: b.ends_at,
-        is_flexible: true,
-        status: "planned",
-        created_by: "navi",
-        reason: opts.reasonPrefix ? `${opts.reasonPrefix}: ${b.reason}` : b.reason,
-      })),
-    );
-    if (error) throw new Error(`Could not save plan: ${error.message}`);
-  }
+  // One locked step in the database: replaces Navi's planned flexible blocks
+  // for the day, so simultaneous planning runs can't both add a plan.
+  const { error } = await ctx.db.rpc("replace_day_plan", {
+    p_user: ctx.userId,
+    p_day: day,
+    p_blocks: out.blocks.map((b) => ({
+      task_id: b.task_id,
+      routine_id: b.routine_id,
+      title: b.title,
+      starts_at: b.starts_at,
+      ends_at: b.ends_at,
+      reason: opts.reasonPrefix ? `${opts.reasonPrefix}: ${b.reason}` : b.reason,
+    })),
+  });
+  if (error) throw new Error(`Could not save plan: ${error.message}`);
 
   const before = new Map(replaceable.map((b) => [b.task_id ?? b.routine_id ?? b.title, b.starts_at]));
   const moved = out.blocks.filter((b) => {

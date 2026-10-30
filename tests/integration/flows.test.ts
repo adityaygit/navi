@@ -286,6 +286,24 @@ describe("simultaneous repeats", () => {
     expect(count).toBe(1);
   });
 
+  it("planning the same day twice at once doesn't double-book it", async () => {
+    const ctx = ctxFor(db, userId, zone);
+    const day = DateTime.now().setZone(zone).plus({ days: 3 }).toISODate()!;
+    await db.from("plan_blocks").delete().eq("plan_date", day);
+    await db.from("tasks").delete().eq("title", "Draft cover letter");
+    await db.from("profiles").update({ availability: [{ days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "23:59" }] }).eq("id", userId);
+    const t = await createTask(ctx, { title: "Draft cover letter", estimate_minutes: 45 });
+    await Promise.all([generateDayPlan(ctx, day), generateDayPlan(ctx, day)]);
+    const { data } = await db.from("plan_blocks").select("starts_at,ends_at").eq("plan_date", day).eq("task_id", t.id);
+    const minutes = (data ?? []).reduce((m, b) => m + (Date.parse(b.ends_at) - Date.parse(b.starts_at)) / 60000, 0);
+    expect(minutes).toBeGreaterThan(0);
+    expect(minutes).toBeLessThanOrEqual(45 * 2); // one booking, even with the learned estimate ratio (max ×2)
+    const { data: once } = await db.from("plan_blocks").select("id").eq("plan_date", day);
+    await generateDayPlan(ctx, day);
+    const { data: again } = await db.from("plan_blocks").select("id").eq("plan_date", day);
+    expect(again!.length).toBe(once!.length);
+  });
+
   it("finishing a recurring task twice at once creates one next occurrence", async () => {
     const ctx = ctxFor(db, userId, zone);
     await db.from("tasks").delete().eq("title", "Feed the cat");

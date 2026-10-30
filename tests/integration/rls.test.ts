@@ -46,6 +46,20 @@ describe("row level security", () => {
     expect(error).not.toBeNull();
   });
 
+  it("doesn't let the day-plan function touch someone else's plan", async () => {
+    const day = "2030-01-02";
+    const { error: seedErr } = await alice.db.from("plan_blocks").insert({ title: "Alice's block", plan_date: day, starts_at: `${day}T10:00:00Z`, ends_at: `${day}T11:00:00Z` });
+    expect(seedErr).toBeNull();
+    const block = { title: "Bob was here", starts_at: `${day}T12:00:00Z`, ends_at: `${day}T13:00:00Z` };
+    const { error } = await bob.db.rpc("replace_day_plan", { p_user: alice.userId, p_day: day, p_blocks: [block] });
+    expect(error).not.toBeNull();
+    const { data } = await admin().from("plan_blocks").select("title").eq("user_id", alice.userId).eq("plan_date", day);
+    expect(data).toEqual([{ title: "Alice's block" }]);
+    const anon = createClient(URL_, ANON, { auth: { persistSession: false } });
+    expect((await anon.rpc("replace_day_plan", { p_user: alice.userId, p_day: day, p_blocks: [] })).error).not.toBeNull();
+    expect((await admin().from("plan_blocks").select("id").eq("user_id", alice.userId).eq("plan_date", day)).data).toHaveLength(1);
+  });
+
   it("gives anonymous clients nothing", async () => {
     const anon = createClient(URL_, ANON, { auth: { persistSession: false } });
     const { data } = await anon.from("tasks").select("*");
