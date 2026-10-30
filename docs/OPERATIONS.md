@@ -103,6 +103,25 @@ Import the repo and set the environment variables from `.env.example`:
 
 Leave `NAVI_ALLOW_DEVSIM` unset in production.
 
+### Pre-deploy check
+
+With the production values in the environment (or `.env.local`), run:
+
+```bash
+npm run check:deploy -- https://<app>
+```
+
+It is read-only and never prints secret values. It checks that required
+settings are present, the AI provider is real and the simulator is off, the
+site is https, the scheduler secret is long enough, the VAPID keys belong
+together, every table from the migrations exists, the invite list is non-empty
+and free of `@navi.test` accounts, and that the admin email is invited. With
+`SUPABASE_ACCESS_TOKEN` set, it also reads the project's auth settings: the
+invite hook, Site URL and redirect URLs. Given the app URL, it checks the live
+app: security headers, manifest, service worker, and that the scheduler and
+private APIs refuse unauthenticated calls. Then run `npm run smoke:ai` for the
+real model calls.
+
 ### 4. Scheduler (Trigger.dev)
 
 Briefings (06:00 and 21:00 local), the weekly review, deadline reminders and

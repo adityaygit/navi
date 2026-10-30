@@ -35,6 +35,7 @@
 | Secret protection / access control | verified (local) | No server secret in `.next/static` (checked service key, VAPID private key, cron secret); only `.env.example` tracked; every private API route returns 401 signed out; pages redirect to /login; X-Frame-Options DENY, nosniff, referrer policy, permissions policy (mic self only). Nonce-based CSP from `src/proxy.ts` (scripts self+nonce, connect only to app/Supabase/Gemini Live, no framing); a11y.spec asserts zero CSP violations on every page and that the voice worklet loads. |
 | Phone layout (no sideways scrolling) | verified (emulated) | a11y.spec checks every main page on desktop and iPhone 13 with long titles and a pasted URL; screenshots reviewed 2026-10-30. |
 | Build / typecheck / lint | verified | `npx tsc --noEmit`, `npm run lint`, `npm run build` clean (2026-10-30). |
+| Pre-deploy check (`npm run check:deploy`) | verified (local) | Read-only. Run against local env (flags devsim, http site, short CRON_SECRET, seeded @navi.test invites) and a production-shaped env (passes; mismatched VAPID pair caught). Live-app checks pass against local prod build. Management API fields (`hook_before_user_created_enabled/_uri`, `site_url`, `uri_allow_list`) confirmed in api.supabase.com/api/v1-json 2026-10-30; not yet run against a hosted project. |
 | Deployment (Vercel) / Trigger.dev | blocked | No Vercel/Trigger.dev credentials in the cloud env. Steps in `docs/OPERATIONS.md`. |
 | Physical iPhone verification | blocked | Needs owner device (install, push, mic). Emulated iPhone 13 viewport passes e2e. |
 | Calendar/Gmail/Drive/GitHub integrations | not started (out of V1 core) | Shown as "not connected"; external approvals fail honestly ("isn't connected"). |
@@ -93,4 +94,4 @@ Network check 2026-10-30: api.anthropic.com, generativelanguage.googleapis.com, 
 
 ## Exact next action
 1. Phone-width review done (a11y.spec now fails on sideways scrolling, saves `test-results/phone/*.png`). Next: make deployment a single scripted step once hosted credentials arrive (migrations push, VAPID/CRON secret generation, Trigger.dev deploy), verified as far as possible without credentials.
-2. When keys arrive: run `npm run smoke:ai` (written, fails cleanly without keys; budget-checked, records usage), then run the app with `NAVI_AI_PROVIDER=anthropic` and repeat the core e2e flows manually with the real model; record results here.
+2. When hosted credentials arrive: `npm run check:deploy -- https://<app>` until clean. When AI keys arrive: run `npm run smoke:ai` (written, fails cleanly without keys; budget-checked, records usage), then run the app with `NAVI_AI_PROVIDER=anthropic` and repeat the core e2e flows manually with the real model; record results here.
