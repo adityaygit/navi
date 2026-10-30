@@ -20,6 +20,8 @@ const add = (status, name, detail = "") => results.push({ status, name, detail }
 const pass = (n, d) => add("PASS", n, d);
 const fail = (n, d) => add("FAIL", n, d);
 const warn = (n, d) => add("WARN", n, d);
+/** PASS with `good` when ok, else report `bad` as a failure (or warning). */
+const check = (ok, name, good, bad, onBad = fail) => (ok ? pass(name, good) : onBad(name, bad));
 
 const b64url = (s) => Buffer.from(String(s).replace(/-/g, "+").replace(/_/g, "/"), "base64");
 
@@ -37,32 +39,32 @@ function checkEnv() {
     "NAVI_ADMIN_EMAILS",
   ];
   const missing = required.filter((k) => !env[k]);
-  missing.length ? fail("required settings", `missing: ${missing.join(", ")}`) : pass("required settings", `${required.length} present`);
-  env.GEMINI_API_KEY ? pass("real-time voice key", "GEMINI_API_KEY present") : warn("real-time voice key", "GEMINI_API_KEY missing: voice falls back to basic browser speech");
+  check(!missing.length, "required settings", `${required.length} present`, `missing: ${missing.join(", ")}`);
+  check(env.GEMINI_API_KEY, "real-time voice key", "GEMINI_API_KEY present", "GEMINI_API_KEY missing: voice falls back to basic browser speech", warn);
 
-  env.NAVI_AI_PROVIDER === "anthropic" ? pass("AI provider", "anthropic") : fail("AI provider", `NAVI_AI_PROVIDER is "${env.NAVI_AI_PROVIDER ?? ""}", must be "anthropic" in production`);
-  env.NAVI_ALLOW_DEVSIM === "true" ? fail("simulator", "NAVI_ALLOW_DEVSIM=true must not be set in production") : pass("simulator", "not allowed");
+  check(env.NAVI_AI_PROVIDER === "anthropic", "AI provider", "anthropic", `NAVI_AI_PROVIDER is "${env.NAVI_AI_PROVIDER ?? ""}", must be "anthropic" in production`);
+  check(env.NAVI_ALLOW_DEVSIM !== "true", "simulator", "not allowed", "NAVI_ALLOW_DEVSIM=true must not be set in production");
 
   const site = env.NEXT_PUBLIC_SITE_URL ?? "";
-  if (site) /^https:\/\//.test(site) ? pass("site URL", "https") : fail("site URL", "NEXT_PUBLIC_SITE_URL must be https (push and iPhone install need it)");
+  if (site) check(/^https:\/\//.test(site), "site URL", "https", "NEXT_PUBLIC_SITE_URL must be https (push and iPhone install need it)");
   const supa = env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  if (supa) /^https:\/\/[a-z0-9]+\.supabase\.co$/.test(supa) ? pass("Supabase URL", "hosted project") : warn("Supabase URL", "not a hosted *.supabase.co URL (local stack?)");
+  if (supa) check(/^https:\/\/[a-z0-9]+\.supabase\.co$/.test(supa), "Supabase URL", "hosted project", "not a hosted *.supabase.co URL (local stack?)", warn);
 
-  if (env.CRON_SECRET) env.CRON_SECRET.length >= 32 ? pass("scheduler secret", `${env.CRON_SECRET.length} characters`) : fail("scheduler secret", "CRON_SECRET should be at least 32 random characters");
+  if (env.CRON_SECRET) check(env.CRON_SECRET.length >= 32, "scheduler secret", `${env.CRON_SECRET.length} characters`, "CRON_SECRET should be at least 32 random characters");
 
   if (env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY) {
     try {
       const ecdh = createECDH("prime256v1");
       ecdh.setPrivateKey(b64url(env.VAPID_PRIVATE_KEY));
-      ecdh.getPublicKey().equals(b64url(env.NEXT_PUBLIC_VAPID_PUBLIC_KEY)) ? pass("push keys", "VAPID public and private keys match") : fail("push keys", "VAPID public key doesn't belong to the private key");
+      check(ecdh.getPublicKey().equals(b64url(env.NEXT_PUBLIC_VAPID_PUBLIC_KEY)), "push keys", "VAPID public and private keys match", "VAPID public key doesn't belong to the private key");
     } catch {
       fail("push keys", "VAPID private key isn't a valid P-256 key");
     }
   }
-  if (env.VAPID_SUBJECT) /^(mailto:|https:\/\/)/.test(env.VAPID_SUBJECT) ? pass("push contact", "VAPID_SUBJECT ok") : fail("push contact", "VAPID_SUBJECT must start with mailto: or https://");
+  if (env.VAPID_SUBJECT) check(/^(mailto:|https:\/\/)/.test(env.VAPID_SUBJECT), "push contact", "VAPID_SUBJECT ok", "VAPID_SUBJECT must start with mailto: or https://");
 
   const cap = Number(env.NAVI_DAILY_BUDGET_USD ?? 2);
-  cap > 0 && cap <= 2 ? pass("daily AI budget", `$${cap}`) : warn("daily AI budget", `$${cap} (testing guard is $2/day)`);
+  check(cap > 0 && cap <= 2, "daily AI budget", `$${cap}`, `$${cap} (testing guard is $2/day)`, warn);
 }
 
 function migrationTables() {
@@ -80,15 +82,15 @@ async function checkDatabase() {
     const { error } = await db.from(t).select("*", { head: true, count: "exact" }).limit(1);
     if (error) missing.push(t);
   }
-  missing.length ? fail("database schema", `not reachable or missing: ${missing.join(", ")} (run supabase db push)`) : pass("database schema", "all tables from migrations present");
+  check(!missing.length, "database schema", "all tables from migrations present", `not reachable or missing: ${missing.join(", ")} (run supabase db push)`);
 
   const { data: invited, error } = await db.from("allowed_emails").select("email");
   if (error) return;
   const list = new Set((invited ?? []).map((r) => r.email.toLowerCase()));
-  list.size ? pass("invite list", `${list.size} email(s)`) : fail("invite list", "nobody is invited yet (npm run allow-email add you@example.com)");
+  check(list.size, "invite list", `${list.size} email(s)`, "nobody is invited yet (npm run allow-email add you@example.com)");
   const admins = (env.NAVI_ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
   const notInvited = admins.filter((a) => !list.has(a));
-  if (admins.length) notInvited.length ? warn("admin invited", `${notInvited.length} admin email(s) not on the invite list`) : pass("admin invited", "admin email(s) on the invite list");
+  if (admins.length) check(!notInvited.length, "admin invited", "admin email(s) on the invite list", `${notInvited.length} admin email(s) not on the invite list`, warn);
   const seeded = [...list].filter((e) => e.endsWith("@navi.test"));
   if (seeded.length) fail("test accounts", `${seeded.length} @navi.test email(s) on the invite list; don't seed production`);
 }
@@ -107,9 +109,9 @@ async function checkAuthConfig() {
   else fail("invite hook", "Before User Created hook is off or not pointing at navi_before_user_created: anyone could sign up");
   const site = env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
   if (site) {
-    auth.site_url?.replace(/\/$/, "") === site ? pass("auth site URL", "matches NEXT_PUBLIC_SITE_URL") : fail("auth site URL", "Supabase Site URL doesn't match NEXT_PUBLIC_SITE_URL");
+    check(auth.site_url?.replace(/\/$/, "") === site, "auth site URL", "matches NEXT_PUBLIC_SITE_URL", "Supabase Site URL doesn't match NEXT_PUBLIC_SITE_URL");
     const allow = String(auth.uri_allow_list ?? "");
-    allow.includes(`${site}/auth/callback`) ? pass("auth redirects", "callback allowed") : fail("auth redirects", `add ${site}/auth/callback and ${site}/auth/confirm to redirect URLs`);
+    check(allow.includes(`${site}/auth/callback`), "auth redirects", "callback allowed", `add ${site}/auth/callback and ${site}/auth/confirm to redirect URLs`);
   }
 }
 
@@ -118,16 +120,16 @@ async function checkLiveApp() {
   try {
     const login = await fetch(`${appUrl}/login`, { redirect: "manual" });
     const csp = login.headers.get("content-security-policy") ?? "";
-    login.ok ? pass("app reachable", `${login.status}`) : fail("app reachable", `/login answered ${login.status}`);
-    /frame-ancestors 'none'/.test(csp) && /script-src[^;]*'nonce-/.test(csp) ? pass("security headers", "nonce CSP + framing blocked") : fail("security headers", "CSP missing or without nonce");
+    check(login.ok, "app reachable", `${login.status}`, `/login answered ${login.status}`);
+    check(/frame-ancestors 'none'/.test(csp) && /script-src[^;]*'nonce-/.test(csp), "security headers", "nonce CSP + framing blocked", "CSP missing or without nonce");
     const manifest = await fetch(`${appUrl}/manifest.webmanifest`);
-    manifest.ok ? pass("installable", "manifest served") : fail("installable", `manifest ${manifest.status}`);
+    check(manifest.ok, "installable", "manifest served", `manifest ${manifest.status}`);
     const sw = await fetch(`${appUrl}/sw.js`);
-    sw.ok ? pass("service worker", "served") : fail("service worker", `${sw.status}`);
+    check(sw.ok, "service worker", "served", `${sw.status}`);
     const tick = await fetch(`${appUrl}/api/cron/tick`, { method: "POST" });
-    tick.status === 401 ? pass("scheduler locked", "tick refuses calls without the secret") : fail("scheduler locked", `tick without secret answered ${tick.status}`);
+    check(tick.status === 401, "scheduler locked", "tick refuses calls without the secret", `tick without secret answered ${tick.status}`);
     const exp = await fetch(`${appUrl}/api/export`);
-    exp.status === 401 ? pass("private APIs", "export refuses signed-out calls") : fail("private APIs", `export answered ${exp.status} signed out`);
+    check(exp.status === 401, "private APIs", "export refuses signed-out calls", `export answered ${exp.status} signed out`);
   } catch (e) {
     fail("app reachable", e.message);
   }
