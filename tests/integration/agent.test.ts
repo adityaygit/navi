@@ -141,6 +141,29 @@ describe("Claude tool loop", () => {
     expect(r).toMatchObject({ text: "Planned with the backup model.", model: "claude-haiku-5-5" });
   });
 
+  it("doesn't start over on the backup model after a step already changed something, and says what was done", async () => {
+    const proposeOne = (id: string, title: string) =>
+      reply({ stop_reason: "tool_use", content: [{ type: "tool_use", id, name: "propose_items", input: { items: [{ kind: "task", payload: { title }, source_excerpt: title.toLowerCase(), origin: "stated", confidence: 0.9 }] } }] as Anthropic.Beta.BetaContentBlock[] });
+    create
+      .mockResolvedValueOnce(proposeOne("toolu_p1", "Pack for the trip"))
+      .mockRejectedValueOnce(new RealAnthropic.InternalServerError(500, { type: "error", error: { type: "api_error", message: "boom" } }, "boom", new Headers()));
+    const r = await runAgent(request("planner", "I need to pack for the trip"));
+    expect(create).toHaveBeenCalledTimes(2); // no re-run on the backup model
+    expect(r).toMatchObject({ error: "provider", mutated: true, text: expect.stringMatching(/got partway.*Added 1 item to the review inbox/) });
+    const { count } = await db.from("proposals").select("id", { count: "exact", head: true }).eq("source_excerpt", "pack for the trip");
+    expect(count).toBe(1);
+
+    // A refusal after a step that changed something doesn't claim nothing changed.
+    create.mockReset();
+    create
+      .mockResolvedValueOnce(proposeOne("toolu_p2", "Buy sunscreen"))
+      .mockResolvedValueOnce(reply({ stop_reason: "refusal", content: [] }));
+    const refused = await runAgent(request("fast", "buy sunscreen"));
+    expect(refused.text).not.toMatch(/Nothing was changed/);
+    expect(refused.text).toMatch(/Already done before I stopped/);
+    expect(refused.mutated).toBe(true);
+  });
+
   it("explains provider errors without losing anything", async () => {
     create.mockRejectedValueOnce(new RealAnthropic.AuthenticationError(401, { type: "error", error: { type: "authentication_error", message: "bad key" } }, "bad key", new Headers()));
     const r = await runAgent(request("fast", "hello"));
