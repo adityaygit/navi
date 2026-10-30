@@ -44,7 +44,8 @@ function TaskRow({ task, zone, children_, projectName, opts, depth = 0 }: { task
         ) : (
           <ActionButton className="btn btn-ghost btn-sm" label={`Reopen ${task.title}`} action={() => updateTaskAction(task.id, { status: "todo" })}>Reopen</ActionButton>
         )}
-        <div className="min-w-0 flex-1">
+        {/* basis-48 keeps the title readable: on phones the buttons wrap below it. */}
+        <div className="min-w-0 flex-1 basis-48">
           <div className={`flex flex-wrap items-center gap-1.5 ${done ? "muted line-through" : ""}`}>
             <span>{task.title}</span>
             {task.priority <= 2 && <span className={`badge ${task.priority === 1 ? "badge-danger" : "badge-warn"}`}>P{task.priority}</span>}
@@ -62,7 +63,7 @@ function TaskRow({ task, zone, children_, projectName, opts, depth = 0 }: { task
             {task.blocker && <span className="text-xs text-warn">Blocked: {task.blocker}</span>}
           </div>
         </div>
-        <div className="flex flex-wrap gap-1">
+        <div className="ml-10 flex flex-wrap gap-1 sm:ml-0">
           {!done && <ActionButton action={() => startFocusAction({ task_id: task.id, planned_minutes: task.estimate_minutes })}>Focus</ActionButton>}
           {!done && depth === 0 && <button type="button" className="btn btn-sm" onClick={() => setAddingSub((v) => !v)}>+ Sub</button>}
           <button type="button" className="btn btn-sm" onClick={() => setEditing((v) => !v)} aria-expanded={editing}>{editing ? "Close" : "Edit"}</button>

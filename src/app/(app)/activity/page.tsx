@@ -51,7 +51,7 @@ export default async function ActivityPage() {
             {decided.map((a) => (
               <li key={a.id} className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2 text-sm last:border-0">
                 <span className={`badge ${STATUS_BADGE[a.status]}`}>{a.status}</span>
-                <span className="min-w-0 flex-1">{a.summary}</span>
+                <span className="min-w-0 flex-1 basis-48">{a.summary}</span>
                 {a.error && <span className="w-full text-xs text-danger">{a.error}</span>}
                 <span className="muted text-xs">{fmt(a.decided_at ?? a.created_at)}</span>
               </li>
@@ -67,7 +67,7 @@ export default async function ActivityPage() {
             {activity.map((e) => (
               <li key={e.id} className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2 text-sm last:border-0">
                 <span className={`badge ${e.actor === "navi" ? "badge-accent" : ""}`}>{e.actor === "navi" ? "Navi" : e.actor === "system" ? "Scheduler" : "You"}</span>
-                <span className={`min-w-0 flex-1 ${e.reverted_at ? "muted line-through" : ""}`}>{e.summary}</span>
+                <span className={`min-w-0 flex-1 basis-48 ${e.reverted_at ? "muted line-through" : ""}`}>{e.summary}</span>
                 <span className="muted text-xs">{fmt(e.created_at)}</span>
                 {e.reversible && !e.reverted_at && (
                   <ActionButton className="btn btn-ghost btn-sm" confirm={`Undo: ${e.summary}?`} action={revertActivityAction} args={[e.id]}>Undo</ActionButton>

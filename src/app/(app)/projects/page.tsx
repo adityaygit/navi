@@ -53,11 +53,13 @@ export default async function ProjectsPage() {
           <ul className="flex flex-wrap gap-2">
             {activeWs.map((w) => {
               const p = progress(tasks.filter((t) => t.workspace_id === w.id));
+              const activeProjects = projects.filter((x) => x.workspace_id === w.id && x.status === "active").length;
+              const open = p.total - p.done;
               return (
-                <li key={w.id} className="card flex min-w-48 flex-col gap-1 py-3">
+                <li key={w.id} className="card flex min-w-48 flex-1 flex-col gap-1 py-3 sm:flex-none">
                   <Link href={`/tasks?workspace=${w.id}`} className="font-medium hover:underline">{w.name}</Link>
                   {w.description && <span className="muted text-xs">{w.description}</span>}
-                  <span className="muted text-xs">{projects.filter((x) => x.workspace_id === w.id && x.status === "active").length} active projects · {p.total - p.done} open tasks</span>
+                  <span className="muted text-xs">{activeProjects} active project{activeProjects === 1 ? "" : "s"} · {open} open task{open === 1 ? "" : "s"}</span>
                   <ActionButton className="btn btn-ghost btn-sm self-start" confirm={`Archive “${w.name}”? Its items stay but the area is hidden.`} action={updateItemAction} args={["workspaces", w.id, { status: "archived" }]}>Archive</ActionButton>
                 </li>
               );

@@ -70,10 +70,10 @@ export function ScheduleSettings({ profile }: { profile: Profile }) {
               ))}
             </div>
             <label className="sr-only" htmlFor={`w-s-${i}`}>From</label>
-            <input id={`w-s-${i}`} type="time" className="input w-32" value={w.start} onChange={(e) => updateWindow(i, { start: e.target.value })} />
+            <input id={`w-s-${i}`} type="time" className="input w-36" value={w.start} onChange={(e) => updateWindow(i, { start: e.target.value })} />
             <span aria-hidden>–</span>
             <label className="sr-only" htmlFor={`w-e-${i}`}>To</label>
-            <input id={`w-e-${i}`} type="time" className="input w-32" value={w.end} onChange={(e) => updateWindow(i, { end: e.target.value })} />
+            <input id={`w-e-${i}`} type="time" className="input w-36" value={w.end} onChange={(e) => updateWindow(i, { end: e.target.value })} />
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => setWindows((ws) => ws.filter((_, j) => j !== i))}>Remove</button>
           </div>
         ))}
