@@ -38,15 +38,15 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           <Link className={`btn btn-sm ${show === "done" ? "btn-primary" : ""}`} href={link({ show: "done" })}>Done</Link>
         </div>
       </header>
-      <form className="flex flex-wrap gap-2" action="/tasks">
+      <form className="grid grid-cols-[1fr_1fr_auto] gap-2 sm:flex sm:flex-wrap" action="/tasks">
         <input type="hidden" name="show" value={show} />
         <label className="sr-only" htmlFor="f-ws">Area</label>
-        <select id="f-ws" name="workspace" defaultValue={sp.workspace ?? ""} className="input w-auto min-w-36">
+        <select id="f-ws" name="workspace" defaultValue={sp.workspace ?? ""} className="input min-w-0 sm:w-auto sm:min-w-36">
           <option value="">All areas</option>
           {workspaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
         <label className="sr-only" htmlFor="f-pr">Project</label>
-        <select id="f-pr" name="project" defaultValue={sp.project ?? ""} className="input w-auto min-w-36">
+        <select id="f-pr" name="project" defaultValue={sp.project ?? ""} className="input min-w-0 sm:w-auto sm:min-w-36">
           <option value="">All projects</option>
           {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>

@@ -4,13 +4,27 @@ import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
 
 // Automated WCAG 2.1 A/AA checks (axe) on every main page, with real data on
-// screen. Automated checks catch a subset of issues; they don't replace a
-// manual screen-reader pass.
+// screen, plus a check that no page scrolls sideways (on the iPhone profile
+// that's the phone layout). Automated checks catch a subset of issues; they
+// don't replace a manual screen-reader pass.
 
 config({ path: ".env.local", quiet: true });
 const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
 
 const PAGES = ["/", "/chat", "/inbox", "/planner", "/tasks", "/projects", "/insights", "/memory", "/activity", "/settings", "/more"];
+
+/** Elements sticking out past the right edge of the screen (sideways scrolling). */
+async function overflow(page: Page, label: string) {
+  const wide = await page.evaluate(() => {
+    const width = document.documentElement.clientWidth;
+    if (document.documentElement.scrollWidth <= width) return [];
+    return [...document.querySelectorAll("body *")]
+      .filter((el) => el.getBoundingClientRect().right > width + 1 && el.children.length === 0)
+      .slice(0, 5)
+      .map((el) => `<${el.tagName.toLowerCase()} class="${el.className}"> ${(el.textContent ?? "").slice(0, 40)}`);
+  });
+  return wide.map((w) => `${label}: wider than the screen: ${w}`);
+}
 
 async function audit(page: Page, label: string) {
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
@@ -54,10 +68,14 @@ test("main pages have no automatically detectable WCAG A/AA violations", async (
   for (const row of [
     { title: "Read chapter 4", workspace_id: ws!.id, due_at: new Date(Date.now() + 86_400_000).toISOString(), estimate_minutes: 30 },
     { title: "Email coach", priority: 1 },
+    { title: "Prepare the quarterly reimbursement spreadsheet for the department review meeting", workspace_id: ws!.id, estimate_minutes: 90 },
+    { title: "Read https://example.com/articles/a-very-long-link-that-someone-pasted-straight-into-a-task-title", priority: 3 },
   ]) {
     const { error } = await admin.from("tasks").insert({ user_id: userId, ...row });
     expect(error).toBeNull();
   }
+  const { data: goal } = await admin.from("goals").insert({ user_id: userId, title: "Finish the semester with a 3.5 GPA or better", workspace_id: ws!.id }).select("id").single();
+  await admin.from("projects").insert({ user_id: userId, name: "Science fair volcano with working eruption", workspace_id: ws!.id, goal_id: goal!.id });
   await admin.from("memories").insert({ user_id: userId, kind: "behavioral", content: "Tends to underestimate essays", origin: "inferred", confidence: 0.6 });
   await admin.from("proposals").insert({ user_id: userId, kind: "task", payload: { title: "Buy cleats" }, source_excerpt: "buy cleats", origin: "inferred", confidence: 0.5 });
   await admin.from("approvals").insert({ user_id: userId, action_type: "external.gmail.send", summary: "Email coach about Saturday", details: { to: "coach@example.com" }, idempotency_key: `a11y-${Date.now()}:1` });
@@ -68,7 +86,8 @@ test("main pages have no automatically detectable WCAG A/AA violations", async (
   for (const path of PAGES) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
-    problems.push(...(await audit(page, path)), ...(await cspViolations(path)));
+    problems.push(...(await audit(page, path)), ...(await cspViolations(path)), ...(await overflow(page, path)));
+    if (info.project.name === "iphone") await page.screenshot({ path: `test-results/phone${path === "/" ? "/today" : path}.png`, fullPage: true });
   }
   // The voice audio worklet must load under the CSP.
   const worklet = await page.evaluate(async () => {
