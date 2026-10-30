@@ -151,7 +151,7 @@ export function ProposalCard({
                   </div>
                 </>
               )}
-              {(proposal.kind === "routine" || (proposal.kind === "event" && payload.recurrence)) && (
+              {(proposal.kind === "routine" || (proposal.kind === "event" && Boolean(payload.recurrence))) && (
                 <fieldset className="sm:col-span-2">
                   <legend className="label">Repeats on</legend>
                   <div className="flex flex-wrap gap-1">

@@ -31,10 +31,17 @@ export function Chat({
   const endRef = useRef<HTMLDivElement>(null);
   const draftKey = `navi:chat-draft:${kind}`;
 
+  // Adopt fresh server data (after router.refresh) without an extra effect pass.
+  const [seenInitial, setSeenInitial] = useState(initialMessages);
+  if (seenInitial !== initialMessages) {
+    setSeenInitial(initialMessages);
+    setMessages(initialMessages);
+  }
   useEffect(() => {
+    // Restoring an unsent draft from this device's storage (an external system).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     try { setText(localStorage.getItem(draftKey) ?? ""); } catch {}
   }, [draftKey]);
-  useEffect(() => setMessages(initialMessages), [initialMessages]);
   useEffect(() => endRef.current?.scrollIntoView({ block: "end" }), [messages.length]);
 
   function setDraft(v: string) {

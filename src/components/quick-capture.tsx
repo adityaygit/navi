@@ -16,6 +16,8 @@ export function QuickCapture() {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
+    // Restore an unsent draft from this device's storage (an external system).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     try { setText(localStorage.getItem(DRAFT_KEY) ?? ""); } catch {}
     setOnline(navigator.onLine);
     const load = () => offlineQueue.all().then(setQueue).catch(() => setQueue([]));
@@ -26,6 +28,8 @@ export function QuickCapture() {
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
     const openCapture = () => setOpen(true);
+    // Home-screen shortcut: /?capture=1 opens the capture sheet directly.
+    if (new URLSearchParams(window.location.search).has("capture")) setOpen(true);
     window.addEventListener("navi:open-capture", openCapture);
     return () => {
       window.removeEventListener("navi:queue", load);

@@ -209,3 +209,21 @@ export async function markBriefingReadAction(id: string) {
     await ctx.db.from("briefings").update({ read_at: new Date().toISOString() }).eq("id", id);
   });
 }
+
+// ---- reviews ---------------------------------------------------------------
+export async function generateBriefingAction(kind: "morning" | "evening" | "weekly") {
+  return act(async (ctx) => {
+    const { getProfile } = await import("@/server/context");
+    const { buildBriefing } = await import("@/server/jobs/briefings");
+    const { nowIn } = await import("@/lib/time");
+    const profile = await getProfile(ctx);
+    const date = nowIn(profile.timezone).toISODate()!;
+    const b = await buildBriefing(ctx.db, profile, kind, date);
+    // On-demand reviews replace today's stored one of the same kind (data may have changed).
+    const { error } = await ctx.db
+      .from("briefings")
+      .upsert({ user_id: ctx.userId, kind, local_date: date, title: b.title, body: b.body, data: b.data, generated_by: "rules", read_at: null }, { onConflict: "user_id,kind,local_date" });
+    if (error) throw new Error(error.message);
+    return b;
+  });
+}

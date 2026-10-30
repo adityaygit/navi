@@ -1,19 +1,10 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { NAV_ITEMS } from "@/lib/nav-items";
+import { SignOutButton } from "./sign-out";
 
-const ITEMS = [
-  { href: "/", label: "Today", mobile: true },
-  { href: "/chat", label: "Navi", mobile: true },
-  { href: "/inbox", label: "Inbox", mobile: true, badge: "inbox" as const },
-  { href: "/planner", label: "Planner", mobile: true },
-  { href: "/tasks", label: "Tasks" },
-  { href: "/projects", label: "Projects & Goals" },
-  { href: "/insights", label: "Insights" },
-  { href: "/memory", label: "Memory" },
-  { href: "/activity", label: "Activity", badge: "approvals" as const },
-  { href: "/settings", label: "Settings" },
-];
+const ITEMS = NAV_ITEMS;
 
 export function Nav({ counts }: { counts: { inbox: number; approvals: number } }) {
   const path = usePathname();
@@ -37,9 +28,7 @@ export function Nav({ counts }: { counts: { inbox: number; approvals: number } }
             {badge(i.badge)}
           </Link>
         ))}
-        <form action="/auth/signout" method="post" className="mt-auto">
-          <button className="btn btn-ghost btn-sm w-full justify-start">Sign out</button>
-        </form>
+        <div className="mt-auto"><SignOutButton /></div>
       </nav>
       <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-surface md:hidden safe-bottom">
         {ITEMS.filter((i) => i.mobile).map((i) => (
@@ -64,4 +53,3 @@ export function Nav({ counts }: { counts: { inbox: number; approvals: number } }
   );
 }
 
-export const MORE_LINKS = ITEMS.filter((i) => !i.mobile);
