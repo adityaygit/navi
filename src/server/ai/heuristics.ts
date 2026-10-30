@@ -6,6 +6,8 @@ import { DateTime } from "luxon";
 
 const DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 const DAY_RE = "(sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)(?:day|nesday|rsday|urday)?s?";
+// Same pattern without a capture group, for use inside larger patterns.
+const DAY_NC = "(?:sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)(?:day|nesday|rsday|urday)?s?";
 
 function dayIndex(token: string): number {
   const t = token.toLowerCase().slice(0, 3);
@@ -118,7 +120,7 @@ export function extractItems(text: string, now: DateTime): ExtractedItem[] {
 export function extractWeeklyCommitments(text: string): { title: string; days: number[]; hour: number; minute: number; excerpt: string }[] {
   const results: { title: string; days: number[]; hour: number; minute: number; excerpt: string }[] = [];
   const re = new RegExp(
-    `([a-z][a-z \\-']{2,40}?)\\s+(?:on\\s+|every\\s+)?((?:${DAY_RE}(?:\\s*(?:,|and|&|\\/)\\s*)?)+)\\s*(?:from|at)\\s+(\\d{1,2})(?::(\\d{2}))?\\s*(am|pm)?`,
+    `([a-z][a-z \\-']{2,40}?)\\s+(?:on\\s+|every\\s+)?((?:${DAY_NC}(?:\\s*(?:,|and|&|\\/)\\s*)?)+)\\s*(?:from|at)\\s+(\\d{1,2})(?::(\\d{2}))?\\s*(am|pm)?`,
     "gi",
   );
   for (const m of text.matchAll(re)) {

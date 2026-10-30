@@ -5,6 +5,14 @@ const nextConfig: NextConfig = {
   // force Suspense boundaries around every session read for no benefit here.
   cacheComponents: false,
   poweredByHeader: false,
+  turbopack: {
+    rules: {
+      "*.css": {
+        loaders: ["@tailwindcss/turbopack"],
+        as: "*.css",
+      },
+    },
+  },
   async headers() {
     return [
       {

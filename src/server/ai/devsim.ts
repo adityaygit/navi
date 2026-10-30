@@ -34,7 +34,9 @@ export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
   const profile = await getProfile(req.ctx);
   const zone = profile.timezone;
   const now = DateTime.now().setZone(zone);
-  const text = req.userText.trim();
+  // Capture requests wrap the user's words in a header and quotes; parse only the words.
+  const wrapped = req.userText.match(/"""\n([\s\S]*)\n"""/);
+  const text = (req.mode === "capture" && wrapped ? wrapped[1] : req.userText).trim();
   let reply = "";
 
   if (req.mode === "onboarding") {
