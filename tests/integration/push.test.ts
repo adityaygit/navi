@@ -6,7 +6,8 @@ import { createServer, type Server } from "node:https";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { admin, resetUser, userClient } from "./helpers";
-import { sendToSubscriptions } from "@/server/jobs/notify";
+import { dispatchDue, sendToSubscriptions } from "@/server/jobs/notify";
+import type { Profile } from "@/lib/types";
 
 // End-to-end check of the push sender without a real push service: a local
 // HTTPS endpoint stands in for the browser's push service, and the test
@@ -31,7 +32,7 @@ beforeAll(async () => {
     req.on("data", (c) => chunks.push(c));
     req.on("end", () => {
       received.push({ path: req.url ?? "", headers: req.headers, body: Buffer.concat(chunks) });
-      res.statusCode = req.url === "/gone" ? 410 : 201;
+      res.statusCode = req.url === "/gone" ? 410 : req.url === "/down" ? 503 : 201;
       res.end();
     });
   });
@@ -76,6 +77,48 @@ describe("web push delivery", () => {
     expect(left).toHaveLength(1);
     expect(left![0].endpoint).toMatch(/\/ok$/);
     expect(left![0].last_success_at).not.toBeNull();
+    await a.from("push_subscriptions").delete().eq("user_id", userId);
+  });
+
+  it("sends a due notification once even when two scheduler runs overlap", async () => {
+    const device = createECDH("prime256v1");
+    device.generateKeys();
+    const a = admin();
+    await a.from("push_subscriptions").insert({ user_id: userId, endpoint: `https://127.0.0.1:${port}/ok`, p256dh: device.getPublicKey().toString("base64url"), auth: randomBytes(16).toString("base64url") });
+    await a.from("profiles").update({ quiet_hours_start: null, quiet_hours_end: null }).eq("id", userId);
+    const { data: n } = await a.from("notifications").insert({ user_id: userId, kind: "deadline", title: "Due soon", body: "Essay due 5 PM", dedupe_key: `overlap:${Date.now()}` }).select("id").single();
+    const { data: profile } = await a.from("profiles").select("*").eq("id", userId).single();
+
+    const before = received.length;
+    await Promise.all([dispatchDue(a, profile as Profile), dispatchDue(a, profile as Profile)]);
+    expect(received.length - before).toBe(1);
+    const { data: row } = await a.from("notifications").select("status,attempts").eq("id", n!.id).single();
+    expect(row).toEqual({ status: "sent", attempts: 1 });
+    await a.from("push_subscriptions").delete().eq("user_id", userId);
+  });
+
+  it("retries a failed delivery later, then gives up after three attempts", async () => {
+    const device = createECDH("prime256v1");
+    device.generateKeys();
+    const a = admin();
+    await a.from("push_subscriptions").insert({ user_id: userId, endpoint: `https://127.0.0.1:${port}/down`, p256dh: device.getPublicKey().toString("base64url"), auth: randomBytes(16).toString("base64url") });
+    const { data: n } = await a.from("notifications").insert({ user_id: userId, kind: "deadline", title: "Due soon", body: "Essay due 5 PM", dedupe_key: `retry:${Date.now()}` }).select("id").single();
+    const { data: profile } = await a.from("profiles").select("*").eq("id", userId).single();
+    const row = async () => (await a.from("notifications").select("status,attempts,deliver_after").eq("id", n!.id).single()).data!;
+
+    await dispatchDue(a, profile as Profile);
+    const first = await row();
+    expect(first).toMatchObject({ status: "queued", attempts: 1 });
+    expect(Date.parse(first.deliver_after) - Date.now()).toBeGreaterThan(4 * 60_000);
+    // Not retried before its time.
+    await dispatchDue(a, profile as Profile);
+    expect((await row()).attempts).toBe(1);
+
+    for (const attempts of [2, 3]) {
+      await a.from("notifications").update({ deliver_after: new Date(Date.now() - 1000).toISOString() }).eq("id", n!.id);
+      await dispatchDue(a, profile as Profile);
+      expect(await row()).toMatchObject({ attempts, status: attempts < 3 ? "queued" : "failed" });
+    }
     await a.from("push_subscriptions").delete().eq("user_id", userId);
   });
 });

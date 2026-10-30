@@ -90,15 +90,34 @@ export async function dispatchDue(db: SupabaseClient, profile: Profile) {
     .limit(10);
   let delivered = 0;
   for (const n of due ?? []) {
+    // Claim it by bumping its attempt count from the value read, so when two
+    // scheduler runs overlap only one of them sends it.
+    const { data: claimed } = await db
+      .from("notifications")
+      .update({ attempts: n.attempts + 1 })
+      .eq("id", n.id)
+      .eq("attempts", n.attempts)
+      .in("status", ["queued", "held_quiet_hours"])
+      .select("id");
+    if (!claimed?.length) continue;
     if (!pushConfigured()) {
-      await db.from("notifications").update({ status: "no_subscription", last_error: "Push is not configured on the server", attempts: n.attempts + 1 }).eq("id", n.id);
+      await db.from("notifications").update({ status: "no_subscription", last_error: "Push is not configured on the server" }).eq("id", n.id);
       continue;
     }
     const r = await sendToSubscriptions(db, profile.id, { title: n.title, body: n.body, url: n.url, tag: n.dedupe_key });
-    const status = r.none ? "no_subscription" : r.sent > 0 ? "sent" : "failed";
+    // A failed delivery (e.g. the push service was briefly down) is retried
+    // later, 5 then 10 minutes on, before it's given up as failed.
+    const attempts = n.attempts + 1;
+    const retry = !r.none && r.sent === 0 && attempts < 3;
+    const status = r.none ? "no_subscription" : r.sent > 0 ? "sent" : retry ? n.status : "failed";
     await db
       .from("notifications")
-      .update({ status, attempts: n.attempts + 1, sent_at: r.sent ? new Date().toISOString() : null, last_error: r.errors.join("; ").slice(0, 300) || null })
+      .update({
+        status,
+        sent_at: r.sent ? new Date().toISOString() : null,
+        last_error: r.errors.join("; ").slice(0, 300) || null,
+        ...(retry ? { deliver_after: new Date(Date.now() + attempts * 5 * 60_000).toISOString() } : {}),
+      })
       .eq("id", n.id);
     if (r.sent) delivered++;
   }
