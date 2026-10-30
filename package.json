@@ -16,7 +16,8 @@
     "test:e2e": "playwright test",
     "allow-email": "node scripts/allow-email.mjs",
     "smoke:ai": "node scripts/smoke-ai.mjs",
-    "check:deploy": "node scripts/check-deploy.mjs"
+    "check:deploy": "node scripts/check-deploy.mjs",
+    "env:local": "node scripts/local-env.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",

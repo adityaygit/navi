@@ -12,10 +12,17 @@ Requirements: Node 22+, Docker, the Supabase CLI (installed as a dev dependency)
 ```bash
 npm install
 npm run db:start        # local Supabase in Docker (applies migrations + seed)
-cp .env.example .env.local
-npx supabase status     # copy the API URL, publishable key and secret key into .env.local
+npm run env:local       # writes .env.local: local keys, fresh push keys + scheduler secret, simulator
 npm run dev
 ```
+
+`npm run env:local` won't overwrite an existing `.env.local` (pass `-- --force`).
+To use real models locally, add `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` and set
+`NAVI_AI_PROVIDER=anthropic`.
+
+CI (`.github/workflows/ci.yml`) runs the same steps on every push to `main` or
+`claude/**` and on pull requests: typecheck, lint, unit and integration tests
+against a throwaway local Supabase, a production build, and the browser tests.
 
 Seeded invite list (local only): `dev@navi.test`, `alice@navi.test`,
 `bob@navi.test`. Sign in with "Use a password instead"; the first sign-in

@@ -34,6 +34,7 @@
 | Data export + account deletion | verified (browser) | account.spec: `/api/export` returns only the person's rows (every row's user_id checked) as a dated JSON attachment; Settings → type DELETE → Delete everything removes the auth user, profile, tasks and memories, clears unsent captures on the device, lands on /login, and export then returns 401. |
 | Secret protection / access control | verified (local) | No server secret in `.next/static` (checked service key, VAPID private key, cron secret); only `.env.example` tracked; every private API route returns 401 signed out; pages redirect to /login; X-Frame-Options DENY, nosniff, referrer policy, permissions policy (mic self only). Nonce-based CSP from `src/proxy.ts` (scripts self+nonce, connect only to app/Supabase/Gemini Live, no framing); a11y.spec asserts zero CSP violations on every page and that the voice worklet loads. |
 | Phone layout (no sideways scrolling) | verified (emulated) | a11y.spec checks every main page on desktop and iPhone 13 with long titles and a pasted URL; screenshots reviewed 2026-10-30. |
+| CI (GitHub Actions `.github/workflows/ci.yml`) | pending first run | Typecheck, lint, unit, local Supabase + integration, build, Playwright desktop+iPhone with devsim; on push to main/claude/**, PRs, manual. Repo is public, so Actions minutes are free. |
 | Build / typecheck / lint | verified | `npx tsc --noEmit`, `npm run lint`, `npm run build` clean (2026-10-30). |
 | Pre-deploy check (`npm run check:deploy`) | verified (local) | Read-only. Run against local env (flags devsim, http site, short CRON_SECRET, seeded @navi.test invites) and a production-shaped env (passes; mismatched VAPID pair caught). Live-app checks pass against local prod build. Management API fields (`hook_before_user_created_enabled/_uri`, `site_url`, `uri_allow_list`) confirmed in api.supabase.com/api/v1-json 2026-10-30; not yet run against a hosted project. |
 | Deployment (Vercel) / Trigger.dev | blocked | No Vercel/Trigger.dev credentials in the cloud env. Steps in `docs/OPERATIONS.md`. |
@@ -78,7 +79,7 @@
 ```
 sudo nohup dockerd >/tmp/dockerd.log 2>&1 &
 cd /home/user/navi && npm install && npm run db:start   # prints local keys
-cp .env.example .env.local   # fill keys from `npx supabase status`; NAVI_AI_PROVIDER=devsim; CRON_SECRET; VAPID keys
+npm run env:local            # writes .env.local from local Supabase + fresh VAPID/CRON secrets (devsim)
 npm run dev
 ```
 Seeded allowlist (local only): dev@navi.test, alice@navi.test, bob@navi.test.
