@@ -25,6 +25,8 @@
 
 **Voice onboarding closing line (session 5):** after `mark_onboarding_ready` the client no longer refreshes at once (which swapped in the review screen and cut Navi off mid-reply). It waits for that turn's `turnComplete`, then for queued audio to finish playing (≤15 s), then refreshes; a 20 s fallback timer covers a reply that never completes; hang-up also triggers it. The tool result now asks the model for one short sentence ("the review opens when you finish speaking"). voice-live.spec "setting Navi up by voice" now sends a closing line + audio and asserts the review is not shown until turnComplete and the line is saved in the onboarding conversation — **failed on the old build** (review appeared early), passes on the new one; voice-live.spec `--repeat-each=2` 20/20.
 
+**Capture → routines (session 5):** CAPTURE_SYSTEM now lists routines and says a repeated habit ("gym 3x a week", even "maybe start running again") is a routine, start_time only if stated (null = flexible), a bare count → spread days marked inferred with the assumption. Real Haiku via `bench:ai --only capture` ×3 (≈$0.003, local records only): running → `routine` every time (was a note); payload days [1,3,5], start_time null, origin inferred, confidence 0.6, rationale states the assumed days/duration and the "maybe"; other 5 items unchanged, all checks pass.
+
 ### Infra steps (done in session 5; kept as the runbook)
 1. **CRON_SECRET:** generate (`openssl rand -hex 32`); upsert to Vercel (production + preview, sensitive) — project `prj_ZANEcRpnGDHtxHIbKy3ZRhtcGnlF`, team `team_f7SENdW8nt5IHpmYeZFXAipD`; redeploy production; verify tick 200 with it / 401 without.
 2. **Trigger.dev prod env:** `CRON_SECRET` (same value), `NAVI_APP_URL=https://navi-sand.vercel.app` (API: `POST https://api.trigger.dev/api/v1/projects/$TRIGGER_PROJECT_REF/envvars/prod {name,value}`, or dashboard → Environment variables → Production).
@@ -262,4 +264,4 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 ## Exact next steps
 1. Scheduled `navi-tick` run 13:10 UTC COMPLETED (564 ms) — verified. After #4 merges, confirm Vercel shows no crons.
 2. ~~Record the owner's Google sign-in + iPhone push results~~ — done (all pass).
-3. Continue V1 polish: capture prompt (routines filed as notes, per bench); real-Gemini check of the onboarding closing line.
+3. Continue V1 polish: real-Gemini check of the onboarding closing line; re-run `bench:ai` occasionally after prompt changes.
