@@ -69,7 +69,7 @@ export async function buildBriefing(db: SupabaseClient, profile: Profile, kind: 
     const when = (iso: string) => DateTime.fromISO(iso).setZone(zone).toFormat("ccc h:mm a");
     if (hardSoon.length) lines.push(`Hard deadlines in the next 3 days: ${hardSoon.map((t) => `${t.title} (${when(t.due_at!)})`).join("; ")}.`);
     if (risks.length) {
-      lines.push(`Won't fit before its deadline as planned: ${risks.map((r) => `${r.title} (due ${when(r.due_at)}${r.due_is_hard ? ", hard" : ""}) needs about ${r.shortMinutes} min more than is planned before then`).join("; ")}. Make room, start it early, or renegotiate the deadline.`);
+      lines.push(`Won't fit before its deadline as planned: ${risks.map((r) => `${r.title} (due ${when(r.due_at)}${r.due_is_hard ? ", hard" : ""}) needs about ${r.shortMinutes} min more than is planned before then`).join("; ")}${risks[0].estimateRatio > 1 ? ` (your tasks have taken about ${+risks[0].estimateRatio.toFixed(2)}× their estimates, so that's allowed for)` : ""}. Make room, start it early, or renegotiate the deadline.`);
     }
     const riskIds = new Set(risks.map((r) => r.task_id));
     const didntFit = (extras.plan?.unscheduled ?? []).filter((u) => !riskIds.has(u.task_id));

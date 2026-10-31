@@ -302,6 +302,22 @@ function LiveVoice({ kind, muted, setMuted, setStatus: reportStatus, setError, s
     outRef.current = null;
   }, [flushPlayback, releaseMic]);
 
+  // Onboarding: once the setup is marked ready, the page swaps to the review
+  // screen (which ends this session). Wait for Navi's closing line to finish
+  // playing first; a fallback timer covers a reply that never completes.
+  const finishPending = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const finishAfterPlayback = useCallback(() => {
+    const timer = finishPending.current;
+    if (!timer) return false;
+    clearTimeout(timer);
+    finishPending.current = null;
+    const out = outRef.current;
+    const ms = out ? Math.max(0, (out.next - out.ctx.currentTime) * 1000) : 0;
+    setTimeout(onTurnSaved, Math.min(ms + 300, 15_000));
+    return true;
+  }, [onTurnSaved]);
+  useEffect(() => () => { if (finishPending.current) clearTimeout(finishPending.current); }, []);
+
   /** Saves the turn so far; false if it couldn't be saved (it's kept for the next try). */
   const saveTurn = useCallback(async (interrupted = false) => {
     const t = turnRef.current;
@@ -314,7 +330,7 @@ function LiveVoice({ kind, muted, setMuted, setStatus: reportStatus, setError, s
         body: JSON.stringify({ conversationId: convRef.current, voiceSessionId: voiceSessionRef.current, userText: t.user, assistantText: t.navi, toolEvents: t.tools, inputAudioSeconds: t.inSec, outputAudioSeconds: t.outSec, inputTokens: t.inTok, outputTokens: t.outTok, interrupted }),
       });
       const body = await res.json();
-      onTurnSaved();
+      if (!finishAfterPlayback()) onTurnSaved();
       if (body.budgetExceeded) {
         setError("Today's AI testing budget is used up, so voice was stopped. Your transcript is saved.");
         stopAll();
@@ -336,7 +352,7 @@ function LiveVoice({ kind, muted, setMuted, setStatus: reportStatus, setError, s
       };
       return false;
     }
-  }, [onTurnSaved, setError, stopAll]);
+  }, [finishAfterPlayback, onTurnSaved, setError, stopAll]);
 
 
   // Results by call id: a call the service sends again (e.g. after resuming
@@ -352,7 +368,9 @@ function LiveVoice({ kind, muted, setMuted, setStatus: reportStatus, setError, s
         if (!READ_ONLY_TOOLS.includes(fc.name ?? "")) {
           turnRef.current.tools.push({ name: fc.name ?? "tool", ok: Boolean(result.ok), summary: String(result.summary ?? result.error ?? "") });
         }
-        if (result.mutated) onTurnSaved();
+        if (fc.name === "mark_onboarding_ready" && result.ok) {
+          if (!finishPending.current) finishPending.current = setTimeout(() => { finishPending.current = null; onTurnSaved(); }, 20_000);
+        } else if (result.mutated) onTurnSaved();
         return { id: fc.id, name: fc.name, response: { output: { ok: result.ok, summary: result.summary ?? result.error, data: result.data ?? null } } };
       } catch {
         // The request may have reached the server before the connection dropped.

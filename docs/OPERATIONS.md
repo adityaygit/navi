@@ -1,9 +1,8 @@
 # Navi operations guide
 
-How to run Navi locally, test it, and stand up a real deployment. Nothing here
-has been done against a hosted project yet: hosted Supabase, Vercel,
-Trigger.dev, Google OAuth and the AI provider keys still need the owner's
-accounts. `BUILD_INTELLIGENCE.md` tracks what is verified.
+How to run Navi locally, test it, and stand up a real deployment. Production
+(`https://navi-sand.vercel.app`) runs on hosted Supabase, Vercel and Trigger.dev,
+with email and Google sign-in. `BUILD_INTELLIGENCE.md` tracks what is verified.
 
 ## Local development
 
@@ -253,14 +252,19 @@ places, and redeploy the Vercel app.
 Any other scheduler that can send an authenticated POST every 5 to 15 minutes
 works too.
 
-**Current fallback: Vercel Cron.** `vercel.json` defines 24 daily cron jobs
-on `/api/cron/tick`, one per UTC hour. Hobby allows 100 jobs per project, each
-at most once a day and fired anywhere within its hour, so this gives roughly
-hourly ticks: briefings arrive within about two hours of 06:00/21:00, but
-"due in 2 hours" reminders can be up to an hour late. Vercel sends
-`Authorization: Bearer $CRON_SECRET` automatically. Once Trigger.dev is
-deployed (needs a personal access token `tr_pat_…` for `deploy`, a project ref,
-and a production secret key), remove the `crons` from `vercel.json`.
+**Production status (2026-10-31):** Trigger.dev is live. Version
+`20261031.1` was deployed with `npx trigger.dev@4.8.3 deploy --skip-sync-env-vars`;
+the prod env holds `NAVI_APP_URL` and `CRON_SECRET`, set through the env-var API
+(`POST /api/v1/projects/$TRIGGER_PROJECT_REF/envvars/prod`). The `navi-tick`
+schedule (`*/10 * * * *`) is active, and a manually triggered run completed.
+Trigger runs can be read with `TRIGGER_SECRET_KEY` (tr_prod_) at
+`GET https://api.trigger.dev/api/v3/runs/<id>`.
+
+**Old fallback: Vercel Cron (removed).** Until Trigger.dev was live,
+`vercel.json` defined 24 daily cron jobs on `/api/cron/tick`, one per UTC hour
+(Hobby: once a day each, fired anywhere within the hour). To bring it back, add
+those `crons` again; Vercel sends `Authorization: Bearer $CRON_SECRET`
+automatically.
 
 Manual check:
 
@@ -282,6 +286,56 @@ a Gemini Live ephemeral token, and has a short live voice exchange using that
 token, the way the browser does. Total cost is well under one cent, it's
 recorded against the daily budget, and it refuses to run if the budget is used
 up. Use `npm run smoke:ai -- anthropic` or `-- gemini` to check one provider.
+
+### Benchmarks
+
+`npm run bench:ai` runs four representative operations against the real
+Anthropic API with the app's role models and system prompts, and reports
+latency, tokens, cost (price table from `src/server/ai/config.ts`) and
+deterministic quality checks:
+
+| op | role | what it checks |
+| --- | --- | --- |
+| `capture` | fast | messy brain dump → one `propose_items` call: valid items, all 6 things captured, dentist "tuesday 3pm" = event at 15:00 -05:00, no invented times (checked before the app's time guard) |
+| `chat` | fast | "what's left on my plan today?": reads `get_plan`, no writes, mentions every block, no invented times, ≤120 words |
+| `plan-week` | planner | "I'm behind, replan my week": calls `plan_week`, gives an answer, reports the essay shortfall, says the orgo reading is NOT scheduled, no invented times |
+| `onboarding` | planner | last onboarding turn → `propose_items(batch=onboarding)` + `mark_onboarding_ready`: workspaces/goal, practice weekly `[2,4]` at 16:00 -05:00, timezone + quiet hours, display name, untimed due date, `*_ref`s resolve |
+
+Tool definitions are hand-written mirrors of `src/server/ai/tools.ts` (that
+file can't load outside Next) and tool results are fixtures for a fictional
+user, so nothing is written and no personal data is used. Options: `--runs N`
+(max 10), `--only capture,chat`, `--json`, `--no-record`. It prints its
+worst-case cost first and refuses above $0.10 unless `--yes` (one run of all
+four is about $0.098 worst case). Like `smoke:ai` it checks and records
+`ai_usage` (purpose `benchmark`) when Supabase is configured, so run it with
+the hosted Supabase variables unset (the local stack from `.env.local` is used)
+or with `--no-record`:
+
+```bash
+env -u NEXT_PUBLIC_SUPABASE_URL -u SUPABASE_SERVICE_ROLE_KEY npm run bench:ai
+```
+
+Results, 2026-10-31, one run each (`claude-haiku-5-5`, `claude-sonnet-5-5`;
+latest run of each op after the fixtures were finalized):
+
+| op | model | steps | first token | total | in tok | out tok | cost | quality |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| capture | claude-haiku-5-5 | 1 | 2.4 s | 4.9 s | 3,994 | 1,197 | $0.00069 | 6/6 pass |
+| chat | claude-haiku-5-5 | 2 | 0.8 s | 2.0 s | 8,106 | 287 | $0.00034 | 5/5 pass |
+| plan-week | claude-sonnet-5-5 | 2 | 1.2 s | 6.9 s | 7,382 | 671 | $0.01211 | 5/5 pass |
+| onboarding | claude-sonnet-5-5 | 1 | 4.7 s | 13.1 s | 4,053 | 2,210 | $0.03201 | 9/9 pass |
+
+About $0.045 for the set (input tokens include cache reads/writes; a cold
+prompt cache costs a little more, e.g. capture $0.0012 cold). Observations:
+Sonnet thinks before tool calls, so a tight `max_tokens` (≤650 per step) cut
+`plan-week` off before it answered; it re-reads the week with `get_plan` after
+`plan_week`. In one earlier `plan-week` run it said the unscheduled orgo
+reading was "set for Sunday" (now a check), and the passing run still
+suggested moving weekend hours onto an essay due Friday, a reasoning slip the
+deterministic checks don't catch. Onboarding put the whole setup and
+`mark_onboarding_ready` in a single response. Capture with Haiku turned "maybe
+start running again like 3x a week" into a note rather than a routine, and
+skipped a task the fixture state already had.
 
 ## Spend controls
 

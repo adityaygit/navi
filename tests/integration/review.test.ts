@@ -144,6 +144,25 @@ describe("“my plan broke”", () => {
     expect(week.findings.join(" ")).toMatch(/plan broke once this week/);
   });
 
+  it("work that fits neither today nor tomorrow goes to the next free day, not just a note", async () => {
+    const n = now();
+    const t1 = n.plus({ days: 1 }).startOf("day");
+    // The rest of today and all of tomorrow are taken by fixed commitments.
+    for (const [title, s, e] of [["Shift", n, n.endOf("day")], ["Trip", t1, t1.endOf("day")]] as const) {
+      const { error } = await db.from("events").insert({ user_id: userId, title, starts_at: s.toISO(), ends_at: e.toISO() });
+      expect(error).toBeNull();
+    }
+    const essay = await createTask(ctx(), { title: "Essay draft", estimate_minutes: 60, due_at: n.plus({ days: 5 }).toISO() });
+    const r = await recoverPlan(ctx(), { description: "called in to work", category: "external" });
+    const day2 = n.plus({ days: 2 }).toISODate()!;
+    const { data } = await db.from("plan_blocks").select("plan_date,starts_at,reason").eq("task_id", essay.id).eq("status", "planned");
+    expect(data!.map((b) => b.plan_date)).toEqual([day2]);
+    expect(data![0].reason).toMatch(/^Carried over from /);
+    const label = DateTime.fromISO(data![0].starts_at).setZone(zone).toFormat("ccc h:mm a");
+    expect(r.summary).toContain(`Moved to later days: “Essay draft” ${label}`);
+    expect(r.summary).not.toMatch(/Not scheduled yet/);
+  });
+
   it("with no 'free again' time, only the block running now is affected", async () => {
     const n = now();
     const earlier = await block("Earlier", n.minus({ hours: 2 }), 30);
@@ -212,6 +231,23 @@ describe("morning briefing", () => {
     expect(b.body).toMatch(/Won't fit before its deadline as planned: History essay \(due .*, hard\) needs about 90 min more than is planned before then/);
     expect((b.data as { atRisk: { task_id: string }[] }).atRisk.map((r) => r.task_id)).toEqual([essay.id]);
     expect(later.id).toBeTruthy();
+  });
+
+  it("judges deadline risk with the person's own track record of estimates", async () => {
+    // Five finished tasks that each took 1.5× their estimate.
+    for (let i = 0; i < 5; i++) {
+      const t = await createTask(ctx(), { title: `Past ${i}`, estimate_minutes: 40 });
+      await db.from("tasks").update({ status: "done", actual_minutes: 60, completed_at: now().minus({ days: i + 1 }).toISO() }).eq("id", t.id);
+    }
+    const due = now().plus({ days: 2 }).set({ hour: 17, minute: 0, second: 0, millisecond: 0 });
+    const report = await createTask(ctx(), { title: "Lab report", estimate_minutes: 60, due_at: due.toISO(), due_is_hard: true });
+    // Exactly the raw estimate is planned: fine on paper, 30 min short by their history.
+    await block("Lab report", now().plus({ days: 1 }).set({ hour: 10, minute: 0 }), 60, { task_id: report.id });
+    const b = await buildBriefing(admin(), await profile(), "morning", today());
+    expect(b.body).toMatch(/Lab report \(due .*, hard\) needs about 30 min more than is planned before then/);
+    expect(b.body).toMatch(/your tasks have taken about 1\.5× their estimates/);
+    const risk = (b.data as { atRisk: { task_id: string; needMinutes: number; estimateRatio: number }[] }).atRisk[0];
+    expect(risk).toMatchObject({ task_id: report.id, needMinutes: 90, estimateRatio: 1.5 });
   });
 
   it("the scheduled morning plan's leftovers are in the briefing", async () => {

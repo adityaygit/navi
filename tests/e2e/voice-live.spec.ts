@@ -235,8 +235,20 @@ test("setting Navi up by voice ends in the same reviewed setup as typing", async
   send({ toolCall: { functionCalls: [{ id: "r1", name: "mark_onboarding_ready", args: { summary: "School and chess club" } }] } });
   await expect.poll(() => seen.toolResponse, { timeout: 15_000 }).toMatchObject({ functionResponses: [{ id: "r1", response: { output: { ok: true } } }] });
 
-  // The page switches to review on its own; nothing is active until approved.
+  // Navi gets to say its closing line before the review replaces the conversation.
+  const closing = "Your setup is ready to review on screen.";
+  const pcm = Buffer.alloc(24000 * 2 * 1.5); // 1.5 s of audio
+  send({ serverContent: { outputTranscription: { text: closing }, modelTurn: { parts: [{ inlineData: { mimeType: "audio/pcm;rate=24000", data: pcm.toString("base64") } }] } } });
+  await expect(page.getByRole("region", { name: "Voice conversation" }).getByText(closing)).toBeVisible();
+  await page.waitForTimeout(1_000);
+  await expect(page.getByRole("heading", { name: "Review your setup" })).toHaveCount(0);
+  send({ serverContent: { turnComplete: true } });
+
+  // Then the page switches to review on its own; nothing is active until approved.
   await expect(page.getByRole("heading", { name: "Review your setup" })).toBeVisible({ timeout: 15_000 });
+  const { data: prof } = await admin.from("profiles").select("onboarding_conversation_id").eq("id", userId).single();
+  const { data: said } = await admin.from("messages").select("content").eq("conversation_id", prof!.onboarding_conversation_id).eq("role", "assistant").eq("content", closing);
+  expect(said).toHaveLength(1);
   await expect(page.getByText("Chess club", { exact: true })).toBeVisible();
   const { count } = await admin.from("routines").select("id", { count: "exact", head: true }).eq("user_id", userId);
   expect(count).toBe(0);
