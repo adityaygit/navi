@@ -1,9 +1,8 @@
 # Navi operations guide
 
-How to run Navi locally, test it, and stand up a real deployment. Nothing here
-has been done against a hosted project yet: hosted Supabase, Vercel,
-Trigger.dev, Google OAuth and the AI provider keys still need the owner's
-accounts. `BUILD_INTELLIGENCE.md` tracks what is verified.
+How to run Navi locally, test it, and stand up a real deployment. Production
+(`https://navi-sand.vercel.app`) runs on hosted Supabase, Vercel and Trigger.dev,
+with email and Google sign-in. `BUILD_INTELLIGENCE.md` tracks what is verified.
 
 ## Local development
 
@@ -253,14 +252,19 @@ places, and redeploy the Vercel app.
 Any other scheduler that can send an authenticated POST every 5 to 15 minutes
 works too.
 
-**Current fallback: Vercel Cron.** `vercel.json` defines 24 daily cron jobs
-on `/api/cron/tick`, one per UTC hour. Hobby allows 100 jobs per project, each
-at most once a day and fired anywhere within its hour, so this gives roughly
-hourly ticks: briefings arrive within about two hours of 06:00/21:00, but
-"due in 2 hours" reminders can be up to an hour late. Vercel sends
-`Authorization: Bearer $CRON_SECRET` automatically. Once Trigger.dev is
-deployed (needs a personal access token `tr_pat_…` for `deploy`, a project ref,
-and a production secret key), remove the `crons` from `vercel.json`.
+**Production status (2026-10-31):** Trigger.dev is live. Version
+`20261031.1` was deployed with `npx trigger.dev@4.8.3 deploy --skip-sync-env-vars`;
+the prod env holds `NAVI_APP_URL` and `CRON_SECRET`, set through the env-var API
+(`POST /api/v1/projects/$TRIGGER_PROJECT_REF/envvars/prod`). The `navi-tick`
+schedule (`*/10 * * * *`) is active, and a manually triggered run completed.
+Trigger runs can be read with `TRIGGER_SECRET_KEY` (tr_prod_) at
+`GET https://api.trigger.dev/api/v3/runs/<id>`.
+
+**Old fallback: Vercel Cron (removed).** Until Trigger.dev was live,
+`vercel.json` defined 24 daily cron jobs on `/api/cron/tick`, one per UTC hour
+(Hobby: once a day each, fired anywhere within the hour). To bring it back, add
+those `crons` again; Vercel sends `Authorization: Bearer $CRON_SECRET`
+automatically.
 
 Manual check:
 
