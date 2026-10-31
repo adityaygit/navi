@@ -61,7 +61,8 @@ async function standInLiveApi(page: Page, userId: string, kind: "chat" | "onboar
 
 test.use({
   channel: "chromium",
-  launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] },
+  // Real autoplay rules (headless Chromium otherwise lets any audio start without a gesture).
+  launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream", "--autoplay-policy=document-user-activation-required"] },
 });
 
 test("voice streams the mic, runs tools for real, plays replies and saves the turn to shared history", async ({ page, context, baseURL }, info) => {
@@ -268,4 +269,104 @@ test("words from a voice turn that can't be saved at the end are kept as a captu
   await expect
     .poll(async () => (await admin.from("captures").select("raw_text,source").eq("user_id", userId)).data, { timeout: 30_000 })
     .toEqual([{ raw_text: "Remind me to renew my passport.", source: "voice" }]);
+});
+
+/**
+ * Safari-like audio rules, emulated on top of Chromium: an AudioContext
+ * created outside a user gesture (e.g. after awaiting a fetch and the mic
+ * permission) starts suspended and `resume()` outside a gesture does nothing.
+ * Chromium itself lets any context run once the page has had a click (sticky
+ * activation), which hid the bug in earlier runs. Every context is recorded so
+ * the test can tell which one captures the microphone.
+ */
+const strictAutoplay = () => {
+  const w = window as unknown as { __ctxs: (AudioContext & { __mic?: boolean })[]; __nativeResume: (c: AudioContext) => Promise<void> };
+  const Native = window.AudioContext;
+  let gesture = false;
+  for (const t of ["pointerdown", "pointerup", "mousedown", "mouseup", "click", "keydown", "keyup", "touchstart", "touchend"]) {
+    window.addEventListener(t, () => { gesture = true; setTimeout(() => { gesture = false; }, 0); }, true);
+  }
+  w.__ctxs = [];
+  w.__nativeResume = (c) => Native.prototype.resume.call(c);
+  const createSource = Native.prototype.createMediaStreamSource;
+  Native.prototype.createMediaStreamSource = function (this: AudioContext & { __mic?: boolean }, s: MediaStream) {
+    this.__mic = true;
+    return createSource.call(this, s);
+  };
+  class StrictAudioContext extends Native {
+    constructor(opts?: AudioContextOptions) {
+      super(opts);
+      w.__ctxs.push(this);
+      if (!gesture) void Native.prototype.suspend.call(this);
+    }
+    resume() {
+      return gesture ? Native.prototype.resume.call(this) : Promise.resolve();
+    }
+  }
+  window.AudioContext = StrictAudioContext as unknown as typeof AudioContext;
+};
+const micCtxState = (page: Page) => page.evaluate(() => (window as unknown as { __ctxs: (AudioContext & { __mic?: boolean })[] }).__ctxs.filter((c) => c.__mic).at(-1)?.state ?? "none");
+
+test.describe("strict browser audio rules", () => {
+  // Chromium's real autoplay policy (set for this file above) plus the Safari-like emulation.
+  test("the microphone really runs under strict autoplay rules, and a paused mic asks for a tap", async ({ page, context, baseURL }, info) => {
+    await context.grantPermissions(["microphone"], { origin: baseURL! });
+    const userId = await freshSetUpAccount(page, `voice-strict-${info.project.name}@navi.test`);
+    const { seen } = await standInLiveApi(page, userId, "chat");
+    await page.addInitScript(strictAutoplay);
+    await page.goto("/chat");
+    await page.getByRole("button", { name: "Talk", exact: true }).click();
+    const voice = page.getByRole("region", { name: "Voice conversation" });
+    const status = voice.getByRole("status").first();
+    await voice.getByRole("button", { name: "Start talking" }).click();
+    await expect(status).toContainText("Listening", { timeout: 15_000 });
+    // "Listening" means the microphone's audio graph is running and audio is going out.
+    expect(await micCtxState(page)).toBe("running");
+    await expect.poll(() => seen.audioChunks, { timeout: 2_000 }).toBeGreaterThan(0);
+    // A live level shows sound is being picked up.
+    await expect(voice.getByText("Mic: picking up sound")).toBeVisible({ timeout: 5_000 });
+
+    // The browser suspends the microphone later (iOS Safari: a call, Siri, the
+    // app going to the background): Navi says so instead of silently "listening".
+    await page.evaluate(() => (window as unknown as { __ctxs: (AudioContext & { __mic?: boolean })[] }).__ctxs.filter((c) => c.__mic).at(-1)!.suspend());
+    await expect(status).toContainText("Microphone paused");
+    await expect(voice.getByLabel("Microphone is on")).toHaveCount(0);
+    await page.waitForTimeout(300);
+    const atPause = seen.audioChunks;
+    await page.waitForTimeout(700);
+    expect(seen.audioChunks).toBe(atPause);
+    await voice.getByRole("button", { name: "Tap to resume the microphone" }).click();
+    await expect(status).toContainText("Listening");
+    expect(await micCtxState(page)).toBe("running");
+    await expect.poll(() => seen.audioChunks, { timeout: 2_000 }).toBeGreaterThan(atPause);
+    await voice.getByRole("button", { name: "End voice" }).click();
+    await expect.poll(() => seen.closed).toBe(true);
+  });
+
+  test("a silent microphone gets a visible hint and a retry", async ({ page, context, baseURL }, info) => {
+    await context.grantPermissions(["microphone"], { origin: baseURL! });
+    const userId = await freshSetUpAccount(page, `voice-silent-${info.project.name}@navi.test`);
+    const { seen } = await standInLiveApi(page, userId, "chat");
+    await page.addInitScript(strictAutoplay);
+    // A microphone that delivers only silence (wrong input device, hardware mute).
+    await page.addInitScript(() => {
+      const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+      navigator.mediaDevices.getUserMedia = async (c) => {
+        const stream = await original(c);
+        for (const t of stream.getAudioTracks()) t.enabled = false;
+        return stream;
+      };
+    });
+    await page.goto("/chat");
+    await page.getByRole("button", { name: "Talk", exact: true }).click();
+    const voice = page.getByRole("region", { name: "Voice conversation" });
+    await voice.getByRole("button", { name: "Start talking" }).click();
+    await expect(voice.getByRole("status").first()).toContainText("Listening", { timeout: 15_000 });
+    await expect(voice.getByText("Mic: silent")).toBeVisible();
+    await expect(voice.getByText(/Navi isn't hearing your microphone/)).toBeVisible({ timeout: 8_000 });
+    await voice.getByRole("button", { name: "Retry microphone" }).click();
+    await expect.poll(() => seen.sockets, { timeout: 15_000 }).toBe(2);
+    await expect(voice.getByRole("status").first()).toContainText("Listening");
+    await voice.getByRole("button", { name: "End voice" }).click();
+  });
 });

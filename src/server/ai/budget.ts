@@ -2,7 +2,7 @@ import "server-only";
 import { DateTime } from "luxon";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { serverEnv } from "@/lib/env";
-import { tokenCost } from "./config";
+import { tokenCost, VOICE_AUDIO_PRICE_PER_MIN } from "./config";
 
 // Conservative aggregate testing guard for all AI providers (text + voice).
 // Spend is recorded from each provider response's own usage numbers and
@@ -150,13 +150,95 @@ export async function settleUsage(
 
 // Voice: one reservation per minted Live token. The token stops working after
 // VOICE_TOKEN_MINUTES, and VOICE_RESERVE_USD covers that much two-way audio
-// (~$0.023/min), so a client that never reports its usage is still charged.
+// (VOICE_TWO_WAY_USD_PER_MIN ≈ $0.023/min), so a client that never reports its
+// usage is still charged. The reservation is held while the session may still
+// be running; once it ends (the client reports hang-up, or the token's
+// lifetime has passed) it is settled to max(reported, elapsed estimate), where
+// the elapsed estimate is the server-measured minutes from mint to end (or to
+// expiry) at the two-way rate, capped at the reserve. The reservation row's
+// audio_seconds records that measured session length (0 = still open).
 export const VOICE_TOKEN_MINUTES = 10;
 export const VOICE_RESERVE_USD = 0.25;
+export const VOICE_TWO_WAY_USD_PER_MIN = VOICE_AUDIO_PRICE_PER_MIN.input + VOICE_AUDIO_PRICE_PER_MIN.output;
 export const VOICE_MINTS_PER_WINDOW = { max: 6, windowSeconds: 10 * 60 };
 export const VOICE_SESSION_PURPOSE = "voice-session";
+/** After this, a session that never reported its end is treated as ended at token expiry. */
+const VOICE_EXPIRY_GRACE_SECONDS = 60;
+
+/** The least a session that lasted `seconds` is charged, whatever it reported. */
+export function voiceElapsedFloorUsd(seconds: number): number {
+  return Math.min(VOICE_RESERVE_USD, (Math.max(0, seconds) / 60) * VOICE_TWO_WAY_USD_PER_MIN);
+}
+
+type VoiceSessionRow = { id: string; created_at: string; audio_seconds: number | string; ok: boolean };
+
+/**
+ * Brings a session's reservation in line with what is known: still open →
+ * the full reserve; ended (or expired, which marks it ended at expiry) → the
+ * elapsed estimate. Either way the session costs max(that, reported).
+ */
+async function settleVoiceSession(row: VoiceSessionRow, now = Date.now()): Promise<void> {
+  if (!row.ok) return; // a failed mint was released to $0 and stays there
+  const admin = createSupabaseAdmin();
+  let ended = Number(row.audio_seconds);
+  const lifetime = VOICE_TOKEN_MINUTES * 60;
+  if (!(ended > 0) && now - Date.parse(row.created_at) > (lifetime + VOICE_EXPIRY_GRACE_SECONDS) * 1000) {
+    // Never reported its end: it can't have run past the token's lifetime.
+    await admin.from("ai_usage").update({ audio_seconds: lifetime }).eq("id", row.id).eq("audio_seconds", 0);
+    // An end report may have landed first; whichever was recorded counts.
+    const { data } = await admin.from("ai_usage").select("audio_seconds").eq("id", row.id).single();
+    ended = Number(data?.audio_seconds ?? lifetime) || lifetime;
+  }
+  const floor = ended > 0 ? voiceElapsedFloorUsd(ended) : VOICE_RESERVE_USD;
+  const { error } = await admin.rpc("ai_voice_settle", { p_session: row.id, p_reserve: floor });
+  if (error) console.error("voice settle failed:", error.message);
+}
+
+/** Settles this user's sessions whose token has expired without an end report. */
+export async function settleExpiredVoiceSessions(userId: string): Promise<number> {
+  const admin = createSupabaseAdmin();
+  const cutoff = new Date(Date.now() - (VOICE_TOKEN_MINUTES * 60 + VOICE_EXPIRY_GRACE_SECONDS) * 1000).toISOString();
+  const { data } = await admin
+    .from("ai_usage")
+    .select("id,created_at,audio_seconds,ok")
+    .eq("user_id", userId)
+    .eq("purpose", VOICE_SESSION_PURPOSE)
+    .eq("ok", true)
+    .eq("audio_seconds", 0)
+    .lt("created_at", cutoff)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  for (const row of (data ?? []) as VoiceSessionRow[]) await settleVoiceSession(row);
+  return data?.length ?? 0;
+}
+
+/**
+ * The client hung up (or replaced the session): record the server-measured
+ * session length once, and settle. Someone else's session id is ignored.
+ */
+export async function endVoiceSession(userId: string, sessionId: string): Promise<{ ended: boolean; elapsedSeconds?: number }> {
+  const admin = createSupabaseAdmin();
+  const { data: row } = await admin
+    .from("ai_usage")
+    .select("id,created_at,audio_seconds,ok")
+    .eq("id", sessionId)
+    .eq("user_id", userId)
+    .eq("purpose", VOICE_SESSION_PURPOSE)
+    .maybeSingle();
+  if (!row || !row.ok) return { ended: false };
+  if (!(Number(row.audio_seconds) > 0)) {
+    const elapsed = Math.min(VOICE_TOKEN_MINUTES * 60, Math.max(1, (Date.now() - Date.parse(row.created_at as string)) / 1000));
+    // Only the first end report counts.
+    await admin.from("ai_usage").update({ audio_seconds: elapsed }).eq("id", sessionId).eq("audio_seconds", 0);
+  }
+  const { data: fresh } = await admin.from("ai_usage").select("id,created_at,audio_seconds,ok").eq("id", sessionId).single();
+  await settleVoiceSession(fresh as VoiceSessionRow);
+  return { ended: true, elapsedSeconds: Number(fresh?.audio_seconds ?? 0) };
+}
 
 export async function reserveVoiceSession(userId: string, model: string): Promise<string> {
+  // Release what this user's expired, never-ended sessions no longer need before checking the cap.
+  await settleExpiredVoiceSessions(userId);
   return reserveBudget({
     userId,
     provider: "google",
@@ -172,7 +254,8 @@ export async function reserveVoiceSession(userId: string, model: string): Promis
  * Records one reported voice turn against its session. Reported seconds are
  * clamped to what the session could physically have used (each direction at
  * most the time since the token was minted), and the session as a whole is
- * charged max(reserved, reported) — never both.
+ * charged max(reserved, reported) — never both — where "reserved" is the full
+ * reserve while the session is open and the elapsed estimate once it ended.
  */
 export async function recordVoiceTurn(args: {
   userId: string;
@@ -236,9 +319,12 @@ export async function recordVoiceTurn(args: {
   });
   if (error) console.error("ai_usage insert failed:", error.message);
   if (sessionId) {
-    const { error: settleErr } = await admin.rpc("ai_voice_settle", { p_session: sessionId, p_reserve: VOICE_RESERVE_USD });
-    if (settleErr) console.error("voice settle failed:", settleErr.message);
+    // Re-read just before settling: the session may have ended meanwhile.
+    const { data: row } = await admin.from("ai_usage").select("id,created_at,audio_seconds,ok").eq("id", sessionId).single();
+    if (row) await settleVoiceSession(row as VoiceSessionRow);
   }
+  // A report is also a chance to release this user's expired sessions.
+  await settleExpiredVoiceSessions(args.userId);
   return { costUsd, inSec, outSec, sessionId };
 }
 
