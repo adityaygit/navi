@@ -21,6 +21,8 @@
 - `.trigger/**` ignored by git and ESLint (dry-run output).
 **Tests at end of session 5:** tsc + lint pass; vitest **20 files 201/201**; build pass; Playwright **52/52** (desktop + iPhone, run before the planner changes, which are server-only and covered by vitest).
 
+**Owner's device tests (reported 2026-10-31, production):** PASS: Google sign-in (own account); other accounts cannot sign in; email sign-in; iPhone Home Screen install; iPhone push (Send test arrives, tap opens Settings); voice barge-in; voice → text in one history; offline capture → sync. Not tested by the owner: scheduled 06:00/21:00 briefing pushes on the phone and quiet-hours holding (production saves briefings — checked in hosted data — and Trigger.dev runs every 10 min; owner will report a failure), PR #4 features (not merged yet).
+
 ### Infra steps (done in session 5; kept as the runbook)
 1. **CRON_SECRET:** generate (`openssl rand -hex 32`); upsert to Vercel (production + preview, sensitive) — project `prj_ZANEcRpnGDHtxHIbKy3ZRhtcGnlF`, team `team_f7SENdW8nt5IHpmYeZFXAipD`; redeploy production; verify tick 200 with it / 401 without.
 2. **Trigger.dev prod env:** `CRON_SECRET` (same value), `NAVI_APP_URL=https://navi-sand.vercel.app` (API: `POST https://api.trigger.dev/api/v1/projects/$TRIGGER_PROJECT_REF/envvars/prod {name,value}`, or dashboard → Environment variables → Production).
@@ -131,7 +133,7 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 | Schema + RLS for all user tables | verified | `tests/integration/rls.test.ts`: own rows only, cross-user update/delete/forged insert blocked, anon sees nothing, users can't set approval execution state, allowlist unreadable, `replace_day_plan` can't touch another user's plan. Two migrations: `20261030000001_core_schema`, `20261031000001_replace_day_plan`. |
 | Invite-only access (auth hook allowlist + public sign-up off) | verified (local + hosted config) | rls.test: uninvited and invited self-sign-up refused. Accounts created server-side only. Hosted (session 5 read): hook on, sign-up off, Confirm email on. |
 | Email auth (magic link + password) | verified (local) | security.spec: passwordless account → magic link via Mailpit → set password in Settings → password sign-in. Real email delivery on hosted not exercised. |
-| Google sign-in | live in production; owner sign-in pending | Provider on, button live, authorize → Google with the right client id + callback (session 5). `/auth/callback` maps sign-up-refused → `not_invited`. Owner to try their own Google sign-in. |
+| Google sign-in | **verified (owner, production)** | Provider on, button live, authorize → Google with the right client id + callback (session 5). `/auth/callback` maps sign-up-refused → `not_invited`. Owner signed in with Google; other accounts refused. |
 | Domain layer (entities, activity log + revert, approvals, proposals, memory, tasks, focus) | verified | flows.test: approval boundary (hard-deadline move + delete → approval, duplicate request reused, executes exactly once), Navi cannot mark work done; simultaneous accept/complete create one item. |
 | Conversational onboarding → reviewed setup → activation | verified (simulator + **real Claude text + real Gemini Live voice**) | flows.test + e2e (desktop & iPhone). Real run (session 3, Sonnet 5.5): 3 turns → 14 proposals with source quotes/stated-vs-inferred, 0 active rows before approval, activation 2.1 s → week plan. Open-items pass: "I'm Alex" (text) → `profiles.display_name = Alex` after activation; voice onboarding by fake-mic speech → Gemini `propose_items` + `mark_onboarding_ready` → review screen → `display_name = Sam`. |
 | Text + voice share one history | verified | flows.test (onboarding), voice-live.spec (chat: voice turn appears in text history). |
@@ -154,11 +156,11 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 | Hosted Supabase | verified | All 3 migrations, invite hook, Site URL/redirects, owner invited; uninvited sign-up rejected; check:deploy hosted checks pass. |
 | Deployment (Vercel) | verified | Production `navi-sand.vercel.app` = `main` `f3cde3d`, READY; owner uses it on laptop + iPhone. |
 | Scheduler | verified in production (Trigger.dev) | `navi-tick` every 10 min, manual run COMPLETED ok (session 5). Vercel crons kept until PR #4 merges, harmless overlap (tick is idempotent). |
-| Physical iPhone verification | partial | Voice verified by owner (2026-10-31). Install + push still to report. |
+| Physical iPhone verification | **verified (owner, 2026-10-31)** | Install, push + deep link, voice incl. barge-in, voice→text, offline capture. Scheduled-briefing push on the phone not yet observed. |
 | Calendar/Gmail/Drive/GitHub integrations | not started (out of V1 core) | Shown as "not connected"; external approvals fail honestly. |
 
 ## Acceptance gates (spec §7) — where each stands
-1. Google + email sign-in in a configured environment — email works in production (owner signs in); **Google provider live (redirect verified); owner's own Google sign-in to confirm**.
+1. Google + email sign-in in a configured environment — email works in production (owner signs in); **Google + email verified by owner in production; uninvited accounts refused**.
 2. Conversational onboarding (text or voice) → review → saved — verified with simulator and **real Claude (text)**; voice onboarding only with stand-in.
 3. Capture → proposals → review, survives reload, syncs — verified.
 4. Real views with working controls and honest empty states — verified (browser, emulated iPhone).
@@ -168,7 +170,7 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 8. Accountability grounded in real events — verified.
 9. Internal autonomy + external approval boundary, failure + duplicate protection — verified.
 10. Working real-time voice, interrupt, back to text with tools — **owner verified real voice on laptop + iPhone (production)**; barge-in + tools verified with real Live locally.
-11. iPhone install, push, offline capture — offline verified; **install/push on a real iPhone pending**.
+11. iPhone install, push, offline capture — **verified on the owner's iPhone (2026-10-31)**.
 12. Usage recorded, $2/day guard — verified; real usage recorded in session 3 ($0.12 for a full real-model run).
 13. Persistence, secrets, access control, automated checks, mobile usability, deployed preview — verified locally + CI; production deployed and in use.
 14. Resume from repo + checkpoint — this file + `docs/OPERATIONS.md`.
@@ -251,12 +253,11 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 `e400992` handoff docs · `05863b4` scaffold/schema/planner · `095bcc9` AI runtime/capture/auth/shell · `9207241` Today/onboarding/inbox/chat/planner · `361078b` tasks/projects/insights/briefings/tick/push · `92df02a` memory/activity/settings/PWA/voice · `5286be2` build fixes + RLS/flow tests · `967df64` ActionButton refactor + e2e suite · `8d28b26` availability parsing, capture FAB · `7d4e8f2` ops guide, invite script, voice fallback e2e · `dfea149` settle blocks + manage e2e · `0016554` axe a11y + contrast · `6e128d7` owner-only budget override · `ef7992b` goals/projects/routines in setup · `c228123` dictated capture · `157b180` project memory recall · `e5b03bb` accountability tests · `95df9ca` reminder expiry · `4d30a13` briefing DST tests · `f2b7d88` CSP · `3acb55d` time-ordered day view + structure e2e · `afadb63` push delivery + SW tests · `277c611` voice hang-up fix + live voice e2e · `97561de` voice onboarding e2e · `3cbeaf8` phone layout fixes · `22fae22` smoke:ai · `6b83dd3` agent loop tests · `0100d5b` budget test fix · `4aeebff` voice server tests · `16c8aff` shared-device privacy + export/delete e2e · `cf6aac9` record · `df8c562` no-sideways-scroll check · `d0811f1`/`8cfc1d1` check:deploy · `bca0996` recurring-task fixes · `b429943` simultaneous accept/complete · `6d2ba09` push once + retry · `d41e03f` locked day plan (migration `20261031000001`) · `78f5d24` voice tool-call dedupe · `34546fb` chat partial-failure honesty · `8acf091` CI · `6beb342` touch targets · `bfb32f8` voice mic release + mute test · `9e76a96` offline actions don't crash · `0d5e9b9` voice turn kept; push/delete errors · `0151b43` Supabase MCP + agent skills · `9b7c180` handoff (test safety guard, UTC test browser, record, hosted Supabase guide) · **session 2 (`claude/sharp-keller-moxx93`):** accept `NAVI_ANTHROPIC_API_KEY` · `134bbec` checkpoint · **session 3 (`claude/dazzling-cray-isusbm`):** `1618f78` vercel.json (Next.js preset + hourly crons), API-privileges migration, check:deploy HEAD fix · this checkpoint.
 
 ## True blockers (owner action needed)
-1. Merge PR adityaygit/navi#4 (push diagnostics, planner fixes, benchmark, Vercel crons removed).
-2. Try Google sign-in with the owner's own account.
-3. Physical iPhone: Home Screen install + push (owner testing now); Delivery details shows the result after #4 is deployed.
-4. Owner decisions: further invite-list emails; confirm home timezone (environment says America/New_York).
+1. Merge PR adityaygit/navi#4.
+2. Owner to report if a scheduled briefing push doesn't arrive (06:00/21:00 local) or quiet hours misbehave.
+3. Owner decisions: further invite-list emails; confirm home timezone (environment says America/New_York).
 
 ## Exact next steps
 1. Scheduled `navi-tick` run 13:10 UTC COMPLETED (564 ms) — verified. After #4 merges, confirm Vercel shows no crons.
-2. Record the owner's Google sign-in + iPhone push results.
+2. ~~Record the owner's Google sign-in + iPhone push results~~ — done (all pass).
 3. Continue V1 polish: voice onboarding closing line; capture prompt (routines filed as notes, per bench).
