@@ -23,6 +23,8 @@
 
 **Owner's device tests (reported 2026-10-31, production):** PASS: Google sign-in (own account); other accounts cannot sign in; email sign-in; iPhone Home Screen install; iPhone push (Send test arrives, tap opens Settings); voice barge-in; voice → text in one history; offline capture → sync. Not tested by the owner: scheduled 06:00/21:00 briefing pushes on the phone and quiet-hours holding (production saves briefings — checked in hosted data — and Trigger.dev runs every 10 min; owner will report a failure), PR #4 features (not merged yet).
 
+**Voice onboarding closing line (session 5):** after `mark_onboarding_ready` the client no longer refreshes at once (which swapped in the review screen and cut Navi off mid-reply). It waits for that turn's `turnComplete`, then for queued audio to finish playing (≤15 s), then refreshes; a 20 s fallback timer covers a reply that never completes; hang-up also triggers it. The tool result now asks the model for one short sentence ("the review opens when you finish speaking"). voice-live.spec "setting Navi up by voice" now sends a closing line + audio and asserts the review is not shown until turnComplete and the line is saved in the onboarding conversation — **failed on the old build** (review appeared early), passes on the new one; voice-live.spec `--repeat-each=2` 20/20.
+
 ### Infra steps (done in session 5; kept as the runbook)
 1. **CRON_SECRET:** generate (`openssl rand -hex 32`); upsert to Vercel (production + preview, sensitive) — project `prj_ZANEcRpnGDHtxHIbKy3ZRhtcGnlF`, team `team_f7SENdW8nt5IHpmYeZFXAipD`; redeploy production; verify tick 200 with it / 401 without.
 2. **Trigger.dev prod env:** `CRON_SECRET` (same value), `NAVI_APP_URL=https://navi-sand.vercel.app` (API: `POST https://api.trigger.dev/api/v1/projects/$TRIGGER_PROJECT_REF/envvars/prod {name,value}`, or dashboard → Environment variables → Production).
@@ -260,4 +262,4 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 ## Exact next steps
 1. Scheduled `navi-tick` run 13:10 UTC COMPLETED (564 ms) — verified. After #4 merges, confirm Vercel shows no crons.
 2. ~~Record the owner's Google sign-in + iPhone push results~~ — done (all pass).
-3. Continue V1 polish: voice onboarding closing line; capture prompt (routines filed as notes, per bench).
+3. Continue V1 polish: capture prompt (routines filed as notes, per bench); real-Gemini check of the onboarding closing line.

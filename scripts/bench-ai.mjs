@@ -216,7 +216,7 @@ const CANNED = {
     ],
   },
   propose_items: (input) => ({ ok: true, summary: `Added ${input?.items?.length ?? 0} items to the review inbox` }),
-  mark_onboarding_ready: { ok: true, summary: "Setup is ready for the user to review" },
+  mark_onboarding_ready: { ok: true, summary: "Setup is ready for the user to review on screen. Tell them so in one short sentence (the review opens when you finish speaking), then stop." },
 };
 
 // ---------------------------------------------------------------------------
