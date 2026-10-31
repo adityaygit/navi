@@ -16,9 +16,24 @@ type ToolReply = { id?: string; name?: string; response: Record<string, unknown>
 // Raw audio is never stored; transcripts are saved to the shared conversation.
 
 type Kind = "chat" | "onboarding";
-type Status = "idle" | "connecting" | "listening" | "speaking" | "reconnect" | "ended" | "error";
+type Status = "idle" | "connecting" | "listening" | "micpaused" | "speaking" | "reconnect" | "ended" | "error";
 
-// Inline AudioWorklet: forwards mic frames to the main thread.
+// Below this RMS (about -57 dBFS) a 100 ms chunk counts as silence.
+const SILENCE_RMS = 0.0015;
+// "Navi isn't hearing you" after this long without any sound since connecting.
+const DEAF_AFTER_MS = 4000;
+
+function rmsOf(x: Float32Array): number {
+  let sum = 0;
+  for (let i = 0; i < x.length; i++) sum += x[i] * x[i];
+  return Math.sqrt(sum / Math.max(1, x.length));
+}
+
+/** 0..1 for the level bar: -60 dBFS → 0, -10 dBFS → 1. */
+function levelOf(rms: number): number {
+  if (rms < SILENCE_RMS) return 0;
+  return Math.max(0.05, Math.min(1, (20 * Math.log10(rms) + 60) / 50));
+}
 
 function downsampleTo16k(input: Float32Array, rate: number): Int16Array {
   const ratio = rate / 16000;
@@ -60,9 +75,9 @@ export function VoiceSession({ kind, onClose, onTurnSaved }: { kind: Kind; onClo
     <section className="card flex flex-col gap-3 border-accent" aria-label="Voice conversation">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="h2">Talk to Navi</h2>
-        <span className={`badge ${status === "listening" ? "badge-ok" : status === "speaking" ? "badge-accent" : status === "error" || status === "reconnect" ? "badge-danger" : ""}`} role="status" aria-live="polite">
+        <span className={`badge ${status === "listening" ? "badge-ok" : status === "speaking" ? "badge-accent" : status === "error" || status === "reconnect" || status === "micpaused" ? "badge-danger" : ""}`} role="status" aria-live="polite">
           {mode === "browser" ? "Basic voice · " : ""}
-          {{ idle: "Not started", connecting: "Connecting…", listening: muted ? "Muted" : "Listening", speaking: "Navi is speaking", reconnect: "Connection lost", ended: "Ended", error: "Error" }[status]}
+          {{ idle: "Not started", connecting: "Connecting…", listening: muted ? "Muted" : "Listening", micpaused: "Microphone paused", speaking: "Navi is speaking", reconnect: "Connection lost", ended: "Ended", error: "Error" }[status]}
         </span>
         {(status === "listening" || status === "speaking") && !muted && (
           <span className="flex items-center gap-1 text-xs text-danger" aria-label="Microphone is on"><span className="h-2 w-2 animate-pulse rounded-full bg-danger" /> mic on</span>
@@ -103,11 +118,44 @@ export function VoiceSession({ kind, onClose, onTurnSaved }: { kind: Kind; onClo
   );
 }
 
+// Browsers only let an AudioContext run if it was created (or resumed) inside
+// a user gesture: Safari always, Chrome until the page has had a click. Both
+// contexts are therefore created synchronously in the tap that starts voice,
+// before any await, and handed to the session when it connects.
 let primedOutput: AudioContext | null = null;
+let primedMic: AudioContext | null = null;
 function primeOutputAudio() {
-  if (primedOutput || typeof AudioContext === "undefined") return;
+  if (typeof AudioContext === "undefined") return;
+  if (primedOutput && primedOutput.state !== "closed") return void primedOutput.resume().catch(() => {});
   primedOutput = new AudioContext({ sampleRate: 24000 });
   void primedOutput.resume().catch(() => {});
+}
+/**
+ * The microphone's context keeps the device's default sample rate on purpose:
+ * Firefox refuses to connect a microphone to a context forced to another rate.
+ */
+function primeMicAudio() {
+  if (typeof AudioContext === "undefined") return;
+  if (primedMic && primedMic.state !== "closed") return void primedMic.resume().catch(() => {});
+  primedMic = new AudioContext();
+  void primedMic.resume().catch(() => {});
+}
+function discardPrimedAudio() {
+  void primedMic?.close().catch(() => {});
+  void primedOutput?.close().catch(() => {});
+  primedMic = primedOutput = null;
+}
+/** Resume, but don't hang: outside a gesture Safari leaves resume() pending. */
+async function tryResume(ctx: AudioContext, ms = 800): Promise<boolean> {
+  if (ctx.state === "running") return true;
+  await Promise.race([ctx.resume().catch(() => {}), new Promise((r) => setTimeout(r, ms))]);
+  return (ctx.state as AudioContextState) === "running";
+}
+
+/** Tells the server a voice session is over so its budget reservation settles to the time used. */
+function reportSessionEnd(voiceSessionId: string | null) {
+  if (!voiceSessionId) return;
+  void fetch("/api/voice/end", { method: "POST", keepalive: true, headers: { "content-type": "application/json" }, body: JSON.stringify({ voiceSessionId }) }).catch(() => {});
 }
 
 function ModePicker({ onLive, onBrowser, kind }: { onLive: () => void; onBrowser: (reason: string) => void; kind: Kind }) {
@@ -122,11 +170,13 @@ function ModePicker({ onLive, onBrowser, kind }: { onLive: () => void; onBrowser
           // Create the speaker output inside the tap itself: iOS Safari keeps an
           // AudioContext created later (after awaits) suspended, i.e. silent.
           primeOutputAudio();
+          primeMicAudio();
           // Probe availability without opening the mic yet.
           setChecking(true);
           const res = await fetch("/api/voice/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, probe: true }) }).catch(() => null);
           setChecking(false);
           if (res?.ok) return onLive();
+          discardPrimedAudio();
           const body = res ? await res.json().catch(() => ({})) : { error: "You appear to be offline. Voice needs an internet connection." };
           if (body.fallback === "browser") onBrowser(`Real-time voice isn't available (${String(body.error).replace(/\.$/, "")}). Using basic voice: your browser's speech recognition, one turn at a time, not real-time.`);
           else onBrowser(body.error ?? "Voice is unavailable right now.");
@@ -160,7 +210,27 @@ function heardLength(marks: { len: number; at: number }[], playedTo: number): nu
   return len;
 }
 
-function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTurnSaved, onUnavailable }: Setters & { kind: Kind; muted: boolean; setMuted: (m: boolean) => void; onUnavailable: (reason: string) => void }) {
+function LiveVoice({ kind, muted, setMuted, setStatus: reportStatus, setError, setLines, onTurnSaved, onUnavailable }: Setters & { kind: Kind; muted: boolean; setMuted: (m: boolean) => void; onUnavailable: (reason: string) => void }) {
+  const [status, setLocalStatus] = useState<Status>("idle");
+  const statusRef = useRef<Status>("idle");
+  const setStatus = useCallback((s: Status) => {
+    statusRef.current = s;
+    setLocalStatus(s);
+    reportStatus(s);
+  }, [reportStatus]);
+  // Live microphone level and the "can't hear you" safety net. Only levels
+  // and timestamps are kept, never audio.
+  const [level, setLevel] = useState(0);
+  const [deaf, setDeaf] = useState(false);
+  const [soundRecently, setSoundRecently] = useState(false);
+  // `peak`: the level bar, rising instantly and falling gently so speech (and its gaps) reads steadily.
+  const hearingRef = useRef({ armedAt: 0, lastFrameAt: 0, lastSoundAt: -1e9, heard: false, peak: 0 });
+  const arm = useCallback((fresh: boolean) => {
+    const h = hearingRef.current;
+    h.armedAt = performance.now();
+    if (fresh) h.heard = false;
+    setDeaf(false);
+  }, []);
   const sessionRef = useRef<{ close: () => void; sendRealtimeInput: (p: unknown) => void; sendToolResponse: (p: unknown) => void } | null>(null);
   const micRef = useRef<{ stream: MediaStream; ctx: AudioContext; node: AudioWorkletNode } | null>(null);
   const outRef = useRef<{ ctx: AudioContext; next: number; sources: Set<AudioBufferSourceNode> } | null>(null);
@@ -177,7 +247,34 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
   const connectRef = useRef<() => Promise<void>>(async () => {});
   useEffect(() => {
     mutedRef.current = muted;
+    // Unmuting restarts the "can't hear you" clock (the interval re-evaluates it).
+    if (!muted) hearingRef.current.armedAt = performance.now();
   }, [muted]);
+
+  /** What to show when Navi isn't speaking: listening, unless the browser paused the mic. */
+  const idleStatus = useCallback((): Status => (micRef.current && micRef.current.ctx.state !== "running" ? "micpaused" : "listening"), []);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const h = hearingRef.current;
+      const now = performance.now();
+      const st = statusRef.current;
+      const live = (st === "listening" || st === "speaking") && !mutedRef.current && !!sessionRef.current;
+      const next = live && now - h.lastFrameAt < 500 ? Math.round(h.peak * 20) / 20 : 0;
+      setLevel((l) => (l === next ? l : next));
+      const recent = live && now - h.lastSoundAt < 1500;
+      setSoundRecently((r) => (r === recent ? r : recent));
+      if (st !== "listening" || !live) {
+        if (st === "speaking") setDeaf(false);
+        return;
+      }
+      // Nothing at all, or only silence, since connecting (or unmuting/resuming).
+      const noFrames = now - Math.max(h.armedAt, h.lastFrameAt) > DEAF_AFTER_MS;
+      const neverHeard = !h.heard && now - h.armedAt > DEAF_AFTER_MS;
+      setDeaf(noFrames || neverHeard);
+    }, 200);
+    return () => clearInterval(id);
+  }, []);
 
   const flushPlayback = useCallback(() => {
     const out = outRef.current;
@@ -197,6 +294,8 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
   const stopAll = useCallback(() => {
     sessionRef.current?.close();
     sessionRef.current = null;
+    reportSessionEnd(voiceSessionRef.current);
+    voiceSessionRef.current = null;
     releaseMic();
     flushPlayback();
     void outRef.current?.ctx.close();
@@ -278,18 +377,53 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
       return;
     }
     convRef.current = body.conversationId;
+    // A new token replaces the previous session (resume, reconnect, retry): that one is over.
+    if (voiceSessionRef.current && voiceSessionRef.current !== body.voiceSessionId) reportSessionEnd(voiceSessionRef.current);
     voiceSessionRef.current = body.voiceSessionId ?? null;
 
     // Mic first, so a permission denial is reported before connecting.
     if (!micRef.current) {
+      // Created in the tap that got us here (see primeMicAudio); a context made
+      // now, after awaits, would start suspended in Safari and never capture.
+      let ctx: AudioContext | null = primedMic && primedMic.state !== "closed" ? primedMic : null;
+      primedMic = null;
+      let stream: MediaStream | null = null;
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
-        const ctx = new AudioContext();
+        stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
+        ctx ??= new AudioContext();
         await ctx.audioWorklet.addModule("/pcm-worklet.js");
-        const src = ctx.createMediaStreamSource(stream);
+        let src: MediaStreamAudioSourceNode;
+        try {
+          src = ctx.createMediaStreamSource(stream);
+        } catch (err) {
+          // Firefox: a microphone whose rate differs from the context's can't be connected; match it.
+          const rate = stream.getAudioTracks()[0]?.getSettings().sampleRate;
+          if (!(err instanceof DOMException && err.name === "NotSupportedError") || !rate) throw err;
+          void ctx.close();
+          ctx = new AudioContext({ sampleRate: rate });
+          await ctx.audioWorklet.addModule("/pcm-worklet.js");
+          src = ctx.createMediaStreamSource(stream);
+        }
         const node = new AudioWorkletNode(ctx, "navi-capture");
         src.connect(node);
-        micRef.current = { stream, ctx, node };
+        // Keep the node in a rendered graph (Safari only pulls nodes that reach
+        // the speakers); the zero gain keeps the microphone out of them.
+        const sink = ctx.createGain();
+        sink.gain.value = 0;
+        node.connect(sink).connect(ctx.destination);
+        const mic = { stream, ctx, node };
+        micRef.current = mic;
+        // The browser may suspend the microphone later (iOS: a call, Siri,
+        // backgrounding): show it, and resume on the next tap.
+        ctx.onstatechange = () => {
+          if (micRef.current !== mic) return;
+          const st = statusRef.current;
+          if (mic.ctx.state !== "running" && (st === "listening" || st === "speaking")) setStatus("micpaused");
+          else if (mic.ctx.state === "running" && st === "micpaused") { setStatus("listening"); arm(false); }
+        };
+        // Usually already running (created in the tap); otherwise try once more.
+        await tryResume(ctx);
+        const rate = ctx.sampleRate;
         let pending: Float32Array[] = [];
         let pendingLen = 0;
         node.port.onmessage = (e: MessageEvent<Float32Array>) => {
@@ -297,19 +431,35 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
           pending.push(e.data);
           pendingLen += e.data.length;
           // Send ~100ms chunks.
-          if (pendingLen < ctx.sampleRate / 10) return;
+          if (pendingLen < rate / 10) return;
           const merged = new Float32Array(pendingLen);
           let o = 0;
           for (const p of pending) { merged.set(p, o); o += p.length; }
           pending = [];
           pendingLen = 0;
-          const pcm = downsampleTo16k(merged, ctx.sampleRate);
+          const h = hearingRef.current;
+          const rms = rmsOf(merged);
+          h.lastFrameAt = performance.now();
+          h.peak = Math.max(levelOf(rms), h.peak * 0.7);
+          if (rms >= SILENCE_RMS) {
+            h.heard = true;
+            h.lastSoundAt = h.lastFrameAt;
+          }
+          const pcm = downsampleTo16k(merged, rate);
           turnRef.current.inSec += pcm.length / 16000;
           sessionRef.current.sendRealtimeInput({ audio: { data: toBase64(new Uint8Array(pcm.buffer)), mimeType: "audio/pcm;rate=16000" } });
         };
       } catch (err) {
+        stream?.getTracks().forEach((t) => t.stop());
+        if (ctx && micRef.current?.ctx !== ctx) void ctx.close().catch(() => {});
         setStatus("error");
-        setError(err instanceof DOMException && err.name === "NotAllowedError" ? "Microphone permission was denied. Allow it in your browser settings to talk." : "Couldn't open the microphone.");
+        setError(
+          err instanceof DOMException && err.name === "NotAllowedError"
+            ? "Microphone permission was denied. Allow it in your browser settings to talk."
+            : err instanceof DOMException && err.name === "NotFoundError"
+              ? "No microphone was found. Connect one, or check your input device settings."
+              : "Couldn't open the microphone.",
+        );
         return;
       }
     }
@@ -328,7 +478,10 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
         model: body.model,
         config: body.config,
         callbacks: {
-          onopen: () => setStatus("listening"),
+          onopen: () => {
+            arm(true);
+            setStatus(idleStatus());
+          },
           onmessage: (msg) => {
             // Token counts, when the service reports them, are priced alongside audio time.
             const usage = msg.usageMetadata;
@@ -366,7 +519,7 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
                 }
               }
               flushPlayback();
-              setStatus("listening");
+              setStatus(idleStatus());
               void saveTurn(true);
             }
             if (sc.inputTranscription?.text) {
@@ -398,7 +551,7 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
               out.sources.add(node);
               node.onended = () => {
                 out.sources.delete(node);
-                if (out.sources.size === 0) setStatus("listening");
+                if (out.sources.size === 0) setStatus(idleStatus());
               };
               turnRef.current.outSec += buf.duration;
               setStatus("speaking");
@@ -424,7 +577,7 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
       setStatus("error");
       setError(`Couldn't connect to the voice service: ${err instanceof Error ? err.message : String(err)}`);
     }
-  }, [kind, onUnavailable, runTool, saveTurn, flushPlayback, releaseMic, setError, setLines, setStatus]);
+  }, [kind, onUnavailable, runTool, saveTurn, flushPlayback, releaseMic, setError, setLines, setStatus, arm, idleStatus]);
 
   useEffect(() => {
     connectRef.current = connect;
@@ -438,7 +591,16 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
     saveTurnRef.current = saveTurn;
     stopAllRef.current = stopAll;
   }, [saveTurn, stopAll]);
-  useEffect(() => () => { endedByUser.current = true; void saveTurnRef.current(); stopAllRef.current(); }, []);
+  useEffect(() => () => {
+    endedByUser.current = true;
+    // The turn's request is built synchronously (with the session id), then the
+    // session's end is reported once that turn is in, so it settles last.
+    const id = voiceSessionRef.current;
+    const saved = saveTurnRef.current();
+    voiceSessionRef.current = null;
+    void saved.finally(() => reportSessionEnd(id));
+    stopAllRef.current();
+  }, []);
   useEffect(() => {
     // The user already tapped "Start talking" to get here, so connect once on mount.
     if (startedRef.current) return;
@@ -446,11 +608,58 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
     void connect();
   }, [connect]);
 
+  /** Runs inside a tap: the only time Safari lets a paused audio context resume. */
+  const resumeMic = () => {
+    const mic = micRef.current;
+    void outRef.current?.ctx.resume().catch(() => {});
+    if (!mic) return;
+    void mic.ctx.resume().then(() => {
+      if (micRef.current === mic && mic.ctx.state === "running" && statusRef.current === "micpaused") {
+        setStatus("listening");
+        arm(false);
+      }
+    }).catch(() => {});
+  };
+  /** Starts over with a fresh microphone (and a new connection), from a tap. */
+  const reconnect = (freshMic: boolean) => {
+    endedByUser.current = false;
+    if (freshMic) releaseMic();
+    primeMicAudio();
+    void outRef.current?.ctx.resume().catch(() => {});
+    setDeaf(false);
+    const old = sessionRef.current;
+    sessionRef.current = null;
+    old?.close();
+    void connect();
+  };
+  const showLevel = status === "listening" || status === "speaking" || status === "micpaused";
+
   return (
+    <div className="flex flex-col gap-2">
+      {status === "micpaused" && (
+        <div className="notice notice-warn flex flex-wrap items-center gap-2 text-sm">
+          <span>The browser paused the microphone, so Navi can't hear you.</span>
+          <button type="button" className="btn btn-primary btn-sm" onClick={resumeMic}>Tap to resume the microphone</button>
+        </div>
+      )}
+      {deaf && status === "listening" && !muted && (
+        <div className="notice notice-warn flex flex-wrap items-center gap-2 text-sm" aria-live="polite">
+          <span>Navi isn&apos;t hearing your microphone — check the input device and microphone permission (and that it isn&apos;t muted).</span>
+          <button type="button" className="btn btn-sm" onClick={() => reconnect(true)}>Retry microphone</button>
+        </div>
+      )}
+      {showLevel && (
+        <div className="flex items-center gap-2 text-xs">
+          <span aria-hidden="true" className="h-2 w-24 overflow-hidden rounded-full bg-surface-2">
+            <span className="block h-full rounded-full bg-ok transition-[width] duration-100" style={{ width: `${Math.round(level * 100)}%` }} />
+          </span>
+          <span className="muted">{muted ? "Mic: muted" : status === "micpaused" ? "Mic: paused" : soundRecently ? "Mic: picking up sound" : "Mic: silent"}</span>
+        </div>
+      )}
     <div className="flex flex-wrap gap-2">
       <button type="button" className="btn" aria-pressed={muted} onClick={() => setMuted(!muted)}>{muted ? "Unmute mic" : "Mute mic"}</button>
       <button type="button" className="btn" onClick={() => { flushPlayback(); }}>Stop Navi talking</button>
-      <button type="button" className="btn" onClick={() => { endedByUser.current = false; const old = sessionRef.current; sessionRef.current = null; old?.close(); void connect(); }}>Reconnect</button>
+      <button type="button" className="btn" onClick={() => reconnect(false)}>Reconnect</button>
       <button
         type="button"
         className="btn btn-danger"
@@ -470,6 +679,7 @@ function LiveVoice({ kind, muted, setMuted, setStatus, setError, setLines, onTur
       >
         End voice
       </button>
+    </div>
     </div>
   );
 }

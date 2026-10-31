@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireApiCtx } from "@/server/context";
 import { apiError } from "@/server/http";
 import { modelFor, voiceAvailability } from "@/server/ai/config";
-import { assertBudget, BudgetExceededError, RateLimitedError, reserveVoiceSession, settleUsage, VOICE_RESERVE_USD } from "@/server/ai/budget";
+import { assertBudget, BudgetExceededError, RateLimitedError, reserveVoiceSession, settleExpiredVoiceSessions, settleUsage, VOICE_RESERVE_USD } from "@/server/ai/budget";
 import { buildVoiceSession, mintVoiceToken } from "@/server/ai/voice";
 
 const Body = z.object({ kind: z.enum(["chat", "onboarding"]).default("chat"), resumeHandle: z.string().max(500).nullish(), probe: z.boolean().optional() });
@@ -12,7 +12,9 @@ const Body = z.object({ kind: z.enum(["chat", "onboarding"]).default("chat"), re
 // ephemeral token, never the API key. Every minted token first reserves the
 // cost of its whole lifetime (VOICE_TOKEN_MINUTES of two-way audio) against
 // the daily budget, server-side, so spend doesn't depend on the browser
-// reporting it; reported turns are reconciled against that reservation.
+// reporting it; reported turns are reconciled against that reservation, and
+// when the session ends (/api/voice/end, or its token expires) it is settled
+// to max(reported, server-measured elapsed time × the two-way audio rate).
 export async function POST(request: NextRequest) {
   try {
     const ctx = await requireApiCtx();
@@ -24,6 +26,7 @@ export async function POST(request: NextRequest) {
     // Availability check only: nothing is reserved or minted.
     if (body.probe) {
       try {
+        await settleExpiredVoiceSessions(ctx.userId);
         await assertBudget(VOICE_RESERVE_USD);
       } catch (err) {
         if (err instanceof BudgetExceededError) return NextResponse.json({ error: err.message, fallback: "none" }, { status: 402 });

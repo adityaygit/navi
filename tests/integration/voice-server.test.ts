@@ -152,4 +152,93 @@ describe("voice budget is enforced server-side", () => {
       await clearUsage();
     }
   });
+
+  // Owner report: two 10-second attempts used $0.50 of the $2/day budget.
+  describe("a session's reservation settles to the time it really ran", () => {
+    const model = "gemini-3.8-live";
+    const backdate = (id: string, seconds: number) =>
+      admin().from("ai_usage").update({ created_at: new Date(Date.now() - seconds * 1000).toISOString() }).eq("id", id);
+    const row = async (id: string) => (await admin().from("ai_usage").select("cost_usd,audio_seconds").eq("id", id).single()).data!;
+    const withBudget = async (fn: () => Promise<void>) => {
+      await clearUsage();
+      vi.stubEnv("NAVI_DAILY_BUDGET_USD", "1000");
+      try {
+        await fn();
+      } finally {
+        vi.unstubAllEnvs();
+        vi.stubEnv("GEMINI_API_KEY", "test-key-not-real");
+        await clearUsage();
+      }
+    };
+
+    it("a short session that hangs up costs about its elapsed time, not the reserve", () =>
+      withBudget(async () => {
+        const id = await budget.reserveVoiceSession(userId, model);
+        await backdate(id, 10);
+        // While it's open the whole reserve stays held, even with a small turn reported.
+        await budget.recordVoiceTurn({ userId, sessionId: id, model, inputAudioSeconds: 1, outputAudioSeconds: 0, inputTokens: 0, outputTokens: 0, price: price(model) });
+        expect(await sessionTotal(id)).toBeCloseTo(budget.VOICE_RESERVE_USD, 6);
+        expect(await budget.endVoiceSession(userId, id)).toMatchObject({ ended: true });
+        const total = await sessionTotal(id);
+        expect(total).toBeGreaterThanOrEqual(budget.voiceElapsedFloorUsd(10) - 1e-6);
+        expect(total).toBeLessThan(budget.voiceElapsedFloorUsd(20));
+        expect(total).toBeLessThan(0.01);
+        const elapsed = Number((await row(id)).audio_seconds);
+        expect(elapsed).toBeGreaterThanOrEqual(10);
+        expect(elapsed).toBeLessThan(20);
+        // A second end report (or a late turn) doesn't move the end or bring the reserve back.
+        await backdate(id, 300);
+        await budget.endVoiceSession(userId, id);
+        expect(Number((await row(id)).audio_seconds)).toBeCloseTo(elapsed, 3);
+        await budget.recordVoiceTurn({ userId, sessionId: id, model, inputAudioSeconds: 0.5, outputAudioSeconds: 0, inputTokens: 0, outputTokens: 0, price: price(model) });
+        expect(await sessionTotal(id)).toBeCloseTo(total, 5);
+      }));
+
+    it("a session that never reports its end stays reserved until its token expires, then settles to elapsed-at-expiry", () =>
+      withBudget(async () => {
+        const id = await budget.reserveVoiceSession(userId, model);
+        await backdate(id, 5 * 60);
+        expect(await budget.settleExpiredVoiceSessions(userId)).toBe(0);
+        expect(await sessionTotal(id)).toBeCloseTo(budget.VOICE_RESERVE_USD, 6);
+        await backdate(id, 12 * 60);
+        // The next mint by the same person notices it.
+        const next = await budget.reserveVoiceSession(userId, model);
+        expect(await sessionTotal(id)).toBeCloseTo(budget.voiceElapsedFloorUsd(budget.VOICE_TOKEN_MINUTES * 60), 6);
+        expect(budget.voiceElapsedFloorUsd(budget.VOICE_TOKEN_MINUTES * 60)).toBeLessThanOrEqual(budget.VOICE_RESERVE_USD);
+        expect(Number((await row(id)).audio_seconds)).toBe(budget.VOICE_TOKEN_MINUTES * 60);
+        // The new session is open: fully reserved.
+        expect(await sessionTotal(next)).toBeCloseTo(budget.VOICE_RESERVE_USD, 6);
+        // A later turn report notices expired sessions too.
+        await backdate(next, 12 * 60);
+        await budget.recordVoiceTurn({ userId, sessionId: null, model, inputAudioSeconds: 1, outputAudioSeconds: 0, inputTokens: 0, outputTokens: 0, price: price(model) });
+        expect(await sessionTotal(next)).toBeCloseTo(budget.voiceElapsedFloorUsd(budget.VOICE_TOKEN_MINUTES * 60), 6);
+        // A failed mint (released to $0) is never charged on expiry.
+        const failed = await budget.reserveVoiceSession(userId, model);
+        await budget.settleUsage(failed, { costUsd: 0, ok: false }, model);
+        await backdate(failed, 12 * 60);
+        await budget.settleExpiredVoiceSessions(userId);
+        expect(await sessionTotal(failed)).toBe(0);
+      }));
+
+    it("when the reported usage is more than the elapsed estimate, the reported usage is charged", () =>
+      withBudget(async () => {
+        const id = await budget.reserveVoiceSession(userId, model);
+        await backdate(id, 10);
+        const big = await budget.recordVoiceTurn({ userId, sessionId: id, model, inputAudioSeconds: 0, outputAudioSeconds: 0, inputTokens: 20_000, outputTokens: 5_000, price: price(model) });
+        expect(big.costUsd).toBeGreaterThan(budget.voiceElapsedFloorUsd(20));
+        await budget.endVoiceSession(userId, id);
+        expect(Math.abs((await sessionTotal(id)) - big.costUsd)).toBeLessThanOrEqual(1.01e-6);
+        expect(Number((await row(id)).cost_usd)).toBe(0);
+      }));
+
+    it("ignores someone else's session id", () =>
+      withBudget(async () => {
+        const id = await budget.reserveVoiceSession(userId, model);
+        await backdate(id, 10);
+        const { userId: aliceId } = await userClient("alice@navi.test");
+        expect(await budget.endVoiceSession(aliceId, id)).toEqual({ ended: false });
+        expect(await row(id)).toMatchObject({ audio_seconds: 0 });
+        expect(await sessionTotal(id)).toBeCloseTo(budget.VOICE_RESERVE_USD, 6);
+      }));
+  });
 });
