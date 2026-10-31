@@ -21,7 +21,7 @@ import { VOICE_TOKEN_MINUTES } from "./budget";
 const VOICE_STYLE = `
 
 You are speaking aloud in a real-time voice conversation. Keep replies short and natural (one to three sentences), ask one question at a time, never read IDs, URLs or long lists aloud, and say briefly what you did after using a tool. If the user interrupts, stop and listen.
-The state below is a snapshot from when this voice session started and goes stale as you talk. For anything about the schedule, tasks, the inbox or captures, call get_plan, get_inbox or search_items first and answer from the result. For "tomorrow" or a weekday, call get_plan with date "tomorrow" or that date rather than working it out from the snapshot.`;
+The state below is a snapshot from when this voice session started and goes stale as you talk. For anything about the schedule, tasks, the inbox or captures, call get_plan, get_inbox or search_items first and answer from the result. For "how did I do", call get_review and say its numbers; never work statistics out yourself. For "tomorrow" or a weekday, call get_plan with date "tomorrow" or that date rather than working it out from the snapshot.`;
 
 export function voiceFunctionDeclarations(kind: "chat" | "onboarding"): FunctionDeclaration[] {
   return toolsFor(kind === "onboarding" ? "onboarding" : "voice").map((t) => ({

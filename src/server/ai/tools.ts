@@ -18,6 +18,8 @@ import type { CalendarEvent, PlanBlock, Proposal, Routine, Task } from "@/lib/ty
 import { buildDayAgenda, describeDayAgenda, type AgendaEntry } from "@/server/planner/agenda";
 import { proposalTitle } from "@/server/domain/proposals";
 import { fixWeekdayNumbering, guardInventedTimes } from "./time-guard";
+import { dayReview, weekInsights, type DayReview } from "@/server/domain/insights";
+import { summarizeDayPlan, summarizeWeekPlan } from "@/lib/plan-summary";
 
 // The tools Navi can use. The same registry backs text chat, real-time voice
 // and onboarding, and every tool calls the same domain functions the
@@ -129,6 +131,87 @@ async function planText(ctx: Ctx, date: string | null | undefined, days: number)
   const body = list.map((d) => describeDayAgenda(buildDayAgenda({ date: d, zone, ...inputs }), zone, today)).join("\n");
   const noAvailability = profile.availability.length === 0 ? " No availability is set, so Navi hasn't scheduled flexible work." : "";
   return `Times are in ${zone}. Today is ${DateTime.fromISO(today, { zone }).toFormat("cccc, LLL d yyyy")}.${noAvailability}\n${body}`;
+}
+
+const pct = (r: number | null) => (r === null ? null : Math.round(r * 100));
+
+function dayFacts(d: DayReview) {
+  return {
+    date: d.date,
+    completion_percent: pct(d.completionRate),
+    explanation: d.explanation,
+    planned_blocks: d.planned,
+    done: d.done,
+    partly_done: d.partial,
+    rest: d.rest,
+    interrupted: d.interrupted,
+    blocked_on_missing_info: d.skippedMissingInfo,
+    took_longer_than_estimated: d.overran,
+    skipped_without_outside_reason: d.avoided,
+    missed: d.missed,
+    not_marked_yet: d.unmarked,
+    focus_minutes: d.focusMinutes,
+    tasks_completed: d.tasksCompleted,
+    plan_broke: d.disruptions,
+    findings: d.findings,
+  };
+}
+
+/**
+ * The computed review (same code as the Insights page, evening review and
+ * briefings) plus recently stored briefings, so the model quotes real
+ * numbers instead of working them out.
+ */
+async function reviewData(ctx: Ctx, kind: "day" | "week", date: string | null | undefined) {
+  const profile = await getProfile(ctx);
+  const zone = profile.timezone;
+  const today = nowIn(zone).toISODate()!;
+  const d = !date || date === "today" ? today : date === "yesterday" ? DateTime.fromISO(today, { zone }).minus({ days: 1 }).toISODate()! : date;
+  if (!DateTime.fromISO(d, { zone }).isValid) throw new Error(`Not a valid date: ${d}`);
+  if (d > today) throw new Error("That day hasn't happened yet; use get_plan for future days.");
+  const { data: stored } = await ctx.db
+    .from("briefings")
+    .select("kind,local_date,title,body")
+    .eq("user_id", ctx.userId)
+    .lte("local_date", d)
+    .order("local_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(4);
+  const stored_reviews = (stored ?? []).map((b) => ({ kind: b.kind, date: b.local_date, title: b.title, text: b.body.length > 1200 ? `${b.body.slice(0, 1200)}…` : b.body }));
+  const note = "Computed by Navi's code from recorded events. Quote these numbers and findings; don't recompute or estimate statistics. Stored reviews were saved earlier and may be older than the computed review; the computed review is current.";
+  if (kind === "day") return { note, timezone: zone, is_today: d === today, review: dayFacts(await dayReview(ctx.db, ctx.userId, zone, d)), stored_reviews };
+  const w = await weekInsights(ctx.db, ctx.userId, zone, d);
+  return {
+    note,
+    timezone: zone,
+    week: {
+      from: w.start,
+      to: w.end,
+      enough_data_for_trends: w.enoughData,
+      average_completion_percent: pct(w.avgCompletion),
+      days: w.days.map((x) => ({ date: x.date, completion_percent: pct(x.completionRate), planned_blocks: x.planned, done: x.done, partly_done: x.partial, skipped_without_outside_reason: x.avoided, not_marked_yet: x.unmarked })),
+      tasks_completed: w.tasksCompleted,
+      minutes: { in_planned_blocks: w.minutes.planned, in_blocks_marked_done: w.minutes.done, in_blocks_partly_done: w.minutes.partial, measured_focus: w.minutes.focus },
+      estimates: { finished_tasks_with_estimates: w.estimate.samples, median_actual_to_estimate: w.estimate.medianRatio === null ? null : Math.round(w.estimate.medianRatio * 100) / 100 },
+      repeatedly_avoided: w.repeatedlyAvoided.map((a) => ({ title: a.title, times_skipped_in_3_weeks: a.times })),
+      blocks_that_took_longer_than_estimated: w.overran,
+      plan_broke: w.disruptions,
+      interruptions_by_time_of_day_3_weeks: w.interruptionsByPart,
+      late_completions: w.lateCompletions,
+      progress: w.progress.map((p) => ({ kind: p.kind, name: p.name, finished_this_week: p.completed, still_open: p.open })),
+      next_7_days: {
+        from: w.nextWeek.from,
+        to: w.nextWeek.to,
+        deadlines: w.nextWeek.deadlines.map((x) => ({ title: x.title, due: DateTime.fromISO(x.due_at).setZone(zone).toFormat("ccc LLL d h:mm a"), hard: x.due_is_hard })),
+        work_due_minutes: w.nextWeek.loadMinutes,
+        tasks_without_estimate: w.nextWeek.unestimated,
+        free_minutes: w.nextWeek.freeMinutes,
+        overloaded: w.nextWeek.overloaded,
+      },
+      findings: w.findings,
+    },
+    stored_reviews,
+  };
 }
 
 async function overview(ctx: Ctx): Promise<string> {
@@ -264,6 +347,16 @@ export const TOOLS = [
       "Read the review inbox (pending and deferred items), the user's most recent quick captures with what became of each extracted item (pending, accepted into a task, rejected, merged), and the recent activity log (what changed and who did it). Read-only. Quick captures and dashboard edits are NOT in chat history, so call this for questions about captures, the inbox, or what changed.",
     schema: z.object({}),
     run: async (ctx) => ({ ok: true, summary: "Read the inbox, recent captures and activity", data: await inboxText(ctx) }),
+  }),
+  tool({
+    name: "get_review",
+    description:
+      "Read how the user did, computed by Navi's code from what was recorded: kind 'day' gives a day's completion rating with its explanation, counts (done, partly done, rest, interrupted, missing info, took longer than estimated, skipped without an outside reason, not marked yet), focus minutes, findings and plan disruptions; kind 'week' gives the 7 days ending on date: average and per-day completion, estimate accuracy, repeatedly avoided tasks, project/goal progress, planned vs done minutes, disruptions, next week's deadlines and work vs free time, and findings. Also returns recently stored briefings and reviews. Read-only. Use it for 'how did I do today/yesterday/this week?', ratings, streaks or patterns, and quote its numbers.",
+    schema: z.object({
+      kind: z.enum(["day", "week"]).describe("'day' for one day, 'week' for the 7 days ending on date"),
+      date: z.string().regex(/^(\d{4}-\d{2}-\d{2}|today|yesterday)$/, "YYYY-MM-DD, 'today' or 'yesterday'").nullish().describe("Local date (default today); for 'week', the last day of the week"),
+    }),
+    run: async (ctx, { kind, date }) => ({ ok: true, summary: `Read the ${kind === "day" ? "day" : "week"} review${date ? ` for ${date}` : ""}`, data: await reviewData(ctx, kind, date) }),
   }),
   tool({
     name: "search_items",
@@ -420,8 +513,8 @@ export const TOOLS = [
       return {
         ok: true,
         mutated: true,
-        summary: `Planned ${r.date}: ${r.blocks.length} blocks${r.unscheduled.length ? `, ${r.unscheduled.length} didn't fit` : ""}`,
-        data: { blocks: r.blocks.map((b) => ({ title: b.title, start: b.starts_at, end: b.ends_at, why: b.reason })), unscheduled: r.unscheduled, warnings: r.warnings, freeMinutes: r.freeMinutes },
+        summary: summarizeDayPlan(r, ctx.timezone),
+        data: { blocks: r.blocks.map((b) => ({ title: b.title, start: b.starts_at, end: b.ends_at, why: b.reason })), moved: r.moved, unscheduled: r.unscheduled, only_after_deadline: r.afterDeadline, warnings: r.warnings, freeMinutes: r.freeMinutes },
       };
     },
   }),
@@ -434,8 +527,8 @@ export const TOOLS = [
       return {
         ok: true,
         mutated: true,
-        summary: `Planned the week: ${days.reduce((s, d) => s + d.blocks.length, 0)} blocks`,
-        data: days.map((d) => ({ date: d.date, blocks: d.blocks.length, unscheduled: d.unscheduled.map((u) => u.title), warnings: d.warnings })),
+        summary: summarizeWeekPlan(days, ctx.timezone),
+        data: days.map((d) => ({ date: d.date, blocks: d.blocks.length, moved: d.moved, unscheduled: d.unscheduled.map((u) => u.title), only_after_deadline: d.afterDeadline.map((a) => a.title), warnings: d.warnings })),
       };
     },
   }),
@@ -446,10 +539,11 @@ export const TOOLS = [
       description: z.string().min(3).max(500),
       category: z.enum(["interruption", "rest", "missing_info", "estimate", "external", "other"]),
       available_from: z.string().nullish().describe("ISO time the user is free again, if known"),
+      since: z.string().nullish().describe("ISO time the disruption started, if earlier than now (only blocks from then until available_from are marked)"),
     }),
     run: async (ctx, input) => {
-      const r = await recoverPlan(ctx, { description: input.description, category: input.category, availableFrom: input.available_from });
-      return { ok: true, mutated: true, summary: r.summary, data: { unscheduled: r.plan.unscheduled, warnings: r.plan.warnings } };
+      const r = await recoverPlan(ctx, { description: input.description, category: input.category, availableFrom: input.available_from, since: input.since });
+      return { ok: true, mutated: true, summary: r.summary, data: { moved_to_tomorrow: r.movedToTomorrow, not_scheduled: r.notPlaced, warnings: r.plan.warnings } };
     },
   }),
   tool({

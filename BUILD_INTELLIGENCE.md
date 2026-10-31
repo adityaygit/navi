@@ -4,7 +4,39 @@
 **Repo:** `https://github.com/adityaygit/navi` · **Latest work:** `claude/dazzling-cray-isusbm` (session 3; contains all of `claude/sharp-keller-moxx93` plus newer commits; no PR open). Each new cloud session gets its own branch name: check out the latest branch, then push to the session's own designated branch.
 **Scope rule from owner:** The original cloud session also mounted `/home/user/fairylearn-ai` by mistake. **Never read, modify, or push anything in fairylearn.** Work only in the Navi repo.
 **Product source of truth:** `Navi_Product_Spec.md` · **Ops guide:** `docs/OPERATIONS.md` (local dev, tests, hosted Supabase, deploy, env vars, scheduler, spend limits).
-**Last checkpoint:** 2026-10-30, session 3 — security-review fixes (see "Security review (session 3)"), **uncommitted working tree at time of writing**, including new migration `20261102000001_security_hardening.sql` (applied locally only; hosted needs owner OK). See `git log -1` + `git status`.
+**Last checkpoint:** 2026-10-30 late, session 3 — accountability & reviews pass (see "Accountability & reviews pass"), **uncommitted working tree**, no new migration. Before that: security-review fixes (see "Security review (session 3)"), **uncommitted working tree at time of writing**, including new migration `20261102000001_security_hardening.sql` (applied locally only; hosted needs owner OK). See `git log -1` + `git status`.
+
+## ▶ Job for the next session (owner-assigned, 2026-10-30 evening): Trigger.dev + Google sign-in
+The owner is adding these environment variables, then starting a new cloud session with "resume". The owner asked for both setups ("start a new cloud session and you can set that up"):
+`TRIGGER_ACCESS_TOKEN` (tr_pat_), `TRIGGER_PROJECT_REF` (proj_), `TRIGGER_SECRET_KEY` (now tr_prod_), `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` (see `.env.example`).
+
+**State at handoff:**
+- Production is live at https://navi-sand.vercel.app, built from `main` `a13a7ac` (PR adityaygit/navi#1, merged).
+- Hosted Supabase: all 4 migrations applied, sign-up off, Confirm email on, redirects `…/auth/callback**` and `…/auth/confirm**`, owner account created (passwordless, confirmed).
+- Live `check:deploy` passes; the tick answers 200 with the secret; 24 hourly Vercel crons are active.
+- Session 3 may still be finishing the accountability/reviews batch on `claude/dazzling-cray-isusbm`. Check that branch for newer commits or an open PR before touching the same files.
+
+**Steps:**
+0. Check the new variables: names, lengths and prefixes only.
+1. **CRON_SECRET:** the current value exists only in Vercel (stored "sensitive", can't be read back).
+   - Generate a new one (`openssl rand -hex 32`) and upsert it to Vercel (production + preview, type sensitive).
+   - Use the same value in Trigger.dev.
+   - Vercel env changes apply on the next deploy, so redeploy production (redeploy the latest production deployment via the API).
+   - Verify: the tick returns 200 with the new secret and 401 with a wrong one.
+2. **Trigger.dev:**
+   - Run `TRIGGER_ACCESS_TOKEN=… npx trigger.dev@latest deploy`. `trigger.config.ts` reads `TRIGGER_PROJECT_REF`.
+   - In the Trigger.dev **production** environment, set `NAVI_APP_URL=https://navi-sand.vercel.app` and `CRON_SECRET=<new>`, through the Trigger.dev env-var API or the dashboard. Check the current Trigger.dev docs first.
+   - Confirm a `navi-tick` run succeeds: trigger one manually or wait 10 minutes, and read the run status.
+   - Then remove `crons` from `vercel.json` (keep `framework`) in a PR. Ask the owner before merging.
+3. **Google sign-in:**
+   - Supabase Management API: `PATCH /v1/projects/gxfkumxjeemceoygtuod/config/auth` with `{external_google_enabled: true, external_google_client_id, external_google_secret}`.
+   - Vercel: set `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true` (production + preview, plain). It's build-time, so redeploy.
+   - Verify:
+     - the live login page shows "Continue with Google";
+     - `https://gxfkumxjeemceoygtuod.supabase.co/auth/v1/authorize?provider=google` redirects to accounts.google.com with that client id;
+     - an uninvited Google account is refused, because sign-up is off.
+   - The owner tests their own Google sign-in in a browser.
+4. Record the results here and in `docs/OPERATIONS.md`. Then ask the owner to report on the live sign-in and on the iPhone (install, push, voice).
 
 ## ▶ Session 3 status and what's waiting on the owner (2026-10-30)
 Done in session 3 (owner approved hosted Supabase setup and Vercel env vars for Production + Preview):
@@ -46,6 +78,27 @@ All fixed in the working tree on top of `e2c87c9`; each new integration test was
 5. `npm run check:deploy -- https://navi-sand.vercel.app` (now also checks sign-up off / confirm email / wildcard callback).
 
 **Left open:** voice `complete_task` trusts the transcript the user's own browser relays (the model can't write it; the user could tick the task anyway); Gemini `usageMetadata` semantics (per-turn vs cumulative) unverified against the live service — summed, so it can only over-count; rate limit is per user, budget is still global (a user can exhaust the shared $2 by legitimately using it); one vitest run right after the deliberate old-code worktree run had 1 failure that didn't reproduce in 7 consecutive full runs (likely state left by the failing old-code tests).
+
+## Accountability & reviews pass (session 3, after the security pass; no migration)
+Gap-audit fixes, each with tests; new integration tests were run against the old code (worktree at `42c7c38`) and failed there (review.test 11/11, weekly.test 4/5 — the enough-evidence test pins existing behaviour, accuracy get_review ×3, scheduler ×2).
+| Gap | Fix (files) | Tests |
+|---|---|---|
+| Focus **Stop** marked the block `interrupted` (excluded) | `endFocus` + `focusBlockOutcome` (`domain/tasks.ts`): no reason → `skipped` "Stopped the focus session without a reason" (counts); Stop now asks why (Need rest / Missing info / Took longer than estimated / No reason) in `focus.tsx` | review.test, review.spec |
+| Recovery re-marked every earlier block | `recoverPlan` (`planner/plan.ts`): only flexible blocks overlapping [since (default now), free again]; `recoveryOutcome`: rest→rest, missing_info→skipped "Missing information", estimate→skipped "Took longer than estimated", interruption/external/other→interrupted; recovery dialog has "Started at" | review.test |
+| Re-plan deleted past unmarked blocks (hid them) | `generateDayPlan` writes ended, unmarked Navi blocks back through `replace_day_plan` (no migration; they get new ids); earlier-day "already scheduled" minutes count only blocks not yet ended | review.test |
+| Rest/interrupted block time counted as work done | scheduler `UNWORKED_STATUSES` (skipped/missed/rest/interrupted) | scheduler unit, review.test |
+| "Carried to later days" was untrue | Leftovers are planned into tomorrow (`carried` reason "Carried over from …"); summary lists "Moved to tomorrow: “X” 9:00 AM", what still has no time, and earlier unmarked blocks | review.test, manage.spec |
+| No "took longer than estimated" outcome | `src/lib/outcomes.ts` (shared reasons + `blockCategory`); status `skipped` + reason prefix → category `estimate`: not avoidance, excluded from the rating, own finding; plan-block Skip… menu + review screen | outcomes unit, review.test |
+| `plan_disruptions` never read | `dayReview.disruptions`, `weekInsights.disruptions` + findings; Insights shows them | review.test, weekly.test |
+| Planner results discarded | `scheduleDay.afterDeadline`; `src/lib/plan-summary.ts`; `act()` message fn; `ActionButton showResult` on Re-plan today / Plan this day / Plan next 7 days / Plan tomorrow / Plan next week; AI plan tools return the same summary; morning auto-plan leftovers go into the briefing | plan-summary unit, review.test, review.spec, core.spec |
+| AI computed stats itself | read-only `get_review({kind, date})` (tools.ts, `READ_ONLY_TOOLS`, chat + voice), prompt + voice guidance, devsim route | accuracy.test ×3 |
+| Morning briefing: due-today only | hard deadlines next 3 days; `planner/deadlines.ts` `deadlineRisks` (estimate left vs planned minutes before the deadline); didn't-fit / after-deadline from the tick's plan | review.test |
+| Evening review static | `/review?date=` (mark each unmarked block with an optional note, computed review, "Plan tomorrow"/"Plan the rest of today"); `refreshStoredReview` after any outcome/focus/recovery; Today: "N blocks from yesterday aren't marked" + evening prompt; briefing card + 21:00 push link to `/review`, weekly to `/insights`. Decision: past unmarked blocks stay **unmarked** (counted against the rating and flagged), never auto-`missed` | review.test, review.spec, a11y.spec (/review) |
+| Weekly review thin, untested | `weekInsights`: per-project/goal progress, planned/done/partial/focus minutes, disruptions, overruns, interruptions by part of day (3 weeks), next 7 days deadlines + work due vs free time (scheduler `freeMinutes`), true median; weekly briefing lines; Insights "Projects & goals" + "Next 7 days" + **Plan next week** | weekly.test ×5 |
+| Behavioral memory from evidence | `domain/patterns.ts` `learnFromWeek` on each weekly review (saveBriefing / "Weekly review now"): avoidance (`avoid:<task>`), estimate ratio (`estimate:under/over`), interruptions by time (`interruptions:<part>`); origin observed, evidence entries `{pattern, week_end, supports, summary}`, confidence = 0.5 + 0.1·support − 0.2·against (idempotent per week), superseded below 0.4; rejected stay rejected, user-corrected not revived, user-confirmed keep wording; memory card shows "Evidence (n)" | weekly.test ×4, review.spec |
+Also fixed: flaky voice-budget assertion (two `numeric(12,6)` rows can differ from the unrounded sum by 1e-6); manage/a11y e2e failed after ~23:30 UTC (no free time left "today") → those accounts use a no-DST zone where it's midday (`middayTimezone()` in tests/e2e/helpers.ts); review.spec is time-of-day independent.
+Real-model check (Sonnet 5.5, local): "How did I do this week?" → 2 calls ($0.052), answer used get_review-only fields (per-day %, planned vs done minutes, project progress, next-week free time) matching the computed review; read-only calls aren't stored in tool_events, so the tool name itself wasn't logged.
+Still open: no per-day "missed" automation (by decision); `deadlineRisks` ignores the learned estimate ratio; recovery moves leftovers only to tomorrow (anything that doesn't fit there is reported, stays on the list); weekly interruption pattern uses blocks marked interrupted only.
 
 ## How to resume in a fresh session ("resume")
 1. Check out the latest branch (`claude/dazzling-cray-isusbm` as of session 3); read `Navi_Product_Spec.md`, this file, then `git log --oneline -15` and `git status`.
@@ -106,9 +159,9 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 | Planner (day/week, fixed vs flexible, DST) + recovery | verified | Scheduler unit tests incl. DST; recovery keeps unfinished work; blocks settle on finish/cancel/delete; plans written atomically (no double booking); structure.spec plans around a fixed commitment. |
 | Tasks: subtasks, priorities, estimates, blockers, recurrence | verified | Recurrence: next occurrence after now at same local time, no duplicates (flows.test "recurring tasks"). |
 | UI: Today / Chat / Inbox / Planner / Tasks / Projects & Goals / Insights / Memory / Notes / Activity / Settings / More | verified (browser) | Notes (`/notes`, in More): list/view/edit/add/delete, honest empty state, notes.spec + in a11y.spec. Also core/manage/structure specs on desktop + iPhone 13; a11y.spec axe WCAG 2.2 AA clean (light + dark), no sideways scrolling, ≥44px touch targets on iPhone, zero CSP violations. |
-| Persistent memory with provenance | verified | Memory UI e2e; project memory recalled in a new conversation; rejected memories excluded. |
-| Strict-but-fair accountability | verified | flows.test pins scoring (rest/interruptions/missing info excluded, partial = half, unmarked flagged, avoidance question). |
-| Briefings 06:00/21:00, weekly review, reminders, tick | verified (local) | Unit tests across US DST, +05:30, catch-up; one briefing per local day; reminders respect quiet hours/expiry; overlapping ticks send a push once; failed pushes retry ×2. **No scheduler deployed.** |
+| Persistent memory with provenance | verified | Memory UI e2e; project memory recalled in a new conversation; rejected memories excluded. Behavioral memories observed from weekly evidence, strengthened/overturned by later weeks, evidence on the card (weekly.test, review.spec). |
+| Strict-but-fair accountability | verified | flows.test pins scoring; review.test: Stop without reason counts, "took longer than estimated" outcome, recovery marks only the disruption window, re-plan keeps unmarked past blocks, disruptions read back. Guided daily review `/review` (review.spec). |
+| Briefings 06:00/21:00, weekly review, reminders, tick | verified (local) | Unit tests across US DST, +05:30, catch-up; one briefing per local day; reminders respect quiet hours/expiry; overlapping ticks send a push once; failed pushes retry ×2. Morning: hard deadlines 3 days, at-risk work, didn't-fit; evening links `/review` and is rebuilt after marking; weekly: progress, minutes, disruptions, next-week load + Plan next week (review.test, weekly.test). **No scheduler deployed.** |
 | Web push | verified (local), device pending | push.test (real encryption to a local endpoint, VAPID, TTL, 410 cleanup, overlap, retry); pwa.spec (push → notification + deep link). Real push service + iPhone unverified. |
 | PWA manifest, service worker, icons | verified (Chromium), device pending | pwa.spec. Home-screen install on a real iPhone unverified. |
 | Real-time voice (Gemini Live) | **verified with a real Live session (local), incl. barge-in**; device pending | Barge-in (real, open-items pass): fake-mic WAV asks a long question, speaks again 5 s later; Gemini sent `interrupted` 0.5 s into the second utterance (after `generationComplete`), the client stopped all 47–51 queued chunks at that instant (~3.3 s played of a 21 s reply), status → Listening, the new question was answered (once via `get_overview`). Saved transcript now keeps only what was heard + "…(interrupted)". Earlier, session 3: flite speech via Chromium fake mic → real Live socket (v1beta, ephemeral token OK), audio + transcript reply in ~3–4 s, turn saved to shared history, real `create_task` tool call ran once. Not yet: real barge-in/reconnect, physical iPhone. Stand-in coverage: voice-live.spec + voice-server.test. |
@@ -146,7 +199,7 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 - Real-model re-check after the fixes (≈$0.015): chat "what's on my plate tomorrow?" → Call mom 9:00–9:15 + reading 9:00–9:20 PM (matches DB); "what did I just capture?" after a quick capture → exact words + both items pending (matches DB; first try also recapped false claims from old history → prompt tightened, re-run clean); "add a task to call mom on Sunday" → found the existing task and set a soft due date Sun 23:59 instead of duplicating; Gemini Live "what's on my plate tomorrow?" → called `get_plan({date:"tomorrow"})`, answered correctly.
 - ~~Still open~~ (fixed in the open-items pass below): 30-min task split 15+15; capture invented "on friday" → today 6 PM; notes had no view.
 
-## Open-items pass (session 3, after the real-model run; uncommitted working tree at time of writing)
+## Open-items pass (session 3, after the real-model run; commit b21c0cb)
 - **Notes UI:** `/notes` page (`src/app/(app)/notes/`), linked from More/sidebar: list (newest first, source + dates), edit title/body, add, delete (confirm), empty state. Inbox note cards can edit the body and say where it goes. `NoteCreate` schema; `createItemAction`/`updateItemAction` validate notes. `search_items` returns notes (title or body match); `update_item` can edit notes. Tests: notes.spec (desktop + iPhone), a11y.spec includes /notes, accuracy.test "notes are findable".
 - **Planner chunking** (`scheduler.ts`): work ≤ 60 min is placed whole or waits for a day with room; longer work splits into blocks ≥ 30 min and never leaves a < 30 min remainder; reasons describe the block ("no estimate, 30m assumed", "this block: 70 of 100m"). 5 new scheduler tests (all failed on old code); DST tests unchanged and passing. Real check: activation planned two 30-min blocks with matching reasons.
 - **Capture times** (`src/server/ai/time-guard.ts`, used by `propose_items` when it runs for a capture): if the user's words around an item have no time of day, a task's clock time becomes a soft due date 23:59 that day and a one-off timed event becomes a task due that day; a weekday named on that same weekday gets an explicit "read as today/next X; edit if…" note (skipped if the model already said it). Prompt rule added to CORE (never invent a time; named day → soft due 23:59; same-weekday ambiguity → say the assumption). Real Haiku capture "call mom on friday. dentist on monday. pick up the dry cleaning tomorrow at 5pm" → Call mom due Fri Nov 6 (untimed, assumption stated), Dentist → task due Mon (untimed), dry cleaning Sat 5 PM (stated).
@@ -155,7 +208,7 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 - Still open: Gemini's UTC-offset correctness relies on the prompt (no deterministic check without the user's words at tool-call time); voice onboarding ends with the review screen replacing the voice panel mid-turn (Navi doesn't speak a closing line); chat-mode `propose_items` gets only the prompt rule for invented times (the deterministic guard needs the capture text); n=1 real runs per check.
 - Scripts/screenshots were in the session scratchpad (not in the repo).
 
-## Test commands & latest results (2026-10-30, session 3 security pass: tsc + lint pass, vitest **15 files 152/152**, build pass, Playwright **44/44** (22 × desktop + iPhone, incl. new security.spec; notes.spec `--repeat-each=5` 10/10); open-items pass before it: tsc + lint pass, vitest **12 files 104/104**, build pass, Playwright **36/36**; accuracy pass before it: 81/81, 34/34; below is the session 2 handoff run, all via `scripts/local-only.sh`)
+## Test commands & latest results (2026-10-30 ~23:40 UTC, accountability & reviews pass: tsc + lint pass, vitest **19 files 183/183**, build pass, Playwright **46/46** (23 × desktop + iPhone, incl. new review.spec; review.spec `--repeat-each=3` 6/6); session 3 security pass: tsc + lint pass, vitest **15 files 152/152**, build pass, Playwright **44/44** (22 × desktop + iPhone, incl. new security.spec; notes.spec `--repeat-each=5` 10/10); open-items pass before it: tsc + lint pass, vitest **12 files 104/104**, build pass, Playwright **36/36**; accuracy pass before it: 81/81, 34/34; below is the session 2 handoff run, all via `scripts/local-only.sh`)
 - `npx tsc --noEmit` → pass · `npm run lint` → pass.
 - `npx vitest run` → **9 files, 66/66 passed** (unit + integration on local Supabase; Claude and Gemini network calls mocked).
 - `npx next build` → pass.
@@ -181,6 +234,7 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 - Scheduler: one idempotent `/api/cron/tick`; Trigger.dev task every 10 min calls it (Vercel Hobby cron is daily only).
 - Tests run only against local Supabase (guard + wrapper); browser tests run in UTC.
 - AI answers about state come from read tools (`get_plan`, `get_inbox`, `search_items`, `get_overview`), never chat history; one pure day-agenda builder (`src/server/planner/agenda.ts`) backs Planner, Today and `get_plan`. Read-only tool names live in `src/lib/tool-names.ts` (not shown as "actions taken").
+- Block outcomes: category comes from status + reason prefix (`src/lib/outcomes.ts`); "took longer than estimated" = `skipped` + that reason, excluded from the rating like rest/interruptions/missing info but reported as a planning problem. Past unmarked blocks stay "unmarked" (counted, flagged, prompted on Today and in `/review`), never auto-"missed". Reviews/statistics come from code (`get_review`), never the model.
 - Tasks have no do-date (no migration): "on Sunday" = soft `due_at` Sunday 23:59, reported as a due date, never as "scheduled". Accepted inbox questions become episodic memories.
 - Planner: min block 30 min, work ≤ 60 min never split (`MIN_CHUNK_MINUTES`, `WHOLE_UP_TO_MINUTES` in scheduler.ts).
 - No invented times: deterministic guard for captures (`time-guard.ts`); no all-day events (an event blocks its whole span in the planner), so an untimed "event" becomes a task due that day. Weekday numbering is 0 = Sunday everywhere; an off-by-one batch is corrected only when weekly events' own dates prove it.
@@ -208,6 +262,8 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 - Real voice harness: Chromium `--use-fake-device-for-media-stream --use-file-for-fake-audio-capture=<wav>%noloop`, WAVs from ffmpeg `flite` + `anullsrc` silences (48 kHz mono s16); an init script wrapping `AudioBufferSourceNode.start/stop` shows what played and when it was cut.
 - Supabase CLI `config.toml`: `[auth.email] enable_signup=false` disables the whole email provider (GOTRUE_EXTERNAL_EMAIL_ENABLED=false); turn off public sign-up with `[auth] enable_signup=false`. Auth config changes apply on `supabase stop` + `db:start` (data kept). Redirect allow-list entries are exact unless they end in `**`, so `/auth/callback?next=…` needs `/auth/callback**`.
 - Playwright `getByRole("alert")` also matches Next's empty route announcer → scope to `main`.
+- Tests that plan "today" fail late at night (no free time left before 23:59): give those accounts a zone where it's midday (`middayTimezone()`), or accept the honest "didn't fit" result.
+- Read-only tool calls aren't stored in `messages.tool_events`; to see which read tool a real model used, look at what only that tool returns.
 - Concurrency fixes (each with a test that failed first): proposal accept claim, guarded task completion, recurring successor, push claim + retry, locked day plan, voice tool-call dedupe, chat partial-failure honesty, voice mic release on connection loss, voice turn kept on save failure.
 
 ## Commits (chronological)
@@ -223,6 +279,7 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 7. Physical iPhone check after deploy: install, push, mic/voice.
 
 ## Exact next steps (after the "Job for the next session" above)
+-2. **Accountability & reviews pass:** review + commit the working tree (no migration needed; deploys with the same migrations as the security pass).
 -1. **Security pass (session 3):** review + commit the working tree (no push yet); with owner OK do the 5 hosted steps in "Security review (session 3)" — apply migration `20261102000001` **before** deploying this code.
 0. Commit + push the open-items pass (notes UI, chunking, capture time guard, weekday/offset fixes, heard-only interrupted transcripts) if it is still uncommitted; it has no new migration.
 1. Re-check credentials (names/lengths only). If Supabase variables are fixed: run `npm run check:deploy` (read-only) to see the hosted gaps.

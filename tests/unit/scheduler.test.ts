@@ -146,4 +146,22 @@ describe("learnedEstimateRatio", () => {
     const rows = [1.5, 1.5, 1.5, 3, 0.5].map((r) => ({ estimate_minutes: 60, actual_minutes: 60 * r }));
     expect(learnedEstimateRatio(rows).ratio).toBe(1.5);
   });
+
+  it("doesn't count time in skipped, rest or interrupted blocks as work done", () => {
+    const t = task({ id: "t", estimate_minutes: 60 });
+    for (const status of ["skipped", "missed", "rest", "interrupted"] as const) {
+      const kept = [{ starts_at: "2026-11-02T16:00:00-05:00", ends_at: "2026-11-02T17:00:00-05:00", task_id: "t", routine_id: null, status, title: "T" }];
+      const out = scheduleDay({ date: "2026-11-02", zone, now: morning, availability: weekdays, events: [], routines: [], tasks: [t], keptBlocks: kept });
+      expect(out.blocks.filter((b) => b.task_id === "t").reduce((s, b) => s + DateTime.fromISO(b.ends_at).diff(DateTime.fromISO(b.starts_at), "minutes").minutes, 0), status).toBe(60);
+    }
+    const done = [{ starts_at: "2026-11-02T16:00:00-05:00", ends_at: "2026-11-02T17:00:00-05:00", task_id: "t", routine_id: null, status: "done" as const, title: "T" }];
+    expect(scheduleDay({ date: "2026-11-02", zone, now: morning, availability: weekdays, events: [], routines: [], tasks: [t], keptBlocks: done }).blocks).toHaveLength(0);
+  });
+
+  it("lists work that only fits after its deadline, once per task", () => {
+    const t = task({ id: "late", title: "Form", estimate_minutes: 120, due_at: "2026-11-02T16:30:00-05:00" });
+    const out = scheduleDay({ date: "2026-11-02", zone, now: morning, availability: weekdays, events: [], routines: [], tasks: [t], keptBlocks: [], maxBlockMinutes: 60 });
+    expect(out.afterDeadline).toEqual([{ task_id: "late", title: "Form", due_at: DateTime.fromISO("2026-11-02T16:30:00-05:00").toISO() }]);
+    expect(out.warnings.filter((w) => /after its deadline/.test(w))).toHaveLength(1);
+  });
 });

@@ -47,9 +47,9 @@ export default async function PlannerPage({ searchParams }: { searchParams: Prom
           <Link href={nav(startDt.plus({ days: step }).toISODate()!)} className="btn btn-sm" aria-label="Next">→</Link>
         </div>
         {view === "day" ? (
-          <ActionButton className="btn btn-primary btn-sm" action={planDayAction} args={[start]}>Plan this day</ActionButton>
+          <ActionButton className="btn btn-primary btn-sm" action={planDayAction} args={[start]} showResult>Plan this day</ActionButton>
         ) : (
-          <ActionButton className="btn btn-primary btn-sm" action={planWeekAction}>Plan next 7 days</ActionButton>
+          <ActionButton className="btn btn-primary btn-sm" action={planWeekAction} showResult>Plan next 7 days</ActionButton>
         )}
       </header>
       {profile.availability.length === 0 && (

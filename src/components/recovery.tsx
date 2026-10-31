@@ -18,6 +18,7 @@ export function RecoveryButton() {
   const [category, setCategory] = useState<(typeof CATEGORIES)[number][0]>("interruption");
   const [description, setDescription] = useState("");
   const [freeAt, setFreeAt] = useState("");
+  const [since, setSince] = useState("");
   const [pending, start] = useTransition();
   const [result, setResult] = useState<string | null>(null);
 
@@ -28,20 +29,20 @@ export function RecoveryButton() {
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 md:items-center" onClick={() => setOpen(false)}>
           <div role="dialog" aria-modal="true" aria-labelledby="recover-title" className="w-full max-w-md rounded-t-2xl bg-surface p-4 md:rounded-2xl safe-bottom" onClick={(e) => e.stopPropagation()}>
             <h2 id="recover-title" className="h2">What happened?</h2>
-            <p className="muted mt-1 text-sm">Unfinished work stays on your list. Navi re-plans the rest of today around what's realistic.</p>
+            <p className="muted mt-1 text-sm">Only blocks in that time are marked. Unfinished work stays on your list: Navi re-plans the rest of today, and moves what no longer fits to tomorrow.</p>
             <form
               className="mt-3 flex flex-col gap-3"
               onSubmit={(e) => {
                 e.preventDefault();
                 start(async () => {
-                  let availableFrom: string | null = null;
-                  if (freeAt) {
-                    const [h, m] = freeAt.split(":").map(Number);
+                  const at = (hhmm: string) => {
+                    if (!hhmm) return null;
+                    const [h, m] = hhmm.split(":").map(Number);
                     const d = new Date();
                     d.setHours(h, m, 0, 0);
-                    availableFrom = d.toISOString();
-                  }
-                  const r = await recoverPlanAction({ description: description || CATEGORIES.find((c) => c[0] === category)![1], category, availableFrom });
+                    return d.toISOString();
+                  };
+                  const r = await recoverPlanAction({ description: description || CATEGORIES.find((c) => c[0] === category)![1], category, availableFrom: at(freeAt), since: at(since) });
                   if (r.ok) {
                     setResult((r.data as { summary: string }).summary);
                     announceChange();
@@ -61,6 +62,10 @@ export function RecoveryButton() {
               <div>
                 <label htmlFor="recover-desc" className="label">Details (optional)</label>
                 <input id="recover-desc" className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. practice ran 2 hours late" />
+              </div>
+              <div>
+                <label htmlFor="recover-since" className="label">Started at (optional, default now)</label>
+                <input id="recover-since" type="time" className="input" value={since} onChange={(e) => setSince(e.target.value)} />
               </div>
               <div>
                 <label htmlFor="recover-free" className="label">Free again at (optional)</label>

@@ -3,7 +3,7 @@ import { DateTime } from "luxon";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Profile } from "@/lib/types";
 import { atLocalTime } from "@/lib/time";
-import { saveBriefing, type BriefingKind } from "./briefings";
+import { briefingUrl, saveBriefing, type BriefingKind } from "./briefings";
 import { dispatchDue, queueNotification } from "./notify";
 import { generateDayPlan } from "@/server/planner/plan";
 
@@ -36,15 +36,18 @@ export async function tickUser(db: SupabaseClient, profile: Profile, now = DateT
   const ctx = { db, userId: profile.id, actor: "system" as const, timezone: profile.timezone };
   const results: string[] = [];
   for (const { kind, date } of dueBriefings(profile, now)) {
+    let plan: Awaited<ReturnType<typeof generateDayPlan>> | null = null;
     if (kind === "morning") {
-      // Internal autonomy: plan today's flexible work if nothing is planned yet.
+      // Internal autonomy: plan today's flexible work if nothing is planned yet,
+      // and say in the briefing what didn't fit or only fits after its deadline.
       const { count } = await db.from("plan_blocks").select("id", { count: "exact", head: true }).eq("user_id", profile.id).eq("plan_date", date);
-      if (!count && profile.availability.length) await generateDayPlan(ctx, date);
+      const { count: briefed } = await db.from("briefings").select("id", { count: "exact", head: true }).eq("user_id", profile.id).eq("kind", "morning").eq("local_date", date);
+      if (!count && !briefed && profile.availability.length) plan = await generateDayPlan(ctx, date);
     }
-    const b = await saveBriefing(db, profile, kind, date);
+    const b = await saveBriefing(db, profile, kind, date, { plan, now });
     if (b) {
       results.push(`${kind} briefing`);
-      await queueNotification(db, profile, { kind, title: b.title, body: b.body.split("\n")[0], url: "/", dedupeKey: `${kind}:${date}` });
+      await queueNotification(db, profile, { kind, title: b.title, body: b.body.split("\n")[0], url: briefingUrl(kind, date), dedupeKey: `${kind}:${date}` });
     }
   }
 

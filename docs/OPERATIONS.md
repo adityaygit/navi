@@ -174,7 +174,12 @@ General steps:
 1. In Google Cloud, create an OAuth client (Web application). Authorized
    redirect URI: `https://<ref>.supabase.co/auth/v1/callback`.
 2. In Supabase **Auth → Providers → Google**, paste the client ID and secret.
-3. Set `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true` in the app environment.
+   From a Claude Code session: put them in the environment as
+   `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`. The session sets
+   them with the Management API (`PATCH /v1/projects/<ref>/config/auth`,
+   `external_google_enabled`, `external_google_client_id`, `external_google_secret`).
+3. Set `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true` in the app environment and
+   redeploy (it is read at build time).
 
 With sign-up off, Google sign-in works only for accounts the invite script
 already created (Supabase links the Google identity to the existing
@@ -234,13 +239,16 @@ few minutes: each briefing is stored once per local day, and a missed run is
 caught up within 3 hours.
 
 ```bash
-npx trigger.dev@latest login
+npx trigger.dev@latest login          # or set TRIGGER_ACCESS_TOKEN (tr_pat_…) instead, e.g. in a cloud session
 export TRIGGER_PROJECT_REF=proj_...
 npx trigger.dev@latest deploy
 ```
 
-In the Trigger.dev project, set `NAVI_APP_URL` (the app origin) and
-`CRON_SECRET`. The `navi-tick` task runs every 10 minutes.
+In the Trigger.dev project's production environment, set `NAVI_APP_URL` (the
+app origin) and `CRON_SECRET` (the same value as in Vercel). The `navi-tick`
+task runs every 10 minutes. Vercel stores `CRON_SECRET` as a sensitive value
+that can't be read back, so to share it, generate a new one, set it in both
+places, and redeploy the Vercel app.
 
 Any other scheduler that can send an authenticated POST every 5 to 15 minutes
 works too.

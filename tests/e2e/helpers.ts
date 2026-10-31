@@ -51,3 +51,20 @@ export async function freshSetUpAccount(page: Page, email: string) {
     .eq("id", userId);
   return userId;
 }
+
+// Real zones without daylight saving, by UTC offset (hours).
+const NO_DST_ZONES: Record<number, string> = {
+  [-11]: "Pacific/Pago_Pago", [-10]: "Pacific/Honolulu", [-9]: "Pacific/Gambier", [-8]: "Pacific/Pitcairn", [-7]: "America/Phoenix",
+  [-6]: "America/Regina", [-5]: "America/Panama", [-4]: "America/Puerto_Rico", [-3]: "America/Sao_Paulo", [-2]: "America/Noronha",
+  [-1]: "Atlantic/Cape_Verde", 0: "UTC", 1: "Africa/Lagos", 2: "Africa/Johannesburg", 3: "Europe/Moscow", 4: "Asia/Dubai",
+  5: "Asia/Karachi", 6: "Asia/Dhaka", 7: "Asia/Bangkok", 8: "Asia/Shanghai", 9: "Asia/Tokyo", 10: "Australia/Brisbane",
+  11: "Pacific/Noumea", 12: "Pacific/Fiji",
+};
+
+/**
+ * A time zone where it's around midday right now, for tests that need free
+ * time left "today" (planning today fails honestly late at night).
+ */
+export function middayTimezone(): string {
+  return NO_DST_ZONES[12 - new Date().getUTCHours()];
+}

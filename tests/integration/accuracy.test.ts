@@ -1,11 +1,16 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { DateTime } from "luxon";
-import { ctxFor, resetUser, userClient } from "./helpers";
+import { admin, ctxFor, resetUser, userClient } from "./helpers";
 import { jsonSchemaFor, runTool, toolsFor } from "@/server/ai/tools";
 import { handleTurn } from "@/server/ai/chat";
 import { CHAT_SYSTEM, ONBOARDING_SYSTEM } from "@/server/ai/prompts";
 import { acceptMany, acceptProposal, createProposals } from "@/server/domain/proposals";
 import { processCapture, saveCapture } from "@/server/domain/capture";
+import { dayReview, weekInsights } from "@/server/domain/insights";
+import { saveBriefing } from "@/server/jobs/briefings";
+import { READ_ONLY_TOOLS } from "@/lib/tool-names";
+import { voiceFunctionDeclarations } from "@/server/ai/voice";
+import type { Profile } from "@/lib/types";
 
 // Accuracy fixes from the first real-model run: Navi can read any day's plan,
 // reads current state instead of trusting chat history, reports task dates
@@ -252,5 +257,51 @@ describe("weekday numbering in proposals", () => {
     expect(CHAT_SYSTEM).toMatch(/never "Z" unless their time zone is UTC/);
     const overview = String((await runTool(ctx(), "get_overview", {})).data);
     expect(overview).toMatch(/\(America\/New_York, UTC offset [+-]\d\d:\d\d/);
+  });
+});
+
+describe("Navi reads reviews instead of doing the maths", () => {
+  it("get_review returns the computed day and week review plus stored reviews", async () => {
+    await resetUser(userId);
+    const d = now().minus({ days: 1 }).startOf("day");
+    const date = d.toISODate()!;
+    for (const [i, status] of ["done", "done", "partial", "skipped"].entries()) {
+      await db.from("plan_blocks").insert({ user_id: userId, title: `Block ${i}`, plan_date: date, starts_at: d.set({ hour: 9 + i }).toISO(), ends_at: d.set({ hour: 9 + i, minute: 45 }).toISO(), status, outcome_reason: status === "skipped" ? "Avoided it" : null });
+    }
+    const { data: profile } = await admin().from("profiles").select("*").eq("id", userId).single();
+    await saveBriefing(admin(), profile as Profile, "evening", date);
+
+    const r = await runTool(ctx(), "get_review", { kind: "day", date: "yesterday" });
+    expect(r.ok).toBe(true);
+    const data = r.data as { review: Record<string, unknown>; stored_reviews: { kind: string; date: string; text: string }[]; note: string };
+    const computed = await dayReview(db, userId, zone, date);
+    expect(data.review).toMatchObject({ date, completion_percent: 63, explanation: computed.explanation, done: 2, partly_done: 1, skipped_without_outside_reason: 1, findings: computed.findings });
+    expect(data.note).toMatch(/don't recompute/);
+    expect(data.stored_reviews[0]).toMatchObject({ kind: "evening", date });
+    expect(data.stored_reviews[0].text).toContain(computed.explanation);
+    expect((await runTool(ctx(), "get_review", { kind: "day", date })).data).toMatchObject({ review: { completion_percent: 63 } });
+
+    const week = (await runTool(ctx(), "get_review", { kind: "week" })).data as { week: { findings: string[]; days: { date: string; completion_percent: number | null }[]; enough_data_for_trends: boolean } };
+    const computedWeek = await weekInsights(db, userId, zone, now().toISODate()!);
+    expect(week.week.findings).toEqual(computedWeek.findings);
+    expect(week.week.days.find((x) => x.date === date)?.completion_percent).toBe(63);
+    expect(week.week.enough_data_for_trends).toBe(false);
+
+    expect((await runTool(ctx(), "get_review", { kind: "day", date: "2026-02-31" })).ok).toBe(false);
+    expect((await runTool(ctx(), "get_review", { kind: "day", date: now().plus({ days: 2 }).toISODate() })).summary).toMatch(/hasn't happened yet/);
+  });
+
+  it("is a read-only tool offered to text chat and voice, and the prompts say to use it", () => {
+    expect(READ_ONLY_TOOLS).toContain("get_review");
+    for (const mode of ["chat", "voice"] as const) expect(toolsFor(mode).map((t) => t.name)).toContain("get_review");
+    expect(voiceFunctionDeclarations("chat").map((f) => f.name)).toContain("get_review");
+    expect(CHAT_SYSTEM).toMatch(/call get_review and answer from its computed numbers/);
+    expect(CHAT_SYSTEM).toMatch(/Never calculate statistics, percentages, ratings, streaks or averages yourself/);
+  });
+
+  it("“how did I do?” in chat is answered from the review", async () => {
+    const turn = await handleTurn(ctx(), { kind: "chat", text: "how did I do yesterday?", modality: "text" });
+    const computed = await dayReview(db, userId, zone, now().minus({ days: 1 }).toISODate()!);
+    expect(turn.assistantMessage.content).toContain(computed.explanation);
   });
 });

@@ -3,7 +3,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
 import { assertLocalSupabase } from "../local-guard";
-import { ensureAccount, PASSWORD } from "./helpers";
+import { ensureAccount, middayTimezone, PASSWORD } from "./helpers";
 
 // Automated WCAG 2.1 A/AA checks (axe) on every main page, with real data on
 // screen, plus a check that no page scrolls sideways (on the iPhone profile
@@ -14,7 +14,7 @@ config({ path: ".env.local", quiet: true });
 assertLocalSupabase();
 const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
 
-const PAGES = ["/", "/chat", "/inbox", "/planner", "/tasks", "/projects", "/insights", "/memory", "/notes", "/activity", "/settings", "/more"];
+const PAGES = ["/", "/chat", "/inbox", "/planner", "/tasks", "/projects", "/insights", "/review", "/memory", "/notes", "/activity", "/settings", "/more"];
 
 /** Elements sticking out past the right edge of the screen (sideways scrolling). */
 async function overflow(page: Page, label: string) {
@@ -70,7 +70,7 @@ test("main pages have no automatically detectable WCAG A/AA violations", async (
   await expect(page).toHaveURL(/\/onboarding/);
   problems.push(...(await audit(page, "/onboarding")));
 
-  await admin.from("profiles").update({ onboarding_status: "completed", timezone: "UTC", availability: [{ days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "23:59" }] }).eq("id", userId);
+  await admin.from("profiles").update({ onboarding_status: "completed", timezone: middayTimezone(), availability: [{ days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "23:59" }] }).eq("id", userId);
   const { data: ws } = await admin.from("workspaces").insert({ user_id: userId, name: "School" }).select("id").single();
   // Separate inserts: a bulk insert sends NULL for keys a row leaves out.
   for (const row of [
@@ -84,7 +84,7 @@ test("main pages have no automatically detectable WCAG A/AA violations", async (
   }
   const { data: goal } = await admin.from("goals").insert({ user_id: userId, title: "Finish the semester with a 3.5 GPA or better", workspace_id: ws!.id }).select("id").single();
   await admin.from("projects").insert({ user_id: userId, name: "Science fair volcano with working eruption", workspace_id: ws!.id, goal_id: goal!.id });
-  await admin.from("memories").insert({ user_id: userId, kind: "behavioral", content: "Tends to underestimate essays", origin: "inferred", confidence: 0.6 });
+  await admin.from("memories").insert({ user_id: userId, kind: "behavioral", content: "Tends to underestimate essays", origin: "inferred", confidence: 0.6, evidence: [{ pattern: "estimate:under", week_end: "2026-10-25", supports: true, summary: "median 1.6× over 6 finished tasks" }] });
   await admin.from("notes").insert({ user_id: userId, title: "Locker", body: "Combination is on the back of my planner", source: "capture" });
   await admin.from("proposals").insert({ user_id: userId, kind: "task", payload: { title: "Buy cleats" }, source_excerpt: "buy cleats", origin: "inferred", confidence: 0.5 });
   await admin.from("approvals").insert({ user_id: userId, action_type: "external.gmail.send", summary: "Email coach about Saturday", details: { to: "coach@example.com" }, idempotency_key: `a11y-${Date.now()}:1` });
