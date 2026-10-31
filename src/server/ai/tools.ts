@@ -543,7 +543,7 @@ export const TOOLS = [
     }),
     run: async (ctx, input) => {
       const r = await recoverPlan(ctx, { description: input.description, category: input.category, availableFrom: input.available_from, since: input.since });
-      return { ok: true, mutated: true, summary: r.summary, data: { moved_to_tomorrow: r.movedToTomorrow, not_scheduled: r.notPlaced, warnings: r.plan.warnings } };
+      return { ok: true, mutated: true, summary: r.summary, data: { moved_to_tomorrow: r.movedToTomorrow, moved_to_later_days: r.movedLater, not_scheduled: r.notPlaced, warnings: r.plan.warnings } };
     },
   }),
   tool({

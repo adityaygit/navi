@@ -283,6 +283,56 @@ token, the way the browser does. Total cost is well under one cent, it's
 recorded against the daily budget, and it refuses to run if the budget is used
 up. Use `npm run smoke:ai -- anthropic` or `-- gemini` to check one provider.
 
+### Benchmarks
+
+`npm run bench:ai` runs four representative operations against the real
+Anthropic API with the app's role models and system prompts, and reports
+latency, tokens, cost (price table from `src/server/ai/config.ts`) and
+deterministic quality checks:
+
+| op | role | what it checks |
+| --- | --- | --- |
+| `capture` | fast | messy brain dump → one `propose_items` call: valid items, all 6 things captured, dentist "tuesday 3pm" = event at 15:00 -05:00, no invented times (checked before the app's time guard) |
+| `chat` | fast | "what's left on my plan today?": reads `get_plan`, no writes, mentions every block, no invented times, ≤120 words |
+| `plan-week` | planner | "I'm behind, replan my week": calls `plan_week`, gives an answer, reports the essay shortfall, says the orgo reading is NOT scheduled, no invented times |
+| `onboarding` | planner | last onboarding turn → `propose_items(batch=onboarding)` + `mark_onboarding_ready`: workspaces/goal, practice weekly `[2,4]` at 16:00 -05:00, timezone + quiet hours, display name, untimed due date, `*_ref`s resolve |
+
+Tool definitions are hand-written mirrors of `src/server/ai/tools.ts` (that
+file can't load outside Next) and tool results are fixtures for a fictional
+user, so nothing is written and no personal data is used. Options: `--runs N`
+(max 10), `--only capture,chat`, `--json`, `--no-record`. It prints its
+worst-case cost first and refuses above $0.10 unless `--yes` (one run of all
+four is about $0.098 worst case). Like `smoke:ai` it checks and records
+`ai_usage` (purpose `benchmark`) when Supabase is configured, so run it with
+the hosted Supabase variables unset (the local stack from `.env.local` is used)
+or with `--no-record`:
+
+```bash
+env -u NEXT_PUBLIC_SUPABASE_URL -u SUPABASE_SERVICE_ROLE_KEY npm run bench:ai
+```
+
+Results, 2026-10-31, one run each (`claude-haiku-5-5`, `claude-sonnet-5-5`;
+latest run of each op after the fixtures were finalized):
+
+| op | model | steps | first token | total | in tok | out tok | cost | quality |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| capture | claude-haiku-5-5 | 1 | 2.4 s | 4.9 s | 3,994 | 1,197 | $0.00069 | 6/6 pass |
+| chat | claude-haiku-5-5 | 2 | 0.8 s | 2.0 s | 8,106 | 287 | $0.00034 | 5/5 pass |
+| plan-week | claude-sonnet-5-5 | 2 | 1.2 s | 6.9 s | 7,382 | 671 | $0.01211 | 5/5 pass |
+| onboarding | claude-sonnet-5-5 | 1 | 4.7 s | 13.1 s | 4,053 | 2,210 | $0.03201 | 9/9 pass |
+
+About $0.045 for the set (input tokens include cache reads/writes; a cold
+prompt cache costs a little more, e.g. capture $0.0012 cold). Observations:
+Sonnet thinks before tool calls, so a tight `max_tokens` (≤650 per step) cut
+`plan-week` off before it answered; it re-reads the week with `get_plan` after
+`plan_week`. In one earlier `plan-week` run it said the unscheduled orgo
+reading was "set for Sunday" (now a check), and the passing run still
+suggested moving weekend hours onto an essay due Friday, a reasoning slip the
+deterministic checks don't catch. Onboarding put the whole setup and
+`mark_onboarding_ready` in a single response. Capture with Haiku turned "maybe
+start running again like 3x a week" into a note rather than a routine, and
+skipped a task the fixture state already had.
+
 ## Spend controls
 
 The app enforces `NAVI_DAILY_BUDGET_USD` across all users (default $2 per day,

@@ -19,11 +19,12 @@ test("delivery details list devices and recent notification outcomes, and remove
     user_id: other, endpoint: `https://fcm.googleapis.com/fcm/send/diag-${tag}`, p256dh: "p".repeat(40), auth: "a".repeat(16),
   }).select("id").single();
   // One insert per row: a bulk insert with differing keys would send NULLs.
-  for (const row of [
+  const rows: Record<string, unknown>[] = [
     { user_id: userId, kind: "briefing", title: "Good morning", body: "x", dedupe_key: `diag-a-${tag}`, status: "sent", sent_at: new Date().toISOString() },
     { user_id: userId, kind: "reminder", title: "Essay due soon", body: "x", dedupe_key: `diag-b-${tag}`, status: "held_quiet_hours", deliver_after: new Date(Date.now() + 3_600_000).toISOString() },
     { user_id: userId, kind: "reminder", title: "Call the clinic", body: "x", dedupe_key: `diag-c-${tag}`, status: "failed", last_error: "push service answered HTTP 403" },
-  ]) {
+  ];
+  for (const row of rows) {
     const { error } = await admin.from("notifications").insert(row);
     expect(error).toBeNull();
   }

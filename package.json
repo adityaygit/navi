@@ -16,6 +16,7 @@
     "test:e2e": "playwright test",
     "allow-email": "node scripts/allow-email.mjs",
     "smoke:ai": "node scripts/smoke-ai.mjs",
+    "bench:ai": "node scripts/bench-ai.mjs",
     "check:deploy": "node scripts/check-deploy.mjs",
     "env:local": "node scripts/local-env.mjs"
   },

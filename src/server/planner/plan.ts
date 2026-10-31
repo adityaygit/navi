@@ -185,6 +185,9 @@ export function recoveryOutcome(category: RecoveryCategory, description: string)
  * tomorrow. Earlier blocks the user simply hasn't marked are left alone: they
  * belong in the evening review, not hidden as "interrupted".
  */
+/** How many days ahead "my plan broke" looks for room for leftover work. */
+const RECOVERY_DAYS = 7;
+
 export async function recoverPlan(
   ctx: Ctx,
   input: { description: string; category: RecoveryCategory; availableFrom?: string | null; since?: string | null },
@@ -220,27 +223,42 @@ export async function recoverPlan(
   }
   const plan = await generateDayPlan(ctx, today, { from, reasonPrefix: "Replanned" });
 
-  // Work that no longer fits today goes into tomorrow's free time (fixed items and availability respected).
-  const tomorrow = now.plus({ days: 1 }).toISODate()!;
+  // Work that no longer fits today goes into the next free time: tomorrow
+  // first, then the following days up to a week out (fixed items,
+  // availability and work already booked on earlier days respected).
   const carriedIds = plan.unscheduled.map((u) => u.task_id);
+  const carriedFrom = now.toFormat("ccc LLL d");
   let next: PlanResult | null = null;
   let moved: { title: string; starts_at: string }[] = [];
-  if (carriedIds.length) {
-    next = await generateDayPlan(ctx, tomorrow, { carried: { taskIds: carriedIds, from: now.toFormat("ccc LLL d") } });
-    moved = next.blocks.filter((b) => b.task_id && carriedIds.includes(b.task_id)).map((b) => ({ title: b.title, starts_at: b.starts_at }));
+  let movedLater: { title: string; starts_at: string }[] = [];
+  let shifted = 0;
+  let waiting = carriedIds;
+  let stillUnplaced: PlanResult["unscheduled"] = [];
+  for (let d = 1; d <= RECOVERY_DAYS && waiting.length; d++) {
+    const result = await generateDayPlan(ctx, now.plus({ days: d }).toISODate()!, { carried: { taskIds: carriedIds, from: carriedFrom } });
+    if (d === 1) next = result;
+    shifted += result.moved;
+    const placed = result.blocks.filter((b) => b.task_id && waiting.includes(b.task_id)).map((b) => ({ title: b.title, starts_at: b.starts_at }));
+    if (d === 1) moved = placed;
+    else movedLater = movedLater.concat(placed);
+    stillUnplaced = result.unscheduled.filter((u) => waiting.includes(u.task_id));
+    waiting = stillUnplaced.map((u) => u.task_id);
   }
-  const notPlaced = next ? next.unscheduled.filter((u) => carriedIds.includes(u.task_id)) : [];
+  const notPlaced = stillUnplaced;
 
   const label = { rest: "as rest", interrupted: "interrupted", skipped: input.category === "estimate" ? "as taking longer than estimated" : "as blocked on missing info" }[outcome.status as "rest" | "interrupted" | "skipped"];
   const t = (iso: string) => DateTime.fromISO(iso).setZone(zone).toFormat("h:mm a");
+  const day = (iso: string) => DateTime.fromISO(iso).setZone(zone).toFormat("ccc h:mm a");
   const parts = [
     affected.length
       ? `${affected.length} block${affected.length === 1 ? "" : "s"} marked ${label} (${affected.map((b) => `“${b.title}”`).join(", ")}).`
       : "No planned blocks fell in that time.",
     `${plan.blocks.length} block${plan.blocks.length === 1 ? "" : "s"} re-planned from ${from.toFormat("h:mm a")} today.`,
   ];
-  if (moved.length) parts.push(`Moved to tomorrow: ${moved.map((m) => `“${m.title}” ${t(m.starts_at)}`).join(", ")}${next?.moved ? ` (${next.moved} of tomorrow's blocks shifted to make room)` : ""}.`);
-  if (notPlaced.length) parts.push(`Not scheduled yet, still on your task list: ${notPlaced.map((u) => `“${u.title}” (${u.remaining_minutes} min)`).join(", ")}; there's no free time for it tomorrow either.`);
+  if (moved.length) parts.push(`Moved to tomorrow: ${moved.map((m) => `“${m.title}” ${t(m.starts_at)}`).join(", ")}.`);
+  if (movedLater.length) parts.push(`Moved to later days: ${movedLater.map((m) => `“${m.title}” ${day(m.starts_at)}`).join(", ")}.`);
+  if (shifted) parts.push(`${shifted} already-planned block${shifted === 1 ? "" : "s"} on those days shifted to make room.`);
+  if (notPlaced.length) parts.push(`Not scheduled yet, still on your task list: ${notPlaced.map((u) => `“${u.title}” (${u.remaining_minutes} min)`).join(", ")}; there's no free time for it in the next ${RECOVERY_DAYS} days either.`);
   if (untouchedEarlier.length) parts.push(`${untouchedEarlier.length} earlier block${untouchedEarlier.length === 1 ? " isn't" : "s aren't"} marked yet; say how ${untouchedEarlier.length === 1 ? "it" : "they"} went in the evening review.`);
   const summary = parts.join(" ");
 
@@ -253,5 +271,5 @@ export async function recoverPlan(
   });
   await logActivity(ctx, { action: "plan_recovered", summary: `Plan broke (${input.category}): ${summary}`.slice(0, 1000) });
   await refreshStoredReview(ctx.db, ctx.userId, today);
-  return { summary, affected: affected.length, plan, tomorrow: next, movedToTomorrow: moved, notPlaced };
+  return { summary, affected: affected.length, plan, tomorrow: next, movedToTomorrow: moved, movedLater, notPlaced };
 }
