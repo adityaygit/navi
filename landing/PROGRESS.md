@@ -32,6 +32,8 @@ Separate from the Navi app. Self-contained static site in `landing/`, published 
 - 2026-11-04: Refero research done. Reference site gone; blocked on reference captures.
 - 2026-11-04: Found Refero recording; tracked scroll stops; stitched page; wrote section notes.
 - 2026-11-04: Built page, generated assets, two comparison passes (0.55 → 0.84), tests, artifact v1.
+- 2026-11-04: Style pass: original same-kind imagery (rough stone render, headphone portrait, highland wallpaper, fictional avatars), logo-like orbit chips with original marks, heavier headlines. Score 0.86. Artifact v2.
+- Decision (user-facing): reference visual style is matched; reference text, photos, screenshots and logos are never copied.
 
 ## How to verify (desktop)
 1. `cd landing && npm run build && npm test`

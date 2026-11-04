@@ -142,25 +142,47 @@ function Dock() {
   );
 }
 
-const PALETTE = ['#e9e3d6', '#3a6df0', '#d84a3a', '#f2c94c', '#7c5cff', '#2bb673', '#ff7a1a', '#14a3c7', '#b83280', '#9aa5b1', '#56ccf2', '#c0392b'];
+const PALETTE = ['#e9e3d6', '#3a6df0', '#d84a3a', '#f2c94c', '#7c5cff', '#2bb673', '#ff7a1a', '#14a3c7', '#b83280', '#9aa5b1', '#56ccf2', '#c0392b', '#111111', '#f5f5f5'];
+// Original marks for the integration chips (abstract shapes, not real brand logos).
+const MARKS = [
+  (c) => <circle cx="12" cy="12" r="5" fill={c} />,
+  (c) => <path d="M12 6 18 17H6Z" fill={c} />,
+  (c) => <rect x="7" y="7" width="10" height="10" rx="2.5" fill={c} />,
+  (c) => <path d="M5 14c2.5-5 4.5-5 7 0s4.5 5 7 0" stroke={c} strokeWidth="2.4" fill="none" strokeLinecap="round" />,
+  (c) => <path d="M7 17V9M12 17V6M17 17v-5" stroke={c} strokeWidth="2.6" strokeLinecap="round" />,
+  (c) => <circle cx="12" cy="12" r="5.5" stroke={c} strokeWidth="2.6" fill="none" />,
+  (c) => <path d="M12 5.5l1.9 4.3 4.6.4-3.5 3 1.1 4.6L12 15.4 7.9 17.8 9 13.2l-3.5-3 4.6-.4z" fill={c} />,
+  (c) => <path d="M6 12h12M12 6v12" stroke={c} strokeWidth="2.6" strokeLinecap="round" />,
+  (c) => <path d="M6.5 16.5 17.5 7.5M6.5 7.5h5M12.5 16.5h5" stroke={c} strokeWidth="2.4" strokeLinecap="round" />,
+  (c) => <path d="M12 5a7 7 0 1 0 7 7h-7z" fill={c} />,
+];
+const TOOLS = [I.Calendar, I.Inbox, I.Bookmark, I.Compass, I.Mic, I.Gear, I.Home, I.Search, I.Sparkle];
 function Orbit({ ring }) {
-  const rows = [
-    [200, 5], [0, 7], [56, 13], [112, 15], [168, 15], [224, 15], [280, 13], [336, 11], [392, 7],
-  ];
+  const rows = [[0, 9], [56, 13], [112, 15], [168, 15], [224, 15], [280, 13], [336, 11], [392, 7]];
   let seed = 7;
   const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
-  const glyphs = 'ABDEFGHJKMNPRSTVWXZ';
   return (
     <div className="orbit" aria-hidden="true">
-      {rows.map(([top, n], r) => (
-        <div className="orbit-row" key={r} style={{ top: r === 0 ? 0 : top }}>
-          {Array.from({ length: n }, (_, k) => {
-            const c = PALETTE[Math.floor(rnd() * PALETTE.length)];
-            const g = glyphs[Math.floor(rnd() * glyphs.length)];
-            return <div className="chip" key={k}><i style={{ background: c, color: c === '#e9e3d6' || c === '#f2c94c' ? '#111' : '#fff' }}>{g}</i><span /></div>;
-          })}
-        </div>
-      ))}
+      {rows.map(([top, n], r) => {
+        const Tool = TOOLS[r % TOOLS.length];
+        return (
+          <div className="orbit-row" key={r} style={{ top }}>
+            {Array.from({ length: n }, (_, k) => {
+              const bg = PALETTE[Math.floor(rnd() * PALETTE.length)];
+              const light = ['#e9e3d6', '#f2c94c', '#f5f5f5', '#56ccf2'].includes(bg);
+              const mark = MARKS[Math.floor(rnd() * MARKS.length)];
+              return (
+                <div className="chip" key={k}>
+                  <i style={{ background: `radial-gradient(circle at 35% 30%, ${bg}, color-mix(in srgb, ${bg} 70%, #000))` }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24">{mark(light ? '#121212' : '#ffffff')}</svg>
+                  </i>
+                  <b><Tool size={13} /></b>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
       <div className="ring" style={{ '--ring': ring }}><div className="ring-core"><I.Logo /></div></div>
     </div>
   );
@@ -221,7 +243,7 @@ function Monitor() {
         <p className="lede reveal">Navi lays fixed commitments and flexible work side by side, so focus time and rest both land on the calendar early.</p>
         <div className="monitor reveal">
           <div className="mon-bezel">
-            <div className="mon-screen" style={{ backgroundImage: `url(${img('wall-lake.jpg')})` }}>
+            <div className="mon-screen" style={{ backgroundImage: `url(${img('wall-highland.jpg')})` }}>
               <div className="mon-menubar"><b>Navi</b><span>File</span><span>Edit</span><span>View</span><span>Window</span><span>Help</span><span style={{ marginLeft: 'auto' }}>Tue Nov 4 9:41 AM</span></div>
               <div className="mon-window"><WeekWindow /></div>
             </div>

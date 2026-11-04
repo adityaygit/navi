@@ -116,7 +116,7 @@ export function CommitmentsCard() {
     <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(120% 60% at 40% 105%, rgba(150,40,50,.55) 0%, rgba(80,20,25,.25) 40%, transparent 70%), #0b0b0b' }}>
       {PEOPLE.map(([n, d, a, ini, c], k) => (
         <div key={n} style={{ position: 'absolute', left: 38, right: 40, top: 44 + k * 103, height: 70, display: 'flex', alignItems: 'center', borderBottom: k < 4 ? '1px solid rgba(255,255,255,.05)' : 0, paddingBottom: 30, boxSizing: 'content-box', opacity: k === 4 ? 0.45 : 1 }}>
-          <span style={{ width: 66, height: 66, borderRadius: '50%', display: 'grid', placeItems: 'center', background: `radial-gradient(circle at 35% 30%, ${c}, #111 120%)`, fontSize: 18, fontWeight: 600, color: '#fff', border: '2px solid #222' }}>{ini}</span>
+          <span style={{ width: 66, height: 66, borderRadius: '50%', display: 'grid', placeItems: 'center', background: k < 4 ? `#1a1a1a url(./img/avatar-${k + 1}.jpg) center/cover` : `radial-gradient(circle at 35% 30%, ${c}, #111 120%)`, fontSize: 18, fontWeight: 600, color: '#fff', border: '2px solid #222', boxShadow: 'rgba(0,0,0,.6) 0 4px 14px' }}>{k < 4 ? '' : ini}</span>
           <span style={{ marginLeft: 22, flex: 1 }}>
             <span style={{ display: 'block', fontSize: 20, fontWeight: 600, letterSpacing: '-0.01em' }}>{n}</span>
             <span style={{ display: 'block', fontSize: 15, color: '#8a8a8a', marginTop: 4 }}>{d}</span>

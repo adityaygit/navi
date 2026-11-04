@@ -51,8 +51,8 @@ img { display: block; max-width: 100%; }
   margin: 0;
   font-size: 48px;
   line-height: 1.1;
-  font-weight: 600;
-  letter-spacing: -0.022em;
+  font-weight: 660;
+  letter-spacing: -0.026em;
   background: var(--grad-head);
   -webkit-background-clip: text;
   background-clip: text;
@@ -126,7 +126,7 @@ img { display: block; max-width: 100%; }
 /* ---------- Dock ---------- */
 .dock-sec { position: relative; padding-top: 215px; height: 1020px; }
 .dock-stage { position: relative; height: 740px; margin-top: 0; }
-.sculpture { position: absolute; left: 50%; top: 33px; width: 500px; height: 651px; transform: translateX(-50%); background-size: contain; background-repeat: no-repeat; background-position: center bottom; -webkit-mask-image: radial-gradient(closest-side, #000 80%, transparent 100%); mask-image: radial-gradient(closest-side, #000 80%, transparent 100%); }
+.sculpture { position: absolute; left: 50%; top: 23px; width: 466px; height: 647px; transform: translateX(-50%); background-size: contain; background-repeat: no-repeat; background-position: center bottom; -webkit-mask-image: radial-gradient(closest-side, #000 80%, transparent 100%); mask-image: radial-gradient(closest-side, #000 80%, transparent 100%); }
 .floor { position: absolute; left: 50%; bottom: 20px; width: 1000px; height: 1px; transform: translateX(-50%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.07), transparent); }
 .dock { position: absolute; left: 122px; top: 264px; display: flex; align-items: center; gap: 32px; }
 .dock-bar { display: flex; align-items: center; gap: 25px; height: 115px; padding: 0 18px; border-radius: 99px; background: linear-gradient(180deg, rgba(70,70,70,.72), rgba(40,40,40,.72)); border: 1px solid rgba(255,255,255,.14); -webkit-backdrop-filter: blur(18px) saturate(1.2); backdrop-filter: blur(18px) saturate(1.2); box-shadow: inset 0 1px 0 rgba(255,255,255,.12), rgba(0,0,0,.6) 0 20px 60px; }
@@ -163,8 +163,8 @@ img { display: block; max-width: 100%; }
 .orbit { position: absolute; left: 50%; top: 457px; width: 1400px; height: 470px; transform: translateX(-50%); -webkit-mask-image: radial-gradient(48% 50% at 50% 50%, #000 40%, transparent 100%); mask-image: radial-gradient(48% 50% at 50% 50%, #000 40%, transparent 100%); }
 .orbit-row { position: absolute; left: 0; right: 0; display: flex; justify-content: center; gap: 22px; }
 .chip { display: flex; align-items: center; gap: 4px; height: 38px; padding: 0 10px 0 4px; border-radius: 99px; background: #101010; }
-.chip i { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 13px; font-weight: 700; }
-.chip span { width: 22px; height: 14px; border-radius: 4px; background: #232323; }
+.chip i { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-style: normal; box-shadow: inset 0 1px 0 rgba(255,255,255,.18); }
+.chip b { width: 22px; height: 22px; display: grid; place-items: center; color: #5a5a5a; }
 .ring { position: absolute; left: 50%; top: 50%; width: 170px; height: 170px; margin: -85px 0 0 -85px; border-radius: 50%; background: #000; box-shadow: 0 0 0 6px var(--ring, #479ffa), 0 0 40px 12px var(--ring, #479ffa), 0 0 120px 30px color-mix(in srgb, var(--ring, #479ffa) 45%, transparent); transition: box-shadow 1.2s ease; display: grid; place-items: center; z-index: 2; }
 .ring-core { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--ring, #479ffa); color: #061007; transition: background-color 1.2s ease; }
 .routines { position: absolute; left: 50%; top: 520px; width: 760px; transform: translateX(-50%); display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
