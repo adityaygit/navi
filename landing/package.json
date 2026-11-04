@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5180",
-    "build": "vite build",
+    "build": "vite build && node scripts/artifact-html.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 5181",
     "test": "node --test tests/build.test.mjs"
   },

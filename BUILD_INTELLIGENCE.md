@@ -296,3 +296,6 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 4. Run the app locally against real models (`NAVI_AI_PROVIDER=anthropic`) and repeat onboarding/capture/planning/voice flows; record results here.
 5. Deploy to Vercel with production env (see OPERATIONS), Trigger.dev tick, then `npm run check:deploy -- https://<app>`.
 6. Owner iPhone verification; then Google sign-in.
+
+## Side project: landing page (separate from the app)
+See `landing/PROGRESS.md` (branch `claude/landing-reconstruction`). It does not touch the Navi app code.

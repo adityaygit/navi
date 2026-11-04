@@ -10,7 +10,7 @@ page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 await page.goto(url, { waitUntil: 'networkidle' });
 await page.evaluate(() => document.fonts.ready);
-await page.addStyleTag({ content: '.reveal{opacity:1!important;transform:none!important;transition:none!important}' });
+await page.addStyleTag({ content: '.reveal{opacity:1!important;transform:none!important;transition:none!important;animation:none!important}' });
 await page.waitForTimeout(600);
 const height = await page.evaluate(() => document.documentElement.scrollHeight);
 await page.screenshot({ path: out, fullPage: true });

@@ -13,7 +13,7 @@ const errors = [];
 p.on('pageerror', (e) => errors.push(e.message));
 await p.goto(url + (url.includes('?') ? '&' : '?') + 'capture', { waitUntil: 'networkidle' });
 await p.evaluate(() => document.fonts.ready);
-await p.addStyleTag({ content: '.reveal{opacity:1!important;transform:none!important;transition:none!important} .rot-slide{transition:none!important}' });
+await p.addStyleTag({ content: '.reveal{opacity:1!important;transform:none!important;transition:none!important;animation:none!important} .rot-slide{transition:none!important}' });
 for (const [y, state] of stops) {
   await p.evaluate(([y, state]) => { window.scrollTo(0, y); for (const [k, v] of Object.entries(state)) window.__navi[k]?.(v); }, [y, state]);
   await p.waitForTimeout(900);

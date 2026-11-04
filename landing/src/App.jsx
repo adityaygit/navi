@@ -4,16 +4,6 @@ import { HeroWindow, HeroCards, PlannerCard, CommitmentsCard, BalanceCard, WeekW
 
 const img = (name) => `./img/${name}`;
 
-function useReveal() {
-  useEffect(() => {
-    const els = document.querySelectorAll('.reveal');
-    if (!('IntersectionObserver' in window)) { els.forEach((e) => e.classList.add('in')); return; }
-    const io = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -8% 0px' });
-    els.forEach((e) => io.observe(e));
-    return () => io.disconnect();
-  }, []);
-}
-
 const CAPTURE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('capture');
 const hooks = (typeof window !== 'undefined' && (window.__navi = window.__navi || {})) || {};
 
@@ -403,7 +393,6 @@ function Footer() {
 }
 
 export default function App() {
-  useReveal();
   return (
     <>
       <Nav />
