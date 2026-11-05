@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as I from './icons.jsx';
 import { CAPTURE, HeroApp, SetupTranscript, SetupProposal, WeekPlanner, VoiceLog, BriefingVis, InboxVis, MemoryVis, ReviewSheet, ControlTable, Wave } from './product.jsx';
 
-const img = (name) => `./img/${name}`;
+const img = (name) => `${import.meta.env.BASE_URL}img/${name}`;
 const hooks = (typeof window !== 'undefined' && (window.__navi = window.__navi || {})) || {};
 
 function useCycle(n, ms, enabled = true, name) {
@@ -50,7 +50,7 @@ function Nav() {
           <a href="#setup">How it works</a><a href="#planner">Planner</a><a href="#voice">Voice</a><a href="#control">Privacy</a>
         </nav>
         <div className="nav-right">
-          <a href="#" className="nav-signin">Sign in</a>
+          <a href="/login" className="nav-signin">Sign in</a>
           <a href="#start" className="btn-pill sm">Join early access</a>
         </div>
       </div>
@@ -204,7 +204,7 @@ function Voice() {
 function Details() {
   const cards = [
     ['Morning and evening briefings', 'A spoken plan at 06:00 and a short review at 21:00. Both times are yours to change, and quiet hours are respected.', <BriefingVis key="b" />],
-    ['A review inbox for new commitments', 'Promises Navi notices in email and conversation wait here as suggestions until you add or skip them.', <InboxVis key="i" />],
+    ['A review inbox for new commitments', 'Promises Navi picks out of your notes, voice captures and chats wait here as suggestions until you add or skip them.', <InboxVis key="i" />],
     ['Memory you can read and edit', 'Everything Navi knows about you sits in one plain list, with where it learned it. Change a line and the plan follows.', <MemoryVis key="m" />],
   ];
   return (

@@ -244,8 +244,8 @@ export function BriefingVis() {
 export function InboxVis() {
   return (
     <div className="vis inbox">
-      <div className="ib-src"><span className="ava" style={{ backgroundImage: 'url(./img/avatar-1.jpg)' }} /><span><b>Priya Shah</b><span className="muted"> · email · 08:12</span></span></div>
-      <div className="ib-quote">“Could you send the photos by Wednesday? And dinner Friday still works.”</div>
+      <div className="ib-src"><span className="ava ava-mic"><I.Mic size={13} /></span><span><b>Your voice note</b><span className="muted"> · 08:12</span></span></div>
+      <div className="ib-quote">“Priya wants the photos by Wednesday, and dinner on Friday still works.”</div>
       {[['Send Priya the photos', 'Due Wed', STATUS.risk], ['Dinner with Priya', 'Fri 19:30', STATUS.fixed]].map(([t, d, c]) => (
         <div className="ib-row" key={t}><Dot c={c} /><span>{t}</span><span className="mono muted">{d}</span><span className="ib-act"><button className="btn-xs">Add</button><button className="btn-xs ghost">Skip</button></span></div>
       ))}

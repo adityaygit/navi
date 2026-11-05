@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // /pcm-worklet.js: the static, non-personal voice audio worklet; loading it must not depend on the session cookie.
-const PUBLIC_PATHS = ["/login", "/auth", "/early-access", "/api/waitlist", "/offline", "/manifest.webmanifest", "/sw.js", "/pcm-worklet.js", "/api/cron", "/icons"];
+const PUBLIC_PATHS = ["/login", "/auth", "/early-access", "/api/waitlist", "/landing", "/offline", "/manifest.webmanifest", "/sw.js", "/pcm-worklet.js", "/api/cron", "/icons"];
 
 // Refreshes the Supabase session cookie on every request and sends signed-out
 // visitors to /login. Authorization itself is enforced by RLS and by
@@ -62,6 +62,13 @@ export async function proxy(request: NextRequest) {
   const signedIn = Boolean(data?.claims?.sub);
   const path = request.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + "/"));
+
+  // Signed-out visitors at "/" see the marketing page (static build in public/landing); the URL stays "/".
+  if (!signedIn && path === "/") {
+    const rewrite = NextResponse.rewrite(new URL("/landing/index.html", request.url), { request: { headers: requestHeaders } });
+    rewrite.headers.set("Content-Security-Policy", csp);
+    return rewrite;
+  }
 
   if (!signedIn && !isPublic) {
     if (path.startsWith("/api/")) {

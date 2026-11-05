@@ -489,3 +489,5 @@ img { display: block; max-width: 100%; }
 .email { position: relative; }
 .email-note { position: absolute; left: 18px; top: calc(100% + 10px); color: var(--fg3); font-size: 12px; white-space: nowrap; }
 @media (max-width: 560px) { .email-note { position: static; display: block; margin: 8px 0 0 10px; white-space: normal; } }
+
+.ava-mic { display: grid; place-items: center; background: var(--s3); color: var(--fg2); }
