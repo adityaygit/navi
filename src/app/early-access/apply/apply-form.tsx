@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 
-const field = "w-full rounded-xl border border-[#2a2c31] bg-[#070708] px-4 py-3 text-[15px] outline-none placeholder:text-[#6c6f76] focus:border-[#6c6f76]";
+const field = "w-full rounded-xl border border-[#2a2c31] bg-[#070708] px-4 py-3 text-base md:text-[15px] outline-none placeholder:text-[#6c6f76] focus:border-[#6c6f76]";
 const label = "mb-2 block text-[15px] font-semibold";
 
 export function ApplyForm({ token, email }: { token: string; email: string }) {

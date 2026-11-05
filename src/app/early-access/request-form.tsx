@@ -21,7 +21,7 @@ export function RequestForm() {
     <form onSubmit={submit} className="mt-2">
       <label htmlFor="ea-email" className="sr-only">Email address</label>
       <div className="flex items-center gap-1.5 rounded-full border border-[#2a2c31] bg-[#070708] p-1 pl-5 focus-within:border-[#6c6f76]">
-        <input id="ea-email" name="email" type="email" required autoComplete="email" placeholder="you@example.com" className="h-10 min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[#6c6f76]" />
+        <input id="ea-email" name="email" type="email" required autoComplete="email" placeholder="you@example.com" className="h-10 min-w-0 flex-1 bg-transparent text-base md:text-[15px] outline-none placeholder:text-[#6c6f76]" />
         <button type="submit" disabled={state === "sending"} className="h-10 rounded-full bg-[#f2f2f2] px-5 text-sm font-semibold text-black transition-colors hover:bg-white disabled:opacity-60">{state === "sending" ? "Sending…" : "Request access"}</button>
       </div>
       <input name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 opacity-0" />

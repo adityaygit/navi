@@ -491,3 +491,29 @@ img { display: block; max-width: 100%; }
 @media (max-width: 560px) { .email-note { position: static; display: block; margin: 8px 0 0 10px; white-space: normal; } }
 
 .ava-mic { display: grid; place-items: center; background: var(--s3); color: var(--fg2); }
+
+/* ================= Mobile pass ================= */
+.nav { padding-top: env(safe-area-inset-top, 0px); }
+.planner-frame::after { content: none; }
+@media (max-width: 860px) {
+  .planner-frame::after { content: 'Swipe to see the whole week →'; display: block; margin-top: 12px; color: var(--fg3); font-size: 12.5px; }
+  .week { scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
+}
+@media (max-width: 560px) {
+  .nav-signin { display: inline; font-size: 13.5px; }
+  .nav-right { gap: 16px; }
+  .email input { font-size: 16px; }
+  .setup, .planner, .voice, .details, .acct, .control { padding-top: 96px; }
+  .details .ch-title { margin-bottom: 40px; }
+  .ib-row { grid-template-columns: 6px 1fr auto; row-gap: 8px; }
+  .ib-act { grid-column: 2 / -1; }
+  .vis { height: auto; min-height: 200px; }
+  .hb-inner { padding-top: 72px; }
+  .hb-hero { gap: 20px; margin-bottom: 72px; }
+  .hb-chat { padding: 18px 16px 16px; }
+  .close { margin-top: 96px; padding: 80px 0 120px; }
+}
+@media (max-width: 860px) {
+  .email input { font-size: 16px; }
+  .wordmark, .nav-signin { display: inline-flex; align-items: center; min-height: 44px; }
+}
