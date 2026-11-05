@@ -1,10 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as I from './icons.jsx';
-import { HeroWindow, HeroCards, PlannerCard, CommitmentsCard, BalanceCard, WeekWindow, LineChart } from './mockups.jsx';
+import { CAPTURE, HeroApp, SetupTranscript, SetupProposal, WeekPlanner, VoiceLog, BriefingVis, InboxVis, MemoryVis, ReviewSheet, ControlTable, Wave } from './product.jsx';
 
 const img = (name) => `./img/${name}`;
-
-const CAPTURE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('capture');
 const hooks = (typeof window !== 'undefined' && (window.__navi = window.__navi || {})) || {};
 
 function useCycle(n, ms, enabled = true, name) {
@@ -18,20 +16,28 @@ function useCycle(n, ms, enabled = true, name) {
   return [i, setI];
 }
 
+function EmailPill({ id, label = 'Join early access' }) {
+  const [sent, setSent] = useState(false);
+  return (
+    <form className="email" onSubmit={(e) => { e.preventDefault(); setSent(true); }}>
+      <label htmlFor={id} className="sr">Email address</label>
+      <input id={id} type="email" required placeholder="you@example.com" disabled={sent} />
+      <button className="btn-pill" type="submit" disabled={sent}>{sent ? 'You’re on the list' : label}</button>
+    </form>
+  );
+}
+
 function Nav() {
-  const links = [['Features', true], ['Pricing'], ['Updates'], ['Voice'], ['App']];
   return (
     <header className="nav">
       <div className="container nav-inner">
-        <a className="logo" href="#" aria-label="Navi home"><I.Logo /></a>
-        <ul className="nav-links">
-          {links.map(([l, menu]) => (
-            <li key={l}><a href="#">{l}{menu && <I.Chevron />}</a></li>
-          ))}
-        </ul>
-        <div className="nav-pill">
-          <span>Navi is in early access</span>
-          <a className="btn-white" href="#start">Join waitlist</a>
+        <a href="#" className="wordmark" aria-label="Navi home"><I.Wordmark /></a>
+        <nav className="nav-links" aria-label="Primary">
+          <a href="#setup">How it works</a><a href="#planner">Planner</a><a href="#voice">Voice</a><a href="#control">Privacy</a>
+        </nav>
+        <div className="nav-right">
+          <a href="#" className="nav-signin">Sign in</a>
+          <a href="#start" className="btn-pill sm">Join early access</a>
         </div>
       </div>
     </header>
@@ -42,58 +48,50 @@ function Hero() {
   return (
     <section className="hero">
       <div className="container">
-        <div className="device reveal">
-          <div className="device-screen">
-            <div className="device-wall" style={{ backgroundImage: `url(${img('wall-dawn.jpg')})` }} />
-            <div className="device-window"><HeroWindow /></div>
+        <a className="announce reveal" href="#voice"><span className="mono">New</span> Real-time voice is in early access <I.Chevron dir="right" size={11} /></a>
+        <div className="hero-grid reveal">
+          <h1 className="serif hero-h">A calmer way<br />to <em>run</em> your life.</h1>
+          <div className="hero-side">
+            <p className="lead">Navi learns your life in one conversation, then plans your days with you, keeps your commitments honest, and reviews your week.</p>
+            <EmailPill id="email-hero" />
+            <p className="mono fine">Free during early access · Raw audio is never stored</p>
           </div>
-          <HeroCards />
-          <div className="device-fade" />
         </div>
-        <div className="hero-copy reveal">
-          <p className="hero-kicker">Navi</p>
-          <h1 className="display">Your life, finally in order.</h1>
+      </div>
+      <div className="container hero-stage reveal">
+        <div className="hero-glow" style={{ backgroundImage: `url(${img('wall-dawn.jpg')})` }} aria-hidden="true" />
+        <HeroApp />
+        <p className="caption mono">Talk or type. The plan and the conversation share one state, and nothing moves without your OK.</p>
+      </div>
+    </section>
+  );
+}
+
+function Chapter({ id, eyebrow, title, children, className = '' }) {
+  return (
+    <section id={id} className={`chapter ${className}`}>
+      <div className="container">
+        <div className="ch-head reveal">
+          <p className="eyebrow mono">{eyebrow}</p>
+          <h2 className="serif ch-title">{title}</h2>
+          {children}
         </div>
       </div>
     </section>
   );
 }
 
-function Highlights() {
-  const track = useRef(null);
-  const [edge, setEdge] = useState({ start: true, end: false });
-  const items = [
-    { w: 652, cap: 'A planner that plans with you', el: <PlannerCard /> },
-    { w: 458, cap: 'Commitments, kept in view', el: <CommitmentsCard /> },
-    { w: 458, cap: 'Focus and recovery, compared', el: <BalanceCard /> },
-    { w: 458, cap: 'Reviews you can trust', el: <BalanceCard alt /> },
-  ];
-  const onScroll = () => {
-    const t = track.current; if (!t) return;
-    setEdge({ start: t.scrollLeft < 8, end: t.scrollLeft + t.clientWidth > t.scrollWidth - 8 });
-  };
-  const go = (dir) => track.current?.scrollBy({ left: dir * 478, behavior: 'smooth' });
+function Setup() {
   return (
-    <section className="hl" aria-labelledby="hl-label">
-      <div className="container">
-        <div className="hl-head reveal">
-          <div>
-            <p className="hl-label" id="hl-label">Highlights</p>
-            <p className="hl-text">Navi is one home for the plans, promises, and routines that usually live in your head. Tell it what is going on and it builds a realistic day, checks in honestly, and adapts when life shifts.</p>
-          </div>
-          <div className="hl-arrows">
-            <button className="round-btn" aria-label="Previous" disabled={edge.start} onClick={() => go(-1)}><I.Chevron dir="left" size={14} /></button>
-            <button className="round-btn" aria-label="Next" disabled={edge.end} onClick={() => go(1)}><I.Chevron dir="right" size={14} /></button>
-          </div>
+    <section id="setup" className="setup">
+      <div className="container setup-grid">
+        <div className="setup-copy reveal">
+          <p className="eyebrow mono">Set-up</p>
+          <h2 className="serif ch-title">Tell it about your life <em>once</em>.</h2>
+          <p className="body">No forms and no templates. Describe your week out loud or in writing. Navi turns it into real workspaces, routines, goals and commitments, plus a first plan, and shows you all of it before anything is created.</p>
+          <SetupTranscript />
         </div>
-      </div>
-      <div className="hl-track reveal" ref={track} onScroll={onScroll}>
-        {items.map((it) => (
-          <div className="hl-item" key={it.cap} style={{ width: it.w }}>
-            <div className="hl-card">{it.el}</div>
-            <p className="hl-cap">{it.cap}</p>
-          </div>
-        ))}
+        <div className="reveal"><SetupProposal /></div>
       </div>
     </section>
   );
@@ -141,274 +139,149 @@ function Dock() {
     </section>
   );
 }
-
-const PALETTE = ['#e9e3d6', '#3a6df0', '#d84a3a', '#f2c94c', '#7c5cff', '#2bb673', '#ff7a1a', '#14a3c7', '#b83280', '#9aa5b1', '#56ccf2', '#c0392b', '#111111', '#f5f5f5'];
-// Original marks for the integration chips (abstract shapes, not real brand logos).
-const MARKS = [
-  (c) => <circle cx="12" cy="12" r="5" fill={c} />,
-  (c) => <path d="M12 6 18 17H6Z" fill={c} />,
-  (c) => <rect x="7" y="7" width="10" height="10" rx="2.5" fill={c} />,
-  (c) => <path d="M5 14c2.5-5 4.5-5 7 0s4.5 5 7 0" stroke={c} strokeWidth="2.4" fill="none" strokeLinecap="round" />,
-  (c) => <path d="M7 17V9M12 17V6M17 17v-5" stroke={c} strokeWidth="2.6" strokeLinecap="round" />,
-  (c) => <circle cx="12" cy="12" r="5.5" stroke={c} strokeWidth="2.6" fill="none" />,
-  (c) => <path d="M12 5.5l1.9 4.3 4.6.4-3.5 3 1.1 4.6L12 15.4 7.9 17.8 9 13.2l-3.5-3 4.6-.4z" fill={c} />,
-  (c) => <path d="M6 12h12M12 6v12" stroke={c} strokeWidth="2.6" strokeLinecap="round" />,
-  (c) => <path d="M6.5 16.5 17.5 7.5M6.5 7.5h5M12.5 16.5h5" stroke={c} strokeWidth="2.4" strokeLinecap="round" />,
-  (c) => <path d="M12 5a7 7 0 1 0 7 7h-7z" fill={c} />,
-];
-const TOOLS = [I.Calendar, I.Inbox, I.Bookmark, I.Compass, I.Mic, I.Gear, I.Home, I.Search, I.Sparkle];
-function Orbit({ ring }) {
-  const rows = [[0, 9], [56, 13], [112, 15], [168, 15], [224, 15], [280, 13], [336, 11], [392, 7]];
-  let seed = 7;
-  const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+function Rock() {
+  // Protected section. 860–1186px: the stage scales as one unit. Below 860px: CSS mobile arrangement,
+  // with the dock scaled to the screen width via --ds.
+  const wrap = useRef(null);
+  const [w, setW] = useState(1186);
+  useEffect(() => {
+    const fit = () => setW(wrap.current?.clientWidth || 1186);
+    fit(); addEventListener('resize', fit); return () => removeEventListener('resize', fit);
+  }, []);
+  const mobile = w < 860;
+  const s = mobile ? 1 : Math.min(1, w / 1186);
   return (
-    <div className="orbit" aria-hidden="true">
-      {rows.map(([top, n], r) => {
-        const Tool = TOOLS[r % TOOLS.length];
-        return (
-          <div className="orbit-row" key={r} style={{ top }}>
-            {Array.from({ length: n }, (_, k) => {
-              const bg = PALETTE[Math.floor(rnd() * PALETTE.length)];
-              const light = ['#e9e3d6', '#f2c94c', '#f5f5f5', '#56ccf2'].includes(bg);
-              const mark = MARKS[Math.floor(rnd() * MARKS.length)];
-              return (
-                <div className="chip" key={k}>
-                  <i style={{ background: `radial-gradient(circle at 35% 30%, ${bg}, color-mix(in srgb, ${bg} 70%, #000))` }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24">{mark(light ? '#121212' : '#ffffff')}</svg>
-                  </i>
-                  <b><Tool size={13} /></b>
-                </div>
-              );
-            })}
-          </div>
-        );
-      })}
-      <div className="ring" style={{ '--ring': ring }}><div className="ring-core"><I.Logo /></div></div>
+    <div className={`rock-wrap${mobile ? ' rock-m' : ''}`} ref={wrap} style={{ height: !mobile && s < 1 ? 1020 * s : undefined, '--ds': Math.min(1, (w - 32) / 892) }}>
+      <div className="rock-scale" style={s < 1 ? { transform: `scale(${s})`, width: 1186 } : undefined}>
+        <Dock />
+      </div>
     </div>
   );
 }
 
-const RINGS = ['#479ffa', '#4ebe96', '#c9f53b'];
-function Rotator() {
-  const [slide, setSlide] = useCycle(3, 5200, true, 'slide');
-  const [ring, setRing] = useState(0);
-  useEffect(() => { hooks.ring = setRing; }, []);
-  useEffect(() => { if (slide !== 2 || CAPTURE) return; setRing(0); const t = setInterval(() => setRing((v) => (v + 1) % 3), 1600); return () => clearInterval(t); }, [slide]);
-  const slides = [
-    { cls: 'ember', h: 'Briefings at sunrise.', p: 'Every morning at six, Navi reads you a short plan for the day, then checks in at nine with a two-minute review. Hear it while you get ready, or read it in under a minute.' },
-    { cls: 'frost', h: 'Routines that hold.', p: 'Build habits around the life you actually have. Navi spots missed days early and adjusts the routine before it quietly falls apart.' },
-    { cls: 'volt', h: 'Connected to your tools.', p: 'Bring in your calendar, mail, and notes. Navi keeps commitments, routines, and goals current across every one of them.' },
+function Planner() {
+  return (
+    <section id="planner" className="planner">
+      <div className="container">
+        <div className="center-head reveal">
+          <p className="eyebrow mono">Planner</p>
+          <h2 className="serif ch-title">Fixed where it must be.<br /><em>Flexible</em> everywhere else.</h2>
+          <p className="body">Appointments and promises hold their place. Focus work, errands and recovery move around them, so a new meeting reshapes the week instead of breaking it.</p>
+        </div>
+        <div className="planner-frame reveal" style={{ backgroundImage: `url(${img('wall-highland.jpg')})` }}>
+          <WeekPlanner />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Voice() {
+  return (
+    <section id="voice" className="voice">
+      <div className="container voice-grid">
+        <figure className="voice-photo reveal" style={{ backgroundImage: `url(${img('portrait.jpg')})` }}>
+          <figcaption className="voice-live"><span className="live"><span className="pulse" />Live</span><Wave bars={22} /><span className="mono muted">02:14</span></figcaption>
+        </figure>
+        <div className="voice-copy reveal">
+          <p className="eyebrow mono">Voice</p>
+          <h2 className="serif ch-title">Talk it <em>through</em>.</h2>
+          <p className="body">Real-time, two-way voice that shares one history with your typed chats. Navi acts while you talk, and every change shows up as a line you can check or undo.</p>
+          <VoiceLog />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Details() {
+  const cards = [
+    ['Morning and evening briefings', 'A spoken plan at 06:00 and a short review at 21:00. Both times are yours to change, and quiet hours are respected.', <BriefingVis key="b" />],
+    ['A review inbox for new commitments', 'Promises Navi notices in email and conversation wait here as suggestions until you add or skip them.', <InboxVis key="i" />],
+    ['Memory you can read and edit', 'Everything Navi knows about you sits in one plain list, with where it learned it. Change a line and the plan follows.', <MemoryVis key="m" />],
   ];
   return (
-    <section className="rot" aria-roledescription="carousel" aria-label="Navi features">
-      {slides.map((s, k) => (
-        <div className={`rot-slide${k === slide ? ' on' : ''}`} key={s.h} aria-hidden={k !== slide}>
-          <div className="rot-head">
-            <a className="rot-link" href="#">Learn more <I.Chevron dir="right" /></a><br />
-            <h2 className={`display ${s.cls}`}>{s.h}</h2>
-            <p className="lede">{s.p}</p>
-          </div>
-          {k === 0 && (<>
-            <div className="portrait" style={{ backgroundImage: `url(${img('portrait.jpg')})` }} />
-            <div className="notif-stack" />
-            <div className="notif">
-              <div className="notif-icon"><I.Logo width="14" height="16" /></div>
-              <div className="notif-text"><b>Morning briefing</b> is ready for you · 6:00 AM</div>
-              <span className="notif-btn"><I.Play size={14} /> Listen now</span>
-            </div>
-          </>)}
-          {k === 1 && (
-            <div className="routines">
-              {[['Morning run', 'Mon · Wed · Fri', 0.82], ['Read 20 pages', 'Every night', 0.64], ['Inbox zero', 'Weekdays, 4 PM', 0.91], ['Call home', 'Sundays', 0.5]].map(([t, w, v]) => (
-                <div className="ui-card" key={t} style={{ padding: '18px 20px', height: 96 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 600 }}><span>{t}</span><span style={{ color: '#7d8fb3' }}>{Math.round(v * 100)}%</span></div>
-                  <div style={{ fontSize: 11, color: '#6b6b6b', marginTop: 4 }}>{w}</div>
-                  <div style={{ height: 4, borderRadius: 4, background: '#222', marginTop: 16 }}><div style={{ width: `${v * 100}%`, height: '100%', borderRadius: 4, background: 'linear-gradient(90deg,#b6d6ff,#4c5677)' }} /></div>
-                </div>
-              ))}
-            </div>
-          )}
-          {k === 2 && <Orbit ring={RINGS[ring]} />}
-        </div>
-      ))}
-    </section>
-  );
-}
-
-function Monitor() {
-  return (
-    <section className="mon-sec">
-      <div className="container center">
-        <h2 className="display solid reveal">See the whole week at once.</h2>
-        <p className="lede reveal">Navi lays fixed commitments and flexible work side by side, so focus time and rest both land on the calendar early.</p>
-        <div className="monitor reveal">
-          <div className="mon-bezel">
-            <div className="mon-screen" style={{ backgroundImage: `url(${img('wall-highland.jpg')})` }}>
-              <div className="mon-menubar"><b>Navi</b><span>File</span><span>Edit</span><span>View</span><span>Window</span><span>Help</span><span style={{ marginLeft: 'auto' }}>Tue Nov 4 9:41 AM</span></div>
-              <div className="mon-window"><WeekWindow /></div>
-            </div>
-          </div>
-          <div className="mon-stand" />
+    <section className="details">
+      <div className="container">
+        <h2 className="serif ch-title center reveal">Small things, handled <em>well</em>.</h2>
+        <div className="cards3">
+          {cards.map(([t, b, v]) => (
+            <article className="card dcard reveal" key={t}>
+              {v}
+              <h3>{t}</h3>
+              <p>{b}</p>
+            </article>
+          ))}
         </div>
       </div>
     </section>
   );
 }
 
-function Keys() {
-  const [pressed, setPressed] = useState(false);
-  useEffect(() => { if (CAPTURE) return; const t = setInterval(() => { setPressed(true); setTimeout(() => setPressed(false), 260); }, 2600); return () => clearInterval(t); }, []);
+function Accountability() {
+  const stats = [['9/10', 'commitments kept'], ['11.5h', 'focused work'], ['4', 'recovery blocks protected'], ['1', 'promise at risk, flagged early']];
   return (
-    <div className="keys" aria-hidden="true">
-      <div className={`key key-wide${pressed ? ' pressed' : ''}`}><span className="key-sym">⌘</span><span className="key-word">command</span></div>
-      <div className={`key key-sq${pressed ? ' pressed' : ''}`} style={{ transitionDelay: pressed ? '60ms' : '0ms' }}>K</div>
-    </div>
+    <section className="acct">
+      <div className="container acct-grid">
+        <div className="reveal">
+          <p className="eyebrow mono">Reviews</p>
+          <h2 className="serif ch-title">Strict, but <em>fair</em>.</h2>
+          <p className="body">Every evening Navi compares the plan with what really happened. It names what slipped and why, then proposes specific changes for tomorrow. It never guilt-trips, and it always offers a next step.</p>
+          <dl className="stats">
+            {stats.map(([n, l]) => <div key={l}><dt className="serif">{n}</dt><dd>{l}</dd></div>)}
+          </dl>
+          <p className="mono fine">Example week</p>
+        </div>
+        <div className="reveal"><ReviewSheet /></div>
+      </div>
+    </section>
   );
 }
 
-function Envelope() {
+function Control() {
+  const facts = [[I.Mic, 'Transcripts are saved, raw audio is not', 'Voice is turned into text for your history, and the recording is discarded.'], [I.Moon, 'Quiet hours you choose', 'No notifications or briefings inside them, unless you say otherwise.'], [I.Lock, 'Your data stays yours', 'Export or delete your plans, memory and history at any time.']];
   return (
-    <svg width="92" height="104" viewBox="0 0 92 104" aria-hidden="true">
-      <defs>
-        <linearGradient id="env" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#6d6d6d" /><stop offset="1" stopColor="#2a2a2a" /></linearGradient>
-        <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#9a9a9a" /><stop offset="1" stopColor="#5a5a5a" /></linearGradient>
-      </defs>
-      <rect x="20" y="6" width="52" height="66" rx="6" fill="url(#paper)" />
-      {[18, 28, 38, 48].map((y, k) => <rect key={y} x="28" y={y} width={k % 2 ? 26 : 36} height="5" rx="2.5" fill="#cfcfcf" opacity=".85" />)}
-      <path d="M4 50 46 76 88 50V96a6 6 0 0 1-6 6H10a6 6 0 0 1-6-6Z" fill="url(#env)" stroke="#8a8a8a" strokeOpacity=".5" />
-      <path d="M4 96 38 70M88 96 54 70" stroke="#999" strokeOpacity=".5" />
-    </svg>
-  );
-}
-
-function usePanelScroll() {
-  const wrap = useRef(null), bodyRef = useRef(null);
-  const [t, setT] = useState(0);
-  useEffect(() => {
-    let raf = 0;
-    const update = () => {
-      raf = 0;
-      const w = wrap.current, b = bodyRef.current; if (!w || !b) return;
-      const r = w.getBoundingClientRect();
-      const range = w.offsetHeight - 703;
-      const p = Math.min(Math.max(22 - r.top, 0), range);
-      const tmax = Math.max(b.offsetHeight - (703 - 34), 0);
-      setT(range > 0 ? (p / range) * tmax : 0);
-    };
-    const on = () => { if (!raf) raf = requestAnimationFrame(update); };
-    update();
-    addEventListener('scroll', on, { passive: true }); addEventListener('resize', on);
-    return () => { removeEventListener('scroll', on); removeEventListener('resize', on); cancelAnimationFrame(raf); };
-  }, []);
-  return { wrap, bodyRef, t };
-}
-
-function Band() {
-  const [tab, setTab] = useState(0);
-  const { wrap, bodyRef, t } = usePanelScroll();
-  return (
-    <section className="band">
+    <section id="control" className="control">
       <div className="container">
-        <div className="cmd reveal">
-          <div>
-            <h2 className="display">Capture anything, instantly.</h2>
-            <p className="lede">Press two keys to add a task, move a meeting, or ask what comes next, in plain language. No menus, no forms.</p>
+        <div className="control-grid">
+          <div className="reveal">
+            <p className="eyebrow mono">Control</p>
+            <h2 className="serif ch-title">You stay in <em>charge</em>.</h2>
+            <p className="body">Navi works on its own inside your plan. Anything that reaches other people or changes something fixed waits for your approval.</p>
           </div>
-          <Keys />
+          <div className="reveal"><ControlTable /></div>
         </div>
-        <div className="weekly reveal">
-          <div className="wk-card">
-            <Envelope />
-            <div>
-              <div className="wk-meta">Navi weekly review · Sunday, Nov 9</div>
-              <div className="wk-title">A strong week, one loose end</div>
-              <div className="wk-ex">You closed 23 tasks and kept 9 of 10 commitments. The one that slipped, the insurance call, is now on Monday with a reminder.</div>
-            </div>
-          </div>
-          <div className="weekly-copy">
-            <h2 className="display">Sundays, sorted.</h2>
-            <p className="lede">Each Sunday evening, Navi sums up what you finished, what slipped, and what deserves room next week. <b>Five minutes to read</b>, then Monday starts clear.</p>
-          </div>
-        </div>
-
-        <div className="review center">
-          <span className="soon reveal">Coming soon</span>
-          <h2 className="display reveal">Reviews that keep you honest.</h2>
-          <p className="lede reveal">Navi compares what you planned with what really happened, then suggests fair, specific adjustments. No guilt, just a next step.</p>
-        </div>
-        <div className="panel-wrap" ref={wrap}>
-          <div className="panel-sticky">
-            <div className="panel-move" style={{ position: 'absolute', inset: 0, transform: `translateY(${-t}px)` }}>
-              <span className="callout" style={{ right: 'calc(100% + 30px)', top: 140 }}><span style={{ textAlign: 'right', marginRight: 8 }}>The day,<br />summarized</span><span className="tick" /><span className="dash" /><span className="end" /></span>
-              <span className="callout" style={{ right: 'calc(100% + 30px)', top: 218 }}><span style={{ textAlign: 'right', marginRight: 8 }}>Suggested<br />next steps</span><span className="tick" /><span className="dash" /><span className="end" /></span>
-              <span className="callout" style={{ left: 'calc(100% - 72px)', top: 508 }}><span className="end" /><span className="dash" style={{ width: 92 }} /><span className="tick" /><span style={{ marginLeft: 8 }}>Trends over time</span></span>
-            </div>
-            <div className="panel">
-            <div className="panel-bar">
-              <I.Close size={14} />
-              <span style={{ marginLeft: 19 }}>Generated at 9:00 PM</span>
-              <div className="tabs" role="tablist">
-                {['Review', 'Commitments', 'Insights'].map((t, k) => <button key={t} role="tab" aria-selected={k === tab} className={`tab${k === tab ? ' on' : ''}`} onClick={() => setTab(k)}>{t}</button>)}
-              </div>
-            </div>
-              <div className="panel-move" ref={bodyRef} style={{ transform: `translateY(${-t}px)` }}>
-            <div className="panel-body" style={{ textAlign: 'left' }}>
-              <span className="ui-tag"><span className="ui-dot" style={{ background: '#4ebe96' }}>✓</span>Today</span>
-              <h4>Evening review</h4>
-              <p><span style={{ color: '#6f6f6f' }}>Tuesday, Nov 4.</span> You finished the proposal draft and both calls, skipped the run, and pushed two admin tasks for the second day in a row.</p>
-              <div className="chips">
-                {['Move admin to Thu morning', 'Shorter run tomorrow', 'Protect Friday focus'].map((c) => <span className="chip2" key={c}><I.Sliders size={12} />{c}</span>)}
-              </div>
-              <div className="chart-card">
-                <div style={{ position: 'absolute', left: 40, top: 36, fontSize: 14, fontWeight: 600, display: 'flex', gap: 12, alignItems: 'center' }}><I.Chevron dir="left" /> 7-day focus hours</div>
-                <div style={{ position: 'absolute', left: 525, top: 96, height: 26, padding: '0 10px', borderRadius: 6, background: '#1b1b1b', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>Focus <span style={{ color: '#d6d6d6' }}>18.5h</span></div>
-                <LineChart w={590} h={290} x={40} y={110} seed={11} trend={1.4} color="#e8e8e8" />
-              </div>
-              <h4 style={{ marginTop: 42, fontSize: 17 }}>What to adjust tomorrow:</h4>
-              <ul className="bul">
-                <li><b>Admin is stuck.</b> Two small tasks have moved twice; a 30-minute block before your first call clears both of them.</li>
-                <li><b>Energy dips after 3 PM.</b> Your best work this week happened before lunch, so tomorrow’s hardest task now starts at 10.</li>
-                <li><b>Recovery needs room.</b> Three late nights in a row, so the optional meetup has moved to next week.</li>
-                <li><b>One promise at risk.</b> You told Sam the photos would arrive by Wednesday; a reminder is set for 8 PM tomorrow.</li>
-              </ul>
-              <p style={{ marginTop: 30, lineHeight: '30px' }}>Overall, a solid day. Protecting your mornings is working, and tomorrow’s plan leaves an hour of slack in case something runs over.</p>
-              <div className="stat-card">
-                <div><div style={{ fontSize: 12, fontWeight: 600 }}><span style={{ color: '#4ebe96' }}>●</span> Focus streak <span style={{ color: '#6b6b6b', fontWeight: 400 }}>this month</span></div><div style={{ fontSize: 22, fontWeight: 600, marginTop: 8 }}>12<span style={{ color: '#6b6b6b' }}> days</span></div></div>
-                <div style={{ textAlign: 'right' }}><LineChart w={84} h={24} seed={4} trend={2} color="#4ebe96" /><div style={{ fontSize: 11, color: '#4ebe96', marginTop: 10, fontWeight: 600 }}>+3 vs last week</div></div>
-              </div>
-            </div>
-              </div>
-            </div>
-          </div>
+        <div className="facts reveal">
+          {facts.map(([Ic, t, b]) => <div className="fact" key={t}><Ic size={18} /><h3>{t}</h3><p>{b}</p></div>)}
         </div>
       </div>
     </section>
   );
 }
 
-function Cta() {
+function Close() {
   return (
-    <section className="cta" id="start">
-      <div className="container">
-        <div className="cta-note reveal">Free during early access.</div>
-        <h2 className="display reveal">Start with one conversation.</h2>
-        <p className="lede reveal">Tell Navi about your life once. It builds the plan and keeps it current.</p>
-        <a className="btn-ghost reveal" href="#start">Join the waitlist</a>
+    <section className="close" id="start">
+      <div className="close-horizon" style={{ backgroundImage: `url(${img('wall-dawn.jpg')})` }} aria-hidden="true" />
+      <div className="container close-inner reveal">
+        <h2 className="serif close-h">Begin with one <em>conversation</em>.</h2>
+        <p className="body">Tell Navi about your week. It builds the plan and keeps it current.</p>
+        <EmailPill id="email-close" />
       </div>
     </section>
   );
 }
 
 function Footer() {
+  const cols = [['Product', ['Planner', 'Voice', 'Reviews', 'Memory']], ['Company', ['About', 'Updates', 'Careers']], ['Legal', ['Privacy', 'Terms', 'Security']]];
   return (
     <footer className="footer">
-      <div className="container footer-inner">
-        <span>© 2026 Navi</span>
-        <nav aria-label="Footer">
-          <a href="#">Home</a><a href="#">Features</a><a href="#">Updates</a><a href="#">Download</a>
-          <span className="sep" />
-          <a href="#">Privacy</a><a href="#">Terms</a>
-        </nav>
+      <div className="container">
+        <div className="footer-top">
+          <div><I.Wordmark /><p className="muted">A personal operating system for calmer weeks.</p></div>
+          {cols.map(([h, ls]) => <div key={h}><h4 className="mono">{h}</h4>{ls.map((l) => <a href="#" key={l}>{l}</a>)}</div>)}
+        </div>
+        <div className="footer-bottom mono"><span>© 2026 Navi</span><span>Made for people with too many tabs open</span></div>
       </div>
     </footer>
   );
@@ -420,12 +293,14 @@ export default function App() {
       <Nav />
       <main>
         <Hero />
-        <Highlights />
-        <Dock />
-        <Rotator />
-        <Monitor />
-        <Band />
-        <Cta />
+        <Setup />
+        <Rock />
+        <Planner />
+        <Voice />
+        <Details />
+        <Accountability />
+        <Control />
+        <Close />
       </main>
       <Footer />
     </>

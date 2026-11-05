@@ -52,3 +52,12 @@ Separate from the Navi app. Self-contained static site in `landing/`, published 
 - Mobile + tablet layout (user to decide approach; no reference capture exists).
 - Hover states beyond basics; footer detail (only a low-res reference).
 - Optional: second rotator slide visual polish; carousel 4th card.
+
+## v2 — art direction overhaul (2026-11-04)
+- Direction and audit: `research/art-direction.md`. One system drawing on three references: Fey (product-first chapters), Slash (serif/sans editorial type), Resend (black canvas, hairlines, mono data, colour only for status).
+- Type: Instrument Serif (statements, numerals), Instrument Sans (UI, rock section), Geist Mono (data). No brand accent colour.
+- Page: nav → hero (serif headline + email pill + conversation/plan app window that applies a proposal) → set-up (voice transcript → approvable proposal) → **rock + dock (protected, unchanged)** → planner (fixed vs flexible week that re-flows when a fixed event lands) → voice (portrait + transcript with tool calls) → three detail cards (briefings, review inbox, memory) → reviews (serif stats + evening review sheet) → control (permission table + privacy facts) → close → footer.
+- Removed: Highlights carousel, timed rotator/orbit, ⌘K keys, scroll-jacked review panel, old mockups.jsx.
+- Responsive: real layouts at 1100/860/560 breakpoints; rock stage scales 860–1186 px and uses a phone arrangement below 860 px (same rock, dock, icons, behaviour).
+- Verified: build + 4 bundle tests pass; no horizontal overflow at 1440 and 390; motion checks (hero proposal applies, planner re-flows, toggles, email form) pass with no page errors. Artifact v3 published.
+- Next: second look at tablet (860–1100), hover polish, optional new generated imagery for the set-up chapter.
