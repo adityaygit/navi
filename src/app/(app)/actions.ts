@@ -34,6 +34,7 @@ import {
 import { approveBudgetOverride } from "@/server/ai/budget";
 import { logActivity } from "@/server/domain/activity";
 import { isValidZone } from "@/lib/time";
+import { createConversation, deleteConversation, renameConversation } from "@/server/ai/chat";
 
 // Server actions for every dashboard control. Each one goes through the same
 // domain functions the AI tools use, then refreshes all views.
@@ -258,4 +259,15 @@ export async function generateBriefingAction(kind: "morning" | "evening" | "week
     if (error) throw new Error(error.message);
     return { title: b.title, body: b.body };
   });
+}
+
+// ---- chats -----------------------------------------------------------------
+export async function createChatAction() {
+  return act((ctx) => createConversation(ctx, "chat"));
+}
+export async function renameChatAction(id: string, title: string) {
+  return act((ctx) => renameConversation(ctx, z.string().uuid().parse(id), z.string().max(200).parse(title)), "Chat renamed");
+}
+export async function deleteChatAction(id: string) {
+  return act((ctx) => deleteConversation(ctx, z.string().uuid().parse(id)), "Chat deleted");
 }

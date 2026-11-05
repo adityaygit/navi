@@ -6,7 +6,7 @@ import { modelFor, voiceAvailability } from "@/server/ai/config";
 import { assertBudget, BudgetExceededError, RateLimitedError, reserveVoiceSession, settleExpiredVoiceSessions, settleUsage, VOICE_RESERVE_USD } from "@/server/ai/budget";
 import { buildVoiceSession, mintVoiceToken } from "@/server/ai/voice";
 
-const Body = z.object({ kind: z.enum(["chat", "onboarding"]).default("chat"), resumeHandle: z.string().max(500).nullish(), probe: z.boolean().optional() });
+const Body = z.object({ kind: z.enum(["chat", "onboarding"]).default("chat"), conversationId: z.string().uuid().nullish(), resumeHandle: z.string().max(500).nullish(), probe: z.boolean().optional() });
 
 // Starts (or resumes) a real-time voice session: returns a single-use
 // ephemeral token, never the API key. Every minted token first reserves the
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       throw err;
     }
     try {
-      const { conversationId, config } = await buildVoiceSession(ctx, body.kind);
+      const { conversationId, config } = await buildVoiceSession(ctx, body.kind, body.conversationId);
       const minted = await mintVoiceToken(config, body.resumeHandle);
       return NextResponse.json({ token: minted.token, model: minted.model, config: minted.config, conversationId, voiceSessionId });
     } catch (err) {

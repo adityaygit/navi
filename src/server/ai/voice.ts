@@ -2,7 +2,7 @@ import "server-only";
 import { Behavior, GoogleGenAI, Modality, type FunctionDeclaration, type LiveConnectConfig } from "@google/genai";
 import type { Ctx } from "@/server/context";
 import { serverEnv } from "@/lib/env";
-import { buildContext, getOrCreateConversation, listMessages } from "./chat";
+import { buildContext, listMessages, resolveConversation } from "./chat";
 import { CHAT_SYSTEM, ONBOARDING_SYSTEM } from "./prompts";
 import { jsonSchemaFor, toolsFor } from "./tools";
 import { modelFor } from "./config";
@@ -33,8 +33,8 @@ export function voiceFunctionDeclarations(kind: "chat" | "onboarding"): Function
   }));
 }
 
-export async function buildVoiceSession(ctx: Ctx, kind: "chat" | "onboarding") {
-  const conversationId = await getOrCreateConversation(ctx, kind);
+export async function buildVoiceSession(ctx: Ctx, kind: "chat" | "onboarding", conversationId?: string | null) {
+  conversationId = await resolveConversation(ctx, kind, conversationId);
   const recent = await listMessages(ctx, conversationId, 12);
   const history = recent
     .filter((m) => m.content.trim())

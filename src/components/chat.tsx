@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import type { Message } from "@/lib/types";
 import { announceChange, newClientId, offlineQueue, flushQueue } from "@/lib/offline-queue";
 import { VoiceSession } from "./voice-session";
+import { createChatAction } from "@/app/(app)/actions";
 
 type AiStatus = { ready: boolean; mode: string; reason?: string };
 
@@ -14,6 +15,7 @@ function withBold(text: string) {
 
 export function Chat({
   kind,
+  conversationId: initialConversationId = null,
   initialMessages,
   ai,
   voice,
@@ -21,6 +23,8 @@ export function Chat({
   placeholder,
 }: {
   kind: "chat" | "onboarding";
+  /** The chat being continued; null starts a new chat on the first message. Unused for onboarding. */
+  conversationId?: string | null;
   initialMessages: Message[];
   ai: AiStatus;
   voice: { ready: boolean; reason?: string };
@@ -34,7 +38,39 @@ export function Chat({
   const [error, setError] = useState<string | null>(null);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
-  const draftKey = `navi:chat-draft:${kind}`;
+  const [conversationId, setConversationId] = useState<string | null>(initialConversationId);
+  const draftKey = kind === "chat" ? `navi:chat-draft:chat:${conversationId ?? "new"}` : `navi:chat-draft:${kind}`;
+  // Switched to another chat: anything bound to the old one (voice, errors) ends.
+  const [seenConv, setSeenConv] = useState(initialConversationId);
+  if (seenConv !== initialConversationId) {
+    setSeenConv(initialConversationId);
+    if (initialConversationId !== conversationId) {
+      setConversationId(initialConversationId);
+      setVoiceOpen(false);
+      setError(null);
+    }
+  }
+
+  /** A brand-new chat now exists on the server: point the URL (and the chat list) at it. */
+  function adopt(id: string) {
+    if (kind !== "chat" || id === conversationId) return;
+    try {
+      const pending = localStorage.getItem(draftKey);
+      localStorage.removeItem(draftKey);
+      if (pending) localStorage.setItem(`navi:chat-draft:chat:${id}`, pending);
+    } catch {}
+    setConversationId(id);
+    router.replace(`/chat?c=${id}`, { scroll: false });
+  }
+
+  async function openVoice() {
+    if (voiceOpen || kind !== "chat" || conversationId) return setVoiceOpen((v) => !v);
+    // Voice needs a conversation to save into before it starts.
+    const r = await createChatAction();
+    if (!r.ok || !r.data) return setError(r.ok ? "Couldn't start a new chat" : r.error);
+    adopt(r.data);
+    setVoiceOpen(true);
+  }
 
   // Adopt fresh server data (after router.refresh) without an extra effect pass.
   const [seenInitial, setSeenInitial] = useState(initialMessages);
@@ -73,14 +109,15 @@ export function Chat({
     setMessages((m) => [...m, optimistic]);
     setDraft("");
     try {
-      const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, text: value, modality }) });
+      const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, conversationId, text: value, modality }) });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? `Error ${res.status}`);
       setMessages((m) => [...m.filter((x) => x.id !== optimistic.id), body.userMessage, body.assistantMessage]);
-      if (body.mutated) {
-        announceChange();
-        router.refresh();
-      }
+      const isNew = kind === "chat" && body.conversationId !== conversationId;
+      if (body.mutated) announceChange();
+      if (isNew) adopt(body.conversationId);
+      // Chats re-sort by recent activity, so refresh the list as well as any changed data.
+      else if (body.mutated || kind === "chat") router.refresh();
     } catch (err) {
       setMessages((m) => m.filter((x) => x.id !== optimistic.id));
       setDraft(value);
@@ -132,6 +169,7 @@ export function Chat({
       {voiceOpen && (
         <VoiceSession
           kind={kind}
+          conversationId={kind === "chat" ? conversationId : null}
           onClose={() => setVoiceOpen(false)}
           onTurnSaved={() => {
             announceChange();
@@ -164,7 +202,7 @@ export function Chat({
         <button
           type="button"
           className="btn"
-          onClick={() => setVoiceOpen((v) => !v)}
+          onClick={() => void openVoice()}
           aria-pressed={voiceOpen}
           title={voice.ready ? "Talk to Navi" : voice.reason}
         >

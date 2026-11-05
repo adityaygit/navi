@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { requireApiCtx } from "@/server/context";
 import { apiError } from "@/server/http";
-import { saveMessage } from "@/server/ai/chat";
+import { nameNewChat, saveMessage } from "@/server/ai/chat";
 import { getBudgetStatus, recordVoiceTurn } from "@/server/ai/budget";
 import { modelFor, tokenCost, voiceCost } from "@/server/ai/config";
 
@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
     const b = Body.parse(await request.json());
     const { data: conv } = await ctx.db.from("conversations").select("id").eq("id", b.conversationId).maybeSingle();
     if (!conv) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+    if (b.userText.trim()) await nameNewChat(ctx, b.conversationId, b.userText);
     if (b.userText.trim()) await saveMessage(ctx, b.conversationId, "user", b.userText.trim(), "voice");
     if (b.assistantText.trim() || b.toolEvents.length) {
       await saveMessage(ctx, b.conversationId, "assistant", `${b.assistantText.trim()}${b.interrupted ? " …(interrupted)" : ""}`, "voice", b.toolEvents);

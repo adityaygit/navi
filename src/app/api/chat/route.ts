@@ -10,6 +10,8 @@ const Body = z.object({
   kind: z.enum(["chat", "onboarding"]).default("chat"),
   text: z.string().min(1).max(8000),
   modality: z.enum(["text", "voice"]).default("text"),
+  // A chat to continue; omitted (or null) starts a new chat. Ignored for onboarding.
+  conversationId: z.string().uuid().nullish(),
 });
 
 export async function POST(request: NextRequest) {

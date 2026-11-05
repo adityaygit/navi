@@ -45,7 +45,7 @@ describe("voice session setup", () => {
     await saveMessage(ctx, conv, "assistant", "And I answered in text", "text");
     await db.from("memories").insert({ user_id: userId, kind: "profile", content: "Prefers short answers", origin: "stated" });
 
-    const { conversationId, config } = await buildVoiceSession(ctx, "chat");
+    const { conversationId, config } = await buildVoiceSession(ctx, "chat", conv);
     expect(conversationId).toBe(conv);
     const system = String(config.systemInstruction);
     expect(system).toContain("User: I typed this earlier");

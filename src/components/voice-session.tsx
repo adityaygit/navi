@@ -63,7 +63,7 @@ function fromBase64(b64: string): Uint8Array {
   return out;
 }
 
-export function VoiceSession({ kind, onClose, onTurnSaved }: { kind: Kind; onClose: () => void; onTurnSaved: () => void }) {
+export function VoiceSession({ kind, conversationId, onClose, onTurnSaved }: { kind: Kind; conversationId?: string | null; onClose: () => void; onTurnSaved: () => void }) {
   const [mode, setMode] = useState<"live" | "browser" | null>(null);
   const [status, setStatus] = useState<Status>("idle");
   const [muted, setMuted] = useState(false);
@@ -94,6 +94,7 @@ export function VoiceSession({ kind, onClose, onTurnSaved }: { kind: Kind; onClo
       {mode === "live" && (
         <LiveVoice
           kind={kind}
+          conversationId={conversationId ?? null}
           muted={muted}
           setMuted={setMuted}
           setStatus={setStatus}
@@ -103,7 +104,7 @@ export function VoiceSession({ kind, onClose, onTurnSaved }: { kind: Kind; onClo
           onUnavailable={(reason) => { setNotice(reason); setMode("browser"); }}
         />
       )}
-      {mode === "browser" && <BrowserVoice kind={kind} setStatus={setStatus} setError={setError} setLines={setLines} onTurnSaved={onTurnSaved} />}
+      {mode === "browser" && <BrowserVoice kind={kind} conversationId={conversationId ?? null} setStatus={setStatus} setError={setError} setLines={setLines} onTurnSaved={onTurnSaved} />}
       {notice && <p className="notice notice-warn text-xs">{notice}</p>}
       {error && <p role="alert" className="notice notice-danger text-sm">{error}</p>}
       {lines.length > 0 && (
@@ -210,7 +211,7 @@ function heardLength(marks: { len: number; at: number }[], playedTo: number): nu
   return len;
 }
 
-function LiveVoice({ kind, muted, setMuted, setStatus: reportStatus, setError, setLines, onTurnSaved, onUnavailable }: Setters & { kind: Kind; muted: boolean; setMuted: (m: boolean) => void; onUnavailable: (reason: string) => void }) {
+function LiveVoice({ kind, conversationId, muted, setMuted, setStatus: reportStatus, setError, setLines, onTurnSaved, onUnavailable }: Setters & { kind: Kind; conversationId: string | null; muted: boolean; setMuted: (m: boolean) => void; onUnavailable: (reason: string) => void }) {
   const [status, setLocalStatus] = useState<Status>("idle");
   const statusRef = useRef<Status>("idle");
   const setStatus = useCallback((s: Status) => {
@@ -367,7 +368,7 @@ function LiveVoice({ kind, muted, setMuted, setStatus: reportStatus, setError, s
     setError(null);
     setStatus("connecting");
     endedByUser.current = false;
-    const res = await fetch("/api/voice/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, resumeHandle: handleRef.current }) }).catch(() => null);
+    const res = await fetch("/api/voice/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, conversationId: convRef.current ?? conversationId, resumeHandle: handleRef.current }) }).catch(() => null);
     if (!res) { setStatus("reconnect"); setError("You're offline. Voice needs an internet connection."); return; }
     const body = await res.json();
     if (!res.ok) {
@@ -577,7 +578,7 @@ function LiveVoice({ kind, muted, setMuted, setStatus: reportStatus, setError, s
       setStatus("error");
       setError(`Couldn't connect to the voice service: ${err instanceof Error ? err.message : String(err)}`);
     }
-  }, [kind, onUnavailable, runTool, saveTurn, flushPlayback, releaseMic, setError, setLines, setStatus, arm, idleStatus]);
+  }, [kind, conversationId, onUnavailable, runTool, saveTurn, flushPlayback, releaseMic, setError, setLines, setStatus, arm, idleStatus]);
 
   useEffect(() => {
     connectRef.current = connect;
@@ -685,7 +686,7 @@ function LiveVoice({ kind, muted, setMuted, setStatus: reportStatus, setError, s
 }
 
 /** Basic voice: browser speech recognition, one turn at a time, through the text chat. */
-function BrowserVoice({ kind, setStatus, setError, setLines, onTurnSaved }: Setters & { kind: Kind }) {
+function BrowserVoice({ kind, conversationId, setStatus, setError, setLines, onTurnSaved }: Setters & { kind: Kind; conversationId: string | null }) {
   const recRef = useRef<SpeechRec | null>(null);
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState("");
@@ -697,7 +698,7 @@ function BrowserVoice({ kind, setStatus, setError, setLines, onTurnSaved }: Sett
     setStatus("speaking");
     setLines((l) => [...l, { who: "you", text }]);
     try {
-      const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, text, modality: "voice" }) });
+      const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, conversationId, text, modality: "voice" }) });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Navi couldn't reply");
       const reply: string = body.assistantMessage.content;

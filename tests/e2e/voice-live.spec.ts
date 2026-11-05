@@ -195,7 +195,7 @@ test("voice streams the mic, runs tools for real, plays replies and saves the tu
   await expect.poll(() => seen.closed).toBe(true);
   await expect(voice.getByLabel("Microphone is on")).toHaveCount(0);
   await page.reload();
-  await expect(page.getByText("Add a task to call the dentist.")).toBeVisible();
+  await expect(page.getByLabel("Conversation").getByText("Add a task to call the dentist.")).toBeVisible();
   await expect(page.getByText(/Done\. I added “Call the dentist”\./)).toBeVisible();
 });
 
