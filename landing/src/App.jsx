@@ -16,6 +16,9 @@ function useCycle(n, ms, enabled = true, name) {
   return [i, setI];
 }
 
+// True on the real app (and local dev), false inside the artifact preview.
+const onNavi = () => /(^|\.)meetnavi\.app$|\.vercel\.app$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
+
 function EmailPill({ id, label = 'Join early access' }) {
   // Posts to the Navi app's waitlist API on the same site. The artifact preview can't reach it,
   // so a failed request says so instead of pretending.
@@ -26,10 +29,10 @@ function EmailPill({ id, label = 'Join early access' }) {
     setState('sending');
     try {
       const res = await fetch('/api/waitlist', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: f.get('email'), website: f.get('website') }) });
-      setState(res.ok ? 'sent' : res.status === 400 ? 'invalid' : 'offline');
-    } catch { setState('offline'); }
+      setState(res.ok ? 'sent' : res.status === 400 ? 'invalid' : onNavi() ? 'error' : 'offline');
+    } catch { setState(onNavi() ? 'error' : 'offline'); }
   };
-  const note = { sent: 'Check your inbox for a short application.', invalid: 'That email address doesn’t look right.', offline: 'Couldn’t reach Navi from this preview. Sign-up works on the live site.' }[state];
+  const note = { sent: 'Check your inbox for a short application.', invalid: 'That email address doesn’t look right.', error: 'Something went wrong on our side. Try again in a minute.', offline: 'Couldn’t reach Navi from this preview. Sign-up works on the live site.' }[state];
   return (
     <form className="email" onSubmit={submit}>
       <label htmlFor={id} className="sr">Email address</label>
