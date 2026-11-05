@@ -17,12 +17,26 @@ function useCycle(n, ms, enabled = true, name) {
 }
 
 function EmailPill({ id, label = 'Join early access' }) {
-  const [sent, setSent] = useState(false);
+  // Posts to the Navi app's waitlist API on the same site. The artifact preview can't reach it,
+  // so a failed request says so instead of pretending.
+  const [state, setState] = useState('idle');
+  const submit = async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    setState('sending');
+    try {
+      const res = await fetch('/api/waitlist', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: f.get('email'), website: f.get('website') }) });
+      setState(res.ok ? 'sent' : res.status === 400 ? 'invalid' : 'offline');
+    } catch { setState('offline'); }
+  };
+  const note = { sent: 'Check your inbox for a short application.', invalid: 'That email address doesn’t look right.', offline: 'Couldn’t reach Navi from this preview. Sign-up works on the live site.' }[state];
   return (
-    <form className="email" onSubmit={(e) => { e.preventDefault(); setSent(true); }}>
+    <form className="email" onSubmit={submit}>
       <label htmlFor={id} className="sr">Email address</label>
-      <input id={id} type="email" required placeholder="you@example.com" disabled={sent} />
-      <button className="btn-pill" type="submit" disabled={sent}>{sent ? 'You’re on the list' : label}</button>
+      <input id={id} name="email" type="email" required placeholder="you@example.com" disabled={state === 'sent'} />
+      <input name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" style={{ position: 'absolute', left: -9999, width: 0, height: 0, opacity: 0 }} />
+      <button className="btn-pill" type="submit" disabled={state === 'sending' || state === 'sent'}>{state === 'sending' ? 'Sending…' : state === 'sent' ? 'Sent' : label}</button>
+      {note && <span className="email-note" role="status">{note}</span>}
     </form>
   );
 }

@@ -299,3 +299,10 @@ Secrets live only in the cloud environment's settings ("Unrestricted full autono
 
 ## Side project: landing page (separate from the app)
 See `landing/PROGRESS.md` (branch `claude/landing-reconstruction`). It does not touch the Navi app code.
+
+## Early-access waitlist (2026-11-05, branch claude/landing-reconstruction)
+- Flow: `/early-access` (or landing form) → `POST /api/waitlist` → email with single-use link (token hashed, 14-day expiry, 10-min resend cooldown, 5 requests/IP/hour, honeypot) → `/early-access/apply` → `POST /api/waitlist/apply` → admin `/admin/waitlist` (NAVI_ADMIN_EMAILS only): approve (allowlist + account + magic-link email), decline quietly or with email, **auto-approve switch**.
+- Code: `supabase/migrations/20261105000001_waitlist.sql`, `src/server/waitlist.ts`, `src/server/email/{templates,send}.ts` (Resend HTTP API), routes under `src/app/api/waitlist`, pages `src/app/early-access`, `src/app/(app)/admin/waitlist`. Public paths added in `src/proxy.ts`.
+- Emails approved by owner (review artifact). Env: RESEND_API_KEY, EMAIL_FROM, EMAIL_REPLY_TO.
+- Verified here: typecheck, lint, unit (102/102 incl. 11 waitlist), `next build`. **Not run here:** `tests/integration/waitlist.test.ts` (needs local Supabase/Docker; runs in CI).
+- Owner actions pending: Resend domain + key; apply migration to hosted Supabase; production deploy; landing page served from the app domain so the form reaches `/api/waitlist`.
