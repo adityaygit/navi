@@ -33,6 +33,10 @@ function contentSecurityPolicy(nonce: string): string {
   ].join("; ");
 }
 
+// Marketing pages (static build in public/landing, one page app). Served at these paths for everyone, signed in or not.
+const MARKETING_PATHS = ["/how-it-works", "/features", "/guides", "/privacy-and-control", "/about", "/terms"];
+const isMarketing = (path: string) => MARKETING_PATHS.some((p) => path === p || path.startsWith(p + "/"));
+
 export async function proxy(request: NextRequest) {
   const nonce = btoa(crypto.randomUUID());
   const csp = contentSecurityPolicy(nonce);
@@ -64,7 +68,8 @@ export async function proxy(request: NextRequest) {
   const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + "/"));
 
   // Signed-out visitors at "/" see the marketing page (static build in public/landing); the URL stays "/".
-  if (!signedIn && path === "/") {
+  // The other marketing pages are rewritten the same way for everyone; the page reads the path to pick what to show.
+  if ((!signedIn && path === "/") || isMarketing(path)) {
     const rewrite = NextResponse.rewrite(new URL("/landing/index.html", request.url), { request: { headers: requestHeaders } });
     rewrite.headers.set("Content-Security-Policy", csp);
     return rewrite;

@@ -40,3 +40,6 @@ export const Wordmark = (p) => (
     <text x="24" y="16.5" fontFamily="Instrument Sans, sans-serif" fontSize="17" fontWeight="600" letterSpacing="-0.3" fill="currentColor">Navi</text>
   </svg>
 );
+export const Phone = (p) => <S {...p}><rect x="7" y="2.5" width="10" height="19" rx="2.5" /><path d="M11 18.5h2" /></S>;
+export const Cloud = (p) => <S {...p}><path d="M7 18.5h10a4 4 0 0 0 .6-7.96A5.5 5.5 0 0 0 7.1 9.6 4.5 4.5 0 0 0 7 18.5Z" /></S>;
+export const Bell = (p) => <S {...p}><path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 2h-15Z" /><path d="M10 21h4" /></S>;

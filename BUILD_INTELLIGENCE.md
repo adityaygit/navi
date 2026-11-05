@@ -306,3 +306,11 @@ See `landing/PROGRESS.md` (branch `claude/landing-reconstruction`). It does not 
 - Emails approved by owner (review artifact). Env: RESEND_API_KEY, EMAIL_FROM, EMAIL_REPLY_TO.
 - Verified here: typecheck, lint, unit (102/102 incl. 11 waitlist), `next build`. **Not run here:** `tests/integration/waitlist.test.ts` (needs local Supabase/Docker; runs in CI).
 - Owner actions pending: Resend domain + key; apply migration to hosted Supabase; production deploy; landing page served from the app domain so the form reaches `/api/waitlist`.
+
+## Landing: real nav pages (2026-11-05, branch claude/landing-reconstruction)
+- Nav menu is now real pages: How it works, Features, Guides (9 guides, searchable, one page each), Privacy & control, About, plus a placeholder Terms page (marked draft, not lawyer-reviewed). Phone: menu button opens a full-height drawer.
+- One-page app in `landing/` with a tiny router (`landing/src/site.jsx`): real paths in the app build (base `/landing/`), `#p-…` hashes in the artifact preview. `src/proxy.ts` rewrites `/how-it-works`, `/features`, `/guides/*`, `/privacy-and-control`, `/about`, `/terms` to `/landing/index.html` for everyone.
+- Guides show illustrative phone screens (owner: the app UI is being redesigned, so the screens show the intended flow, not today's UI).
+- Each page has a generated header image (Gemini, `landing/public/img/page-*.jpg`). Contact email (temporary): aditya.a.yadav011@gmail.com.
+- Pricing plan saved in `landing/research/pricing-plan.md`; **not on the site yet**, per owner.
+- Verified: preview build (hash mode) screenshots, desktop + 390px, no overflow, no console errors; app build served with the proxy's rewrites: titles, h1, active nav, guide links, unknown-guide fallback. `tsc` passes.
