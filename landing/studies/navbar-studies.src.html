@@ -1,0 +1,323 @@
+<title>Navi Navbar Studies</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: the landing page runs inside a scroll stage; the nav reacts to the stage's scroll. A control bar picks the version and the width. */
+:root {
+  --bg: #000; --s1: #070708; --s2: #0d0d0f; --s3: #141518;
+  --line: #1d1e22; --line2: #2a2c31;
+  --fg: #f2f2f2; --fg2: #a3a5aa; --fg3: #6c6f76;
+  --glass: rgba(14,14,16,.8); --glass-edge: rgba(255,255,255,.09);
+  --sans: 'Instrument Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --ease: cubic-bezier(.22,.8,.24,1);
+  --dur: 380ms;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 16px; -webkit-font-smoothing: antialiased; overflow: hidden; }
+a { color: inherit; text-decoration: none; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; border-radius: 6px; }
+
+/* ---------- stage ---------- */
+.shell { height: 100%; display: flex; justify-content: center; background: #050506; }
+.stage { position: relative; width: 100%; height: 100%; overflow-y: auto; overflow-x: hidden; background: var(--bg); container-type: inline-size; scroll-behavior: smooth; transition: width .4s var(--ease); }
+.shell.phone { padding: 18px 16px 96px; }
+.shell.phone .stage { width: 390px; max-width: 100%; border: 1px solid var(--line2); border-radius: 34px; }
+
+/* ---------- nav (shared) ---------- */
+.nav { position: sticky; top: 0; z-index: 50; height: 0; } /* takes no space; the bar floats over the hero */
+.bar { position: absolute; left: 0; right: 0; top: 0; display: flex; justify-content: center; padding-top: env(safe-area-inset-top, 0px); transition: transform var(--dur) var(--ease); }
+.inner { position: relative; display: flex; align-items: center; width: 100%; max-width: 1186px; height: 64px; padding: 0 24px; border: 1px solid transparent; border-radius: 0; background: transparent; transition: max-width var(--dur) var(--ease), height var(--dur) var(--ease), margin var(--dur) var(--ease), padding var(--dur) var(--ease), border-radius var(--dur) var(--ease), background-color var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+.brand { display: inline-flex; align-items: center; gap: 9px; height: 44px; font-size: 17px; font-weight: 600; letter-spacing: -0.02em; flex: none; }
+.brand svg { transition: transform var(--dur) var(--ease); transform-origin: left center; }
+.links { position: relative; display: flex; align-items: center; gap: 4px; margin-left: 44px; font-size: 14px; color: var(--fg2); transition: margin var(--dur) var(--ease), gap var(--dur) var(--ease); }
+.links a { position: relative; z-index: 1; display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 99px; transition: color .2s; white-space: nowrap; }
+.links a:hover, .links a.on { color: var(--fg); }
+.ind { position: absolute; z-index: 0; top: 50%; height: 32px; margin-top: -16px; border-radius: 99px; background: rgba(255,255,255,.08); opacity: 0; transition: left .35s var(--ease), width .35s var(--ease), opacity .25s; pointer-events: none; }
+.actions { margin-left: auto; display: flex; align-items: center; gap: 20px; font-size: 14px; flex: none; }
+.signin { color: var(--fg2); display: inline-flex; align-items: center; height: 44px; }
+.signin:hover { color: var(--fg); }
+.btn { display: inline-flex; align-items: center; justify-content: center; height: 34px; padding: 0 15px; border: 0; border-radius: 99px; background: var(--fg); color: #000; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: height var(--dur) var(--ease), background-color .2s; }
+.btn:hover { background: #fff; }
+.label { display: none; }
+.menu-btn { display: none; }
+
+/* ---------- A · Capsule: the bar shrinks into one centered pill, hides while you read ---------- */
+[data-v="a"] .float .inner { max-width: 780px; height: 52px; margin-top: 12px; padding: 0 8px 0 20px; border-radius: 99px; background: var(--glass); border-color: var(--glass-edge); box-shadow: 0 10px 40px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.05); -webkit-backdrop-filter: blur(18px) saturate(1.3); backdrop-filter: blur(18px) saturate(1.3); }
+[data-v="a"] .float .brand svg { transform: scale(.9); }
+[data-v="a"] .float .links { margin-left: 26px; }
+[data-v="a"] .float .ind { opacity: 1; }
+[data-v="a"] .float .actions { gap: 14px; }
+[data-v="a"] .float .btn { height: 36px; }
+[data-v="a"] .tuck .bar { transform: translateY(-120%); }
+
+/* ---------- B · Islands: the bar splits into three floating pieces and stays put ---------- */
+[data-v="b"] .inner { display: grid; grid-template-columns: 1fr auto 1fr; }
+[data-v="b"] .links { margin-left: 0; padding: 0 4px; height: 44px; border: 1px solid transparent; border-radius: 99px; transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+[data-v="b"] .brand { justify-self: start; padding: 0 2px; border: 1px solid transparent; border-radius: 99px; transition: padding var(--dur) var(--ease), background-color var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+[data-v="b"] .actions { justify-self: end; margin-left: 0; height: 44px; padding: 0 2px; border: 1px solid transparent; border-radius: 99px; transition: padding var(--dur) var(--ease), background-color var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+[data-v="b"] .float .inner { height: 68px; margin-top: 6px; padding: 0 16px; }
+[data-v="b"] .float :is(.brand, .links, .actions) { background: var(--glass); border-color: var(--glass-edge); box-shadow: 0 10px 34px rgba(0,0,0,.45); -webkit-backdrop-filter: blur(18px) saturate(1.3); backdrop-filter: blur(18px) saturate(1.3); }
+[data-v="b"] .float .brand { padding: 0 16px; }
+[data-v="b"] .float .actions { padding: 0 5px 0 18px; gap: 14px; }
+[data-v="b"] .float .ind { opacity: 1; }
+
+/* ---------- C · Dock: collapses to a small pill that names where you are; opens on hover or tap ---------- */
+[data-v="c"] .label { display: inline-flex; align-items: center; gap: 8px; max-width: 0; overflow: hidden; opacity: 0; font-size: 13.5px; color: var(--fg2); white-space: nowrap; transition: max-width var(--dur) var(--ease), opacity .2s, margin var(--dur) var(--ease); }
+[data-v="c"] .label i { width: 1px; height: 14px; background: var(--line2); }
+[data-v="c"] .links { overflow: hidden; max-width: 560px; transition: max-width var(--dur) var(--ease), opacity .25s, margin var(--dur) var(--ease); }
+[data-v="c"] .float .inner { max-width: 420px; height: 50px; margin-top: 12px; padding: 0 7px 0 18px; border-radius: 99px; background: var(--glass); border-color: var(--glass-edge); box-shadow: 0 10px 40px rgba(0,0,0,.45); -webkit-backdrop-filter: blur(18px) saturate(1.3); backdrop-filter: blur(18px) saturate(1.3); }
+[data-v="c"] .float .signin { display: none; }
+[data-v="c"] .float .label { max-width: 220px; opacity: 1; margin-left: 12px; }
+[data-v="c"] .float .links { max-width: 0; opacity: 0; margin-left: 0; }
+[data-v="c"] .float .ind { opacity: 1; }
+[data-v="c"] .float.open .inner, [data-v="c"] .float .inner:hover, [data-v="c"] .float .inner:focus-within { max-width: 760px; }
+[data-v="c"] .float.open .label, [data-v="c"] .float .inner:hover .label, [data-v="c"] .float .inner:focus-within .label { max-width: 0; opacity: 0; margin-left: 0; }
+[data-v="c"] .float.open .links, [data-v="c"] .float .inner:hover .links, [data-v="c"] .float .inner:focus-within .links { max-width: 560px; opacity: 1; margin-left: 20px; }
+
+/* ---------- phone widths ---------- */
+@container (max-width: 720px) {
+  .inner { padding: 0 16px; }
+  .links { display: none; }
+  .actions { gap: 14px; }
+  [data-v="a"] .float .inner, [data-v="c"] .float .inner { max-width: calc(100% - 24px); padding: 0 6px 0 16px; }
+  [data-v="b"] .inner { grid-template-columns: 1fr 1fr; }
+  [data-v="b"] .float .inner { padding: 0 12px; }
+  [data-v="b"] .float .signin { display: none; }
+  [data-v="b"] .float .actions { padding: 0 5px; }
+  /* C on a phone: the label stays, a menu button opens a sheet of links */
+  [data-v="c"] .float .inner:hover .label, [data-v="c"] .float .inner:focus-within .label { max-width: 220px; opacity: 1; margin-left: 12px; }
+  [data-v="c"] .float .menu-btn { display: inline-grid; place-items: center; width: 36px; height: 36px; margin-left: auto; margin-right: 4px; border: 0; border-radius: 99px; background: transparent; color: var(--fg2); cursor: pointer; }
+  [data-v="c"] .float .actions { margin-left: 0; }
+  [data-v="c"] .float.open .label { max-width: 220px; opacity: 1; margin-left: 12px; }
+  [data-v="c"] .float.open .inner { max-width: calc(100% - 24px); }
+}
+.sheet { position: absolute; left: 12px; right: 12px; top: 70px; display: none; flex-direction: column; padding: 8px; border: 1px solid var(--glass-edge); border-radius: 22px; background: rgba(14,14,16,.97); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); box-shadow: 0 16px 50px rgba(0,0,0,.55); }
+.sheet a { display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 14px; border-radius: 14px; font-size: 15px; color: var(--fg2); }
+.sheet a.on { color: var(--fg); background: rgba(255,255,255,.06); }
+@container (max-width: 720px) { [data-v="c"] .float.open .sheet { display: flex; } }
+
+/* ---------- page content ---------- */
+.wrap { max-width: 1186px; margin: 0 auto; padding-inline: max(24px, env(safe-area-inset-left, 0px)) max(24px, env(safe-area-inset-right, 0px)); }
+.hero { position: relative; padding-top: 150px; padding-bottom: 120px; text-align: center; overflow: hidden; }
+.sky { position: absolute; inset: 0 0 auto 0; height: 820px; background: url(__HORIZON__) center 70% / cover; }
+.sky::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.3) 0%, rgba(0,0,0,0) 38%, rgba(0,0,0,.6) 74%, #000 100%); }
+.hero .wrap { position: relative; display: flex; flex-direction: column; align-items: center; gap: 24px; }
+h1 { margin: 0; font-size: 92px; line-height: .96; font-weight: 600; letter-spacing: -0.045em; text-wrap: balance; background: linear-gradient(180deg, #f4f4f4 15%, #9c9c9c 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.lead { margin: 0; max-width: 560px; font-size: 18px; line-height: 1.55; color: var(--fg2); text-wrap: pretty; }
+.email { display: flex; align-items: center; gap: 6px; width: 100%; max-width: 440px; padding: 4px 4px 4px 18px; border: 1px solid var(--line2); border-radius: 99px; background: var(--s1); }
+.email input { flex: 1; min-width: 0; height: 38px; border: 0; background: transparent; outline: none; font-size: 15px; }
+.email input::placeholder { color: var(--fg3); }
+.email .btn { height: 38px; padding: 0 18px; font-size: 14px; }
+.day { width: 100%; max-width: 860px; margin-top: 64px; padding: 22px 24px; border: 1px solid rgba(255,255,255,.1); border-radius: 18px; background: rgba(12,12,14,.55); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); text-align: left; }
+.day-top { display: flex; justify-content: space-between; font-size: 13px; color: var(--fg3); margin-bottom: 16px; font-variant-numeric: tabular-nums; }
+.row { display: grid; grid-template-columns: 52px 1fr; gap: 12px; align-items: center; height: 46px; border-top: 1px solid var(--line); font-size: 13px; color: var(--fg3); font-variant-numeric: tabular-nums; }
+.blk { height: 32px; border-radius: 8px; display: flex; align-items: center; padding: 0 12px; font-size: 13.5px; color: var(--fg); background: var(--s3); border: 1px solid var(--line2); }
+.blk.focus { background: rgba(140,160,255,.12); border-color: rgba(140,160,255,.28); }
+.blk.fixed { background: rgba(255,255,255,.07); }
+.blk.rest { background: rgba(120,200,170,.1); border-color: rgba(120,200,170,.24); }
+
+section.band { padding-block: 120px; border-top: 1px solid var(--line); }
+.eyebrow { font-size: 13px; color: var(--fg3); margin-bottom: 18px; }
+h2 { margin: 0 0 18px; font-size: 52px; line-height: 1.02; font-weight: 600; letter-spacing: -0.035em; max-width: 760px; text-wrap: balance; }
+.band p { margin: 0; max-width: 580px; font-size: 17px; line-height: 1.6; color: var(--fg2); }
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 56px; }
+.card { padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--s1); min-height: 210px; min-width: 0; }
+.card b { display: block; font-weight: 600; margin-bottom: 8px; }
+.card span { color: var(--fg3); font-size: 14.5px; line-height: 1.55; }
+footer { padding-block: 60px 140px; border-top: 1px solid var(--line); color: var(--fg3); font-size: 13px; }
+@container (max-width: 720px) {
+  .hero { padding-top: 120px; padding-bottom: 80px; }
+  .sky { height: 640px; }
+  h1 { font-size: 46px; }
+  .lead { font-size: 16.5px; }
+  .day { padding: 16px; margin-top: 44px; }
+  h2 { font-size: 34px; }
+  section.band { padding-block: 80px; }
+  .cards { grid-template-columns: 1fr; margin-top: 36px; }
+  .card { min-height: 0; }
+  .wrap { padding-inline: 16px; }
+}
+
+/* ---------- study controls ---------- */
+.ctl { position: fixed; z-index: 100; left: 50%; bottom: max(16px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; width: min(640px, calc(100% - 32px)); padding: 10px; border: 1px solid var(--line2); border-radius: 20px; background: rgba(10,10,12,.92); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+.ctl-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.seg { display: flex; padding: 3px; border: 1px solid var(--line); border-radius: 99px; background: var(--s1); }
+.seg button { height: 32px; padding: 0 13px; border: 0; border-radius: 99px; background: transparent; color: var(--fg2); font-size: 13px; cursor: pointer; white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--fg); color: #000; font-weight: 600; }
+.ctl .ghost { height: 38px; padding: 0 14px; border: 1px solid var(--line); border-radius: 99px; background: transparent; color: var(--fg2); font-size: 13px; cursor: pointer; margin-left: auto; }
+.ctl .ghost:hover { color: var(--fg); }
+.desc { margin: 0; padding: 2px 6px 2px; font-size: 13px; line-height: 1.5; color: var(--fg2); }
+.desc b { color: var(--fg); font-weight: 600; }
+@media (max-width: 560px) { .ctl .ghost { margin-left: 0; } .seg button { padding: 0 10px; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .bar, .inner, .brand, .links, .ind, .label, .btn, .actions, .stage { transition: none !important; }
+  .stage { scroll-behavior: auto; }
+}
+</style>
+
+<div class="shell" id="shell">
+  <div class="stage" id="stage" data-v="a">
+    <header class="nav" id="nav">
+      <div class="bar">
+        <div class="inner">
+          <a href="#top" class="brand" aria-label="Navi home">
+            <svg width="18" height="22" viewBox="0 0 18 22" aria-hidden="true"><path d="M9 1.5 16.5 20.5 9 16.2 1.5 20.5Z" fill="currentColor"/><path d="M9 1.5V16.2L1.5 20.5Z" fill="#000" opacity=".3"/></svg>
+            Navi
+          </a>
+          <span class="label" id="label"><i></i><span id="label-text">How it works</span></span>
+          <nav class="links" id="links" aria-label="Primary">
+            <span class="ind" id="ind"></span>
+            <a href="#setup">How it works</a><a href="#planner">Planner</a><a href="#voice">Voice</a><a href="#control">Privacy</a>
+          </nav>
+          <button class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false">
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5h12M2 11h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </button>
+          <div class="actions">
+            <a href="#top" class="signin">Sign in</a>
+            <a href="#start" class="btn">Join early access</a>
+          </div>
+        </div>
+        <div class="sheet" id="sheet">
+          <a href="#setup">How it works</a><a href="#planner">Planner</a><a href="#voice">Voice</a><a href="#control">Privacy</a>
+        </div>
+      </div>
+    </header>
+
+    <div id="top" class="hero">
+      <div class="sky" aria-hidden="true"></div>
+      <div class="wrap">
+        <h1>A calmer way<br>to run your life.</h1>
+        <p class="lead">Navi learns your life in one conversation, then plans your days with you, keeps your commitments honest, and reviews your week.</p>
+        <form class="email" id="start" onsubmit="event.preventDefault()"><label for="em" class="sr" hidden>Email</label><input id="em" type="email" placeholder="you@email.com" aria-label="Email address"><button class="btn" type="submit">Join early access</button></form>
+        <div class="day" aria-label="Example day">
+          <div class="day-top"><span>Thursday · 6h 20m planned</span><span>2h 10m free</span></div>
+          <div class="row"><span>09:00</span><div class="blk fixed">Team standup</div></div>
+          <div class="row"><span>10:00</span><div class="blk focus">Deep work · Q4 budget draft</div></div>
+          <div class="row"><span>12:30</span><div class="blk rest">Walk, no phone</div></div>
+          <div class="row"><span>14:00</span><div class="blk">Call the landlord about the lease</div></div>
+        </div>
+      </div>
+    </div>
+
+    <section class="band" id="setup"><div class="wrap">
+      <div class="eyebrow">How it works</div>
+      <h2>Tell Navi about your week. It sets everything up.</h2>
+      <p>Talk or type for a few minutes. Navi proposes your workspaces, routines and first plan, and nothing is created until you've looked it over.</p>
+      <div class="cards"><div class="card"><b>One conversation</b><span>Work, gym, the side project, the dentist you keep putting off.</span></div><div class="card"><b>A proposal you review</b><span>Projects, routines and commitments laid out before they exist.</span></div><div class="card"><b>A first plan</b><span>Tomorrow, blocked out around what can't move.</span></div></div>
+    </div></section>
+
+    <section class="band" id="planner"><div class="wrap">
+      <div class="eyebrow">Planner</div>
+      <h2>Fixed things stay fixed. The rest moves around them.</h2>
+      <p>Meetings and appointments hold their place. Flexible work slides into open time, and focus and recovery get protected blocks.</p>
+      <div class="cards"><div class="card"><b>Fixed</b><span>Standup at 09:00, pickup at 15:30.</span></div><div class="card"><b>Flexible</b><span>Budget draft, any two hours before Friday.</span></div><div class="card"><b>Recovery</b><span>A walk after lunch, kept on the calendar.</span></div></div>
+    </div></section>
+
+    <section class="band" id="voice"><div class="wrap">
+      <div class="eyebrow">Voice</div>
+      <h2>Talk it through, out loud.</h2>
+      <p>Real-time voice with the same history as text. Say "move the gym to tomorrow" and watch it happen.</p>
+      <div class="cards"><div class="card"><b>Same thread</b><span>Voice and text share one history.</span></div><div class="card"><b>Transcripts kept</b><span>Raw audio isn't stored.</span></div><div class="card"><b>Hands free</b><span>Plan your morning while you make coffee.</span></div></div>
+    </div></section>
+
+    <section class="band" id="control"><div class="wrap">
+      <div class="eyebrow">Privacy</div>
+      <h2>You approve anything that leaves Navi.</h2>
+      <p>Internal changes happen within the permissions you set. Emails, bookings and anything external waits for your yes.</p>
+      <div class="cards"><div class="card"><b>Inspectable memory</b><span>See and edit everything Navi remembers.</span></div><div class="card"><b>Approval for outside actions</b><span>Nothing is sent on your behalf without a tap.</span></div><div class="card"><b>Quiet hours</b><span>No pings when you said no pings.</span></div></div>
+    </div></section>
+
+    <footer><div class="wrap">© 2026 Navi · Mockup for the navbar study</div></footer>
+  </div>
+</div>
+
+<div class="ctl" role="region" aria-label="Study controls">
+  <div class="ctl-row">
+    <div class="seg" id="ver" role="group" aria-label="Version">
+      <button aria-pressed="true" data-v="a">A · Capsule</button>
+      <button aria-pressed="false" data-v="b">B · Islands</button>
+      <button aria-pressed="false" data-v="c">C · Dock</button>
+    </div>
+    <div class="seg" id="dev" role="group" aria-label="Width">
+      <button aria-pressed="true" data-d="desk">Desktop</button>
+      <button aria-pressed="false" data-d="phone">Phone</button>
+    </div>
+    <button class="ghost" id="replay">Back to top</button>
+  </div>
+  <p class="desc" id="desc"></p>
+</div>
+
+<script>
+const stage = document.getElementById('stage'), nav = document.getElementById('nav'), shell = document.getElementById('shell');
+const links = [...document.querySelectorAll('#links a')], sheetLinks = [...document.querySelectorAll('#sheet a')];
+const ind = document.getElementById('ind'), labelText = document.getElementById('label-text'), menuBtn = document.getElementById('menu-btn');
+const DESC = {
+  a: '<b>Capsule.</b> At the top it’s a clear bar on the sky. Scroll past 80px and it shrinks into one centered glass pill. Scroll down fast and it slides away; scroll up a little and it’s back. The section you’re in gets a soft highlight.',
+  b: '<b>Islands.</b> At the top it’s a clear bar. On scroll it splits into three glass pieces: Navi on the left, the links in the middle, Sign in and Join on the right. It never hides. On a phone it’s two pieces.',
+  c: '<b>Dock.</b> On scroll it collapses into a small pill that names the section you’re in, with Join beside it. Hover or tab into it and it opens to show every link. On a phone, the menu button opens a list.',
+};
+let v = 'a', lastY = 0, active = null;
+
+function setV(next) {
+  v = next; stage.dataset.v = v; nav.classList.remove('tuck', 'open'); menuBtn.setAttribute('aria-expanded', 'false');
+  document.querySelectorAll('#ver button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
+  document.getElementById('desc').innerHTML = DESC[v];
+  requestAnimationFrame(() => setTimeout(moveInd, 400));
+}
+function moveInd() {
+  const a = links.find(l => l.getAttribute('href') === '#' + active);
+  if (!a) { ind.style.width = '0px'; return; }
+  ind.style.left = a.offsetLeft + 'px'; ind.style.width = a.offsetWidth + 'px';
+}
+function setActive(id) {
+  if (id === active) return; active = id;
+  links.concat(sheetLinks).forEach(l => l.classList.toggle('on', l.getAttribute('href') === '#' + id));
+  const a = links.find(l => l.getAttribute('href') === '#' + id);
+  labelText.textContent = a ? a.textContent : 'Overview';
+  moveInd();
+}
+let ticking = false;
+stage.addEventListener('scroll', () => {
+  if (ticking) return; ticking = true;
+  requestAnimationFrame(() => {
+    ticking = false;
+    const y = stage.scrollTop, dy = y - lastY;
+    nav.classList.toggle('float', y > 80);
+    if (v === 'a') {
+      if (y < 300 || dy < -4) nav.classList.remove('tuck');
+      else if (dy > 6) nav.classList.add('tuck');
+    }
+    if (Math.abs(dy) > 20) { nav.classList.remove('open'); menuBtn.setAttribute('aria-expanded', 'false'); }
+    // active section: the last one whose top has passed a third of the stage
+    let cur = null;
+    for (const s of stage.querySelectorAll('section.band')) if (s.offsetTop - stage.clientHeight / 3 <= y) cur = s.id;
+    setActive(cur);
+    lastY = y;
+  });
+}, { passive: true });
+// keep the nav visible after a link is used; links scroll the stage, not the page
+document.querySelectorAll('#nav a[href^="#"]').forEach(a => a.addEventListener('click', e => {
+  const t = document.getElementById(a.getAttribute('href').slice(1)); if (!t) return;
+  e.preventDefault();
+  stage.scrollTo({ top: a.getAttribute('href') === '#top' ? 0 : t.offsetTop - 70 });
+  nav.classList.remove('open'); menuBtn.setAttribute('aria-expanded', 'false');
+  setTimeout(() => nav.classList.remove('tuck'), 50);
+  setTimeout(() => nav.classList.remove('tuck'), 700);
+}));
+menuBtn.addEventListener('click', () => { const o = nav.classList.toggle('open'); menuBtn.setAttribute('aria-expanded', String(o)); });
+document.querySelectorAll('#ver button').forEach(b => b.addEventListener('click', () => setV(b.dataset.v)));
+document.querySelectorAll('#dev button').forEach(b => b.addEventListener('click', () => {
+  shell.classList.toggle('phone', b.dataset.d === 'phone');
+  document.querySelectorAll('#dev button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  setTimeout(moveInd, 450);
+}));
+document.getElementById('replay').addEventListener('click', () => stage.scrollTo({ top: 0 }));
+addEventListener('resize', moveInd);
+setV('a');
+</script>
