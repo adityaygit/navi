@@ -47,6 +47,7 @@ function EmailPill({ id, label = 'Join early access' }) {
 function Nav() {
   return (
     <header className="nav">
+      <div className="nav-fade" aria-hidden="true"><i /><i /><i /><i /></div>
       <div className="container nav-inner">
         <a href="#" className="wordmark" aria-label="Navi home"><I.Wordmark /></a>
         <nav className="nav-links" aria-label="Primary">
