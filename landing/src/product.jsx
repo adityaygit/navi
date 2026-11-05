@@ -136,12 +136,13 @@ export function Wave({ bars = 24, live = true }) {
   );
 }
 
+// [name, detail, 'stated' | 'inferred', source quote]
 const PROPOSAL = [
-  ['Workspaces', [['Studio', 'Mon–Thu, 09:30–18:00'], ['Personal', 'Fridays and weekends']]],
-  ['Routine', [['Gym', 'Mon · Wed · Fri, 07:30 · flexible']]],
-  ['Goal', [['Portfolio site live', 'By 31 March · 3 milestones']]],
-  ['Commitment', [['Call Mum', 'Sundays, 18:00 · fixed · reminder at 17:30']]],
-  ['First plan', [['This week', '4 focus blocks, 3 gym sessions, 1 call']]],
+  ['Workspaces', [['Studio', 'Mon–Thu, 09:30–18:00', 'stated', 'design studio, Monday to Thursday'], ['Personal', 'Fridays and weekends', 'inferred', 'Fridays are mine']]],
+  ['Routine', [['Gym', 'Mon · Wed · Fri, 07:30 · flexible', 'inferred', 'three mornings a week, before work']]],
+  ['Goal', [['Portfolio site live', 'By 31 March · 3 milestones', 'stated', 'live by the end of March']]],
+  ['Commitment', [['Call Mum', 'Sundays, 18:00 · fixed', 'inferred', 'call my mum on Sundays']]],
+  ['First plan', [['This week', '4 focus blocks, 3 gym sessions, 1 call', 'inferred', 'from everything above']]],
 ];
 export function SetupProposal() {
   const [on, setOn] = useState(() => PROPOSAL.flatMap(([, r]) => r.map(() => true)));
@@ -150,21 +151,21 @@ export function SetupProposal() {
   return (
     <div className="card proposal-card">
       <div className="pc-head">
-        <div><div className="pc-title">Here is what I’ll set up</div><div className="mono muted">From a 31-second conversation</div></div>
+        <div><div className="pc-title">Here is what I’ll set up</div><div className="mono muted">From a 31-second conversation · each item shows where it came from</div></div>
         <span className="chip-status mono"><Dot c={STATUS.recovery} />Draft</span>
       </div>
       {PROPOSAL.map(([group, rows]) => (
         <div className="pc-group" key={group}>
           <div className="pc-label mono">{group}</div>
-          {rows.map(([name, detail]) => {
+          {rows.map(([name, detail, kind, quote]) => {
             const k = ++idx;
             return (
-              <label className="pc-row" key={name}>
+              <label className="pc-row" key={name} title={`From: “${quote}”`}>
                 <input type="checkbox" id={`pc-${k}`} checked={on[k]} onChange={() => setOn((v) => v.map((x, j) => (j === k ? !x : x)))} />
                 <span className="box" aria-hidden="true"><I.Check size={11} /></span>
                 <span className="pc-name">{name}</span>
-                <span className="pc-detail">{detail}</span>
-                <span className="pc-edit" aria-hidden="true"><I.Pencil size={13} /></span>
+                <span className="pc-detail">{detail}<span className="pc-quote">“{quote}”</span></span>
+                <span className={`pc-kind mono ${kind}`}>{kind}</span>
               </label>
             );
           })}

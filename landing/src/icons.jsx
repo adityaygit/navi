@@ -40,3 +40,17 @@ export const Wordmark = (p) => (
     <text x="24" y="16.5" fontFamily="Instrument Sans, sans-serif" fontSize="17" fontWeight="600" letterSpacing="-0.3" fill="currentColor">Navi</text>
   </svg>
 );
+// Beacon mark: the Lantern silhouette (tapered arch) with a slit through its crown.
+// The slit takes the current state colour via the `glow` prop.
+export const BeaconMark = ({ size = 22, glow = '#f4e3c8', stone = '#e9e4dc', ...p }) => (
+  <svg width={size * 0.68} height={size} viewBox="0 0 15 22" aria-hidden="true" {...p}>
+    <path d="M1.2 21.2 2.4 7.6C2.8 3.4 4.9 1 7.5 1s4.7 2.4 5.1 6.6l1.2 13.6Z" fill={stone} />
+    <path d="M6.9 1.05h1.2v11.4a.6.6 0 0 1-1.2 0Z" fill={glow} />
+  </svg>
+);
+export const BeaconWordmark = ({ glow }) => (
+  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}>
+    <BeaconMark size={21} glow={glow} />
+    <span style={{ fontFamily: 'var(--sans)', fontWeight: 600, fontSize: 17, letterSpacing: '-0.02em' }}>Navi</span>
+  </span>
+);

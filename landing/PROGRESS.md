@@ -61,3 +61,12 @@ Separate from the Navi app. Self-contained static site in `landing/`, published 
 - Responsive: real layouts at 1100/860/560 breakpoints; rock stage scales 860–1186 px and uses a phone arrangement below 860 px (same rock, dock, icons, behaviour).
 - Verified: build + 4 bundle tests pass; no horizontal overflow at 1440 and 390; motion checks (hero proposal applies, planner re-flows, toggles, email form) pass with no page errors. Artifact v3 published.
 - Next: second look at tablet (860–1100), hover polish, optional new generated imagery for the set-up chapter.
+
+## v3 — Beacon identity sprint (2026-11-05)
+- Identity: `research/beacon-identity.md`; three directions in `research/beacon-directions.jpg` (Lodestone obsidian spire, Lantern alabaster monolith, Fold glass chevron). **Lantern selected**: recognisable split-crown silhouette, beautiful unlit, colour lives inside the stone, kin to the protected rock.
+- Assets (Gemini `gemini-3-pro-image`, reference-image variants for one consistent object): `beacon-hero(-m)`, state variants `beacon-rest/listen/dawn/confirm/evening` share framing and crossfade in place. Raw originals stay in `assets-src/` (gitignored).
+- Page: nav (Beacon mark) → Beacon hero → words-to-plan (transcript → proposal with stated/inferred + source quote) → **rock + dock (protected)** → your day (conversation + plan applying a proposal) → presence (six Beacon states tied to real behaviour) + voice log → memory/plan/review loop (type and hairlines, no card grid) → control (permissions + undo/transcripts/quiet hours/export) → close → footer (kept; user likes it).
+- Accuracy pass vs BUILD_INTELLIGENCE: removed the email-integration claim (Calendar/Gmail not started); CTA is "Request an invite" (invite-only); form states it doesn't collect emails in this preview.
+- Removed: portrait/voice photo, week planner + toast, three-card grid, stat numerals, horizon close.
+- Verified: build + 4 bundle tests; no horizontal overflow at 1440/390; functional checks at both widths (anchors resolve, proposal applies, state selection, email note, toggles), no page errors. Artifact v4.
+- Known gaps: tablet 860–1100 not reviewed closely; Beacon is still images (no real-time 3D); small mark is a 2D approximation; invite form not wired to a backend.
