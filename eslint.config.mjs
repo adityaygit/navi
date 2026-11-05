@@ -17,6 +17,9 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "public/sw.js",
+    // The marketing page is a separate Vite project; public/landing is its build output.
+    "landing/**",
+    "public/landing/**",
   ]),
 ]);
 
