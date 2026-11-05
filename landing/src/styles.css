@@ -463,3 +463,26 @@ img { display: block; max-width: 100%; }
   .hb-hr span { left: -44px; width: 34px; }
 }
 @media (max-width: 560px) { .hb-bar { justify-content: space-between; } }
+
+/* ================= Typography: Fey system (single sans, tight display, grey body) ================= */
+:root { --serif: var(--sans); --mono: var(--sans); --small: var(--sans); }
+.serif { font-family: var(--sans); font-weight: 600; letter-spacing: -0.035em;
+  background: var(--grad-head); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.serif em { font-style: normal; -webkit-text-fill-color: #fff; }
+.hb-h { font-size: 72px; line-height: 1.02; letter-spacing: -0.045em; }
+.ch-title { font-size: 48px; line-height: 1.08; letter-spacing: -0.035em; }
+.close-h { font-size: 56px; line-height: 1.05; letter-spacing: -0.04em; }
+.hb-title, .day-title { font-size: 28px; letter-spacing: -0.03em; }
+.stats dt { font-size: 48px; letter-spacing: -0.04em; }
+.rs-sum { font-family: var(--sans); font-size: 20px; font-weight: 600; line-height: 1.35; letter-spacing: -0.015em; }
+.mono, .small { font-family: var(--sans); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.eyebrow { text-transform: none; letter-spacing: -0.005em; font-size: 15px; font-weight: 600; color: var(--fg2); margin-bottom: 16px; }
+.pc-label, .ct-h, .footer h4, .loop-n { text-transform: none; letter-spacing: 0; font-size: 12.5px; font-weight: 600; }
+.body, .lead { color: #8f949b; }
+.body { font-size: 16px; line-height: 1.55; }
+.lead { font-size: 17px; line-height: 1.55; }
+.hb-blk .t, .blk-title { font-weight: 600; letter-spacing: -0.01em; }
+.dcard h3, .fact h3, .sub { letter-spacing: -0.015em; }
+@media (max-width: 960px) { .hb-h { font-size: 56px; } }
+@media (max-width: 860px) { .ch-title { font-size: 40px; } .close-h { font-size: 44px; } }
+@media (max-width: 560px) { .hb-h { font-size: 42px; } .ch-title { font-size: 34px; } .close-h { font-size: 38px; } }
