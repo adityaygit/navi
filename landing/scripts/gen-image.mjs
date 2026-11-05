@@ -11,9 +11,6 @@ const key = /GEMINI_API_KEY=(.+)/.exec(env)?.[1]?.trim();
 if (!key) throw new Error('GEMINI_API_KEY missing from .env.local');
 
 const [name, aspect = '16:9', count = '1', prompt] = process.argv.slice(2);
-// Optional REF=path: a reference image sent with the prompt (for consistent variants of one object).
-const refPath = process.env.REF;
-const refPart = refPath ? { inlineData: { mimeType: refPath.endsWith('.png') ? 'image/png' : 'image/jpeg', data: readFileSync(refPath).toString('base64') } } : null;
 if (!name || !prompt) throw new Error('usage: gen-image.mjs <name> <aspect> <count> "<prompt>"');
 const MODEL = 'gemini-3-pro-image';
 const outDir = join(root, 'assets-src');
@@ -27,7 +24,7 @@ async function call() {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify({
-        contents: [{ parts: refPart ? [refPart, { text: prompt }] : [{ text: prompt }] }],
+        contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: aspect, imageSize: '2K' } },
       }),
     });
@@ -45,6 +42,6 @@ for (let i = start; i < start + Number(count); i++) {
   const ext = part.inlineData.mimeType.includes('png') ? 'png' : 'jpg';
   const file = join(outDir, `${name}-${i}.${ext}`);
   writeFileSync(file, Buffer.from(part.inlineData.data, 'base64'));
-  appendFileSync(join(outDir, 'generation-log.txt'), `${new Date().toISOString()} ${MODEL} ${name}-${i}.${ext} aspect=${aspect}${refPath ? ' ref=' + refPath.split('/').pop() : ''}\n`);
+  appendFileSync(join(outDir, 'generation-log.txt'), `${new Date().toISOString()} ${MODEL} ${name}-${i}.${ext} aspect=${aspect}\n`);
   console.log('saved', file);
 }

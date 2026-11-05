@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as I from './icons.jsx';
-import { CAPTURE, HeroApp, SetupTranscript, SetupProposal, VoiceLog, MemoryVis, ReviewSheet, ControlTable } from './product.jsx';
-import { Presence } from './beacon.jsx';
+import { CAPTURE, HeroApp, SetupTranscript, SetupProposal, WeekPlanner, VoiceLog, BriefingVis, InboxVis, MemoryVis, ReviewSheet, ControlTable, Wave } from './product.jsx';
 
 const img = (name) => `./img/${name}`;
 const hooks = (typeof window !== 'undefined' && (window.__navi = window.__navi || {})) || {};
@@ -17,29 +16,28 @@ function useCycle(n, ms, enabled = true, name) {
   return [i, setI];
 }
 
-function EmailPill({ id, label = 'Request an invite' }) {
+function EmailPill({ id, label = 'Join early access' }) {
   const [sent, setSent] = useState(false);
   return (
     <form className="email" onSubmit={(e) => { e.preventDefault(); setSent(true); }}>
       <label htmlFor={id} className="sr">Email address</label>
       <input id={id} type="email" required placeholder="you@example.com" disabled={sent} />
-      <button className="btn-pill" type="submit" disabled={sent}>{sent ? 'Noted' : label}</button>
-      {sent && <span className="email-note mono" role="status">This preview doesn’t collect emails yet.</span>}
+      <button className="btn-pill" type="submit" disabled={sent}>{sent ? 'You’re on the list' : label}</button>
     </form>
   );
 }
-
 
 function Nav() {
   return (
     <header className="nav">
       <div className="container nav-inner">
-        <a href="#top" className="wordmark" aria-label="Navi home"><I.BeaconWordmark glow="#ffc58a" /></a>
+        <a href="#" className="wordmark" aria-label="Navi home"><I.Wordmark /></a>
         <nav className="nav-links" aria-label="Primary">
-          <a href="#how">How it works</a><a href="#day">Your day</a><a href="#presence">Voice</a><a href="#control">Control</a>
+          <a href="#setup">How it works</a><a href="#planner">Planner</a><a href="#voice">Voice</a><a href="#control">Privacy</a>
         </nav>
         <div className="nav-right">
-          <a href="#start" className="btn-pill sm">Request an invite</a>
+          <a href="#" className="nav-signin">Sign in</a>
+          <a href="#start" className="btn-pill sm">Join early access</a>
         </div>
       </div>
     </header>
@@ -48,37 +46,52 @@ function Nav() {
 
 function Hero() {
   return (
-    <section className="hero3" id="top">
-      <picture className="hero3-art" aria-hidden="true">
-        <source media="(max-width: 760px)" srcSet={img('beacon-hero-m.jpg')} />
-        <img src={img('beacon-hero.jpg')} alt="" />
-      </picture>
-      <div className="container hero3-inner">
-        <p className="eyebrow mono reveal">Personal AI · invite-only early access</p>
-        <h1 className="serif hero3-h reveal">A quiet guide<br />for a full <em>life</em>.</h1>
-        <p className="lead reveal">Navi learns how your life works in one conversation, plans each day with you, and helps you follow through, adjusting when things change.</p>
-        <div className="hero3-cta reveal">
-          <EmailPill id="email-hero" />
-          <a className="text-link" href="#how">See how it works <I.Arrow size={14} /></a>
+    <section className="hero">
+      <div className="container">
+        <a className="announce reveal" href="#voice"><span className="mono">New</span> Real-time voice is in early access <I.Chevron dir="right" size={11} /></a>
+        <div className="hero-grid reveal">
+          <h1 className="serif hero-h">A calmer way<br />to <em>run</em> your life.</h1>
+          <div className="hero-side">
+            <p className="lead">Navi learns your life in one conversation, then plans your days with you, keeps your commitments honest, and reviews your week.</p>
+            <EmailPill id="email-hero" />
+            <p className="mono fine">Free during early access · Raw audio is never stored</p>
+          </div>
+        </div>
+      </div>
+      <div className="container hero-stage reveal">
+        <div className="hero-glow" style={{ backgroundImage: `url(${img('wall-dawn.jpg')})` }} aria-hidden="true" />
+        <HeroApp />
+        <p className="caption mono">Talk or type. The plan and the conversation share one state, and nothing moves without your OK.</p>
+      </div>
+    </section>
+  );
+}
+
+function Chapter({ id, eyebrow, title, children, className = '' }) {
+  return (
+    <section id={id} className={`chapter ${className}`}>
+      <div className="container">
+        <div className="ch-head reveal">
+          <p className="eyebrow mono">{eyebrow}</p>
+          <h2 className="serif ch-title">{title}</h2>
+          {children}
         </div>
       </div>
     </section>
   );
 }
 
-function How() {
+function Setup() {
   return (
-    <section id="how" className="how">
-      <div className="container">
-        <div className="how-head reveal">
-          <p className="eyebrow mono">From words to a plan</p>
-          <h2 className="serif ch-title">Say it the way you’d <em>say</em> it.</h2>
-          <p className="body">Describe your week out loud or in writing. Navi turns it into workspaces, routines, goals, commitments and a first plan. Each item shows the words it came from and whether you said it or Navi inferred it. Nothing exists until you approve it.</p>
+    <section id="setup" className="setup">
+      <div className="container setup-grid">
+        <div className="setup-copy reveal">
+          <p className="eyebrow mono">Set-up</p>
+          <h2 className="serif ch-title">Tell it about your life <em>once</em>.</h2>
+          <p className="body">No forms and no templates. Describe your week out loud or in writing. Navi turns it into real workspaces, routines, goals and commitments, plus a first plan, and shows you all of it before anything is created.</p>
+          <SetupTranscript />
         </div>
-        <div className="how-grid">
-          <div className="reveal"><SetupTranscript /></div>
-          <div className="reveal"><SetupProposal /></div>
-        </div>
+        <div className="reveal"><SetupProposal /></div>
       </div>
     </section>
   );
@@ -146,39 +159,34 @@ function Rock() {
   );
 }
 
-
-function Day() {
+function Planner() {
   return (
-    <section id="day" className="day3">
+    <section id="planner" className="planner">
       <div className="container">
         <div className="center-head reveal">
-          <p className="eyebrow mono">Your day</p>
-          <h2 className="serif ch-title">When the day moves,<br />the plan <em>moves</em> with it.</h2>
-          <p className="body">Fixed things stay where they are. Flexible work, focus and recovery re-route around them. Navi explains the change and waits for your OK before it touches anything you marked fixed.</p>
+          <p className="eyebrow mono">Planner</p>
+          <h2 className="serif ch-title">Fixed where it must be.<br /><em>Flexible</em> everywhere else.</h2>
+          <p className="body">Appointments and promises hold their place. Focus work, errands and recovery move around them, so a new meeting reshapes the week instead of breaking it.</p>
         </div>
-        <div className="day3-frame reveal" style={{ backgroundImage: `url(${img('wall-highland.jpg')})` }}>
-          <HeroApp />
+        <div className="planner-frame reveal" style={{ backgroundImage: `url(${img('wall-highland.jpg')})` }}>
+          <WeekPlanner />
         </div>
       </div>
     </section>
   );
 }
 
-function PresenceSection() {
+function Voice() {
   return (
-    <section id="presence" className="presence-sec">
-      <div className="container">
-        <div className="presence-head reveal">
-          <p className="eyebrow mono">Presence</p>
-          <h2 className="serif ch-title">Always there. Rarely <em>loud</em>.</h2>
-          <p className="body">Black stays constant. Navi’s light changes with what it is doing, so you can tell at a glance whether it is listening, working or waiting for you.</p>
-        </div>
-        <div className="reveal"><Presence /></div>
-        <div className="voice-row reveal">
-          <div>
-            <h3 className="sub">Talk, type, or both</h3>
-            <p className="body">Voice and text share one history. Ask out loud on a walk, finish in chat at your desk; the changes it made are listed either way.</p>
-          </div>
+    <section id="voice" className="voice">
+      <div className="container voice-grid">
+        <figure className="voice-photo reveal" style={{ backgroundImage: `url(${img('portrait.jpg')})` }}>
+          <figcaption className="voice-live"><span className="live"><span className="pulse" />Live</span><Wave bars={22} /><span className="mono muted">02:14</span></figcaption>
+        </figure>
+        <div className="voice-copy reveal">
+          <p className="eyebrow mono">Voice</p>
+          <h2 className="serif ch-title">Talk it <em>through</em>.</h2>
+          <p className="body">Real-time, two-way voice that shares one history with your typed chats. Navi acts while you talk, and every change shows up as a line you can check or undo.</p>
           <VoiceLog />
         </div>
       </div>
@@ -186,45 +194,52 @@ function PresenceSection() {
   );
 }
 
-function Loop() {
-  const plan = [['09:30', 'Dentist', 'fixed'], ['11:00', 'Finish the Q4 deck', 'focus'], ['15:00', 'Client call', 'fixed'], ['16:15', 'Deck review with Sam', 'flex']];
+function Details() {
+  const cards = [
+    ['Morning and evening briefings', 'A spoken plan at 06:00 and a short review at 21:00. Both times are yours to change, and quiet hours are respected.', <BriefingVis key="b" />],
+    ['A review inbox for new commitments', 'Promises Navi notices in email and conversation wait here as suggestions until you add or skip them.', <InboxVis key="i" />],
+    ['Memory you can read and edit', 'Everything Navi knows about you sits in one plain list, with where it learned it. Change a line and the plan follows.', <MemoryVis key="m" />],
+  ];
   return (
-    <section className="loop">
+    <section className="details">
       <div className="container">
-        <h2 className="serif ch-title loop-title reveal">It remembers, plans, and <em>checks in</em>.</h2>
-        <div className="loop-grid">
-          <div className="loop-col reveal">
-            <span className="mono loop-n">Memory</span>
-            <h3 className="sub">Knows what matters to you</h3>
-            <p>Everything Navi has learned sits in one readable list, with where it learned it. Correct a line or delete it and the next plan follows.</p>
-            <MemoryVis />
-          </div>
-          <div className="loop-col reveal">
-            <span className="mono loop-n">Plan</span>
-            <h3 className="sub">Plans with real time</h3>
-            <p>It never invents free time, never moves a fixed item on its own, and never marks your work done for you.</p>
-            <ul className="mini-plan">
-              {plan.map(([t, n, k]) => <li key={n} className={`k-${k}`}><span className="mono">{t}</span>{n}</li>)}
-            </ul>
-          </div>
-          <div className="loop-col reveal">
-            <span className="mono loop-n">Review</span>
-            <h3 className="sub">Strict, but fair</h3>
-            <p>Each evening it compares the plan with what happened. Interruptions and rest don’t count against you; slipped promises are named, with a next step.</p>
-            <ul className="mini-review">
-              <li><span className="dot" style={{ background: '#3ad389' }} />Deck sent to Sam<span className="mono">Kept</span></li>
-              <li><span className="dot" style={{ background: '#70b8ff' }} />Admin batch<span className="mono">Moved twice</span></li>
-              <li><span className="dot" style={{ background: '#ff9592' }} />Photos for Priya<span className="mono">At risk</span></li>
-            </ul>
-          </div>
+        <h2 className="serif ch-title center reveal">Small things, handled <em>well</em>.</h2>
+        <div className="cards3">
+          {cards.map(([t, b, v]) => (
+            <article className="card dcard reveal" key={t}>
+              {v}
+              <h3>{t}</h3>
+              <p>{b}</p>
+            </article>
+          ))}
         </div>
       </div>
     </section>
   );
 }
 
+function Accountability() {
+  const stats = [['9/10', 'commitments kept'], ['11.5h', 'focused work'], ['4', 'recovery blocks protected'], ['1', 'promise at risk, flagged early']];
+  return (
+    <section className="acct">
+      <div className="container acct-grid">
+        <div className="reveal">
+          <p className="eyebrow mono">Reviews</p>
+          <h2 className="serif ch-title">Strict, but <em>fair</em>.</h2>
+          <p className="body">Every evening Navi compares the plan with what really happened. It names what slipped and why, then proposes specific changes for tomorrow. It never guilt-trips, and it always offers a next step.</p>
+          <dl className="stats">
+            {stats.map(([n, l]) => <div key={l}><dt className="serif">{n}</dt><dd>{l}</dd></div>)}
+          </dl>
+          <p className="mono fine">Example week</p>
+        </div>
+        <div className="reveal"><ReviewSheet /></div>
+      </div>
+    </section>
+  );
+}
+
 function Control() {
-  const facts = [[I.Clock, 'Undo what it did', 'Every change Navi makes is listed in Activity and can be reverted.'], [I.Mic, 'Transcripts, not recordings', 'Voice is saved as text in your history; the raw audio is not kept.'], [I.Moon, 'Quiet hours you set', 'No briefings or notifications inside them.'], [I.Lock, 'Yours to take or delete', 'Export everything or delete your account from Settings.']];
+  const facts = [[I.Mic, 'Transcripts are saved, raw audio is not', 'Voice is turned into text for your history, and the recording is discarded.'], [I.Moon, 'Quiet hours you choose', 'No notifications or briefings inside them, unless you say otherwise.'], [I.Lock, 'Your data stays yours', 'Export or delete your plans, memory and history at any time.']];
   return (
     <section id="control" className="control">
       <div className="container">
@@ -232,11 +247,11 @@ function Control() {
           <div className="reveal">
             <p className="eyebrow mono">Control</p>
             <h2 className="serif ch-title">You stay in <em>charge</em>.</h2>
-            <p className="body">Navi works on its own inside your plan. Anything consequential, like moving something fixed, deleting, or finishing work, waits for your approval.</p>
+            <p className="body">Navi works on its own inside your plan. Anything that reaches other people or changes something fixed waits for your approval.</p>
           </div>
           <div className="reveal"><ControlTable /></div>
         </div>
-        <div className="facts facts4 reveal">
+        <div className="facts reveal">
           {facts.map(([Ic, t, b]) => <div className="fact" key={t}><Ic size={18} /><h3>{t}</h3><p>{b}</p></div>)}
         </div>
       </div>
@@ -246,12 +261,12 @@ function Control() {
 
 function Close() {
   return (
-    <section className="close3" id="start">
-      <div className="container close3-inner">
-        <img className="close3-stone reveal" src={img('beacon-dawn.jpg')} alt="" aria-hidden="true" />
-        <h2 className="serif close-h reveal">Start with one <em>conversation</em>.</h2>
-        <p className="body reveal">Navi is in invite-only early access. Leave your email and tell it about your week when your invite arrives.</p>
-        <div className="reveal"><EmailPill id="email-close" /></div>
+    <section className="close" id="start">
+      <div className="close-horizon" style={{ backgroundImage: `url(${img('wall-dawn.jpg')})` }} aria-hidden="true" />
+      <div className="container close-inner reveal">
+        <h2 className="serif close-h">Begin with one <em>conversation</em>.</h2>
+        <p className="body">Tell Navi about your week. It builds the plan and keeps it current.</p>
+        <EmailPill id="email-close" />
       </div>
     </section>
   );
@@ -263,7 +278,7 @@ function Footer() {
     <footer className="footer">
       <div className="container">
         <div className="footer-top">
-          <div><I.BeaconWordmark /><p className="muted">A personal operating system for calmer weeks.</p></div>
+          <div><I.Wordmark /><p className="muted">A personal operating system for calmer weeks.</p></div>
           {cols.map(([h, ls]) => <div key={h}><h4 className="mono">{h}</h4>{ls.map((l) => <a href="#" key={l}>{l}</a>)}</div>)}
         </div>
         <div className="footer-bottom mono"><span>© 2026 Navi</span><span>Made for people with too many tabs open</span></div>
@@ -272,18 +287,18 @@ function Footer() {
   );
 }
 
-
 export default function App() {
   return (
     <>
       <Nav />
       <main>
         <Hero />
-        <How />
+        <Setup />
         <Rock />
-        <Day />
-        <PresenceSection />
-        <Loop />
+        <Planner />
+        <Voice />
+        <Details />
+        <Accountability />
         <Control />
         <Close />
       </main>
