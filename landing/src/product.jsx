@@ -21,85 +21,76 @@ const Dot = ({ c }) => <span className="dot" style={{ background: c }} />;
 const STATUS = { focus: '#3ad389', fixed: '#f0f0f0', flex: '#70b8ff', recovery: '#ffca16', risk: '#ff9592', memory: '#baa7ff' };
 
 /* ---------------- Hero: conversation + day plan in one window ---------------- */
-const DAY_START = 6, PX = 46; // px per hour
-const PLAN = [
-  { id: 'brief', t: 6, d: 0.5, title: 'Morning briefing', kind: 'done', meta: 'Listened · 4 min' },
-  { id: 'run', t: 7, d: 0.75, title: 'Run, river loop', kind: 'recovery', meta: 'Flexible' },
-  { id: 'dentist', t: 9.5, d: 0.75, title: 'Dentist', kind: 'fixed', meta: 'Fixed · Harley St' },
-  { id: 'deck', t: 11, d: 1.5, title: 'Finish the Q4 deck', kind: 'focus', meta: 'Focus · flexible' },
-  { id: 'lunch', t: 13, d: 1, title: 'Lunch with Ana', kind: 'fixed', meta: 'Fixed' },
-  { id: 'admin', t: 15, d: 1, title: 'Admin batch', kind: 'flex', meta: 'Flexible · 3 tasks' },
-  { id: 'client', t: 15, d: 1, title: 'Client call, moved', kind: 'fixed', meta: 'Fixed · was 14:00', late: true },
-  { id: 'review', t: 16.25, d: 0.5, title: 'Deck review with Sam', kind: 'flex', meta: 'New · flexible', late: true },
+// Hours 09–17. Before approval the moved client call clashes with the admin batch; after it, admin
+// leaves for Thursday and a short review with Sam appears.
+const H_START = 9, H_COUNT = 8, H_PX = 56;
+const BASE = [
+  { id: 'dentist', t: 9.5, d: 0.75, title: 'Dentist', kind: 'fixed', time: '09:30' },
+  { id: 'deck', t: 11, d: 1.5, title: 'Finish the Q4 deck', kind: 'focus', time: '11:00' },
+  { id: 'lunch', t: 13, d: 1, title: 'Lunch with Ana', kind: 'fixed', time: '13:00' },
+  { id: 'walk', t: 16.75, d: 0.5, title: 'Short walk', kind: 'rec', time: '16:45' },
+];
+const BEFORE = [
+  { id: 'client', t: 15, d: 1, title: 'Client call', kind: 'fixed clash', time: '15:00', side: 'l' },
+  { id: 'admin', t: 15, d: 1, title: 'Admin batch', kind: 'flex clash', time: '15:00', side: 'r' },
+];
+const AFTER = [
+  { id: 'client', t: 15, d: 1, title: 'Client call', kind: 'fixed', time: '15:00' },
+  { id: 'review', t: 16.1, d: 0.5, title: 'Deck review with Sam', kind: 'flex new', time: '16:05' },
 ];
 
 export function HeroApp() {
   const [applied, setApplied] = useState(false);
   const [pressing, setPressing] = useState(false);
   const ref = useInView(() => {
-    setTimeout(() => setPressing(true), 1700);
-    setTimeout(() => { setPressing(false); setApplied(true); }, 2100);
+    setTimeout(() => setPressing(true), 1900);
+    setTimeout(() => { setPressing(false); setApplied(true); }, 2300);
   });
-  const items = PLAN.filter((p) => (applied ? p.id !== 'admin' : !p.late || p.id === 'client'));
-  const clash = !applied;
+  const items = BASE.concat(applied ? AFTER : BEFORE);
   return (
-    <div className="app" ref={ref}>
-      <div className="app-bar">
-        <span className="app-ws"><I.Logo width="11" height="13" /> Personal <I.Chevron size={10} /></span>
-        <span className="mono app-date">Tuesday 4 November</span>
-        <span className="mono app-time">09:41</span>
+    <div className="hb-win" ref={ref}>
+      <div className="hb-bar">
+        <span className="hb-ws">Personal</span>
+        <span className="small hb-date">Tuesday 4 November</span>
+        <span className="small hb-clock">09:41</span>
       </div>
-      <div className="app-body">
-        <nav className="app-rail" aria-hidden="true">
-          {[I.Home, I.Calendar, I.Compass, I.Bookmark, I.Inbox, I.Mic].map((Ic, k) => <span key={k} className={k === 0 ? 'on' : ''}><Ic size={17} /></span>)}
-          <span className="rail-end"><I.Gear size={17} /></span>
-        </nav>
-        <section className="day">
-          <header className="day-head">
+      <div className="hb-body">
+        <section className="hb-day">
+          <div className="hb-head">
             <div>
-              <div className="serif day-title">Today</div>
-              <div className="mono muted">6h 20m planned · 2h 10m free · 3 fixed</div>
+              <div className="hb-title">Today</div>
+              <div className="small hb-summary">6h 20m planned · 2h 10m free · 3 fixed</div>
             </div>
-            <div className="day-legend mono">
-              <span><Dot c={STATUS.fixed} />Fixed</span><span><Dot c={STATUS.flex} />Flexible</span><span><Dot c={STATUS.focus} />Focus</span><span><Dot c={STATUS.recovery} />Recovery</span>
+            <div className="small hb-legend">
+              <span><i className="k-fixed-dot" />Fixed</span><span><i className="k-flex-dot" />Flexible</span><span><i className="k-focus-dot" />Focus</span><span><i className="k-rec-dot" />Recovery</span>
             </div>
-          </header>
-          <div className="timeline" style={{ height: 12 * PX }}>
-            {Array.from({ length: 12 }, (_, k) => (
-              <div className="hour" key={k} style={{ top: k * PX }}><span className="mono">{String(DAY_START + k).padStart(2, '0')}:00</span></div>
+          </div>
+          <div className="hb-tl" style={{ height: H_COUNT * H_PX }}>
+            {Array.from({ length: H_COUNT + 1 }, (_, k) => (
+              <div className="hb-hr" key={k} style={{ top: k * H_PX }}><span className="small">{String(H_START + k).padStart(2, '0')}:00</span></div>
             ))}
-            <div className="now" style={{ top: (9.68 - DAY_START) * PX }}><span className="mono">09:41</span></div>
+            <div className="hb-now" style={{ top: (9.68 - H_START) * H_PX }} />
             {items.map((p) => (
-              <div key={p.id} className={`blk k-${p.kind}${applied && p.late ? ' fresh' : ''}${!applied && (p.id === 'admin' || p.id === 'client') ? ' clash' : ''}`} style={{ top: (p.t - DAY_START) * PX + 1, height: p.d * PX - 3, ...(!applied && p.id === 'admin' ? { left: 'calc(50% + 4px)' } : {}), ...(!applied && p.id === 'client' ? { right: 'calc(50% + 4px)' } : {}) }}>
-                <span className="blk-title">{p.kind === 'done' && <I.Check size={12} />}{p.title}</span>
-                <span className="mono blk-meta">{String(Math.floor(p.t)).padStart(2, '0')}:{p.t % 1 ? String(Math.round((p.t % 1) * 60)).padStart(2, '0') : '00'} · {p.meta}</span>
+              <div key={p.id} className={`hb-blk ${p.kind}${p.side ? ` side-${p.side}` : ''}`} style={{ top: (p.t - H_START) * H_PX + 2, height: p.d * H_PX - 4 }}>
+                <span className="t">{p.title}</span><span className="m small">{p.time}</span>
               </div>
             ))}
           </div>
         </section>
-        <aside className="chat">
-          <div className="chat-log">
-            <div className="msg me">
-              <span className="voice-tag mono"><I.Mic size={11} /> 0:07</span>
-              My two o’clock moved to three, and I still have to get the deck to Sam today.
-            </div>
-            <div className="msg navi">
-              The client call now sits at 15:00, so the admin batch can wait until Thursday morning. I kept 11:00 to 12:30 for the deck and added a short review with Sam after the call.
-            </div>
-            <div className={`proposal${applied ? ' done' : ''}`}>
-              <div className="proposal-head mono"><span>{applied ? 'Applied' : 'Proposed changes'}</span><span>{applied ? '2 of 2' : 'Needs your OK'}</span></div>
-              <div className="diff"><Dot c={STATUS.flex} /><span>Admin batch</span><span className="mono">15:00 → Thu 09:00</span></div>
-              <div className="diff"><Dot c={STATUS.flex} /><span>Deck review with Sam</span><span className="mono">new · 16:15</span></div>
-              <div className="proposal-actions">
-                <button className={`btn-sm white${pressing ? ' press' : ''}`} onClick={() => setApplied(true)} disabled={applied}>{applied ? <><I.Check size={12} /> Approved</> : 'Approve'}</button>
-                {!applied && <button className="btn-sm">Edit</button>}
-              </div>
+        <aside className="hb-chat">
+          <div className="hb-me"><span className="small hb-voice">Voice · 0:07</span>My two o’clock moved to three, and I still have to get the deck to Sam today.</div>
+          <div className="hb-navi">The client call now sits at 15:00, so the admin batch can wait until Thursday morning. I kept your focus block for the deck and added a short review with Sam.</div>
+          <div className={`hb-change${applied ? ' done' : ''}`}>
+            <div className="small hb-change-h"><span>{applied ? 'Applied' : 'Proposed change'}</span><span className={applied ? 'ok' : ''}>{applied ? '2 of 2' : 'Needs your OK'}</span></div>
+            <div className="hb-row"><span>Admin batch</span><span className="small"><s>15:00</s> <span className="to">Thu 09:00</span></span></div>
+            <div className="hb-row"><span>Deck review with Sam</span><span className="small to">New · 16:05</span></div>
+            <div className="hb-actions">
+              {applied
+                ? <span className="hb-btn ok"><I.Check size={12} /> Approved</span>
+                : <><button className={`hb-btn w${pressing ? ' press' : ''}`} onClick={() => setApplied(true)}>Approve</button><button className="hb-btn">Edit</button></>}
             </div>
           </div>
-          <div className="chat-input">
-            <span>Ask Navi, or hold to talk</span>
-            <span className="mic"><I.Mic size={15} /></span>
-          </div>
+          <div className="hb-ask"><span>Ask Navi, or hold to talk</span><span className="hb-mic"><I.Mic size={15} /></span></div>
         </aside>
       </div>
     </div>

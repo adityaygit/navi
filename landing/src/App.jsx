@@ -46,22 +46,15 @@ function Nav() {
 
 function Hero() {
   return (
-    <section className="hero">
-      <div className="container">
-        <a className="announce reveal" href="#voice"><span className="mono">New</span> Real-time voice is in early access <I.Chevron dir="right" size={11} /></a>
-        <div className="hero-grid reveal">
-          <h1 className="serif hero-h">A calmer way<br />to <em>run</em> your life.</h1>
-          <div className="hero-side">
-            <p className="lead">Navi learns your life in one conversation, then plans your days with you, keeps your commitments honest, and reviews your week.</p>
-            <EmailPill id="email-hero" />
-            <p className="mono fine">Free during early access · Raw audio is never stored</p>
-          </div>
+    <section className="hb">
+      <div className="hb-sky" style={{ backgroundImage: `url(${img('horizon.jpg')})` }} aria-hidden="true" />
+      <div className="container hb-inner">
+        <div className="hb-hero reveal">
+          <h1 className="serif hb-h">A calmer way<br />to <em>run</em> your life.</h1>
+          <p className="lead">Navi learns your life in one conversation, then plans your days with you, keeps your commitments honest, and reviews your week.</p>
+          <EmailPill id="email-hero" />
         </div>
-      </div>
-      <div className="container hero-stage reveal">
-        <div className="hero-glow" style={{ backgroundImage: `url(${img('wall-dawn.jpg')})` }} aria-hidden="true" />
-        <HeroApp />
-        <p className="caption mono">Talk or type. The plan and the conversation share one state, and nothing moves without your OK.</p>
+        <div className="reveal"><HeroApp /></div>
       </div>
     </section>
   );
