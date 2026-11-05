@@ -39,7 +39,7 @@ describe("early-access waitlist", () => {
 
     expect((await submitApplication(db, { token, ...answers }, m.send)).outcome).toBe("applied");
     expect((await findByToken(db, token)).state).toBe("used"); // single use
-    expect((await submitApplication(db, { token, ...answers }, m.send)).outcome).toBe("invalid");
+    expect((await submitApplication(db, { token, ...answers }, m.send)).outcome).toBe("used");
 
     const { data: row } = await db.from("waitlist").select("id,status").eq("email", email).single();
     expect(row!.status).toBe("applied");

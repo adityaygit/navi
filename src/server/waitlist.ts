@@ -125,13 +125,13 @@ export async function setAutoApprove(db: SupabaseClient, on: boolean, by: string
   if (error) throw error;
 }
 
-/** Saves the answers. The link becomes single-use: the token is cleared. Auto-approves if the switch is on. */
+/** Saves the answers. Single use: only a 'requested' row can be submitted; the hash is kept so a reused link reads as "already sent". Auto-approves if the switch is on. */
 export async function submitApplication(db: SupabaseClient, input: unknown, send: Sender = resendSender, now = new Date()): Promise<{ outcome: "applied" | "approved" | "invalid" | "expired" | "used" }> {
   const a = applicationSchema.parse(input);
   const found = await findByToken(db, a.token, now);
   if (found.state !== "valid") return { outcome: found.state };
   const { data, error } = await db.from("waitlist")
-    .update({ status: "applied", name: a.name, reason: a.reason, use_case: a.use_case, timezone: a.timezone, referral: a.referral || null, applied_at: now.toISOString(), token_hash: null, token_expires_at: null })
+    .update({ status: "applied", name: a.name, reason: a.reason, use_case: a.use_case, timezone: a.timezone, referral: a.referral || null, applied_at: now.toISOString() })
     .eq("token_hash", hashToken(a.token)).eq("status", "requested")
     .select("id").maybeSingle<{ id: string }>();
   if (error) throw error;
