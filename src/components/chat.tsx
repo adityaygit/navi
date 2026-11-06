@@ -221,7 +221,7 @@ export function Chat({
           const el = e.currentTarget;
           stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
         }}
-        className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain py-2 pr-1"
+        className="chat-log flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain py-3 pr-1"
         role="log"
         aria-live="polite"
         aria-label="Conversation"
@@ -252,9 +252,9 @@ export function Chat({
           }}
         />
       )}
-      {quick && !voiceOpen && <div className="-mx-1 flex shrink-0 gap-2 overflow-x-auto px-1 md:hidden">{quick}</div>}
+      {quick && !voiceOpen && !text && <div className="chat-quick -mx-1 flex shrink-0 gap-2 overflow-x-auto px-1 md:hidden">{quick}</div>}
       <form
-        className="lg flex shrink-0 items-end gap-2 rounded-[22px] py-2 pl-4 pr-2 md:flex-col md:items-stretch md:py-3 md:pl-5 md:pr-3"
+        className={`lg composer flex shrink-0 gap-1 rounded-[22px] py-2 pl-4 pr-2 md:flex-col md:items-stretch md:py-3 md:pl-5 md:pr-3 ${text ? "flex-col" : "items-center"}`}
         onSubmit={(e) => {
           e.preventDefault();
           void send(text);
@@ -264,7 +264,7 @@ export function Chat({
         <textarea
           id={`chat-input-${kind}`}
           rows={1}
-          className="max-h-40 min-h-11 w-full min-w-0 flex-1 resize-none bg-transparent py-2 text-[17px] leading-snug text-text outline-none [field-sizing:content] placeholder:text-dim focus-visible:outline-none"
+          className={`max-h-32 min-h-11 w-full min-w-0 resize-none ${text ? "" : "flex-1 md:flex-none"} bg-transparent py-2 md:max-h-40 text-[17px] leading-snug text-text outline-none [field-sizing:content] placeholder:text-dim focus-visible:outline-none`}
           placeholder={placeholder ?? "Tell Navi anything…"}
           value={text}
           onChange={(e) => setDraft(e.target.value)}

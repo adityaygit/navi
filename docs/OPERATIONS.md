@@ -189,6 +189,11 @@ built yet and show as "not connected".
 
 ### 3. App on Vercel
 
+**Main domain: `https://www.meetnavi.app`.** `meetnavi.app` redirects to it (308), and
+`navi-sand.vercel.app` still serves the same production deployment. Use the main domain for
+`NEXT_PUBLIC_SITE_URL`, Supabase's Site URL and redirect URLs (`/auth/callback**`,
+`/auth/confirm**`), the scheduler's `NAVI_APP_URL`, and `npm run check:deploy`.
+
 Import the repo and set the environment variables from `.env.example`:
 
 | Variable | Notes |
@@ -216,7 +221,7 @@ services are accepted: `fcm.googleapis.com`, `*.push.apple.com`,
 With the production values in the environment (or `.env.local`), run:
 
 ```bash
-npm run check:deploy -- https://<app>
+npm run check:deploy -- https://www.meetnavi.app
 ```
 
 It is read-only and never prints secret values. It checks that required

@@ -48,7 +48,7 @@ export function InsightsStory({ slides, rangeLabel, autoOpen = false }: { slides
         className="m-0 h-dvh max-h-none w-full max-w-none bg-transparent p-0 text-text backdrop:bg-black/80 md:m-auto md:h-[min(820px,92dvh)] md:max-w-[440px] md:rounded-[22px]"
       >
         {open && (
-          <div className="relative flex h-full flex-col gap-4 overflow-y-auto bg-[#060608] px-5 pb-6 pt-4 safe-top md:border md:border-border md:rounded-[22px]">
+          <div className="relative flex h-full flex-col gap-4 overflow-y-auto bg-[#060608] px-5 pb-6 pt-[calc(env(safe-area-inset-top)+20px)] md:border md:pt-4 md:border-border md:rounded-[22px]">
             <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(100%_100%_at_50%_0%,color-mix(in_srgb,var(--navi-mid)_22%,transparent),transparent_70%)]" />
             <div className="relative flex items-center gap-3.5">
               <button type="button" className="btn h-11 w-11 shrink-0 px-0" aria-label="Close report" onClick={() => setOpen(false)}>
