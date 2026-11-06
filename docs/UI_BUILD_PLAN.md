@@ -1,6 +1,13 @@
 # Navi UI rebuild: overnight build plan
 
-Status: **planned, not started.** Starts only when the owner says go.
+Status: **planned, not started.** Starts only when the owner writes exactly: **"start coding the UI now"**. Before that, only mockups and plan changes.
+
+## Owner decisions (2026-11-05, night)
+- **Delivery:** PR + Vercel preview. No merge to `main`, no production deploy.
+- **Dark only** for now.
+- **Live chat is a must:** steps and Navi's reply stream in as they happen. Reply text arrives in small chunks and each new chunk **fades in** (short opacity + slight blur-to-sharp, about 150–250 ms, word groups not letters). Steps appear one by one and change from "working" to done/failed in place. All motion off under reduced motion; screen readers get the finished text once, not every chunk.
+- **Glow only where it means something:** Pebble on the hero, Navi working/listening, and things that need the owner (approvals). No glow under ordinary cards, charts or buttons. Page background glows kept very faint. (Mockups on canvas page v5 updated to this.)
+- **Navi's colour is the person's choice.** Settings → Navi offers 8 Pebble colours (Amber default, Rose, Lilac, Sky, Mint, Lime, Peach, Pearl); see the "Choose Navi's colour" artboard on page v5. The choice colours only Pebble and Navi's own accents (its badge, its "working" text, its glow). The meaning colours (fixed, flexible, focus, recovery, clash) never change. Stored in `profiles.preferences.navi_color` (column already exists, no migration). Pebble's eye colour and gradient come from the chosen palette entry; contrast of Navi-coloured text is checked for every palette entry.
 Design source: canvas page "v5 · Landing style" (https://claude.ai/artifact/6HUenJGa1yifXfT9YKHJNZ) and `docs/REDESIGN_PLAN.md` → "Decisions so far".
 Rule for the whole run: **change how the app looks and presents real data. Never fake data, never drop working behaviour, never skip or delete a test to get green.**
 
@@ -31,7 +38,7 @@ Rule for the whole run: **change how the app looks and presents real data. Never
 | 3 | Navi chat: streamed action steps + cards, approval card, glass composer, voice screen with Pebble | subagent B | live steps show for a real turn and survive reload; tests green |
 | 4 | Insights + daily/weekly review screens | subagent C | real numbers from the existing review code, honest "not enough data" states |
 | 5 | Inbox, Planner, Tasks, Projects & goals | subagent D | restyled, all controls still work |
-| 6 | Memory, Notes, Activity, Settings, Onboarding, Login, Early access, Admin waitlist | subagent E | restyled, all controls still work |
+| 6 | Memory, Notes, Activity, Settings (incl. "Navi's colour" picker), Onboarding, Login, Early access, Admin waitlist | subagent E | restyled, all controls still work; colour choice saves and changes Pebble everywhere |
 | 7 | Integration: merge, full suite, axe contrast on glass, no sideways scroll, 44px touch targets, reduced motion | lead | all green |
 | 8 | Screenshots of every screen (390px and 1440px), PR, BUILD_INTELLIGENCE update | lead | PR open with evidence |
 
