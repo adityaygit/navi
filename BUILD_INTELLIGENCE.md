@@ -6,7 +6,12 @@
 **Product source of truth:** `Navi_Product_Spec.md` · **Ops guide:** `docs/OPERATIONS.md` (local dev, tests, hosted Supabase, deploy, env vars, scheduler, spend limits).
 **Last checkpoint:** 2026-10-30, session 4 — voice mic/budget fix (see the "Voice connected-but-didn't-hear-me fix" section), uncommitted on `claude/dazzling-cray-isusbm` from `main` 031017e. Before: 2026-10-30 late, session 3 — accountability & reviews pass (see "Accountability & reviews pass"), **uncommitted working tree**, no new migration. Before that: security-review fixes (see "Security review (session 3)"), **uncommitted working tree at time of writing**, including new migration `20261102000001_security_hardening.sql` (applied locally only; hosted needs owner OK). See `git log -1` + `git status`.
 
-## ▶ Job for the next session (owner-assigned, 2026-10-30 evening): Trigger.dev + Google sign-in
+## ▶ Owner update 2026-11-05: redesign is next; deploy/scheduler/Google/iPhone are closed
+- The owner says **production deploy, Trigger.dev scheduler, Google sign-in and physical iPhone verification are all done now.** The older sections below that list them as open or blocked (job for the next session, true blockers, roadmap rows for Deployment / Scheduler / Google sign-in / Physical iPhone, acceptance gates 1, 7, 11, 13) are **stale**. This is the owner's report; it has not been re-verified from this session, so confirm against the live app and update the rows with evidence when convenient.
+- **Next work: UI redesign.** Plan is in `docs/REDESIGN_PLAN.md`: (1) chat shows live action steps and cards, (2) Opal-style reflection (daily and weekly stories, rows against your average, explainable score), (3) dark glass look matching Opal and the owner's amber dashboard reference, desktop and phone equally. Status: planned, not started. Open questions for the owner are at the end of that file.
+- Design references are saved in the owner's private Mobbin collections "Navi – How it works" and "Navi – Look".
+
+## (stale, see update above) Job for the next session (owner-assigned, 2026-10-30 evening): Trigger.dev + Google sign-in
 The owner is adding these environment variables, then starting a new cloud session with "resume". The owner asked for both setups ("start a new cloud session and you can set that up"):
 `TRIGGER_ACCESS_TOKEN` (tr_pat_), `TRIGGER_PROJECT_REF` (proj_), `TRIGGER_SECRET_KEY` (now tr_prod_), `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` (see `.env.example`).
 
