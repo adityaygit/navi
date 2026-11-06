@@ -293,7 +293,6 @@ export default async function TodayPage() {
           <div className="order-5 grid grid-cols-2 gap-3 md:order-none md:grid-cols-3 md:gap-3.5">
             <Link
               href="/insights"
-              aria-label={ft.score === null ? "Follow-through: not enough days yet. Open insights" : `Follow-through ${ft.score}, ${ftWord.word}. Open insights`}
               className="lg col-span-2 flex flex-col gap-4 p-5 no-underline md:col-span-1"
             >
               <div className="flex items-start justify-between gap-2">

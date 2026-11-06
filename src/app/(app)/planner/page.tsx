@@ -300,8 +300,8 @@ export default async function PlannerPage({ searchParams }: { searchParams: Prom
               Navi won&apos;t invent free time. Set when you&apos;re available in <Link className="underline" href="/settings">Settings</Link> (or tell Navi) so it can schedule flexible work.
             </p>
           )}
-          <ul className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-[13px] text-muted" aria-label="What the colours mean">
-            <li className="flex items-center gap-2"><span className="h-3.5 w-5 rounded-[5px] bg-fixed" aria-hidden />Fixed</li>
+          <ul className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-[13px] text-muted" aria-label="Colour key">
+            <li className="flex items-center gap-2"><span className="h-3.5 w-5 rounded-[5px] bg-[#f0f0f0]" aria-hidden />Fixed</li>
             <li className="flex items-center gap-2"><span className="h-3.5 w-5 rounded-[5px] border-[1.5px] border-flex" aria-hidden />Flexible</li>
             <li className="flex items-center gap-2"><span className="h-3.5 w-5 rounded-[5px] border-[1.5px] border-recovery" aria-hidden />Routine / rest</li>
             <li className="flex items-center gap-2"><span className="h-3.5 w-5 rounded-[5px] border border-dashed border-[#5a5c62]" aria-hidden />Free</li>

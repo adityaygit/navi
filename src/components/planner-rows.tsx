@@ -8,7 +8,7 @@ const durationText = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ?
 // timeline look (shared with Today); these are the entries around them.
 
 const CARD = {
-  fixed: "bg-fixed text-[#060608]",
+  fixed: "bg-[#f0f0f0] text-[#060608]",
   flex: "border-[1.5px] border-flex bg-[rgba(143,184,255,0.06)]",
   recovery: "border-[1.5px] border-recovery bg-[rgba(242,196,107,0.06)]",
 } as const;
@@ -30,7 +30,7 @@ export function PlannerFixedRow({ title, label, timeline }: { title: string; lab
           </div>
           <span className="flex shrink-0 flex-col items-end gap-1">
             {timeline.marker && (
-              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${dark ? "bg-[#060608] text-fixed" : "bg-fixed text-[#060608]"}`}>{timeline.marker}</span>
+              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${dark ? "bg-[#060608] text-fixed" : "bg-[#f0f0f0] text-[#060608]"}`}>{timeline.marker}</span>
             )}
             <span className={`badge bg-transparent p-0 text-[11px] uppercase tracking-[0.06em] ${KIND_TEXT[timeline.kind]}`}>{label}</span>
           </span>
@@ -92,7 +92,6 @@ export function PlannerWeekStrip({ days }: { days: StripDay[] }) {
         <Link
           key={d.date}
           href={d.href}
-          aria-label={d.label}
           aria-current={d.selected ? "date" : undefined}
           className={`flex min-h-[72px] flex-col items-center justify-center gap-1 rounded-[16px] border transition-colors ${
             d.selected
@@ -104,8 +103,10 @@ export function PlannerWeekStrip({ days }: { days: StripDay[] }) {
         >
           <span className={`text-[12px] ${d.selected ? "font-semibold" : ""}`}>{d.weekday}</span>
           <span className={`num text-[19px] leading-none ${d.selected ? "font-bold" : "text-text"}`}>{d.dayNum}</span>
+          {/* Named by its visible text first, so voice control ("tap Sat 7") still works. */}
+          <span className="sr-only">, {d.label}</span>
           <span className="flex h-1.5 gap-[3px]" aria-hidden>
-            {d.fixed > 0 && <span className={`h-1.5 w-1.5 rounded-full ${d.selected ? "bg-[#3a3b40]" : "bg-fixed"}`} />}
+            {d.fixed > 0 && <span className={`h-1.5 w-1.5 rounded-full ${d.selected ? "bg-[#3a3b40]" : "bg-[#f0f0f0]"}`} />}
             {d.flexible > 0 && <span className={`h-1.5 w-1.5 rounded-full ${d.selected ? "bg-[#2f62c9]" : "bg-flex"}`} />}
             {d.risk && <span className={`h-1.5 w-1.5 rounded-full ${d.selected ? "bg-[#c8332d]" : "bg-clash"}`} />}
           </span>
