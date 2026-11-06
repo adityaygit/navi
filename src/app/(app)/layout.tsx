@@ -13,7 +13,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const [profile, inbox, approvals, budget] = await Promise.all([
     getProfile(ctx),
     ctx.db.from("proposals").select("id", { count: "exact", head: true }).eq("status", "pending").is("batch", null),
-    ctx.db.from("approvals").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    ctx.db.from("approvals").select("id", { count: "exact", head: true }).eq("status", "proposed").gt("expires_at", new Date().toISOString()),
     getBudgetStatus().catch(() => null),
   ]);
   const naviVars = naviColorVars((profile.preferences as Record<string, unknown> | null)?.navi_color) as CSSProperties;

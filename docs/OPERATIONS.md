@@ -113,7 +113,12 @@ Steps (each is a change to the hosted project; do them deliberately, once):
    the atomic budget reservation functions the app now calls before every AI
    request and voice token (`ai_reserve`, `ai_voice_settle`, `ai_usage.session_id`)
    and limits notification updates to `status`; **the app's AI calls fail
-   without it**, so apply it before deploying this code. If you apply them through
+   without it**, so apply it before deploying this code.
+   `20261107000001_inline_actions.sql` (inline action cards) renames approval
+   states (pending → proposed, rejected → declined, executed → completed) and
+   adds `conversation_id`, `expires_at`, `revision`, `updated_at` and a
+   one-open-action-per-key index; **chat, Activity and approvals break without
+   it**, so apply it before deploying that code. If you apply them through
    the Management API or MCP, the recorded versions are the apply time; set
    them back to the file versions in `supabase_migrations.schema_migrations`
    so `supabase db push` doesn't re-run them.

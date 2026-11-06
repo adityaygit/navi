@@ -25,7 +25,9 @@ export function focusBlockOutcome(outcome: "completed" | "progress" | "interrupt
 }
 
 export async function createTask(ctx: Ctx, input: TaskCreate): Promise<Task> {
-  const values = compact(TaskCreate.parse(input));
+  const values: Record<string, unknown> = compact(TaskCreate.parse(input));
+  // "Not given" for columns that have defaults (the schema allows null, the table doesn't).
+  for (const k of ["due_is_hard", "priority"]) if (values[k] === null) delete values[k];
   return createEntity<Task>(ctx, "tasks", { ...values, source: ctx.actor === "navi" ? "navi" : "user" });
 }
 

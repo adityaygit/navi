@@ -10,7 +10,8 @@ import { jsonSchemaFor, runTool, toolsFor } from "./tools";
 import { runDevSim } from "./devsim";
 import { READ_ONLY_TOOLS } from "@/lib/tool-names";
 import type { AgentEvent } from "@/lib/chat-stream";
-import { emitter, stepEndEvent, stepStartEvent } from "./live";
+import { emitter, stepEndEvent, stepStartEvent, toolEventOf } from "./live";
+import { actionViews } from "@/server/domain/approvals";
 
 export type AgentMode = "chat" | "onboarding" | "capture";
 
@@ -204,16 +205,15 @@ async function runAnthropic(req: AgentRequest, model: string, allowServerFallbac
         // userMessage: the person's own words this turn, held by the server (see complete_task).
         const result = await runTool({ ...req.ctx, actor: "navi", userMessage: req.userText }, use.name, use.input);
         open.delete(use.id);
-        emit(stepEndEvent(use.id, use.name, result.ok, result.summary));
+        const action = result.actionId && req.onEvent ? (await actionViews(req.ctx, [result.actionId]))[result.actionId] : undefined;
+        emit(stepEndEvent(use.id, use.name, result.ok, result.summary, { action, undo: result.actionId ? undefined : result.undo }));
         if (result.mutated) mutated = true;
-        if (!READ_ONLY_TOOLS.includes(use.name)) {
-          toolEvents.push({ name: use.name, ok: result.ok, summary: result.summary });
-        }
+        if (!READ_ONLY_TOOLS.includes(use.name)) toolEvents.push(toolEventOf(use.name, result));
         results.push({
           type: "tool_result",
           tool_use_id: use.id,
           is_error: !result.ok,
-          content: JSON.stringify({ ok: result.ok, summary: result.summary, data: result.data ?? null }).slice(0, 30000),
+          content: JSON.stringify({ ok: result.ok, summary: result.summary, action_id: result.actionId ?? null, data: result.data ?? null }).slice(0, 30000),
         });
       }
       messages.push({ role: "user", content: results });

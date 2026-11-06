@@ -1,17 +1,22 @@
 "use client";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Message } from "@/lib/types";
 import { announceChange, newClientId, offlineQueue, flushQueue } from "@/lib/offline-queue";
 import { readChatStream, CHAT_STREAM_CONTENT_TYPE, type ChatStreamEvent, type TurnDone } from "@/lib/chat-stream";
 import { VoiceSession } from "./voice-session";
-import { LiveNavi, NaviMessage, UserBubble, type LiveItem, type PendingApproval } from "./chat-turn";
+import { LiveNavi, NaviMessage, UserBubble, type LiveItem } from "./chat-turn";
+import { ActionsContext } from "./action-card";
+import type { ActionView } from "@/lib/actions";
 import { Pebble } from "./pebble";
 import { createChatAction } from "@/app/(app)/actions";
 
 type AiStatus = { ready: boolean; mode: string; reason?: string };
 
 const QUICK_PROMPTS = ["My plan broke", "What's next?", "Review my day"];
+// Stable defaults: fresh {} / [] each render would look like new server data every time.
+const NO_ACTIONS: Record<string, ActionView> = {};
+const NO_UNDONE: string[] = [];
 
 /** Applies one stream event to the live reply being drawn. */
 function applyEvent(items: LiveItem[], event: ChatStreamEvent, nextChunk: () => number): LiveItem[] {
@@ -22,7 +27,7 @@ function applyEvent(items: LiveItem[], event: ChatStreamEvent, nextChunk: () => 
       if (items.some((i) => i.kind === "step" && i.id === event.id)) return items;
       return [...items, { kind: "step", id: event.id, name: event.name, label: event.label, readOnly: event.readOnly, status: "running" }];
     case "step_end":
-      return items.map((i) => (i.kind === "step" && i.id === event.id ? { ...i, status: event.ok ? "ok" : "failed", doneLabel: event.label, summary: event.summary } : i));
+      return items.map((i) => (i.kind === "step" && i.id === event.id ? { ...i, status: event.ok ? "ok" : "failed", doneLabel: event.label, summary: event.summary, action: event.action } : i));
     case "text": {
       const last = items[items.length - 1];
       const chunk = { id: nextChunk(), text: event.delta };
@@ -38,7 +43,8 @@ export function Chat({
   kind,
   conversationId: initialConversationId = null,
   initialMessages,
-  approvals = [],
+  initialActions = NO_ACTIONS,
+  initialUndone = NO_UNDONE,
   ai,
   voice,
   placeholder,
@@ -47,8 +53,10 @@ export function Chat({
   /** The chat being continued; null starts a new chat on the first message. Unused for onboarding. */
   conversationId?: string | null;
   initialMessages: Message[];
-  /** Pending approvals, shown as cards on the reply that asked for them. */
-  approvals?: PendingApproval[];
+  /** Cards for the actions these messages proposed, as they are now. */
+  initialActions?: Record<string, ActionView>;
+  /** Automatic changes in these messages that were already undone. */
+  initialUndone?: string[];
   ai: AiStatus;
   voice: { ready: boolean; reason?: string };
   placeholder?: string;
@@ -98,6 +106,10 @@ export function Chat({
     setVoiceOpen(true);
   }
 
+  // Action cards: the server's view, updated by taps, stream events and refreshes.
+  const [actions, setActions] = useState<Record<string, ActionView>>(initialActions);
+  const [undone, setUndone] = useState<Set<string>>(() => new Set(initialUndone));
+
   // Adopt fresh server data (after router.refresh) without an extra effect pass.
   const [seenInitial, setSeenInitial] = useState(initialMessages);
   if (seenInitial !== initialMessages) {
@@ -105,6 +117,32 @@ export function Chat({
     // Mid-turn, the in-flight messages stay until the turn settles.
     if (!sending) setMessages(initialMessages);
   }
+  const [seenActions, setSeenActions] = useState(initialActions);
+  if (seenActions !== initialActions) {
+    setSeenActions(initialActions);
+    setActions((a) => ({ ...a, ...initialActions }));
+  }
+  const [seenUndone, setSeenUndone] = useState(initialUndone);
+  if (seenUndone !== initialUndone) {
+    setSeenUndone(initialUndone);
+    setUndone((u) => new Set([...u, ...initialUndone]));
+  }
+
+  // Each action is shown in full on the newest message that mentions it (e.g.
+  // after "make it Friday" the updated card sits under that reply); older
+  // mentions shrink to one line, so it's always clear which card to tap.
+  const actionState = useMemo(() => {
+    const latest = new Map<string, string>();
+    for (const m of messages) for (const e of m.tool_events ?? []) if (e.action_id) latest.set(e.action_id, m.id);
+    for (const i of live ?? []) if (i.kind === "step" && i.action) latest.set(i.action.id, "live");
+    return {
+      actions,
+      setAction: (v: ActionView) => setActions((a) => ({ ...a, [v.id]: v })),
+      undone,
+      markUndone: (ids: string[]) => setUndone((u) => new Set([...u, ...ids])),
+      latest,
+    };
+  }, [actions, undone, messages, live]);
   useEffect(() => {
     // Restoring an unsent draft from this device's storage (an external system).
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -161,7 +199,14 @@ export function Chat({
             setMessages((m) => m.map((x) => (x.id === optimistic.id ? userMessage : x)));
           } else if (event.type === "done") turn.done = event;
           else if (event.type === "error") failure = event.message;
-          else setLive((items) => applyEvent(items ?? [], event, () => ++chunkId.current));
+          else {
+            // A step that proposed or changed an action carries its newest card.
+            if (event.type === "step_end" && event.action) {
+              const view = event.action;
+              setActions((a) => ({ ...a, [view.id]: view }));
+            }
+            setLive((items) => applyEvent(items ?? [], event, () => ++chunkId.current));
+          }
         });
         if (failure) throw new Error(failure);
       }
@@ -169,6 +214,7 @@ export function Chat({
       if (!result) throw new TypeError("stream ended early");
       // One update: the live reply is replaced by the saved one (announced once).
       setLive(null);
+      if (result.actions) setActions((a) => ({ ...a, ...result.actions }));
       setMessages((m) => [...m.filter((x) => x.id !== optimistic.id && x.id !== result.userMessage.id), result.userMessage, result.assistantMessage]);
       const isNew = kind === "chat" && result.conversationId !== conversationId;
       if (result.mutated) announceChange();
@@ -204,6 +250,7 @@ export function Chat({
   );
 
   return (
+    <ActionsContext.Provider value={actionState}>
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       {!ai.ready && (
         <p className="notice notice-warn" role="status">
@@ -236,7 +283,7 @@ export function Chat({
             </p>
           </div>
         )}
-        {messages.map((m) => (m.role === "user" ? <UserBubble key={m.id} message={m} /> : <NaviMessage key={m.id} message={m} approvals={approvals} />))}
+        {messages.map((m) => (m.role === "user" ? <UserBubble key={m.id} message={m} /> : <NaviMessage key={m.id} message={m} />))}
         {live && <LiveNavi items={live} />}
         {sending && <div className="sr-only" role="status">Navi is thinking…</div>}
       </div>
@@ -300,5 +347,6 @@ export function Chat({
         </div>
       </form>
     </div>
+    </ActionsContext.Provider>
   );
 }

@@ -5,9 +5,11 @@ import type { Ctx } from "@/server/context";
 import { getProfile } from "@/server/context";
 import { createProposals, proposalProblem } from "@/server/domain/proposals";
 import { createTask, completeTask, updateTask } from "@/server/domain/tasks";
-import { updateEntity, type EntityTable } from "@/server/domain/entities";
+import { deleteEntity, updateEntity, type EntityTable } from "@/server/domain/entities";
 import { addMemory, relevantMemories } from "@/server/domain/memory";
-import { requestApproval } from "@/server/domain/approvals";
+import { decideApproval, requestApproval, reviseApproval } from "@/server/domain/approvals";
+import { autonomyFrom } from "@/lib/actions";
+import { READ_ONLY_TOOLS } from "@/lib/tool-names";
 import { generateDayPlan, generateWeekPlan, recoverPlan } from "@/server/planner/plan";
 import { ProfileUpdate, TaskCreate, TaskUpdate, compact } from "@/server/domain/schemas";
 import { ENTITY_PATCHES } from "@/server/domain/schemas";
@@ -25,7 +27,15 @@ import { summarizeDayPlan, summarizeWeekPlan } from "@/lib/plan-summary";
 // and onboarding, and every tool calls the same domain functions the
 // dashboard uses, with the user's own database permissions.
 
-export type ToolResult = { ok: boolean; summary: string; data?: unknown; mutated?: boolean };
+/**
+ * `actionId`: the step proposed (or changed) an action that waits for the
+ * person's OK; the chat shows it as a card. `undo`: activity entries that undo
+ * what the step changed on its own.
+ */
+export type ToolResult = { ok: boolean; summary: string; data?: unknown; mutated?: boolean; actionId?: string; undo?: string[] };
+
+/** What a tool says when its change became a card instead of running. */
+const WAITING = "It's shown to the user as a card with Approve and Decline; nothing has changed yet. Don't ask them to confirm in text.";
 
 export type NaviTool<S extends z.ZodTypeAny = z.ZodTypeAny> = {
   name: string;
@@ -225,7 +235,7 @@ async function overview(ctx: Ctx): Promise<string> {
     ctx.db.from("proposals").select("kind,payload,source_excerpt", { count: "exact" }).eq("status", "pending").order("created_at", { ascending: false }).limit(8),
     ctx.db.from("projects").select("id,name,status,due_date").eq("status", "active"),
     ctx.db.from("goals").select("id,title,status,target_date").eq("status", "active"),
-    ctx.db.from("approvals").select("id,summary").eq("status", "pending"),
+    ctx.db.from("approvals").select("id,summary,revision").eq("status", "proposed").gt("expires_at", new Date().toISOString()).order("created_at"),
     ctx.db.from("workspaces").select("id,name").eq("status", "active"),
     ctx.db.from("routines").select("id,title,days,start_time,duration_minutes,is_fixed").eq("active", true),
     loadAgendaInputs(ctx, zone, today, week[1]),
@@ -254,7 +264,7 @@ async function overview(ctx: Ctx): Promise<string> {
   );
   const pending = (inbox.data ?? []) as Pick<Proposal, "kind" | "payload" | "source_excerpt">[];
   lines.push(
-    `Review inbox: ${inbox.count ?? 0} pending${pending.length ? ` (newest: ${pending.map((p) => `${proposalTitle(p).slice(0, 60)} (${p.kind})`).join("; ")})` : ""}; get_inbox has details and recent captures. Pending approvals: ${(approvals.data ?? []).map((a) => a.summary).join("; ") || "none"}.`,
+    `Review inbox: ${inbox.count ?? 0} pending${pending.length ? ` (newest: ${pending.map((p) => `${proposalTitle(p).slice(0, 60)} (${p.kind})`).join("; ")})` : ""}; get_inbox has details and recent captures. Actions waiting for the user's OK on a card (change one with revise_action, drop one with decline_action): ${(approvals.data ?? []).map((a) => `${a.summary}${a.revision > 1 ? " (changed)" : ""} [${a.id}]`).join("; ") || "none"}.`,
   );
   return lines.join("\n");
 }
@@ -434,6 +444,16 @@ export const TOOLS = [
     schema: TaskCreate.extend({ user_command: z.string().min(3).max(300).describe("The user's explicit instruction, quoted") }),
     run: async (ctx, input) => {
       const { user_command, ...task } = input;
+      if (ctx.autonomy === "ask") {
+        // The person asked Navi to check with them before changing things.
+        const values = { ...compact(TaskCreate.parse(task)), title: task.title };
+        await requestApproval(ctx, {
+          actionType: "internal.create.tasks",
+          summary: `Create task “${values.title.slice(0, 80)}”`,
+          details: { op: "create", table: "tasks", values, subject: values.title, reason: "you chose to approve every change", user_command },
+        });
+        return { ok: true, mutated: true, summary: `Not created yet: the task “${values.title}” is waiting for the user's Approve tap. ${WAITING}` };
+      }
       const t = await createTask(ctx, task);
       await logActivity(ctx, { action: "explicit_command", entityType: "tasks", entityId: t.id, summary: `Added at your request: “${user_command.slice(0, 120)}”` });
       return { ok: true, mutated: true, summary: `Created task “${t.title}”: ${taskDateSummary(t, ctx.timezone, user_command)}`, data: { id: t.id, due_at: t.due_at, due_is_hard: t.due_is_hard } };
@@ -441,18 +461,14 @@ export const TOOLS = [
   }),
   tool({
     name: "update_task",
-    description: "Change an existing task (title, notes, priority, estimate, due date, status other than done, blocker, links). Hard-deadline changes go to the user for approval automatically.",
+    description: "Change an existing task (title, notes, priority, estimate, due date, status other than done, blocker, links). Just call it: hard-deadline changes and cancelling automatically become a card the user approves with one tap.",
     schema: TaskUpdate.omit({ status: true }).extend({
       id: z.string().uuid(),
       status: z.enum(["todo", "in_progress", "blocked", "cancelled"]).nullish(),
     }),
     run: async (ctx, { id, ...patch }) => {
-      if (patch.status === "cancelled") {
-        const approval = await requestApproval(ctx, { actionType: "internal.update.tasks", summary: `Cancel task ${id.slice(0, 8)}`, details: { op: "update", table: "tasks", id, patch: { status: "cancelled" } } });
-        return { ok: true, mutated: true, summary: `Cancelling needs the user's approval (request ${approval.id.slice(0, 8)})` };
-      }
       const r = await updateTask(ctx, id, patch);
-      if (r.kind === "approval_requested") return { ok: true, mutated: true, summary: `That change ${r.reason}, so it was sent to the user for approval` };
+      if (r.kind === "approval_requested") return { ok: true, mutated: true, summary: `That change needs the user's OK because ${r.reason}. ${WAITING}` };
       const dates = "due_at" in patch || "due_is_hard" in patch ? `: ${await taskScheduleSummary(ctx, r.row)}` : "";
       return { ok: true, mutated: true, summary: `Updated task “${r.row.title}”${dates}` };
     },
@@ -469,15 +485,15 @@ export const TOOLS = [
         const { data: task } = await ctx.db.from("tasks").select("title,status").eq("id", id).maybeSingle();
         if (!task) return { ok: false, summary: "That task doesn't exist (or isn't yours)" };
         if (task.status === "done") return { ok: true, summary: `“${task.title}” is already done` };
-        const approval = await requestApproval(ctx, {
+        await requestApproval(ctx, {
           actionType: "internal.complete.tasks",
           summary: `Mark “${String(task.title).slice(0, 80)}” done`,
-          details: { op: "complete", table: "tasks", id, actual_minutes: actual_minutes ?? null },
+          details: { op: "complete", table: "tasks", id, actual_minutes: actual_minutes ?? null, subject: String(task.title), reason: "only you can say your work is finished" },
         });
         return {
           ok: true,
           mutated: true,
-          summary: `Not marked done: the user's message doesn't say they finished it, so they were asked to confirm with one tap (request ${approval.id.slice(0, 8)}). Tell them it's waiting for their OK.`,
+          summary: `Not marked done: the user's message doesn't say they finished it, so it waits for their tap. ${WAITING}`,
         };
       }
       const r = await completeTask({ ...ctx, actor: "user" }, id, actual_minutes);
@@ -490,14 +506,14 @@ export const TOOLS = [
     description:
       "Change an existing project, goal, workspace, routine, event, milestone, plan block or note by id. Only these fields can be patched: " +
       Object.entries(ENTITY_PATCHES).map(([t, sch]) => `${t}: ${Object.keys(sch.shape).join(", ")}`).join("; ") +
-      ". Changing events, fixed routines or fixed blocks, marking a project done / goal achieved / milestone done, or dropping goals/projects is sent to the user for approval automatically.",
+      ". Just call it: changing events, fixed routines or fixed blocks, marking a project done / goal achieved / milestone done, or dropping goals/projects automatically becomes a card the user approves with one tap.",
     schema: z.object({ table: z.enum(ENTITY_TABLES), id: z.string().uuid(), patch: z.record(z.string(), z.unknown()) }),
     run: async (ctx, { table, id, patch }) => {
       const checked = parseEntityPatch(table, patch);
       if (!checked.ok) return { ok: false, summary: checked.summary };
       const clean = checked.patch;
       const r = await updateEntity(ctx, table as EntityTable, id, clean);
-      if (r.kind === "approval_requested") return { ok: true, mutated: true, summary: `That change ${r.reason}, so it was sent to the user for approval` };
+      if (r.kind === "approval_requested") return { ok: true, mutated: true, summary: `That change needs the user's OK because ${r.reason}. ${WAITING}` };
       // Say exactly what changed: the summary is all later turns see of this action.
       const row = r.row as Record<string, unknown>;
       const changes = Object.entries(clean).map(([k, v]) => `${k} → ${String(typeof v === "object" ? JSON.stringify(v) : v).slice(0, 40)}`).join(", ");
@@ -577,6 +593,14 @@ export const TOOLS = [
     run: async (ctx, input) => {
       const patch = compact(ProfileUpdate.parse(input));
       if (patch.timezone && !DateTime.now().setZone(patch.timezone).isValid) return { ok: false, summary: `Unknown time zone ${patch.timezone}` };
+      if (ctx.autonomy === "ask") {
+        await requestApproval(ctx, {
+          actionType: "internal.settings.profile",
+          summary: `Change settings: ${Object.keys(patch).map((k) => k.replace(/_/g, " ")).join(", ")}`,
+          details: { op: "settings", patch, subject: "Your settings", reason: "you chose to approve every change" },
+        });
+        return { ok: true, mutated: true, summary: `Not changed yet: the settings change is waiting for the user's Approve tap. ${WAITING}` };
+      }
       const { error } = await ctx.db.from("profiles").update(patch).eq("id", ctx.userId);
       if (error) return { ok: false, summary: error.message };
       await logActivity(ctx, { action: "settings_updated", summary: `Updated settings: ${Object.keys(patch).join(", ")}` });
@@ -593,7 +617,7 @@ export const TOOLS = [
       parameters: z.record(z.string(), z.unknown()),
     }),
     run: async (ctx, input) => {
-      const a = await requestApproval(ctx, {
+      await requestApproval(ctx, {
         actionType: `external.${input.service}.${input.action}`,
         summary: input.exact_description,
         details: input.parameters,
@@ -602,8 +626,38 @@ export const TOOLS = [
       return {
         ok: true,
         mutated: true,
-        summary: `Approval requested (${a.id.slice(0, 8)}). Nothing has been sent or changed.${connected ? "" : ` Note: ${input.service} isn't connected, so even if approved it can't run yet.`}`,
+        summary: `Waiting for the user's approval. Nothing has been sent or changed. ${WAITING}${connected ? "" : ` Note: ${input.service} isn't connected, so even if approved it can't run yet; say so.`}`,
       };
+    },
+  }),
+  tool({
+    name: "delete_item",
+    description: "Delete a task, project, goal, area (workspace), routine, event, milestone, plan block or note by id when the user asks. Deleting can't be undone, so it always becomes a card the user approves with one tap; just call it, don't ask first in text.",
+    schema: z.object({ table: z.enum(["tasks", ...ENTITY_TABLES]), id: z.string().uuid() }),
+    run: async (ctx, { table, id }) => {
+      const r = await deleteEntity(ctx, table as EntityTable, id);
+      if (r.kind === "approval_requested") return { ok: true, mutated: true, summary: `Deleting needs the user's OK. ${WAITING}` };
+      return { ok: true, mutated: true, summary: `Deleted the ${table.replace(/s$/, "")}` };
+    },
+  }),
+  tool({
+    name: "revise_action",
+    description:
+      "Change an action that is still waiting for the user's OK, when they ask for something different before approving ('make it Friday instead', 'call it Draft essay', 'estimate 2 hours'). The same card updates in place; never propose a second action for the same thing. action_id comes from the overview or an earlier tool result. changes uses the same fields as the original tool (e.g. due_at, due_is_hard, title, priority, estimate_minutes, notes for tasks; the item's own fields for other changes; for an outside action give parameters plus exact_description, the full new description).",
+    schema: z.object({ action_id: z.string().uuid(), changes: z.record(z.string(), z.unknown()) }),
+    run: async (ctx, { action_id, changes }) => {
+      const a = await reviseApproval(ctx, action_id, changes);
+      return { ok: true, mutated: true, summary: `Changed the waiting action: ${a.summary}. The card now shows the new details and still needs the user's tap.` };
+    },
+  }),
+  tool({
+    name: "decline_action",
+    description: "Drop an action that is waiting for the user's OK when they say they don't want it ('no', 'never mind', 'don't cancel it'). Nothing runs. Approving only happens by the user's own tap on the card, never through you.",
+    schema: z.object({ action_id: z.string().uuid() }),
+    run: async (ctx, { action_id }) => {
+      const a = await decideApproval(ctx, action_id, "reject");
+      if (a.status === "declined") return { ok: true, mutated: true, summary: `Dropped: ${a.summary}. Nothing was done.` };
+      return { ok: false, summary: `That action is already ${a.status}, so it couldn't be dropped.` };
     },
   }),
   tool({
@@ -639,8 +693,30 @@ export async function runTool(ctx: Ctx, name: string, rawInput: unknown): Promis
   if (!parsed.success) {
     return { ok: false, summary: `Invalid input: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}` };
   }
+  // Collect what this step changed (for Undo) and any action it proposed (for its card).
+  const undo: string[] = [];
+  const actions: string[] = [];
+  let autonomy = ctx.autonomy;
+  if (ctx.actor === "navi" && !autonomy && !READ_ONLY_TOOLS.includes(name)) {
+    const { data } = await ctx.db.from("profiles").select("preferences").eq("id", ctx.userId).maybeSingle();
+    autonomy = autonomyFrom(data?.preferences);
+  }
+  const stepCtx: Ctx = {
+    ...ctx,
+    autonomy,
+    onActivity: (e) => {
+      if (e.reversible) undo.push(e.id);
+      ctx.onActivity?.(e);
+    },
+    onAction: (id) => {
+      actions.push(id);
+      ctx.onAction?.(id);
+    },
+  };
   try {
-    return await t.run(ctx, parsed.data);
+    const result = await t.run(stepCtx, parsed.data);
+    const actionId = actions.at(-1);
+    return { ...result, ...(actionId ? { actionId } : {}), ...(undo.length ? { undo } : {}) };
   } catch (err) {
     return { ok: false, summary: err instanceof Error ? err.message : String(err) };
   }

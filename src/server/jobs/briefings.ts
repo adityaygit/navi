@@ -52,7 +52,7 @@ export async function buildBriefing(db: SupabaseClient, profile: Profile, kind: 
       db.from("plan_blocks").select("*").eq("user_id", userId).eq("plan_date", date).order("starts_at"),
       db.from("tasks").select("id,title,due_at,due_is_hard").eq("user_id", userId).in("status", ["todo", "in_progress", "blocked"]).lte("due_at", dayEnd.toISO()!).order("due_at"),
       db.from("proposals").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("status", "pending"),
-      db.from("approvals").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("status", "pending"),
+      db.from("approvals").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("status", "proposed").gt("expires_at", new Date().toISOString()),
       db.from("tasks").select("id,title,due_at").eq("user_id", userId).in("status", ["todo", "in_progress", "blocked"]).eq("due_is_hard", true).gt("due_at", dayEnd.toISO()!).lte("due_at", dayEnd.plus({ days: 3 }).toISO()!).order("due_at"),
       deadlineRisks(db, userId, zone, now, 3),
     ]);

@@ -362,10 +362,16 @@ function LiveVoice({ kind, conversationId, muted, setMuted, setStatus: reportSta
         const res = await fetch("/api/voice/tool", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ conversationId: convRef.current, name: fc.name, args: fc.args ?? {}, userTranscript: turnRef.current.user }) });
         const result = await res.json();
         if (!READ_ONLY_TOOLS.includes(fc.name ?? "")) {
-          turnRef.current.tools.push({ name: fc.name ?? "tool", ok: Boolean(result.ok), summary: String(result.summary ?? result.error ?? "") });
+          turnRef.current.tools.push({
+            name: fc.name ?? "tool",
+            ok: Boolean(result.ok),
+            summary: String(result.summary ?? result.error ?? "").slice(0, 500),
+            // A card waiting for the person's OK, or what Undo reverses, shows on the saved reply like in text chat.
+            ...(typeof result.actionId === "string" ? { action_id: result.actionId } : Array.isArray(result.undo) && result.undo.length ? { undo: result.undo.map(String) } : {}),
+          });
         }
         if (result.mutated) onTurnSaved();
-        return { id: fc.id, name: fc.name, response: { output: { ok: result.ok, summary: result.summary ?? result.error, data: result.data ?? null } } };
+        return { id: fc.id, name: fc.name, response: { output: { ok: result.ok, summary: result.summary ?? result.error, action_id: result.actionId ?? null, data: result.data ?? null } } };
       } catch {
         // The request may have reached the server before the connection dropped.
         return { id: fc.id, name: fc.name, response: { error: "The connection dropped during this action, so it may or may not have gone through. Check with get_overview or get_inbox before trying again." } };

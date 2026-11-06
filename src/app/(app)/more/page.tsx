@@ -20,7 +20,7 @@ const HINTS: Record<string, string> = {
 
 export default async function MorePage() {
   const ctx = await requireCtx();
-  const { count } = await ctx.db.from("approvals").select("id", { count: "exact", head: true }).eq("status", "pending");
+  const { count } = await ctx.db.from("approvals").select("id", { count: "exact", head: true }).eq("status", "proposed").gt("expires_at", new Date().toISOString());
   const approvals = count ?? 0;
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">

@@ -4,12 +4,15 @@ import type { ActivityEntry, Approval } from "@/lib/types";
 import { ActionButton } from "@/components/action-button";
 import { Pebble } from "@/components/pebble";
 import { GROUP, SectionHead } from "@/components/settings-ui";
-import { decideApprovalAction, revertActivityAction } from "../actions";
+import { revertActivityAction } from "../actions";
+import { actionView, revertedAmong } from "@/server/domain/approvals";
+import { isOpen } from "@/lib/actions";
+import { ActionList } from "@/components/action-list";
 
 export const metadata = { title: "Activity · Navi" };
 
-const STATUS_BADGE: Record<Approval["status"], string> = {
-  pending: "badge-accent", approved: "badge-accent", executing: "badge-accent", executed: "badge-ok", rejected: "", failed: "badge-danger", expired: "",
+const STATUS_BADGE: Record<Approval["status"], [string, string]> = {
+  proposed: ["waiting", "badge-accent"], approved: ["running", "badge-accent"], executing: ["running", "badge-accent"], completed: ["done", "badge-ok"], declined: ["declined", ""], failed: ["failed", "badge-danger"], expired: ["expired", ""],
 };
 
 const ACTOR: Record<string, [string, string]> = {
@@ -25,8 +28,11 @@ export default async function ActivityPage() {
     ctx.db.from("activity_log").select("id,actor,action,entity_type,entity_id,summary,reversible,reverted_at,created_at").order("created_at", { ascending: false }).limit(150),
   ]);
   const approvals = (apprRes.data ?? []) as Approval[];
-  const pending = approvals.filter((a) => a.status === "pending");
-  const decided = approvals.filter((a) => a.status !== "pending");
+  const reverted = await revertedAmong(ctx, approvals.flatMap((a) => (Array.isArray((a.result as { undo?: unknown } | null)?.undo) ? (a.result as { undo: string[] }).undo : [])));
+  const views = approvals.map((a) => actionView(a, ctx.timezone, reverted));
+  const pending = views.filter((v) => isOpen(v.status));
+  const decided = views.filter((v) => !isOpen(v.status));
+  const byId = new Map(approvals.map((a) => [a.id, a]));
   const activity = (actRes.data ?? []) as ActivityEntry[];
   const fmt = (iso: string) => new Date(iso).toLocaleString(undefined, { timeZone: ctx.timezone, dateStyle: "medium", timeStyle: "short" });
   const time = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { timeZone: ctx.timezone, timeStyle: "short" });
@@ -48,7 +54,7 @@ export default async function ActivityPage() {
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-9">
       <header className="flex flex-col gap-3">
         <h1 className="h1">Activity &amp; approvals</h1>
-        <p className="muted max-w-prose text-[15px]">Navi organizes your plans on its own, but anything consequential waits here for you. Every change is logged; many can be undone.</p>
+        <p className="muted max-w-prose text-[15px]">Navi makes low-risk changes on its own and asks first for anything consequential, usually right in the chat. Everything it did is logged here; most changes can be undone.</p>
       </header>
 
       <section aria-labelledby="ap-h" className="flex flex-col gap-3">
@@ -60,23 +66,7 @@ export default async function ActivityPage() {
         {pending.length === 0 ? (
           <p className="surf muted px-4 py-4 text-sm sm:px-5">Nothing waiting.</p>
         ) : (
-          pending.map((a) => (
-            <article key={a.id} className="lg lg-ask flex flex-col gap-3 p-4 sm:p-5">
-              <p className="text-[17px] font-semibold leading-snug tracking-[-0.01em]">{a.summary}</p>
-              {a.action_type.startsWith("external.") && <p className="notice notice-warn text-[13px]">This affects an outside service. It only runs if that service is connected, and Navi will report the real result.</p>}
-              <details className="text-[13px]">
-                <summary className="muted inline-flex cursor-pointer items-center hover:text-text">Exactly what will happen</summary>
-                <pre className="well mt-2 overflow-x-auto whitespace-pre-wrap break-words p-3 text-[12px] leading-relaxed text-muted">{a.action_type}{"\n"}{JSON.stringify(a.details, null, 2)}</pre>
-              </details>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-3">
-                <span className="dim text-[13px]">Requested {fmt(a.created_at)}</span>
-                <div className="flex gap-2">
-                  <ActionButton className="btn btn-sm" action={decideApprovalAction} args={[a.id, "reject"]}>Reject</ActionButton>
-                  <ActionButton className="btn btn-primary btn-sm" action={decideApprovalAction} args={[a.id, "approve"]}>Approve</ActionButton>
-                </div>
-              </div>
-            </article>
-          ))
+          <ActionList views={pending} />
         )}
       </section>
 
@@ -84,18 +74,22 @@ export default async function ActivityPage() {
         <section aria-labelledby="ad-h" className="flex flex-col gap-3">
           <SectionHead id="ad-h" title="Past decisions" />
           <ul className={GROUP}>
-            {decided.map((a) => (
-              <li key={a.id} className="flex items-start gap-3 px-4 py-3 text-sm sm:px-5">
-                <span className={`badge mt-px w-[4.5rem] shrink-0 justify-center ${STATUS_BADGE[a.status]}`}>{a.status}</span>
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
-                    <span className="break-words">{a.summary}</span>
-                    <span className="dim num shrink-0 text-[13px]">{fmt(a.decided_at ?? a.created_at)}</span>
+            {decided.map((v) => {
+              const a = byId.get(v.id)!;
+              const [word, cls] = STATUS_BADGE[v.status];
+              return (
+                <li key={v.id} className="flex items-start gap-3 px-4 py-3 text-sm sm:px-5">
+                  <span className={`badge mt-px w-[4.5rem] shrink-0 justify-center ${cls}`}>{word}</span>
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+                      <span className="break-words">{v.status === "completed" && v.result ? v.result : a.summary}</span>
+                      <span className="dim num shrink-0 text-[13px]">{fmt(a.decided_at ?? a.updated_at ?? a.created_at)}{v.undone ? " · undone" : ""}</span>
+                    </div>
+                    {v.error && v.status !== "completed" && <span className="text-[13px] text-danger">{v.error}</span>}
                   </div>
-                  {a.error && <span className="text-[13px] text-danger">{a.error}</span>}
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}

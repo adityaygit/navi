@@ -72,9 +72,12 @@ describe("row level security", () => {
       .insert({ action_type: "external.gmail.send", summary: "test", details: {}, idempotency_key: `t-${Date.now()}` })
       .select()
       .single();
-    await alice.db.from("approvals").update({ status: "executed" }).eq("id", ap!.id);
+    await alice.db.from("approvals").update({ status: "completed" }).eq("id", ap!.id);
     const { data: after } = await admin().from("approvals").select("status").eq("id", ap!.id).single();
-    expect(after?.status).toBe("pending");
+    expect(after?.status).toBe("proposed");
+    // Nor create one that claims to be approved or done already.
+    const { error: forged } = await alice.db.from("approvals").insert({ action_type: "external.gmail.send", summary: "forged", details: {}, idempotency_key: `f-${Date.now()}`, status: "completed" });
+    expect(forged).not.toBeNull();
     const { data: allow } = await alice.db.from("allowed_emails").select("*");
     expect(allow ?? []).toHaveLength(0);
   });

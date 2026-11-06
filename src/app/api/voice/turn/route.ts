@@ -12,7 +12,19 @@ const Body = z.object({
   voiceSessionId: z.string().uuid().nullish(),
   userText: z.string().max(8000).default(""),
   assistantText: z.string().max(8000).default(""),
-  toolEvents: z.array(z.object({ name: z.string().max(64), ok: z.boolean(), summary: z.string().max(500) })).max(20).default([]),
+  toolEvents: z
+    .array(
+      z.object({
+        name: z.string().max(64),
+        ok: z.boolean(),
+        summary: z.string().max(500),
+        // Ids are only links: cards and Undo read the person's own rows under RLS.
+        action_id: z.string().uuid().optional(),
+        undo: z.array(z.string().uuid()).max(20).optional(),
+      }),
+    )
+    .max(20)
+    .default([]),
   inputAudioSeconds: z.number().min(0).max(3600).default(0),
   outputAudioSeconds: z.number().min(0).max(3600).default(0),
   /** Gemini Live usageMetadata, when the service sent it for this turn. */
