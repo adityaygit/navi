@@ -19,7 +19,7 @@ export function AddCommitment({ zone, defaultDate }: { zone: string; defaultDate
   if (!open) return <button type="button" className="btn self-start" onClick={() => setOpen(true)}>+ Add fixed commitment</button>;
   return (
     <form
-      className="card flex flex-col gap-3"
+      className="card flex flex-col gap-4"
       onSubmit={(e) => {
         e.preventDefault();
         const s = DateTime.fromISO(`${date}T${startT}`, { zone });
@@ -35,19 +35,19 @@ export function AddCommitment({ zone, defaultDate }: { zone: string; defaultDate
         });
       }}
     >
-      <h2 className="h2">Add fixed commitment</h2>
+      <h2 className="text-[17px] font-semibold">Add fixed commitment</h2>
       <div>
         <label htmlFor="c-title" className="label">What</label>
         <input id="c-title" required className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Soccer practice" />
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        <div className="col-span-2 sm:col-span-1"><label htmlFor="c-date" className="label">Date</label><input id="c-date" type="date" required className="input" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="col-span-2"><label htmlFor="c-date" className="label">Date</label><input id="c-date" type="date" required className="input" value={date} onChange={(e) => setDate(e.target.value)} /></div>
         <div><label htmlFor="c-start" className="label">Start</label><input id="c-start" type="time" required className="input" value={startT} onChange={(e) => setStartT(e.target.value)} /></div>
         <div><label htmlFor="c-end" className="label">End</label><input id="c-end" type="time" required className="input" value={endT} onChange={(e) => setEndT(e.target.value)} /></div>
       </div>
       <fieldset>
         <legend className="label">Repeats weekly on (optional)</legend>
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1.5">
           {DAYS.map((d, i) => (
             <button key={d} type="button" aria-pressed={repeat.includes(i)} className={`btn btn-sm ${repeat.includes(i) ? "btn-primary" : ""}`} onClick={() => setRepeat((r) => (r.includes(i) ? r.filter((x) => x !== i) : [...r, i].sort()))}>{d}</button>
           ))}

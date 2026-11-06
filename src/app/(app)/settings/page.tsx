@@ -72,7 +72,7 @@ export default async function SettingsPage() {
       <div className="flex min-w-0 flex-col gap-9">
         <header className="flex flex-col gap-5">
           <h1 className="h1">Settings</h1>
-          <div className={`${GROUP} flex items-center gap-4 px-4 py-4 sm:px-5`}>
+          <div className="surf flex items-center gap-4 px-4 py-4 sm:px-5">
             <span style={naviColorVars(color) as CSSProperties}><Pebble size={48} /></span>
             <div className="flex min-w-0 flex-col">
               <p className="truncate text-[17px] font-semibold">{profile.display_name || "You"}</p>

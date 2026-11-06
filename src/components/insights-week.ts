@@ -15,6 +15,15 @@ export function hm(minutes: number): string {
   return r ? `${h}h ${String(r).padStart(2, "0")}m` : `${h}h`;
 }
 
+/** Tight form for narrow chart columns: "2h40", "40m", "3h". */
+export function hmTight(minutes: number): string {
+  const m = Math.max(0, Math.round(minutes));
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  if (!h) return `${r}m`;
+  return r ? `${h}h${String(r).padStart(2, "0")}` : `${h}h`;
+}
+
 /** "2 hours 40 minutes" for screen readers. */
 export function hmLong(minutes: number): string {
   const m = Math.max(0, Math.round(minutes));
@@ -114,9 +123,10 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 
 function outsideWords(o: DayBar["outside"]): string {
   const bits = [];
-  if (o.interrupted) bits.push(`${plural(o.interrupted, "block")} interrupted`);
-  if (o.missingInfo) bits.push(`${plural(o.missingInfo, "block")} blocked on missing information`);
-  if (o.estimate) bits.push(`${plural(o.estimate, "block")} that ran over the estimate`);
+  const was = (n: number) => `${plural(n, "block")} ${n === 1 ? "was" : "were"}`;
+  if (o.interrupted) bits.push(`${was(o.interrupted)} interrupted`);
+  if (o.missingInfo) bits.push(`${was(o.missingInfo)} blocked on missing information`);
+  if (o.estimate) bits.push(`${plural(o.estimate, "block")} ran over ${o.estimate === 1 ? "its" : "their"} estimate`);
   return bits.join(", ");
 }
 
@@ -136,16 +146,16 @@ export function readWeek(bars: DayBar[], disruptionsByDay: Record<string, Record
   }
   const best = [...worked].filter((b) => b.done > 0).sort((a, b) => b.done - a.done || (b.done / b.planned) - (a.done / a.planned))[0];
   if (best) out.push(`${best.long}${best.isToday ? " (today)" : ""} was your best day: ${hm(best.done)} done${best.done < best.planned ? ` of ${hm(best.planned)} planned` : ", everything you planned"}.`);
-  for (const b of bars.filter((x) => x.kind === "short")) {
-    out.push(`${b.long} fell short: ${plural(b.skipped, "block")} skipped without an outside reason${b.done ? `, ${hm(b.done)} of ${hm(b.planned)} done` : ""}.`);
-  }
   for (const b of bars) {
     const outside = outsideWords(b.outside);
     const dis = describeDisruptions(disruptionsByDay[b.date] ?? {});
-    if (!outside && !dis) continue;
     const notes = b.outside.notes.slice(0, 2).map((n) => `“${n}”`);
-    const why = [outside, dis ? `the plan broke (${dis})` : ""].filter(Boolean).join("; ");
-    out.push(`On ${b.long}, ${why}${notes.length ? `: ${notes.join(", ")}` : ""}. That isn't counted against you.`);
+    const why = [outside, dis ? `you reported the plan breaking (${dis})` : ""].filter(Boolean).join("; ") + (notes.length ? `: ${notes.join(", ")}` : "");
+    if (b.kind === "short") {
+      out.push(`${b.long} fell short: ${plural(b.skipped, "block")} skipped without an outside reason, ${hm(b.done)} of ${hm(b.planned)} done.${why ? ` Also ${why}, which isn't counted against you.` : ""}`);
+    } else if (why) {
+      out.push(`On ${b.long}, ${why}. That isn't counted against you.`);
+    }
   }
   const rest = bars.filter((b) => b.kind === "rest");
   if (rest.length) out.push(`${listWords(rest.map((b) => b.long))} ${rest.length === 1 ? "was" : "were"} rest you chose, which never counts against you.`);

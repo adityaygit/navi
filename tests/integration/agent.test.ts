@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
 import { admin, ctxFor, resetUser, userClient } from "./helpers";
+import type { AgentEvent } from "@/lib/chat-stream";
 
 // The real Claude tool loop (runAgent → runAnthropic) with only the network
 // call replaced: request shape, tool execution against the real database,
@@ -21,6 +22,7 @@ vi.mock("@anthropic-ai/sdk", async (importOriginal) => {
 
 const { runAgent } = await import("@/server/ai/agent");
 const { default: RealAnthropic } = await import("@anthropic-ai/sdk");
+const { Stream } = await import("@anthropic-ai/sdk/core/streaming");
 
 let db: Awaited<ReturnType<typeof userClient>>["db"];
 let userId = "";
@@ -36,6 +38,29 @@ const reply = (over: Partial<Anthropic.Beta.BetaMessage>): Anthropic.Beta.BetaMe
     usage: { input_tokens: 1200, output_tokens: 80, cache_read_input_tokens: 1000, cache_creation_input_tokens: 0 },
     ...over,
   }) as unknown as Anthropic.Beta.BetaMessage;
+
+/** The raw server-sent events the API streams for this message (text split in two pieces). */
+function streamOf(message: Anthropic.Beta.BetaMessage) {
+  const events: unknown[] = [
+    { type: "message_start", message: { ...message, content: [], stop_reason: null, usage: { ...message.usage, output_tokens: 0 } } },
+  ];
+  message.content.forEach((block, index) => {
+    if (block.type === "text") {
+      events.push({ type: "content_block_start", index, content_block: { type: "text", text: "" } });
+      const half = Math.ceil(block.text.length / 2);
+      for (const piece of [block.text.slice(0, half), block.text.slice(half)]) events.push({ type: "content_block_delta", index, delta: { type: "text_delta", text: piece } });
+    } else if (block.type === "tool_use") {
+      events.push({ type: "content_block_start", index, content_block: { ...block, input: {} } });
+      events.push({ type: "content_block_delta", index, delta: { type: "input_json_delta", partial_json: JSON.stringify(block.input) } });
+    }
+    events.push({ type: "content_block_stop", index });
+  });
+  events.push({ type: "message_delta", delta: { stop_reason: message.stop_reason, stop_sequence: null }, usage: { output_tokens: message.usage.output_tokens } });
+  events.push({ type: "message_stop" });
+  return new Stream(async function* () {
+    yield* events;
+  } as never, new AbortController());
+}
 
 const request = (role: "fast" | "planner", userText: string) => ({
   ctx: ctxFor(db, userId),
@@ -102,6 +127,53 @@ describe("Claude tool loop", () => {
     expect(proposal).toMatchObject({ status: "pending", payload: { title: "Book flights home" } });
     const { count } = await admin().from("ai_usage").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("purpose", "test");
     expect(count).toBe(2);
+  });
+
+  it("streams steps and text live when asked, with the same result and saved actions", async () => {
+    const toolTurn = reply({
+      stop_reason: "tool_use",
+      content: [
+        { type: "text", text: "Let me check your plan first." },
+        { type: "tool_use", id: "toolu_r1", name: "get_overview", input: {} },
+        { type: "tool_use", id: "toolu_s1", name: "propose_items", input: { items: [{ kind: "task", payload: { title: "Return library books" }, source_excerpt: "return library books", origin: "stated", confidence: 0.9 }] } },
+      ] as Anthropic.Beta.BetaContentBlock[],
+    });
+    const finalTurn = reply({ content: [{ type: "text", text: "Added “Return library books” to your inbox." }] as Anthropic.Beta.BetaContentBlock[] });
+    create.mockImplementationOnce(async (p: { stream?: boolean }) => (p.stream ? streamOf(toolTurn) : toolTurn));
+    create.mockImplementationOnce(async (p: { stream?: boolean }) => (p.stream ? streamOf(finalTurn) : finalTurn));
+
+    const events: AgentEvent[] = [];
+    const r = await runAgent({ ...request("fast", "I need to return library books"), onEvent: (e) => events.push(e) });
+
+    expect(create.mock.calls[0][0]).toMatchObject({ stream: true, model: "claude-haiku-5-5" });
+    // Same outcome as the non-streaming call: final text only, read-only steps not saved.
+    expect(r).toMatchObject({ text: "Added “Return library books” to your inbox.", mutated: true, model: "claude-haiku-5-5" });
+    expect(r.toolEvents).toEqual([expect.objectContaining({ name: "propose_items", ok: true })]);
+    // The tool input still arrives whole through the stream.
+    const toolResult = create.mock.calls[1][0].messages.at(-1).content[1];
+    expect(toolResult).toMatchObject({ tool_use_id: "toolu_s1", is_error: false });
+
+    const kinds = events.map((e) => (e.type === "step_start" || e.type === "step_end" ? `${e.type}:${e.name}` : e.type));
+    expect(kinds).toEqual(["text", "text", "step_start:get_overview", "step_start:propose_items", "step_end:get_overview", "step_end:propose_items", "text", "text"]);
+    const text = (seg: number) => events.filter((e): e is Extract<AgentEvent, { type: "text" }> => e.type === "text" && e.segment === seg).map((e) => e.delta).join("");
+    expect(text(0)).toBe("Let me check your plan first.");
+    expect(text(1)).toBe(r.text);
+    // A step is never shown done before its tool result: the end carries the tool's own summary.
+    const end = events.find((e) => e.type === "step_end" && e.name === "propose_items");
+    expect(end).toMatchObject({ ok: true, readOnly: false, label: "Added to review inbox", summary: r.toolEvents[0].summary });
+    expect(events.find((e) => e.type === "step_end" && e.name === "get_overview")).toMatchObject({ readOnly: true, summary: "" });
+  });
+
+  it("closes a started step as not run when the turn stops before running it", async () => {
+    const cut = reply({ stop_reason: "max_tokens", content: [{ type: "tool_use", id: "toolu_cut", name: "create_task", input: { title: "x" } }] as Anthropic.Beta.BetaContentBlock[] });
+    create.mockImplementationOnce(async () => streamOf(cut));
+    const events: AgentEvent[] = [];
+    const r = await runAgent({ ...request("fast", "add x"), onEvent: (e) => events.push(e) });
+    expect(r.toolEvents).toEqual([]);
+    expect(events.filter((e) => e.type !== "text")).toEqual([
+      expect.objectContaining({ type: "step_start", id: "toolu_cut" }),
+      expect.objectContaining({ type: "step_end", id: "toolu_cut", ok: false, summary: "Didn't run" }),
+    ]);
   });
 
   it("reports a failed tool to the model instead of hiding it", async () => {

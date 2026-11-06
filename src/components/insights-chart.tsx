@@ -1,4 +1,4 @@
-import { chartLabel, hm, type DayBar } from "./insights-week";
+import { chartLabel, hm, hmTight, type DayBar } from "./insights-week";
 
 /**
  * Planned vs done for 7 days: the outlined bar is what was planned, the fill
@@ -7,6 +7,16 @@ import { chartLabel, hm, type DayBar } from "./insights-week";
  * colour, a rest day as a short recovery-yellow bar. Pure: no data fetching,
  * so the weekly story can reuse it.
  */
+function Amount({ m, compact }: { m: number; compact: boolean }) {
+  if (compact) return <>{hmTight(m)}</>;
+  return (
+    <>
+      <span className="md:hidden">{hmTight(m)}</span>
+      <span className="hidden md:inline">{hm(m)}</span>
+    </>
+  );
+}
+
 export function PlannedDoneChart({ bars, compact = false }: { bars: DayBar[]; compact?: boolean }) {
   const max = Math.max(60, ...bars.map((b) => b.planned));
   const best = bars.filter((b) => b.done > 0).sort((a, b) => b.done - a.done)[0]?.date;
@@ -30,11 +40,11 @@ export function PlannedDoneChart({ bars, compact = false }: { bars: DayBar[]; co
               : b.kind === "none" ? <span className="text-dim">–</span>
               : short ? (
                 <span className="text-clash">
-                  {hm(b.done)}
+                  <Amount m={b.done} compact={compact} />
                   <span className={compact ? "hidden" : "hidden md:inline"}> of {hm(b.planned)}</span>
                 </span>
               )
-              : <span className={b.date === best ? "font-semibold text-text" : "text-muted"}>{hm(b.done)}</span>;
+              : <span className={b.date === best ? "font-semibold text-text" : "text-muted"}><Amount m={b.done} compact={compact} /></span>;
             return (
               <div key={b.date} className="flex h-full min-w-0 flex-col items-center justify-end gap-1.5">
                 <span className="num max-w-full truncate text-[11px] leading-4 md:text-xs">{label}</span>
@@ -44,7 +54,7 @@ export function PlannedDoneChart({ bars, compact = false }: { bars: DayBar[]; co
                   <div className="h-0.5 w-full rounded bg-white/15" />
                 ) : (
                   <div
-                    className={`flex w-full flex-col justify-end overflow-hidden rounded-[5px] border ${short ? "border-clash/70" : "border-white/40"}`}
+                    className={`flex w-full flex-col justify-end overflow-hidden rounded-[5px] border bg-white/[0.03] ${short ? "border-clash/70" : "border-white/40"}`}
                     style={{ height: `calc((100% - 22px) * ${Math.max(0.04, b.planned / max)})` }}
                   >
                     {b.partial > 0 && <div className={short ? "bg-clash/35" : "bg-white/35"} style={{ height: `${(b.partial / b.planned) * 100}%` }} />}

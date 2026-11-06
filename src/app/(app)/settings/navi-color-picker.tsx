@@ -44,7 +44,7 @@ export function NaviColorPicker({ saved }: { saved: NaviColorKey }) {
           </div>
         </div>
 
-        <fieldset className="px-2 py-2 sm:px-3">
+        <fieldset className="min-w-0 px-2 py-2 sm:px-3">
           <legend className="sr-only">Navi's colour</legend>
           <div className="grid grid-cols-4 gap-1 sm:grid-cols-8">
             {NAVI_COLORS.map((c) => (

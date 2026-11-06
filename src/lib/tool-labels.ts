@@ -17,6 +17,7 @@ const LABELS: Record<string, Label> = {
   recall: { doing: "Checking what I remember", done: "Checked what I remember", looksAt: "what I remember" },
   propose_items: { doing: "Adding to your review inbox", done: "Added to review inbox" },
   create_task: { doing: "Adding task", done: "Added task" },
+  create_project: { doing: "Creating project", done: "Created project" },
   update_task: { doing: "Updating task", done: "Updated task" },
   complete_task: { doing: "Marking it done", done: "Marked done" },
   update_item: { doing: "Updating", done: "Updated" },

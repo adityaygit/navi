@@ -52,8 +52,10 @@ export function ChatList({ chats, currentId, onNavigate }: { chats: ChatSummary[
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <Link href="/chat?new=1" className="btn btn-primary w-full justify-center" onClick={onNavigate}>
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
         New chat
       </Link>
+      <span className="eyebrow px-3 pb-0.5 pt-2 text-[12px] text-dim">Chats</span>
       {chats.length > 4 && (
         <>
           <label htmlFor="chat-filter" className="sr-only">Find a chat</label>
@@ -62,12 +64,12 @@ export function ChatList({ chats, currentId, onNavigate }: { chats: ChatSummary[
       )}
       {error && <p role="alert" className="notice notice-danger text-xs">{error}</p>}
       <ul className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto" aria-label="Chats" aria-busy={pending}>
-        {shown.length === 0 && <li className="muted px-2 py-1 text-sm">{q ? "No chats match." : "No chats yet."}</li>}
+        {shown.length === 0 && <li className="dim px-3 py-1 text-sm">{q ? "No chats match." : "No chats yet."}</li>}
         {shown.map((c) => {
           const title = c.title || "Untitled chat";
           const current = c.id === currentId;
           return (
-            <li key={c.id} className={`group flex items-center gap-1 rounded-lg ${current ? "bg-accent-soft" : "hover:bg-surface-2"}`}>
+            <li key={c.id} className={`group flex items-center gap-1 rounded-[10px] transition-colors ${current ? "bg-white/[0.07]" : "hover:bg-white/[0.04]"}`}>
               {editing === c.id ? (
                 <form
                   className="flex flex-1 items-center gap-1 p-1"
@@ -94,15 +96,15 @@ export function ChatList({ chats, currentId, onNavigate }: { chats: ChatSummary[
                     href={`/chat?c=${c.id}`}
                     aria-current={current ? "page" : undefined}
                     onClick={onNavigate}
-                    className={`flex min-h-10 min-w-0 flex-1 flex-col justify-center px-3 py-1 text-sm ${current ? "font-medium text-accent" : ""}`}
+                    className="flex min-h-12 min-w-0 flex-1 flex-col justify-center px-3 py-1.5"
                   >
-                    <span className="truncate">{title}</span>
-                    <span className="muted text-xs font-normal">{when(c.updated_at)}</span>
+                    <span className={`truncate text-[15px] ${current ? "font-semibold" : ""}`}>{title}</span>
+                    <span className={`num text-[13px] ${current ? "muted" : "dim"}`} suppressHydrationWarning>{when(c.updated_at)}</span>
                   </Link>
                   <span className={`flex shrink-0 ${current ? "" : "md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100"}`}>
                   <button
                     type="button"
-                    className="btn btn-ghost btn-sm shrink-0 px-2 text-xs"
+                    className="btn btn-ghost btn-sm shrink-0 px-2 text-xs text-muted"
                     aria-label={`Rename ${title}`}
                     onClick={() => {
                       setDraft(c.title ?? "");
@@ -111,7 +113,7 @@ export function ChatList({ chats, currentId, onNavigate }: { chats: ChatSummary[
                   >
                     Rename
                   </button>
-                  <button type="button" className="btn btn-ghost btn-sm shrink-0 px-2 text-xs" aria-label={`Delete ${title}`} onClick={() => remove(c.id, title)}>
+                  <button type="button" className="btn btn-ghost btn-sm shrink-0 px-2 text-xs text-muted" aria-label={`Delete ${title}`} onClick={() => remove(c.id, title)}>
                     Delete
                   </button>
                   </span>
