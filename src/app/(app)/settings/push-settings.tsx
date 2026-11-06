@@ -84,18 +84,19 @@ export function PushSettings({ configured }: { configured: boolean }) {
     }
   }
 
-  if (!configured) return <p className="notice notice-warn text-sm">Push isn't configured on this server yet (VAPID keys missing). Briefings still appear in the app.</p>;
+  if (!configured) return <p className="px-4 py-3.5 text-sm text-recovery sm:px-5">Push isn&apos;t configured on this server yet (VAPID keys missing). Briefings still appear in the app.</p>;
+  const status = state === "checking" ? "Checking…" : state === "on" ? "Notifications on" : state === "off" ? "Notifications off" : state === "denied" ? "Blocked in browser/OS settings" : state === "needs-install" ? "On iPhone, install Navi to your Home Screen first (Share → Add to Home Screen), then open it from there" : "This browser doesn't support web push";
   return (
-    <div className="flex flex-col gap-2">
-      <p className="text-sm" role="status">
-        This device:{" "}
-        {state === "checking" ? "checking…" : state === "on" ? "notifications on" : state === "off" ? "notifications off" : state === "denied" ? "blocked in browser/OS settings" : state === "needs-install" ? "on iPhone, install Navi to your Home Screen first (Share → Add to Home Screen), then open it from there" : "this browser doesn't support web push"}
-      </p>
-      <div className="flex flex-wrap gap-2">
+    <div className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-5">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <span className="text-[15px] font-medium">This device</span>
+        <span role="status" className={`text-[13px] leading-snug ${state === "on" ? "text-focus" : state === "denied" ? "text-recovery" : "muted"}`}>{status}</span>
+        {msg && <span role="status" className="text-[13px] leading-snug">{msg}</span>}
+      </div>
+      {(state === "off" || state === "on") && <div className="flex shrink-0 flex-wrap gap-2">
         {state === "off" && <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={enable}>Enable notifications</button>}
         {state === "on" && <><button type="button" className="btn btn-sm" disabled={busy} onClick={test}>Send test</button><button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={disable}>Turn off on this device</button></>}
-      </div>
-      {msg && <p role="status" className="text-sm">{msg}</p>}
+      </div>}
     </div>
   );
 }

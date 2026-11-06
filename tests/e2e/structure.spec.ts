@@ -66,7 +66,10 @@ test("goals, projects, milestones and fixed commitments", async ({ page }, info)
   expect(tomorrowBlocks.some((b) => Date.parse(b.ends_at) <= Date.parse(dentistStart))).toBe(true);
   expect(tomorrowBlocks.some((b) => Date.parse(b.starts_at) >= Date.parse(dentistEnd))).toBe(true);
   // The day reads in time order: work before the dentist, the dentist, work after.
-  const day = await page.getByRole("region", { name: tomorrowDt.toFormat("cccc LLL d") }).innerText();
+  // The result message names the planned tasks before the day list refreshes, so wait for the day itself.
+  const dayRegion = page.getByRole("region", { name: tomorrowDt.toFormat("cccc LLL d") });
+  await expect(dayRegion.getByText(/Practice drill \d+/).first()).toBeVisible();
+  const day = await dayRegion.innerText();
   const before = day.indexOf("Practice drill");
   const dentist = day.indexOf("Dentist");
   expect(before).toBeGreaterThanOrEqual(0);

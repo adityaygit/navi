@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { createSupabaseBrowser } from "@/lib/supabase/client";
 import { connectionError } from "@/lib/connection";
+import { GROUP, Row, SectionHead } from "@/components/settings-ui";
 
 /**
  * Set or change the account password. Accounts are created without one
@@ -43,21 +44,20 @@ export function PasswordSettings() {
   }
 
   return (
-    <section className="card flex flex-col gap-2" aria-labelledby="pw-h">
-      <h2 id="pw-h" className="h2">Password</h2>
-      <p className="muted text-sm">Optional. Email links always work; a password lets you sign in without checking email.</p>
-      <form onSubmit={submit} className="flex flex-col gap-2">
-        <div>
-          <label htmlFor="new-password" className="label">New password</label>
+    <section id="password" className="flex scroll-mt-24 flex-col gap-3" aria-labelledby="pw-h">
+      <SectionHead id="pw-h" title="Password" desc="Optional. Email links always work; a password lets you sign in without checking email." />
+      <form onSubmit={submit} className={GROUP}>
+        <Row label="New password" htmlFor="new-password">
           <input id="new-password" type="password" autoComplete="new-password" minLength={8} required className="input" value={password} onChange={(e) => setPassword(e.target.value)} />
-        </div>
-        <div>
-          <label htmlFor="new-password-again" className="label">Repeat new password</label>
+        </Row>
+        <Row label="Repeat new password" htmlFor="new-password-again">
           <input id="new-password-again" type="password" autoComplete="new-password" minLength={8} required className="input" value={again} onChange={(e) => setAgain(e.target.value)} />
+        </Row>
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-5">
+          <button className="btn btn-sm" disabled={busy}>{busy ? "Saving…" : "Save password"}</button>
+          {msg && <p role={msg.kind === "error" ? "alert" : "status"} className={`text-sm ${msg.kind === "error" ? "text-danger" : "text-focus"}`}>{msg.text}</p>}
         </div>
-        <button className="btn btn-sm self-start" disabled={busy}>{busy ? "Saving…" : "Save password"}</button>
       </form>
-      {msg && <p role={msg.kind === "error" ? "alert" : "status"} className={`text-sm ${msg.kind === "error" ? "text-danger" : ""}`}>{msg.text}</p>}
     </section>
   );
 }

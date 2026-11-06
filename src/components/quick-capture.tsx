@@ -21,9 +21,10 @@ export function QuickCapture({ userId }: { userId: string }) {
   const recRef = useRef<SpeechRec | null>(null);
   const [listening, setListening] = useState(false);
   const [usedVoice, setUsedVoice] = useState(false);
-  // During setup the person is already talking to Navi, and the floating
-  // button would cover the review bar. Queued captures still show.
-  const hideFab = usePathname().startsWith("/onboarding") && queue.length === 0;
+  // During setup and in chat the person is already talking to Navi, and the
+  // floating button would cover the composer. Queued captures still show.
+  const path = usePathname();
+  const hideFab = (path.startsWith("/onboarding") || path.startsWith("/chat")) && queue.length === 0;
 
   useEffect(() => {
     // Restore an unsent draft from this device's storage (an external system).
@@ -107,14 +108,14 @@ export function QuickCapture({ userId }: { userId: string }) {
       {!hideFab && <button
         type="button"
         onClick={() => setOpen(true)}
-        className="btn btn-primary fixed bottom-20 right-4 z-30 h-14 rounded-full px-5 shadow-lg md:bottom-6"
+        className="btn btn-primary fixed bottom-[calc(env(safe-area-inset-bottom)+92px)] right-4 z-30 h-12 rounded-full px-5 shadow-[0_12px_30px_-10px_rgba(0,0,0,0.8)] md:bottom-6 md:right-6"
         aria-haspopup="dialog"
       >
-        + Capture{queue.length > 0 && <span className="badge ml-1 border-accent-text text-accent-text">{queue.length}</span>}
+        + Capture{queue.length > 0 && <span className="ml-1 rounded-full bg-black/80 px-1.5 text-xs text-white">{queue.length}</span>}
       </button>}
       {open && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 md:items-center" onClick={() => setOpen(false)}>
-          <div role="dialog" aria-modal="true" aria-labelledby="capture-title" className="w-full max-w-lg rounded-t-2xl bg-surface p-4 md:rounded-2xl safe-bottom" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-sm md:items-center" onClick={() => setOpen(false)}>
+          <div role="dialog" aria-modal="true" aria-labelledby="capture-title" className="lg w-full max-w-lg rounded-b-none bg-[#101013]/90 p-5 md:rounded-[14px] safe-bottom" onClick={(e) => e.stopPropagation()}>
             <form onSubmit={submit} className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <h2 id="capture-title" className="h2">Capture</h2>

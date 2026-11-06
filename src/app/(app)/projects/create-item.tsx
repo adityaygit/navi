@@ -17,7 +17,7 @@ export function CreateItem({ kind, workspaces, goals, parent, label }: { kind: K
   const id = `${kind}-${parent ? Object.values(parent)[0] : "new"}`;
   return (
     <form
-      className="card flex w-full flex-col gap-2"
+      className="card flex w-full flex-col gap-4 md:p-6"
       onSubmit={(e) => {
         e.preventDefault();
         const payload: Record<string, unknown> = { ...parent };
@@ -30,14 +30,14 @@ export function CreateItem({ kind, workspaces, goals, parent, label }: { kind: K
     >
       <div><label className="label" htmlFor={`${id}-n`}>New {LABEL[kind]}</label><input id={`${id}-n`} required className="input" value={v[nameKey] ?? ""} onChange={set(nameKey)} /></div>
       {kind === "goals" && (
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-3">
           <div><label className="label" htmlFor={`${id}-w`}>Why it matters</label><input id={`${id}-w`} className="input" value={v.why ?? ""} onChange={set("why")} /></div>
           <div><label className="label" htmlFor={`${id}-m`}>How you'll measure it</label><input id={`${id}-m`} className="input" value={v.measure ?? ""} onChange={set("measure")} /></div>
           <div><label className="label" htmlFor={`${id}-t`}>Target date</label><input id={`${id}-t`} type="date" className="input" value={v.target_date ?? ""} onChange={set("target_date")} /></div>
         </div>
       )}
       {kind === "projects" && (
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-3">
           <div className="sm:col-span-3"><label className="label" htmlFor={`${id}-o`}>Objective</label><input id={`${id}-o`} className="input" value={v.objective ?? ""} onChange={set("objective")} /></div>
           <div><label className="label" htmlFor={`${id}-d`}>Due</label><input id={`${id}-d`} type="date" className="input" value={v.due_date ?? ""} onChange={set("due_date")} /></div>
           <div><label className="label" htmlFor={`${id}-g`}>Goal</label><select id={`${id}-g`} className="input" value={v.goal_id ?? ""} onChange={set("goal_id")}><option value="">None</option>{goals.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div>

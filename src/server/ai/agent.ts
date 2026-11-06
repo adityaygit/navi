@@ -1,5 +1,6 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
+import { BetaMessageStream } from "@anthropic-ai/sdk/lib/BetaMessageStream";
 import type { Ctx } from "@/server/context";
 import type { ToolEvent } from "@/lib/types";
 import { serverEnv } from "@/lib/env";
@@ -8,6 +9,8 @@ import { BudgetExceededError, reserveBudget, settleUsage } from "./budget";
 import { jsonSchemaFor, runTool, toolsFor } from "./tools";
 import { runDevSim } from "./devsim";
 import { READ_ONLY_TOOLS } from "@/lib/tool-names";
+import type { AgentEvent } from "@/lib/chat-stream";
+import { emitter, stepEndEvent, stepStartEvent } from "./live";
 
 export type AgentMode = "chat" | "onboarding" | "capture";
 
@@ -20,6 +23,12 @@ export type AgentRequest = {
   history: { role: "user" | "assistant"; content: string }[];
   userText: string;
   purpose: string;
+  /**
+   * Live progress for a streaming client: each tool step as it starts and
+   * finishes, and reply text as it is written. Purely a view: the result (and
+   * what gets saved) is the same with or without it.
+   */
+  onEvent?: (event: AgentEvent) => void;
 };
 
 export type AgentResult = {
@@ -63,6 +72,8 @@ export async function runAgent(req: AgentRequest): Promise<AgentResult> {
       (err instanceof Anthropic.APIError && (err.status === 529 || err.status === 503));
     if (req.role === "planner" && retriable && fallback !== modelFor("planner")) {
       try {
+        // Anything shown live from the failed attempt is discarded before the retry.
+        emitter(req)({ type: "reset" });
         const r = await runAnthropic(req, fallback, false);
         return { ...r, text: r.text };
       } catch (err2) {
@@ -93,10 +104,21 @@ async function runAnthropic(req: AgentRequest, model: string, allowServerFallbac
     { role: "user", content: req.userText },
   ];
   const useFallbacks = allowServerFallback && serverEnv.refusalFallbacks() && model.startsWith("claude-sonnet");
+  const emit = emitter(req);
   const toolEvents: ToolEvent[] = [];
   let mutated = false;
   let costUsd = 0;
   let finalText = "";
+  // Tool steps already shown as started (streaming announces them early).
+  const started = new Set<string>();
+  // Steps shown as started but not finished yet (id → tool name).
+  const open = new Map<string, string>();
+  const startStep = (id: string, name: string) => {
+    if (started.has(id)) return;
+    started.add(id);
+    open.set(id, name);
+    emit(stepStartEvent(id, name));
+  };
   // Pessimistic reserve for one call: full max_tokens of output.
   const reserve = tokenCost(model, { input: 20000, output: MAX_TOKENS }).usd;
 
@@ -105,19 +127,36 @@ async function runAnthropic(req: AgentRequest, model: string, allowServerFallbac
       // Hold back the worst case for this call atomically, then settle to the real usage.
       const reservation = await reserveBudget({ userId: req.ctx.userId, provider: "anthropic", model, role: req.role, purpose: req.purpose, amountUsd: reserve });
       let response: Anthropic.Beta.BetaMessage;
+      const params = {
+        model,
+        max_tokens: MAX_TOKENS,
+        system: [
+          { type: "text" as const, text: req.system, cache_control: { type: "ephemeral" as const } },
+          { type: "text" as const, text: req.context },
+        ],
+        tools,
+        messages,
+        output_config: { effort: req.role === "fast" ? ("low" as const) : ("medium" as const) },
+        ...(useFallbacks ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
+      };
       try {
-        response = await client.beta.messages.create({
-          model,
-          max_tokens: MAX_TOKENS,
-          system: [
-            { type: "text", text: req.system, cache_control: { type: "ephemeral" } },
-            { type: "text", text: req.context },
-          ],
-          tools,
-          messages,
-          output_config: { effort: req.role === "fast" ? "low" : "medium" },
-          ...(useFallbacks ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
-        });
+        if (req.onEvent) {
+          // Streamed: text appears as it is written and each tool step shows
+          // as soon as the model starts it. The SDK's own accumulator builds
+          // the same final message the non-streaming call returns.
+          const raw = await client.beta.messages.create({ ...params, stream: true });
+          const stream = BetaMessageStream.fromReadableStream(raw.toReadableStream());
+          const segment = i;
+          stream.on("text", (delta) => {
+            if (delta) emit({ type: "text", delta, segment });
+          });
+          stream.on("streamEvent", (event) => {
+            if (event.type === "content_block_start" && event.content_block.type === "tool_use") startStep(event.content_block.id, event.content_block.name);
+          });
+          response = await stream.finalMessage();
+        } else {
+          response = await client.beta.messages.create(params);
+        }
       } catch (err) {
         await settleUsage(reservation, { costUsd: 0, ok: false }, model);
         throw err;
@@ -161,8 +200,11 @@ async function runAnthropic(req: AgentRequest, model: string, allowServerFallbac
       const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
       // Run sequentially: tools mutate shared state and later calls may depend on earlier ones.
       for (const use of toolUses) {
+        startStep(use.id, use.name);
         // userMessage: the person's own words this turn, held by the server (see complete_task).
         const result = await runTool({ ...req.ctx, actor: "navi", userMessage: req.userText }, use.name, use.input);
+        open.delete(use.id);
+        emit(stepEndEvent(use.id, use.name, result.ok, result.summary));
         if (result.mutated) mutated = true;
         if (!READ_ONLY_TOOLS.includes(use.name)) {
           toolEvents.push({ name: use.name, ok: result.ok, summary: result.summary });
@@ -192,6 +234,10 @@ async function runAnthropic(req: AgentRequest, model: string, allowServerFallbac
       costUsd,
       error: err instanceof BudgetExceededError ? "budget" : "provider",
     };
+  } finally {
+    // A step the model began but that never ran (stopped, refused, failed) must not look done.
+    for (const [id, name] of open) emit(stepEndEvent(id, name, false, "Didn't run"));
+    open.clear();
   }
   return { text: finalText || "Done.", toolEvents, mutated, model, simulated: false, costUsd };
 }

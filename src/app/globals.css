@@ -1,46 +1,47 @@
 @import "tailwindcss";
 
-/* Navi's deliberately basic design system: system font, neutral surfaces,
-   one accent, clear focus rings, large touch targets. */
+/* Navi's design system: the landing page's language (near-black, hairlines,
+   Instrument Sans, grey-gradient headlines, colour only as meaning) plus
+   translucent cards, and liquid glass only for the things that matter.
+   Dark only for now. */
 
 :root {
-  --bg: #f7f7f5;
-  --surface: #ffffff;
-  --surface-2: #f0f0ed;
-  --border: #e2e2dd;
-  --text: #1b1b1a;
-  --muted: #6b6b66;
-  --accent: #2f5bd3;
-  --accent-text: #ffffff;
-  --accent-soft: #e8eefc;
-  --danger: #b42318;
-  --danger-soft: #fdecea;
-  --warn: #7d5400;
-  --warn-soft: #fff4d6;
-  --ok: #1a7f37;
-  --ok-soft: #e6f4ea;
-  color-scheme: light;
-}
+  /* Canvas and text (from landing/src/styles.css). */
+  --bg: #060608;
+  --surface: rgba(255, 255, 255, 0.035);
+  --surface-2: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --text: #f2f2f2;
+  --muted: #a3a5aa;
+  --dim: #8b8e95;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #141414;
-    --surface: #1c1c1c;
-    --surface-2: #252525;
-    --border: #333331;
-    --text: #ededea;
-    --muted: #a3a39d;
-    --accent: #7c9cf5;
-    --accent-text: #0d1430;
-    --accent-soft: #1f2a4a;
-    --danger: #ff8a80;
-    --danger-soft: #3a1d1b;
-    --warn: #f2c14e;
-    --warn-soft: #3a2f12;
-    --ok: #6fdc8c;
-    --ok-soft: #173322;
-    color-scheme: dark;
-  }
+  /* Meaning colours: these never change. */
+  --fixed: #f0f0f0;
+  --flex: #8fb8ff;
+  --focus: #5fd39a;
+  --recovery: #f2c46b;
+  --clash: #ff8f8a;
+
+  /* Legacy names mapped onto the new system. */
+  --accent: #f2f2f2;
+  --accent-text: #060608;
+  --accent-soft: rgba(255, 255, 255, 0.08);
+  --danger: var(--clash);
+  --danger-soft: rgba(255, 143, 138, 0.12);
+  --warn: var(--recovery);
+  --warn-soft: rgba(242, 196, 107, 0.12);
+  --ok: var(--focus);
+  --ok-soft: rgba(95, 211, 154, 0.12);
+
+  /* Navi's own colour; the app layout overrides these from the person's choice. */
+  --navi-light: #ffe7b0;
+  --navi-mid: #f5a83a;
+  --navi-dark: #c9661c;
+  --navi-ink: #2a1606;
+  --navi-text: #ffd58a;
+
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -48,8 +49,10 @@
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-text: var(--text);
   --color-muted: var(--muted);
+  --color-dim: var(--dim);
   --color-accent: var(--accent);
   --color-accent-text: var(--accent-text);
   --color-accent-soft: var(--accent-soft);
@@ -59,85 +62,236 @@
   --color-warn-soft: var(--warn-soft);
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --color-fixed: var(--fixed);
+  --color-flex: var(--flex);
+  --color-focus: var(--focus);
+  --color-recovery: var(--recovery);
+  --color-clash: var(--clash);
+  --color-navi: var(--navi-mid);
+  --color-navi-text: var(--navi-text);
+  --font-sans: var(--font-instrument), "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --radius-surface: 14px;
+  --radius-control: 8px;
 }
 
 html {
   -webkit-text-size-adjust: 100%;
+  background: var(--bg);
 }
 
 body {
-  background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
   line-height: 1.45;
+  /* Very faint colour in the dark, plus fine grain, so it isn't flat black. */
+  background:
+    radial-gradient(60% 40% at 8% 25%, rgba(90, 120, 190, 0.08), transparent 70%),
+    radial-gradient(55% 35% at 95% 70%, rgba(110, 90, 200, 0.06), transparent 70%),
+    var(--bg);
+  background-attachment: fixed;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+::selection {
+  background: rgba(143, 184, 255, 0.35);
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--flex);
   outline-offset: 2px;
 }
 
+.tabular,
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
 @layer components {
+  /* Surfaces */
+  .surf,
   .card {
-    @apply rounded-xl border border-border bg-surface p-4;
+    @apply rounded-[14px] border border-border;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
-  .btn {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3.5 text-sm font-medium text-text transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50;
+  .card {
+    @apply p-5;
   }
-  .btn-primary {
-    @apply border-accent bg-accent text-accent-text hover:bg-accent hover:opacity-90;
+  /* Liquid glass: only for what matters (score, approvals, Navi's panel, composer, dock). */
+  .lg {
+    @apply rounded-[14px];
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.035) 45%, rgba(255, 255, 255, 0.06) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    -webkit-backdrop-filter: blur(30px) saturate(170%);
+    backdrop-filter: blur(30px) saturate(170%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 1px 0 0 rgba(255, 255, 255, 0.06), 0 24px 60px -30px rgba(0, 0, 0, 0.7);
   }
-  .btn-danger {
-    @apply border-danger text-danger hover:bg-danger-soft;
+  /* Needs the person: the one place a card glows, in Navi's colour. */
+  .lg-ask {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 20px 50px -26px color-mix(in srgb, var(--navi-mid) 32%, transparent);
   }
-  .btn-ghost {
-    @apply border-transparent bg-transparent hover:bg-surface-2;
+  .glass {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04));
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    -webkit-backdrop-filter: blur(26px) saturate(170%);
+    backdrop-filter: blur(26px) saturate(170%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 16px 40px -16px rgba(0, 0, 0, 0.6);
   }
-  .btn-sm {
-    @apply min-h-9 px-2.5 text-xs pointer-coarse:min-h-11;
+  .well {
+    @apply rounded-[12px] border border-border;
+    background: rgba(0, 0, 0, 0.25);
   }
-  .input {
-    @apply min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-base text-text placeholder:text-muted;
+
+  /* Type */
+  .gh {
+    background: linear-gradient(180deg, #f4f4f4 15%, #a4a4a4 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
-  textarea.input {
-    @apply py-2;
+  .display {
+    @apply font-semibold;
+    letter-spacing: -0.035em;
+    line-height: 1.02;
   }
-  .label {
-    @apply mb-1 block text-sm font-medium;
+  .h1 {
+    @apply text-[32px] font-semibold md:text-[40px];
+    letter-spacing: -0.035em;
+    line-height: 1.05;
+    background: linear-gradient(180deg, #f4f4f4 15%, #a4a4a4 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .h2 {
+    @apply text-xl font-semibold;
+    letter-spacing: -0.02em;
+  }
+  .eyebrow {
+    @apply text-[13px] font-medium uppercase text-muted;
+    letter-spacing: 0.07em;
   }
   .muted {
     @apply text-muted;
   }
-  .h1 {
-    @apply text-2xl font-semibold tracking-tight;
+  .dim {
+    @apply text-dim;
   }
-  .h2 {
-    @apply text-lg font-semibold;
+
+  /* Controls: pills for actions */
+  .btn {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full border px-4 text-[15px] font-medium text-text transition-colors disabled:cursor-not-allowed disabled:opacity-45;
+    border-color: rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.02);
   }
+  .btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.07);
+  }
+  .btn-primary {
+    @apply border-transparent font-semibold;
+    background: #f2f2f2;
+    color: #060608;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: #ffffff;
+  }
+  .btn-danger {
+    color: var(--clash);
+    border-color: rgba(255, 143, 138, 0.45);
+  }
+  .btn-danger:hover:not(:disabled) {
+    background: var(--danger-soft);
+  }
+  .btn-ghost {
+    @apply border-transparent bg-transparent;
+  }
+  .btn-sm {
+    @apply min-h-9 px-3 text-[13px] pointer-coarse:min-h-11;
+  }
+  .input {
+    @apply min-h-11 w-full rounded-[10px] border px-3.5 text-base text-text placeholder:text-dim;
+    border-color: rgba(255, 255, 255, 0.14);
+    background: rgba(0, 0, 0, 0.3);
+  }
+  .input:focus {
+    border-color: rgba(143, 184, 255, 0.6);
+  }
+  textarea.input {
+    @apply py-2.5;
+  }
+  select.input {
+    @apply pr-8;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-muted;
+  }
+
+  /* Badges: tinted, never decorative */
   .badge {
-    @apply inline-flex items-center rounded-full border border-border px-2 py-0.5 text-xs font-medium text-muted;
+    @apply inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium;
+    color: var(--muted);
+    background: rgba(255, 255, 255, 0.06);
   }
   .badge-accent {
-    @apply border-transparent bg-accent-soft text-accent;
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.12);
   }
   .badge-warn {
-    @apply border-transparent bg-warn-soft text-warn;
+    color: var(--recovery);
+    background: var(--warn-soft);
   }
   .badge-danger {
-    @apply border-transparent bg-danger-soft text-danger;
+    color: var(--clash);
+    background: var(--danger-soft);
   }
   .badge-ok {
-    @apply border-transparent bg-ok-soft text-ok;
+    color: var(--focus);
+    background: var(--ok-soft);
   }
+  .badge-flex {
+    color: var(--flex);
+    background: rgba(143, 184, 255, 0.12);
+  }
+  .badge-navi {
+    color: var(--navi-ink);
+    background: var(--navi-mid);
+  }
+  .pill-status {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[13px] font-medium;
+  }
+  .dot {
+    @apply inline-block h-2 w-2 shrink-0 rounded-full;
+  }
+
   .notice {
-    @apply rounded-lg border border-border bg-surface-2 p-3 text-sm;
+    @apply rounded-[12px] border border-border p-3.5 text-sm;
+    background: rgba(255, 255, 255, 0.04);
   }
   .notice-warn {
-    @apply border-transparent bg-warn-soft text-text;
+    border-color: rgba(242, 196, 107, 0.35);
+    background: rgba(242, 196, 107, 0.07);
   }
   .notice-danger {
-    @apply border-transparent bg-danger-soft text-text;
+    border-color: rgba(255, 143, 138, 0.4);
+    background: rgba(255, 143, 138, 0.08);
+  }
+
+  .hairline {
+    border-color: var(--border);
+  }
+  .divide-hair > * + * {
+    border-top: 1px solid var(--border);
   }
 }
 
@@ -154,4 +308,134 @@ body {
     min-height: 2.75rem;
     padding-block: 0.625rem;
   }
+}
+
+/* ---------------- Pebble ---------------- */
+.pebble {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: var(--pebble-size);
+  height: var(--pebble-size);
+  font-size: calc(var(--pebble-size) / 20);
+  vertical-align: middle;
+}
+.pebble-body {
+  position: absolute;
+  left: 2.2em;
+  top: 3em;
+  width: 15.6em;
+  height: 14.6em;
+  border-radius: 6.4em;
+  background: radial-gradient(circle at 35% 28%, var(--navi-light) 0%, var(--navi-mid) 48%, var(--navi-dark) 100%);
+}
+.pebble-glow .pebble-body {
+  box-shadow: 0 0 2.6em 0.4em color-mix(in srgb, var(--navi-mid) 38%, transparent);
+}
+.pebble-shine {
+  position: absolute;
+  left: 2.4em;
+  top: 2em;
+  width: 5.2em;
+  height: 2.4em;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+}
+.pebble-eye {
+  position: absolute;
+  top: 5.7em;
+  width: 2em;
+  height: 3em;
+  border-radius: 50%;
+  background: var(--navi-ink);
+  animation: pebble-blink 4.5s infinite;
+}
+.pebble-eye-l { left: 4.6em; }
+.pebble-eye-r { left: 9em; }
+.pebble-mouth,
+.pebble-brow,
+.pebble-blush,
+.pebble-dots { display: none; }
+.pebble-float { animation: pebble-float 4s ease-in-out infinite; }
+
+/* Listening: wide eyes with a catch-light, sound rings. */
+.pebble-listening .pebble-eye { width: 2.4em; height: 3.6em; top: 5.3em; animation: none; background: radial-gradient(circle at 68% 28%, rgba(255, 255, 255, 0.9) 0 17%, var(--navi-ink) 19%); }
+.pebble-listening .pebble-eye-l { left: 4.4em; }
+.pebble-listening::before,
+.pebble-listening::after {
+  content: "";
+  position: absolute;
+  inset: 0.6em;
+  border-radius: 50%;
+  border: 0.4em solid var(--navi-mid);
+  animation: pebble-ring 1.8s ease-out infinite;
+}
+.pebble-listening::after { animation-delay: 0.6s; }
+/* Working: looks up and to the side, thinking dots. */
+.pebble-working .pebble-eye { top: 4.6em; height: 2.8em; animation: none; }
+.pebble-working .pebble-eye-l { left: 5.4em; }
+.pebble-working .pebble-eye-r { left: 9.8em; }
+.pebble-working .pebble-dots { display: flex; position: absolute; left: 5.4em; top: 10.4em; gap: 0.6em; }
+.pebble-working .pebble-dots i { width: 1.2em; height: 1.2em; border-radius: 50%; background: var(--navi-ink); animation: pebble-dot 1.2s infinite; }
+.pebble-working .pebble-dots i:nth-child(2) { animation-delay: 0.2s; }
+.pebble-working .pebble-dots i:nth-child(3) { animation-delay: 0.4s; }
+/* Speaking: a small mouth. */
+.pebble-speaking .pebble-eye { top: 5.1em; }
+.pebble-speaking .pebble-mouth { display: block; position: absolute; left: 6.4em; top: 9.8em; width: 2.8em; height: 1.8em; border-radius: 50%; background: var(--navi-ink); animation: pebble-talk 0.5s ease-in-out infinite alternate; }
+/* Done: happy eyes, blush, a hop. */
+.pebble-done { animation: pebble-hop 1.6s ease-in-out infinite; }
+.pebble-done .pebble-eye { background: transparent; height: 1.7em; top: 6.2em; width: 2.6em; border: 0.75em solid var(--navi-ink); border-bottom: 0; border-radius: 1.6em 1.6em 0 0; animation: none; box-sizing: border-box; }
+.pebble-done .pebble-eye-l { left: 4.4em; }
+.pebble-done .pebble-blush { display: block; position: absolute; top: 9.3em; width: 2.4em; height: 1.4em; border-radius: 50%; background: #ff8a5c; opacity: 0.5; }
+.pebble-done .pebble-blush-l { left: 2.4em; }
+.pebble-done .pebble-blush-r { left: 10.8em; }
+/* Needs your OK: head tilt and one raised brow. */
+.pebble-ask .pebble-body { transform: rotate(-7deg); transform-origin: 50% 100%; animation: pebble-tilt 3s ease-in-out infinite; }
+.pebble-ask .pebble-brow { display: block; position: absolute; left: 8.6em; top: 4.2em; width: 2.8em; height: 0.75em; border-radius: 0.4em; background: var(--navi-ink); transform: rotate(-12deg); }
+/* Gentle nudge: half-lidded, level mouth. */
+.pebble-nudge .pebble-eye { height: 1.15em; top: 6.8em; width: 2.2em; border-radius: 0 0 1.1em 1.1em; animation: none; }
+.pebble-nudge .pebble-mouth { display: block; position: absolute; left: 6.6em; top: 10.6em; width: 2.4em; height: 0.7em; border-radius: 0.35em; background: var(--navi-ink); }
+/* Quiet hours: asleep and dimmed. */
+.pebble-quiet .pebble-body { opacity: 0.7; }
+.pebble-quiet .pebble-eye { background: transparent; height: 1.2em; top: 6.6em; width: 2.4em; border: 0.7em solid var(--navi-ink); border-top: 0; border-radius: 0 0 1.4em 1.4em; animation: none; box-sizing: border-box; }
+.pebble-z { position: absolute; right: 0; top: 0; font-size: 4em; font-weight: 700; line-height: 1; color: var(--muted); }
+
+@keyframes pebble-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.12); } }
+@keyframes pebble-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4%); } }
+@keyframes pebble-ring { 0% { transform: scale(0.85); opacity: 0.6; } 100% { transform: scale(1.15); opacity: 0; } }
+@keyframes pebble-dot { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+@keyframes pebble-talk { 0% { transform: scaleY(0.35); } 100% { transform: scaleY(1); } }
+@keyframes pebble-hop { 0%, 100% { transform: translateY(0); } 30% { transform: translateY(-6%); } }
+@keyframes pebble-tilt { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(-3deg); } }
+
+/* ---------------- Streaming text ---------------- */
+.stream-chunk {
+  animation: stream-in 220ms ease-out both;
+}
+@keyframes stream-in {
+  from { opacity: 0; filter: blur(4px); }
+  to { opacity: 1; filter: blur(0); }
+}
+.step-in {
+  animation: step-in 240ms ease-out both;
+}
+@keyframes step-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.shimmer-text {
+  background: linear-gradient(90deg, var(--muted) 0%, var(--text) 45%, var(--muted) 90%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 2.2s linear infinite;
+}
+@keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .pebble *, .pebble, .pebble::before, .pebble::after, .stream-chunk, .step-in, .shimmer-text {
+    animation: none !important;
+  }
+  .shimmer-text { color: var(--text); background: none; }
 }

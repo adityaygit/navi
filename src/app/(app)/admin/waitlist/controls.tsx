@@ -1,14 +1,19 @@
 "use client";
 import { useTransition, useState } from "react";
+import { Switch } from "@/components/settings-ui";
 import { decideAction, setAutoApproveAction } from "./actions";
 
 export function AutoApprove({ on }: { on: boolean }) {
   const [pending, start] = useTransition();
   return (
-    <label className="flex items-center gap-3 text-sm">
-      <input type="checkbox" checked={on} disabled={pending} onChange={(e) => start(() => setAutoApproveAction(e.target.checked))} className="h-4 w-4" />
-      Approve new applications automatically
-    </label>
+    <Switch
+      id="wl-auto"
+      checked={on}
+      disabled={pending}
+      onChange={(next) => start(() => setAutoApproveAction(next))}
+      label="Approve new applications automatically"
+      hint="Each new application is approved and emailed a sign-in link without review."
+    />
   );
 }
 
@@ -21,12 +26,12 @@ export function Decide({ id, status }: { id: string; status: string }) {
   });
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <button disabled={pending} onClick={() => run("approve", true)} className="rounded-lg bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black">Approve</button>
+      <button type="button" disabled={pending} onClick={() => run("approve", true)} className="btn btn-primary btn-sm">Approve</button>
       {status === "applied" && <>
-        <button disabled={pending} onClick={() => run("decline", false)} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-50">Decline quietly</button>
-        <button disabled={pending} onClick={() => run("decline", true)} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-50">Decline and email</button>
+        <button type="button" disabled={pending} onClick={() => run("decline", false)} className="btn btn-sm">Decline quietly</button>
+        <button type="button" disabled={pending} onClick={() => run("decline", true)} className="btn btn-sm">Decline and email</button>
       </>}
-      {msg && <span role="status" className="text-sm text-neutral-500">{msg}</span>}
+      {msg && <span role="status" className="muted text-sm">{msg}</span>}
     </div>
   );
 }

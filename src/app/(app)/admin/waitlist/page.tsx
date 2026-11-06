@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireCtx } from "@/server/context";
 import { getSettings, isAdmin, listWaitlist, waitlistDb, type WaitlistStatus } from "@/server/waitlist";
+import { GROUP } from "@/components/settings-ui";
 import { AutoApprove, Decide } from "./controls";
 
 const TABS: { key: WaitlistStatus; label: string }[] = [
@@ -16,27 +17,37 @@ export default async function WaitlistAdmin({ searchParams }: { searchParams: Pr
   const db = waitlistDb();
   const [rows, settings] = await Promise.all([listWaitlist(db, status), getSettings(db)]);
   return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div><h1 className="text-2xl font-semibold">Waitlist</h1><p className="text-sm text-neutral-500">Approving adds the email to the access list and sends a sign-in link.</p></div>
-        <AutoApprove on={settings.auto_approve} />
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-7">
+      <header className="flex flex-col gap-3">
+        <h1 className="h1">Waitlist</h1>
+        <p className="muted text-[15px]">Approving adds the email to the access list and sends a sign-in link.</p>
       </header>
+      <div className={GROUP}>
+        <AutoApprove on={settings.auto_approve} />
+      </div>
       <nav className="flex flex-wrap gap-2" aria-label="Status">
-        {TABS.map((t) => <a key={t.key} href={`?status=${t.key}`} aria-current={t.key === status ? "page" : undefined} className={`rounded-full border px-3 py-1 text-sm ${t.key === status ? "bg-neutral-900 text-white dark:bg-white dark:text-black" : ""}`}>{t.label}</a>)}
+        {TABS.map((t) => (
+          <a key={t.key} href={`?status=${t.key}`} aria-current={t.key === status ? "page" : undefined} className={`btn btn-sm ${t.key === status ? "btn-primary" : ""}`}>{t.label}</a>
+        ))}
       </nav>
-      {rows.length === 0 ? <p className="text-sm text-neutral-500">Nobody here yet.</p> : (
-        <ul className="divide-y rounded-xl border">
+      {rows.length === 0 ? (
+        <p className="surf muted px-4 py-4 text-sm sm:px-5">Nobody here yet.</p>
+      ) : (
+        <ul className={GROUP}>
           {rows.map((r) => (
-            <li key={r.id} className="space-y-2 p-4">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <div><span className="font-medium">{r.name ?? r.email}</span>{r.name && <span className="ml-2 text-sm text-neutral-500">{r.email}</span>}</div>
-                <span className="text-xs text-neutral-500">{new Date(r.applied_at ?? r.created_at).toLocaleString()} · {r.timezone ?? "timezone not given"}</span>
+            <li key={r.id} className="flex flex-col gap-2.5 px-4 py-4 sm:px-5">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <div className="min-w-0 break-words">
+                  <span className="text-[16px] font-semibold">{r.name ?? r.email}</span>
+                  {r.name && <span className="muted ml-2 text-sm">{r.email}</span>}
+                </div>
+                <span className="dim num text-[13px]">{new Date(r.applied_at ?? r.created_at).toLocaleString()} · {r.timezone ?? "timezone not given"}</span>
               </div>
-              {r.reason && <p className="text-sm"><span className="text-neutral-500">Why: </span>{r.reason}</p>}
-              {r.use_case && <p className="text-sm"><span className="text-neutral-500">First use: </span>{r.use_case}</p>}
-              {r.referral && <p className="text-sm text-neutral-500">Heard via {r.referral}</p>}
-              {(r.status === "applied" || r.status === "declined") && <Decide id={r.id} status={r.status} />}
-              {r.status === "approved" && <p className="text-xs text-neutral-500">Approved by {r.decided_by} · {r.decision_email_sent ? "invite emailed" : "invite email not sent"}</p>}
+              {r.reason && <p className="break-words text-sm"><span className="muted">Why: </span>{r.reason}</p>}
+              {r.use_case && <p className="break-words text-sm"><span className="muted">First use: </span>{r.use_case}</p>}
+              {r.referral && <p className="muted break-words text-sm">Heard via {r.referral}</p>}
+              {(r.status === "applied" || r.status === "declined") && <div className="pt-1"><Decide id={r.id} status={r.status} /></div>}
+              {r.status === "approved" && <p className="dim text-[13px]">Approved by {r.decided_by} · {r.decision_email_sent ? "invite emailed" : "invite email not sent"}</p>}
             </li>
           ))}
         </ul>

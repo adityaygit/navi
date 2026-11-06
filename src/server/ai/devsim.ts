@@ -6,6 +6,7 @@ import { recordUsage } from "./budget";
 import { runTool } from "./tools";
 import { areaFor, detectAreas, extractAvailability, extractGoals, extractItems, extractName, extractProjects, extractRoutines, extractWeeklyCommitments } from "./heuristics";
 import type { AgentRequest, AgentResult } from "./agent";
+import { emitter, stepEndEvent, stepStartEvent } from "./live";
 
 // Development simulator: a deterministic stand-in for the model so the full
 // product loop (onboarding, capture, inbox, planning) can be exercised and
@@ -21,16 +22,44 @@ const ONBOARDING_QUESTIONS = [
   "Thanks. When are you usually free to do focused work (like “free after 5pm on weekdays”), and when should I stay quiet and not notify you (like “quiet 10pm to 7am”)?",
 ];
 
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Word groups of one to three words, each keeping its trailing space, for live text. */
+export function wordGroups(text: string): string[] {
+  const words = text.match(/\S+\s*/g) ?? [];
+  const groups: string[] = [];
+  for (let i = 0; i < words.length; ) {
+    const n = 1 + ((i * 7 + words.length) % 3);
+    groups.push(words.slice(i, i + n).join(""));
+    i += n;
+  }
+  return groups;
+}
+
 export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
   const ctx = { ...req.ctx, actor: "navi" as const, userMessage: req.userText };
   const events: ToolEvent[] = [];
   let mutated = false;
-  const call = async (name: string, input: unknown) => {
+  const emit = emitter(req);
+  // Live pacing only when someone is watching the stream, and never in tests.
+  const live = !!req.onEvent && process.env.NODE_ENV !== "test";
+  let steps = 0;
+  // Every tool call shows as a live step; only changes are saved as actions taken.
+  const step = async (name: string, input: unknown) => {
+    const id = `sim_${++steps}`;
+    emit(stepStartEvent(id, name));
+    if (live) await pause(350 + Math.random() * 250);
     const r = await runTool(ctx, name, input);
+    emit(stepEndEvent(id, name, r.ok, r.summary));
+    return r;
+  };
+  const call = async (name: string, input: unknown) => {
+    const r = await step(name, input);
     events.push({ name, ok: r.ok, summary: r.summary });
     if (r.mutated) mutated = true;
     return r;
   };
+  if (live) await pause(400);
   const profile = await getProfile(req.ctx);
   const zone = profile.timezone;
   const now = DateTime.now().setZone(zone);
@@ -58,23 +87,23 @@ export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
     }
   } else if (req.mode === "chat" && /\b(on my plate|on (for )?tomorrow|tomorrow look|schedule for tomorrow|what'?s (on )?tomorrow)\b/i.test(text)) {
     // Questions about state are answered from a fresh read, never from history.
-    const r = await runTool(ctx, "get_plan", { date: "tomorrow" });
+    const r = await step("get_plan", { date: "tomorrow" });
     reply = String(r.data ?? r.summary).replace(/\s*\[[0-9a-f-]{36}\]/g, "");
   } else if (req.mode === "chat" && /\bhow (did|have) i (do|done)\b|\bhow was my (day|week)\b/i.test(text)) {
     // "How did I do" comes from the computed review, never from the model's arithmetic.
     const kind = /\bweek\b/i.test(text) ? "week" : "day";
-    const r = await runTool(ctx, "get_review", { kind, date: /\byesterday\b/i.test(text) ? "yesterday" : "today" });
+    const r = await step("get_review", { kind, date: /\byesterday\b/i.test(text) ? "yesterday" : "today" });
     const d = r.data as { review?: { explanation: string; findings: string[] }; week?: { findings: string[]; average_completion_percent: number | null } } | undefined;
     reply = d?.review ? [d.review.explanation, ...d.review.findings].join(" ") : d?.week ? d.week.findings.join(" ") : r.summary;
   } else if (req.mode === "chat" && /\b(just captured|did i (just )?capture|in my inbox|what changed)\b/i.test(text)) {
-    const r = await runTool(ctx, "get_inbox", {});
+    const r = await step("get_inbox", {});
     reply = String(r.data ?? r.summary).replace(/\s*\[[0-9a-f-]{36}\]/g, "");
   } else if (req.mode === "chat" && /\b(plan|organi[sz]e)\b.*\b(week)\b/i.test(text)) {
     const r = await call("plan_week", {});
     reply = r.summary;
   } else if (req.mode === "chat" && /\b(plan|organi[sz]e|schedule)\b.*\b(day|today)\b/i.test(text)) {
     const r = await call("plan_day", {});
-    const data = (await runTool(ctx, "get_overview", {})).data as string;
+    const data = (await step("get_overview", {})).data as string;
     // The overview carries item IDs for the model; people don't need them.
     const planLine = (data.split("\n").find((l) => l.startsWith("Today's plan")) ?? "").replace(/\s*\[[0-9a-f-]{36}\]/g, "");
     reply = `${r.summary.replace(/\.$/, "")}. ${planLine}`;
@@ -113,7 +142,14 @@ export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
   }
 
   await recordUsage({ userId: req.ctx.userId, provider: "devsim", model: "devsim", role: req.role, purpose: req.purpose, costUsd: 0 });
-  return { text: `${SIM_LABEL} ${reply}`, toolEvents: events, mutated, model: "devsim", simulated: true, costUsd: 0 };
+  const full = `${SIM_LABEL} ${reply}`;
+  if (req.onEvent) {
+    for (const delta of wordGroups(full)) {
+      emit({ type: "text", delta, segment: 0 });
+      if (live) await pause(30 + Math.random() * 30);
+    }
+  }
+  return { text: full, toolEvents: events, mutated, model: "devsim", simulated: true, costUsd: 0 };
 }
 
 type Proposal = {

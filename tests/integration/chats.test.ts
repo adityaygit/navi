@@ -11,6 +11,7 @@ import {
   titleFromText,
 } from "@/server/ai/chat";
 import { buildVoiceSession } from "@/server/ai/voice";
+import type { ChatStreamEvent } from "@/lib/chat-stream";
 
 // Multiple chats: each has its own history, can be started, named, renamed,
 // deleted, and is private to its owner. Onboarding stays separate.
@@ -75,6 +76,36 @@ describe("multiple chats", () => {
     const system = String(session.config.systemInstruction);
     expect(system).toContain("marmalade");
     expect(system).not.toContain("unrelated topic");
+  });
+
+  it("streams a turn live and saves exactly what a plain turn saves", async () => {
+    const events: ChatStreamEvent[] = [];
+    const live = await handleTurn(ctx, { kind: "chat", text: "Book the dentist tomorrow and buy a new charger", modality: "text" }, (e) => events.push(e));
+    const plain = await handleTurn(ctx, { kind: "chat", text: "Book the dentist tomorrow and buy a new charger", modality: "text" });
+
+    // First the saved user message and its (already named) chat.
+    expect(events[0]).toMatchObject({ type: "user", conversationId: live.conversationId, title: "Book the dentist tomorrow and buy a new charger", userMessage: { id: live.userMessage.id } });
+    const steps = events.filter((e) => e.type === "step_start" || e.type === "step_end");
+    expect(steps).toEqual([
+      expect.objectContaining({ type: "step_start", name: "propose_items", label: "Adding to your review inbox" }),
+      expect.objectContaining({ type: "step_end", name: "propose_items", ok: true, summary: live.assistantMessage.tool_events[0].summary }),
+    ]);
+    // Text arrives in pieces, after the steps, and adds up to the saved reply.
+    const pieces = events.filter((e): e is Extract<ChatStreamEvent, { type: "text" }> => e.type === "text");
+    expect(pieces.length).toBeGreaterThan(3);
+    expect(events.findIndex((e) => e.type === "text")).toBeGreaterThan(events.findIndex((e) => e.type === "step_end"));
+    expect(pieces.map((p) => p.delta).join("")).toBe(live.assistantMessage.content);
+
+    const [saved] = (await listMessages(ctx, live.conversationId)).filter((m) => m.role === "assistant");
+    expect(saved.content).toBe(plain.assistantMessage.content);
+    expect(saved.tool_events.map((e) => [e.name, e.ok])).toEqual(plain.assistantMessage.tool_events.map((e) => [e.name, e.ok]));
+  });
+
+  it("shows read-only steps live but doesn't save them as actions taken", async () => {
+    const events: ChatStreamEvent[] = [];
+    const r = await handleTurn(ctx, { kind: "chat", text: "what's in my inbox?", modality: "text" }, (e) => events.push(e));
+    expect(events.filter((e) => e.type === "step_end")).toEqual([expect.objectContaining({ name: "get_inbox", readOnly: true, summary: "" })]);
+    expect(r.assistantMessage.tool_events).toEqual([]);
   });
 
   it("is private to its owner", async () => {

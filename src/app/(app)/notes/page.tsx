@@ -13,16 +13,17 @@ export default async function NotesPage() {
   const notes = (data ?? []) as Note[];
   const when = (iso: string) => DateTime.fromISO(iso).setZone(ctx.timezone).toFormat("LLL d, yyyy");
   return (
-    <div className="flex flex-col gap-4">
-      <header>
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-7">
+      <header className="flex flex-col gap-3">
         <h1 className="h1">Notes</h1>
-        <p className="muted text-sm">Things you wanted to keep that aren't tasks: notes you accept from the review inbox, or add here. Navi can look them up when you ask.</p>
+        <p className="muted max-w-prose text-[15px]">Things you wanted to keep that aren&apos;t tasks: notes you accept from the review inbox, or add here. Navi can look them up when you ask.</p>
+        {notes.length > 0 && <p className="num dim text-sm">{notes.length} {notes.length === 1 ? "note" : "notes"}</p>}
       </header>
-      <AddNote />
+      <div className="max-w-2xl"><AddNote /></div>
       {notes.length === 0 ? (
-        <p className="muted text-sm">No notes yet. When you accept a note from your inbox, or add one here, it shows up here.</p>
+        <p className="surf muted max-w-2xl px-4 py-5 text-sm sm:px-5">No notes yet. When you accept a note from your inbox, or add one here, it shows up here.</p>
       ) : (
-        <ul className="flex flex-col gap-2" aria-label="Your notes">
+        <ul className="grid items-start gap-3 md:grid-cols-2 xl:grid-cols-3" aria-label="Your notes">
           {notes.map((n) => (
             <NoteItem
               key={n.id}

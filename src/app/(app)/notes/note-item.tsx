@@ -9,7 +9,7 @@ function NoteFields({ id, title, body, setTitle, setBody }: { id: string; title:
   return (
     <>
       <div><label className="label" htmlFor={`${id}-t`}>Title (optional)</label><input id={`${id}-t`} className="input" value={title} maxLength={300} onChange={(e) => setTitle(e.target.value)} /></div>
-      <div><label className="label" htmlFor={`${id}-b`}>Note</label><textarea id={`${id}-b`} required className="input min-h-24" value={body} maxLength={20000} onChange={(e) => setBody(e.target.value)} /></div>
+      <div><label className="label" htmlFor={`${id}-b`}>Note</label><textarea id={`${id}-b`} required className="input min-h-32" value={body} maxLength={20000} onChange={(e) => setBody(e.target.value)} /></div>
     </>
   );
 }
@@ -22,7 +22,7 @@ export function NoteItem({ note, meta }: { note: Note; meta: string }) {
   const [pending, start] = useTransition();
   const label = note.title || note.body.split("\n")[0].slice(0, 80);
   return (
-    <li className="card flex flex-col gap-2" aria-label={`Note: ${label}`}>
+    <li className="surf flex min-w-0 flex-col gap-3 p-4 sm:p-5" aria-label={`Note: ${label}`}>
       {editing ? (
         <form
           className="flex flex-col gap-2"
@@ -44,10 +44,10 @@ export function NoteItem({ note, meta }: { note: Note; meta: string }) {
         </form>
       ) : (
         <>
-          {note.title && <h2 className="font-medium">{note.title}</h2>}
-          <p className="whitespace-pre-wrap break-words">{note.body}</p>
-          <p className="muted text-xs">{meta}</p>
-          <div className="flex flex-wrap gap-1">
+          {note.title && <h2 className="break-words text-[17px] font-semibold tracking-[-0.01em]">{note.title}</h2>}
+          <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{note.body}</p>
+          <p className="dim mt-auto text-[13px]">{meta}</p>
+          <div className="flex flex-wrap gap-1.5 border-t border-border pt-3">
             <button type="button" className="btn btn-sm" onClick={() => setEditing(true)}>Edit</button>
             <ActionButton className="btn btn-danger btn-sm" confirm="Delete this note permanently?" action={() => deleteItemAction("notes", note.id)}>Delete</ActionButton>
           </div>
@@ -66,7 +66,7 @@ export function AddNote() {
   if (!open) return <button type="button" className="btn self-start" onClick={() => setOpen(true)}>+ New note</button>;
   return (
     <form
-      className="card flex flex-col gap-2"
+      className="surf flex flex-col gap-3 p-4 sm:p-5"
       aria-label="New note"
       onSubmit={(e) => {
         e.preventDefault();

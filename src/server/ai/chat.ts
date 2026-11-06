@@ -8,6 +8,7 @@ import { CHAT_SYSTEM, ONBOARDING_SYSTEM } from "./prompts";
 import { runTool } from "./tools";
 import { nowIn } from "@/lib/time";
 import { UserFacingError } from "@/server/http";
+import type { AgentEvent, ChatStreamEvent } from "@/lib/chat-stream";
 
 // Text and voice share each conversation's history: every turn is stored, so
 // the dashboard, chat and voice all see the same context. The user can keep
@@ -173,9 +174,16 @@ export type TurnResult = {
   error?: string;
 };
 
+/**
+ * One conversation turn: saves the user's message, runs Navi, saves the reply.
+ * `onEvent` (optional) receives live progress for a streaming client: the
+ * saved user message, then each step and piece of text as it happens. The
+ * result and what is stored are the same with or without it.
+ */
 export async function handleTurn(
   ctx: Ctx,
   input: { kind: "chat" | "onboarding"; text: string; modality: "text" | "voice"; conversationId?: string | null },
+  onEvent?: (event: Exclude<ChatStreamEvent, { type: "done" } | { type: "error" }>) => void,
 ): Promise<TurnResult> {
   const conversationId = await resolveConversation(ctx, input.kind, input.conversationId);
   const prior = await listMessages(ctx, conversationId, 24);
@@ -189,6 +197,10 @@ export async function handleTurn(
         : m.content,
     }));
   const userMessage = await saveMessage(ctx, conversationId, "user", input.text, input.modality);
+  if (onEvent) {
+    const { data: named } = await ctx.db.from("conversations").select("title").eq("id", conversationId).maybeSingle();
+    onEvent({ type: "user", userMessage, conversationId, title: named?.title ?? null });
+  }
   const turnCtx: Ctx = { ...ctx, conversationId };
   const mode: AgentMode = input.kind === "onboarding" ? "onboarding" : "chat";
   const context = await buildContext(turnCtx, input.text, mode);
@@ -202,6 +214,7 @@ export async function handleTurn(
     history,
     userText: input.text,
     purpose: mode === "onboarding" ? "onboarding" : "chat",
+    onEvent: onEvent ? (event: AgentEvent) => onEvent(event) : undefined,
   });
   const assistantMessage = await saveMessage(ctx, conversationId, "assistant", result.text, input.modality, result.toolEvents);
   const { data: conv } = await ctx.db.from("conversations").select("title").eq("id", conversationId).maybeSingle();

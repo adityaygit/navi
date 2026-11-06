@@ -154,7 +154,7 @@ describe("weekInsights", () => {
 function emptyWeek(end: string, over: Partial<WeekInsights> = {}): WeekInsights {
   return {
     start: end, end, days: [], avgCompletion: null, focusMinutes: 0, tasksCompleted: 0,
-    estimate: { samples: 0, medianRatio: null }, repeatedlyAvoided: [], interruptionsByPart: [], lateCompletions: 0,
+    estimate: { samples: 0, medianRatio: null }, repeatedlyAvoided: [], interruptionsByPart: [], lateCompletions: 0, dueCompletions: 0,
     overran: 0, disruptions: {}, minutes: { planned: 0, done: 0, partial: 0, focus: 0 }, progress: [],
     nextWeek: { from: end, to: end, deadlines: [], loadMinutes: 0, unestimated: 0, freeMinutes: 0, overloaded: false },
     findings: [], enoughData: false, ...over,
