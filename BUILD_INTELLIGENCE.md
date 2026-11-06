@@ -11,7 +11,7 @@
 - **Next work: UI redesign.** Plan is in `docs/REDESIGN_PLAN.md`: (1) chat shows live action steps and cards, (2) Opal-style reflection (daily and weekly stories, rows against your average, explainable score), (3) dark glass look matching Opal and the owner's amber dashboard reference, desktop and phone equally. Status: planned, not started. Open questions for the owner are at the end of that file.
 - Design references are saved in the owner's private Mobbin collections "Navi – How it works" and "Navi – Look".
 
-## ▶ UI rebuild: built and verified locally (2026-11-06), awaiting owner review on the PR preview
+## ▶ UI rebuild: merged and live (2026-11-06)
 Plan: `docs/UI_BUILD_PLAN.md`. Branch `claude/blissful-goodall-6u0obg`. Delivery: PR + Vercel preview, no merge to main.
 - **Foundation (2033726):** tokens + component classes in `src/app/globals.css` (dark only; legacy class names render the new look), Instrument Sans self-hosted, `Pebble` (`src/components/pebble.tsx`, pure CSS, 8 moods), `src/lib/navi-colors.ts`, top bar + glass dock (`src/components/nav.tsx`), `src/lib/follow-through.ts` (Done/Focus/On time), landing photos in `public/img/`.
 - **Screens (5 parallel subagents, integrated 156a50e…924974c):**
@@ -23,7 +23,8 @@ Plan: `docs/UI_BUILD_PLAN.md`. Branch `claude/blissful-goodall-6u0obg`. Delivery
 - **Verification (2026-11-06, local Supabase, devsim):** `tsc` clean; `eslint .` clean; vitest 26 files / 228 tests pass; `next build` OK; Playwright against the production build 52/52 across desktop + iPhone 13 incl. axe WCAG A/AA, sideways-overflow and 44px targets (first full run 48/52: fixed label/visible-text mismatches on the follow-through card and planner day strip, a "What" label clash with the planner legend, and a pre-existing race in `structure.spec` where the plan result message appeared before the day list refreshed; reran a11y+structure, then structure ×3 green; full rerun 51/52 with only that race, fixed after). Screenshots of every screen reviewed at phone and desktop width.
 - **Not verified:** streaming against the real Anthropic API (no API key in Cloud; covered by a mocked-stream test through the real SDK accumulator); real iPhone; Vercel preview depends on the GitHub/Vercel integration.
 - **Known small leftovers:** "Next 7 days" says "0m free" when availability is unset; past-week Insights card titled by dates; inbox origin labels kept as "You said this"/"Navi inferred" because e2e relies on them; colour save is read-then-write on the preferences jsonb (concurrent pref writes could race; atomic version needs a jsonb_set function/migration).
-- **Next:** owner reviews the PR preview and gives refinement notes.
+- **Shipped:** PR adityaygit/navi#8 (CI test + Vercel preview green) merged to main as bbd53bd on owner request; production https://navi-sand.vercel.app/login serves the new UI (checked "Sign in to Navi", HTTP 200).
+- **Next:** owner refinement notes; real-model streaming check once an API key is available in Cloud; real iPhone check.
 
 ## (stale, see update above) Job for the next session (owner-assigned, 2026-10-30 evening): Trigger.dev + Google sign-in
 The owner is adding these environment variables, then starting a new cloud session with "resume". The owner asked for both setups ("start a new cloud session and you can set that up"):
