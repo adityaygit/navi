@@ -125,6 +125,8 @@ export type WeekInsights = {
   /** Interrupted blocks in the last 3 weeks by local part of day (only parts with any). */
   interruptionsByPart: { part: PartOfDay; count: number }[];
   lateCompletions: number;
+  /** Tasks finished this week that had a due date (the base for "on time"). */
+  dueCompletions: number;
   /** Blocks this week that ran over their estimate. */
   overran: number;
   /** "My plan broke" reports this week, by category. */
@@ -212,6 +214,7 @@ export async function weekInsights(db: SupabaseClient, userId: string, zone: str
   const ratios = done.filter((t) => t.estimate_minutes && t.actual_minutes > 0).map((t) => t.actual_minutes / t.estimate_minutes!).sort((a, b) => a - b);
   const medianRatio = ratios.length >= MIN_ESTIMATE_SAMPLES ? median(ratios) : null;
   const lateCompletions = done.filter((t) => t.due_at && t.completed_at && t.completed_at > t.due_at).length;
+  const dueCompletions = done.filter((t) => t.due_at && t.completed_at).length;
   const plannedTotal = days.reduce((s, d) => s + d.planned, 0);
   const enoughData = rated.length >= ENOUGH_DAYS && plannedTotal >= ENOUGH_BLOCKS;
 
@@ -307,6 +310,7 @@ export async function weekInsights(db: SupabaseClient, userId: string, zone: str
     repeatedlyAvoided,
     interruptionsByPart,
     lateCompletions,
+    dueCompletions,
     overran,
     disruptions,
     minutes,
