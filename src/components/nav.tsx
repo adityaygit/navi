@@ -71,7 +71,7 @@ export function Nav({ counts }: { counts: Counts }) {
       </header>
 
       {/* Phone: a floating glass dock. */}
-      <nav aria-label="Main" className="glass fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+12px)] z-30 flex h-[68px] items-center justify-around rounded-full px-1.5 md:hidden">
+      <nav aria-label="Main" className="glass dock fixed inset-x-4 z-30 flex items-center justify-around rounded-full px-1.5 md:hidden">
         {[
           { href: "/", label: "Today", icon: <Pebble size={26} /> },
           { href: "/chat", label: "Navi", icon: <Icon name="chat" /> },

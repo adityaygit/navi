@@ -16,7 +16,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <>
       <HorizonBackdrop />
-      <main className="relative z-[1] mx-auto flex min-h-dvh w-full max-w-[400px] flex-col items-stretch justify-center gap-7 px-4 py-10 safe-top">
+      <main className="relative z-[1] mx-auto flex min-h-dvh w-full max-w-[400px] flex-col items-stretch justify-center gap-7 px-4 pb-10 pt-[calc(env(safe-area-inset-top)+40px)]">
         <div className="flex justify-center"><Wordmark glow /></div>
         <div className="flex flex-col gap-6 rounded-[20px] border border-white/10 bg-[rgba(10,11,14,0.78)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_40px_100px_-30px_rgba(0,0,0,0.9)] backdrop-blur-2xl sm:p-8">
           <div className="flex flex-col gap-2 text-center">

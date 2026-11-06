@@ -7,7 +7,7 @@ import { ChatList, type ChatSummary } from "./chat-list";
 export function ChatShell({ chats, currentId, title, children }: { chats: ChatSummary[]; currentId: string | null; title: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="flex h-[calc(100dvh-10rem)] gap-5 md:h-[calc(100dvh-7rem)]">
+    <div className="chat-shell flex gap-5">
       <aside aria-label="Your chats" className="surf hidden w-[280px] shrink-0 flex-col p-2.5 md:flex">
         <ChatList chats={chats} currentId={currentId} />
       </aside>
