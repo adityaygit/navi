@@ -3,6 +3,7 @@ import { requireCtx, getProfile } from "@/server/context";
 import { Nav } from "@/components/nav";
 import { QuickCapture } from "@/components/quick-capture";
 import { LiveRefresh } from "@/components/live-refresh";
+import { KeyboardWatch } from "@/components/keyboard-watch";
 import { BudgetBanner } from "@/components/budget-banner";
 import { getBudgetStatus } from "@/server/ai/budget";
 import { naviColorVars } from "@/lib/navi-colors";
@@ -24,6 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {budget && (budget.warn || budget.exceeded) && <BudgetBanner spent={budget.spentUsd} cap={budget.capUsd} exceeded={budget.exceeded} />}
       <main className="app-main mx-auto w-full max-w-[1240px] flex-1 px-4 pb-44 md:px-8 md:pb-16">{children}</main>
       <QuickCapture userId={ctx.userId} />
+      <KeyboardWatch />
       <LiveRefresh adoptTimezone={profile.timezone === "UTC" && profile.onboarding_status === "not_started"} />
     </div>
   );

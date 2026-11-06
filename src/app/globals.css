@@ -518,3 +518,16 @@ html {
   -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 14px, #000 calc(100% - 22px), transparent 100%);
   mask-image: linear-gradient(180deg, transparent 0, #000 14px, #000 calc(100% - 22px), transparent 100%);
 }
+
+/* Keyboard up on a phone: no dock or floating button, chat fits above the keys. */
+@media (max-width: 767.98px) {
+  html[data-kb="open"] .dock,
+  html[data-kb="open"] .edge-bottom,
+  html[data-kb="open"] .fab,
+  html[data-kb="open"] .chat-quick {
+    display: none;
+  }
+  html[data-kb="open"] .chat-shell {
+    height: calc(var(--vvh, 100dvh) - var(--top-pad) - 10px);
+  }
+}
