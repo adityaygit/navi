@@ -3,6 +3,15 @@
 Status: **plan only, nothing built yet.** Written 2026-11-05 from the owner's direction in a design session.
 Product rules still come from `Navi_Product_Spec.md`. This file only covers how the app *looks* and how a few screens *behave*.
 
+## Decisions so far (2026-11-05)
+- Mockups live in the private canvas https://claude.ai/artifact/6HUenJGa1yifXfT9YKHJNZ (page v1 = first Opal-style pass, v2 = Today directions, v3 = Navi's face).
+- **Look changed from Opal glow to "dark + meaningful colour".** Dark base; every colour means something: life-area colours (e.g. School blue, Robotics violet, Personal pink, Fitness green), a status scale (coral slipping → yellow okay → teal good), amber reserved for Navi itself. Glow only on Navi and live moments. Grain/texture on big tiles, no decorative gradients. Everything ~30% larger than the first pass, less cluttered.
+- **Today screen locked: version C "Bold timeline"** (near-black, heavier type, follow-through 78 with Done/Focus/On time as segmented status bars, deep-work ring split by area, timeline blocks as grainy area-coloured tiles: solid = fixed, striped = flexible, dotted = free, height = duration).
+- Follow-through score: one score with three explainable parts (Done, Focus, On time). Accent for Navi: amber.
+- **Navi gets a friendly character instead of a plain orb.** Three candidates on canvas page v3: Pebble (soft round face), Dots (three dots that form faces), Wisp (small guiding flame with a face). Each has states: idle, listening, working, speaking, done, needs your OK, gentle nudge, quiet hours. Choice pending.
+
+The sections below are the original plan; where they conflict with these decisions (e.g. "glowing orb", "glass" look), the decisions win.
+
 ## Why
 
 The app works, but the UI is the deliberately basic first version (neutral greys, one blue accent, small text). Almost nothing reads well. The finished app should feel like a consumer product, not a tool. Target mood: **Opal** (dark, glassy, calm, premium) plus the amber-on-black dashboard the owner shared (Deep Work Time, Focus Stability bars, Daily Timeline).
