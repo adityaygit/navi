@@ -33,7 +33,7 @@ export type TimelineInfo = {
   kindLabel: string;
 };
 
-const durationText = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}` : `${m}m`);
+export const durationText = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}` : `${m}m`);
 
 const CARD: Record<TimelineKind, string> = {
   fixed: "bg-[#f0f0f0] text-[#060608]",
@@ -113,7 +113,7 @@ export function PlanBlockRow({ block, time, canFocus, timeline }: { block: PlanB
     return (
       <li className="flex gap-3">
         <TimelineShell start={timeline.start} meridiem={timeline.meridiem}>
-          <div className={`flex min-w-0 flex-1 flex-col gap-2 rounded-[14px] p-3.5 ${CARD[timeline.kind]} ${finished && !dark ? "border-border bg-transparent" : ""}`}>
+          <div className={`flex min-w-0 flex-1 flex-col gap-2 rounded-[14px] p-3.5 ${finished && !dark ? "border border-border-strong bg-white/[0.02]" : CARD[timeline.kind]}`}>
             <div className="flex items-center gap-2">
               <span className={`text-[11px] font-medium uppercase tracking-[0.06em] ${finished && !dark ? "text-dim" : KIND_TEXT[timeline.kind]}`}>{timeline.kindLabel}</span>
               <span className="ml-auto flex items-center gap-1.5">
@@ -123,9 +123,13 @@ export function PlanBlockRow({ block, time, canFocus, timeline }: { block: PlanB
                 )}
               </span>
             </div>
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <span className={`text-[17px] font-semibold leading-snug break-words ${finished && !dark ? "text-muted" : ""}`}>{block.title}</span>
-              <AreaMeta area={timeline.area} rest={`${timeline.range} · ${durationText(timeline.minutes)}`} dark={dark} />
+            <div className="flex min-w-0 items-start gap-2">
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className={`text-[17px] font-semibold leading-snug break-words ${finished && !dark ? "text-muted" : ""}`}>{block.title}</span>
+                <AreaMeta area={timeline.area} rest={`${timeline.range} · ${durationText(timeline.minutes)}`} dark={dark} />
+              </div>
+              {/* A marked block only needs Undo: keep it on the title line so the card stays compact. */}
+              {finished && <div className="-mt-1 -mr-1 shrink-0">{actions}</div>}
             </div>
             {(whyButton || note) && (
               <div className="flex flex-col">
@@ -133,7 +137,7 @@ export function PlanBlockRow({ block, time, canFocus, timeline }: { block: PlanB
                 {note}
               </div>
             )}
-            {actions}
+            {open && actions}
           </div>
         </TimelineShell>
       </li>

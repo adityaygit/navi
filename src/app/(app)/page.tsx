@@ -265,7 +265,7 @@ export default async function TodayPage() {
           {(inboxCount > 0 || approvalsCount > 0) && (
             <div className="lg lg-ask order-2 flex flex-wrap items-center gap-3 p-4 md:order-none">
               <Pebble size={40} mood="ask" />
-              <p className="m-0 min-w-0 flex-1 text-[15px]">
+              <p className="m-0 min-w-0 flex-1 basis-[13rem] text-[15px]">
                 {approvalsCount > 0 ? "Navi is waiting for your OK before acting." : "Navi found things to add. Nothing is added until you review it."}
               </p>
               <div className="flex flex-wrap gap-2">
