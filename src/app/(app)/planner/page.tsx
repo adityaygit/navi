@@ -214,7 +214,7 @@ export default async function PlannerPage({ searchParams }: { searchParams: Prom
             const fixedCount = items.filter((i) => i.type === "fixed").length;
             const blockCount = items.length - fixedCount;
             const doneCount = items.filter((i) => i.type === "block" && i.b.status === "done").length;
-            const summary = [fixedCount && plural(fixedCount, "fixed"), blockCount && `${blockCount} planned${doneCount ? `, ${doneCount} done` : ""}`].filter(Boolean).join(" · ");
+            const summary = [fixedCount && `${fixedCount} fixed`, blockCount && `${blockCount} planned${doneCount ? `, ${doneCount} done` : ""}`].filter(Boolean).join(" · ");
 
             const rows: { key: string; node: React.ReactNode }[] = [];
             let lastEnd: number | null = null;
@@ -264,7 +264,7 @@ export default async function PlannerPage({ searchParams }: { searchParams: Prom
                     {dt.toFormat("cccc")}
                     <span className="font-normal text-muted">, {dt.toFormat("LLL d")}</span>
                   </h2>
-                  <p className="text-[15px] text-dim">Nothing scheduled.</p>
+                  <p className="order-last basis-full pb-1 text-[15px] text-dim sm:order-none sm:basis-auto sm:pb-0">Nothing scheduled.</p>
                   <Link href={nav(d, "day")} className="btn btn-ghost btn-sm ml-auto" aria-label={`Open ${dt.toFormat("cccc LLL d")}`}>Open</Link>
                 </section>
               );
