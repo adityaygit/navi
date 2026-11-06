@@ -73,10 +73,22 @@ export function titleOf(p: Proposal): string {
   return String(pl.title ?? pl.name ?? pl.question ?? pl.content ?? pl.body ?? KIND_LABEL[p.kind] ?? p.kind);
 }
 
+
+/** Navi's confidence in plain words (the exact figure stays in the tooltip). */
+export function confidenceWords(c: number): string {
+  if (c >= 0.85) return "Very sure";
+  if (c >= 0.65) return "Fairly sure";
+  if (c >= 0.45) return "Not sure, check it";
+  return "Just a guess";
+}
+
+export type ProposalArea = { name: string; color: string | null };
+
 export function ProposalCard({
   proposal,
   zone,
   openTasks = [],
+  area,
   selectable,
   selected,
   onSelect,
@@ -84,6 +96,8 @@ export function ProposalCard({
   proposal: Proposal;
   zone: string;
   openTasks?: { id: string; title: string }[];
+  /** The life area this item would land in, when the caller can resolve it. */
+  area?: ProposalArea | null;
   selectable?: boolean;
   selected?: boolean;
   onSelect?: (v: boolean) => void;
@@ -105,27 +119,52 @@ export function ProposalCard({
   }
   const set = (k: string, v: unknown) => setPayload((p) => ({ ...p, [k]: v }));
   const taskLike = proposal.kind === "task" || proposal.kind === "reminder";
+  const stated = proposal.origin === "stated";
+  const summary = proposalSummary({ ...proposal, payload }, zone);
+  // A new area carries its own colour.
+  const dotColor = proposal.kind === "workspace" ? (typeof payload.color === "string" ? payload.color : null) : area?.color ?? null;
+  const shell = editing
+    ? "lg p-5 md:p-7"
+    : `card md:p-6 ${stated ? "" : "border-dashed border-white/30"} ${selectable && !selected ? "opacity-70" : ""}`;
 
   return (
-    <article className="card flex flex-col gap-2" aria-label={`${KIND_LABEL[proposal.kind]}: ${titleOf(proposal)}`}>
-      <div className="flex items-start gap-2">
+    <article className={`${shell} flex flex-col gap-4`} aria-label={`${KIND_LABEL[proposal.kind]}: ${titleOf(proposal)}`}>
+      <div className="flex items-start gap-3">
         {selectable && (
-          <input type="checkbox" className="mt-1.5 h-5 w-5" checked={selected} onChange={(e) => onSelect?.(e.target.checked)} aria-label={`Include ${titleOf(proposal)}`} />
+          <input type="checkbox" className="mt-1 h-5 w-5 shrink-0 accent-[#f2f2f2]" checked={selected} onChange={(e) => onSelect?.(e.target.checked)} aria-label={`Include ${titleOf(proposal)}`} />
         )}
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="badge">{KIND_LABEL[proposal.kind]}</span>
-            <span className={`badge ${proposal.origin === "stated" ? "badge-ok" : "badge-warn"}`}>{proposal.origin === "stated" ? "You said this" : "Navi inferred"}</span>
-            <span className="badge" title="Navi's confidence">{Math.round(proposal.confidence * 100)}% sure</span>
-            {proposal.status === "deferred" && <span className="badge">deferred</span>}
+        <div className="flex min-w-0 flex-1 flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="flex min-w-0 items-center gap-2 text-sm text-muted">
+              {(dotColor || area) && <span className="dot" style={{ background: dotColor ?? "#8b8e95" }} aria-hidden />}
+              <span>{KIND_LABEL[proposal.kind]}</span>
+              {area && proposal.kind !== "workspace" && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span className="truncate">{area.name}</span>
+                </>
+              )}
+            </span>
+            <span className="ml-auto flex flex-wrap items-center gap-2">
+              {proposal.status === "deferred" && <span className="badge">deferred</span>}
+              <span
+                className={`pill-status ${stated ? "border-transparent bg-[#e6e6ec] text-[#060608]" : "border-dashed border-white/45 text-text"}`}
+              >
+                {stated ? "You said this" : "Navi inferred"}
+              </span>
+              <span className="text-[13px] text-dim" title={`Navi's confidence: ${Math.round(proposal.confidence * 100)}%`}>
+                {confidenceWords(proposal.confidence)}
+              </span>
+            </span>
           </div>
+
           {!editing ? (
-            <>
-              <div className="mt-1 font-medium">{titleOf({ ...proposal, payload })}</div>
-              {proposalSummary({ ...proposal, payload }, zone) && <div className="muted text-sm">{proposalSummary({ ...proposal, payload }, zone)}</div>}
-            </>
+            <div className="flex flex-col gap-1">
+              <h3 className="text-[19px] font-semibold leading-snug tracking-[-0.01em] break-words">{titleOf({ ...proposal, payload })}</h3>
+              {summary && <p className="text-[15px] text-muted">{summary}</p>}
+            </div>
           ) : (
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
               {proposal.kind !== "preference" && (
                 <div className="sm:col-span-2">
                   <label className="label" htmlFor={`t-${proposal.id}`}>Title</label>
@@ -151,8 +190,8 @@ export function ProposalCard({
                       <option value="4">P4 — low</option>
                     </select>
                   </div>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={Boolean(payload.due_is_hard)} onChange={(e) => set("due_is_hard", e.target.checked)} /> Hard deadline
+                  <label className="flex min-h-11 items-center gap-2.5 self-end text-[15px]">
+                    <input type="checkbox" className="h-5 w-5 accent-[#f2f2f2]" checked={Boolean(payload.due_is_hard)} onChange={(e) => set("due_is_hard", e.target.checked)} /> Hard deadline
                   </label>
                 </>
               )}
@@ -171,13 +210,13 @@ export function ProposalCard({
               {(proposal.kind === "routine" || (proposal.kind === "event" && Boolean(payload.recurrence))) && (
                 <fieldset className="sm:col-span-2">
                   <legend className="label">Repeats on</legend>
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-1.5">
                     {DAY_NAMES.map((d, i) => {
                       const days: number[] = proposal.kind === "routine" ? ((payload.days as number[]) ?? []) : (((payload.recurrence as { days: number[] }) ?? { days: [] }).days ?? []);
                       const on = days.includes(i);
                       const next = on ? days.filter((x) => x !== i) : [...days, i].sort();
                       return (
-                        <button key={d} type="button" aria-pressed={on} className={`btn btn-sm ${on ? "btn-primary" : ""}`} onClick={() => (proposal.kind === "routine" ? set("days", next) : set("recurrence", { ...(payload.recurrence as object), freq: "weekly", days: next }))}>
+                        <button key={d} type="button" aria-pressed={on} className={`btn btn-sm min-w-12 ${on ? "btn-primary" : ""}`} onClick={() => (proposal.kind === "routine" ? set("days", next) : set("recurrence", { ...(payload.recurrence as object), freq: "weekly", days: next }))}>
                           {d}
                         </button>
                       );
@@ -200,7 +239,7 @@ export function ProposalCard({
               {proposal.kind === "note" && (
                 <div className="sm:col-span-2">
                   <label className="label" htmlFor={`nb-${proposal.id}`}>Note</label>
-                  <textarea id={`nb-${proposal.id}`} className="input min-h-20" value={String(payload.body ?? proposal.source_excerpt ?? "")} onChange={(e) => set("body", e.target.value)} />
+                  <textarea id={`nb-${proposal.id}`} className="input min-h-24" value={String(payload.body ?? proposal.source_excerpt ?? "")} onChange={(e) => set("body", e.target.value)} />
                 </div>
               )}
               {proposal.kind === "preference" && (
@@ -208,19 +247,26 @@ export function ProposalCard({
               )}
             </div>
           )}
-          {proposal.source_excerpt && <blockquote className="muted mt-2 border-l-2 border-border pl-2 text-sm">“{proposal.source_excerpt}”</blockquote>}
-          {proposal.rationale && <p className="muted mt-1 text-xs">Why: {proposal.rationale}</p>}
-          {proposal.kind === "note" && <p className="muted mt-1 text-xs">Accepting saves it in Notes (under More).</p>}
+
+          {(proposal.source_excerpt || proposal.rationale) && (
+            <div className={`flex flex-col gap-1.5 ${proposal.rationale ? "well px-4 py-3" : ""}`}>
+              {proposal.source_excerpt && (
+                <blockquote className="border-l-2 border-white/20 pl-3 text-[15px] italic leading-relaxed text-[#d6d7da]">“{proposal.source_excerpt}”</blockquote>
+              )}
+              {proposal.rationale && <p className="text-sm text-muted">Why: {proposal.rationale}</p>}
+            </div>
+          )}
+          {proposal.kind === "note" && <p className="dim text-[13px]">Accepting saves it in Notes (under More).</p>}
           {proposal.kind === "question" && (
-            <p className="muted mt-1 text-xs">{selectable ? "If kept, it's saved" : "Saving keeps it"} in Memory as an open question, so you can find it there and Navi can bring it up or help answer it in chat.</p>
+            <p className="dim text-[13px]">{selectable ? "If kept, it's saved" : "Saving keeps it"} in Memory as an open question, so you can find it there and Navi can bring it up or help answer it in chat.</p>
           )}
         </div>
       </div>
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}
       {(proposal.status === "pending" || proposal.status === "deferred") && (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap items-center gap-2">
           {!selectable && (
-            <button type="button" className="btn btn-primary btn-sm" disabled={pending} onClick={() => run(() => acceptProposalAction(proposal.id, editing ? payload : undefined))}>
+            <button type="button" className="btn btn-primary btn-sm min-w-24 px-5" disabled={pending} onClick={() => run(() => acceptProposalAction(proposal.id, editing ? payload : undefined))}>
               {proposal.kind === "question" ? "Save to memory" : "Accept"}
             </button>
           )}
@@ -242,9 +288,9 @@ export function ProposalCard({
             </>
           )}
           {taskLike && openTasks.length > 0 && !selectable && (
-            <span className="flex items-center gap-1">
+            <span className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
               <label htmlFor={`m-${proposal.id}`} className="sr-only">Merge into existing task</label>
-              <select id={`m-${proposal.id}`} className="input min-h-9 w-44 text-sm" value={mergeTarget} onChange={(e) => setMergeTarget(e.target.value)}>
+              <select id={`m-${proposal.id}`} className="input min-h-9 min-w-0 flex-1 rounded-full text-sm sm:w-48 sm:flex-none pointer-coarse:min-h-11" value={mergeTarget} onChange={(e) => setMergeTarget(e.target.value)}>
                 <option value="">Merge into…</option>
                 {openTasks.map((t) => <option key={t.id} value={t.id}>{t.title.slice(0, 50)}</option>)}
               </select>

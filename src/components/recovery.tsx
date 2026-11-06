@@ -13,7 +13,7 @@ const CATEGORIES = [
 ] as const;
 
 /** The fast "my plan broke" flow: say what happened, get a realistic re-plan. */
-export function RecoveryButton() {
+export function RecoveryButton({ className = "btn" }: { className?: string }) {
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState<(typeof CATEGORIES)[number][0]>("interruption");
   const [description, setDescription] = useState("");
@@ -24,10 +24,10 @@ export function RecoveryButton() {
 
   return (
     <>
-      <button type="button" className="btn" onClick={() => setOpen(true)}>My plan broke</button>
+      <button type="button" className={className} onClick={() => setOpen(true)}>My plan broke</button>
       {open && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 md:items-center" onClick={() => setOpen(false)}>
-          <div role="dialog" aria-modal="true" aria-labelledby="recover-title" className="w-full max-w-md rounded-t-2xl bg-surface p-4 md:rounded-2xl safe-bottom" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-sm md:items-center" onClick={() => setOpen(false)}>
+          <div role="dialog" aria-modal="true" aria-labelledby="recover-title" className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-[20px] border border-border-strong bg-[#111215] p-5 shadow-[0_-20px_60px_-20px_rgba(0,0,0,0.8)] md:rounded-[20px] safe-bottom" onClick={(e) => e.stopPropagation()}>
             <h2 id="recover-title" className="h2">What happened?</h2>
             <p className="muted mt-1 text-sm">Only blocks in that time are marked. Unfinished work stays on your list: Navi re-plans the rest of today, and moves what no longer fits to tomorrow.</p>
             <form
@@ -53,8 +53,8 @@ export function RecoveryButton() {
               <fieldset className="flex flex-col gap-1">
                 <legend className="label">Reason</legend>
                 {CATEGORIES.map(([value, text]) => (
-                  <label key={value} className="flex min-h-9 items-center gap-2 text-sm">
-                    <input type="radio" name="category" value={value} checked={category === value} onChange={() => setCategory(value)} />
+                  <label key={value} className="flex min-h-11 items-center gap-3 rounded-[10px] px-2 text-[15px] hover:bg-white/5 md:min-h-9">
+                    <input type="radio" className="h-4 w-4 accent-[#8fb8ff]" name="category" value={value} checked={category === value} onChange={() => setCategory(value)} />
                     {text}
                   </label>
                 ))}

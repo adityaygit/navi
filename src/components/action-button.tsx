@@ -56,7 +56,7 @@ export function ActionButton<A extends unknown[]>({
       >
         {pending ? "…" : children}
       </button>
-      {error && <span role="alert" className="mt-1 max-w-xs text-xs text-danger">{error}</span>}
+      {error && <span role="alert" className="mt-1 max-w-xs text-xs text-clash">{error}</span>}
       {showResult && <span role="status" className={result ? "notice mt-1 max-w-sm text-xs" : "sr-only"}>{result}</span>}
     </span>
   );

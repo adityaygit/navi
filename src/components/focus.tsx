@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { ActionButton } from "./action-button";
 import { endFocusAction } from "@/app/(app)/client-actions";
+import { Pebble } from "./pebble";
 
 export function FocusCard({ session }: { session: { id: string; started_at: string; planned_minutes: number | null; task_title: string | null } }) {
   const [now, setNow] = useState(() => Date.now());
@@ -15,16 +16,17 @@ export function FocusCard({ session }: { session: { id: string; started_at: stri
   const ss = String(elapsed % 60).padStart(2, "0");
   const over = session.planned_minutes && elapsed > session.planned_minutes * 60;
   return (
-    <section className="card border-accent" aria-label="Focus session">
+    <section className="lg border-[rgba(95,211,154,0.35)] p-5" aria-label="Focus session">
       <div className="flex flex-wrap items-center gap-3">
-        <div>
-          <div className="muted text-xs uppercase tracking-wide">Focusing on</div>
-          <div className="font-semibold">{session.task_title ?? "Untitled focus"}</div>
+        <Pebble size={44} mood="working" />
+        <div className="min-w-0 flex-1">
+          <div className="eyebrow text-[12px] text-focus">Focusing on</div>
+          <div className="text-lg font-semibold leading-snug break-words">{session.task_title ?? "Untitled focus"}</div>
         </div>
-        <div className={`ml-auto font-mono text-3xl tabular-nums ${over ? "text-warn" : ""}`} aria-live="off">{mm}:{ss}</div>
+        <div className={`num ml-auto text-[40px] font-semibold leading-none tracking-[-0.03em] ${over ? "text-recovery" : "gh"}`} aria-live="off">{mm}:{ss}</div>
       </div>
-      {session.planned_minutes && <div className="muted mt-1 text-xs">Planned {session.planned_minutes} min{over ? " — running over" : ""}</div>}
-      <div className="mt-3 flex flex-wrap gap-2">
+      {session.planned_minutes && <div className="muted mt-2 text-sm">Planned {session.planned_minutes} min{over ? " — running over" : ""}</div>}
+      <div className="mt-4 flex flex-wrap gap-2">
         <ActionButton className="btn btn-primary btn-sm" action={() => endFocusAction(session.id, "completed")}>Finished the task</ActionButton>
         <ActionButton action={() => endFocusAction(session.id, "progress")}>Made progress</ActionButton>
         <ActionButton action={() => endFocusAction(session.id, "interrupted")}>Interrupted</ActionButton>
@@ -32,7 +34,7 @@ export function FocusCard({ session }: { session: { id: string; started_at: stri
       </div>
       {stopping && (
         // Stopping counts as skipped unless there's an outside reason; only the person can give one.
-        <div className="mt-3 flex flex-col gap-2" role="group" aria-labelledby="stop-why">
+        <div className="well mt-4 flex flex-col gap-2 p-3.5" role="group" aria-labelledby="stop-why">
           <p id="stop-why" className="text-sm">Why stop? Without a reason, this block counts as skipped.</p>
           <div className="flex flex-wrap gap-2">
             <ActionButton action={() => endFocusAction(session.id, "abandoned", null, "rest")}>Need rest</ActionButton>
