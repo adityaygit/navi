@@ -11,6 +11,14 @@
 - **Next work: UI redesign.** Plan is in `docs/REDESIGN_PLAN.md`: (1) chat shows live action steps and cards, (2) Opal-style reflection (daily and weekly stories, rows against your average, explainable score), (3) dark glass look matching Opal and the owner's amber dashboard reference, desktop and phone equally. Status: planned, not started. Open questions for the owner are at the end of that file.
 - Design references are saved in the owner's private Mobbin collections "Navi – How it works" and "Navi – Look".
 
+## ▶ UI rebuild in progress (started 2026-11-05 ~22:30 UTC, owner said "start coding the UI now")
+Plan: `docs/UI_BUILD_PLAN.md`. Branch `claude/blissful-goodall-6u0obg`. Delivery: PR + Vercel preview, no merge to main.
+- **Step 0 done:** `npm ci`, Docker + local Supabase, `.env.local` (devsim). Baseline vitest 23 files / 214 tests green (incl. new follow-through unit test).
+- **Step 1 done (commit 2033726):** tokens + component classes rewritten in `src/app/globals.css` (dark only; legacy class names `.card/.btn/.badge/.notice/.input/.h1/.h2` now render the new look, so every page changed at once), Instrument Sans self-hosted (`src/app/fonts`, next/font/local, CSP `font-src 'self'` holds), `Pebble` (`src/components/pebble.tsx`, pure CSS, 8 moods, colour from `--navi-*` vars), `src/lib/navi-colors.ts` (8 colours, layout sets vars from `profiles.preferences.navi_color`), new top bar (desktop) + glass dock (phone) in `src/components/nav.tsx`, `src/lib/follow-through.ts` (score from weekInsights; `weekInsights` gained `dueCompletions`), landing photos in `public/img/`.
+- Dev tools: `scripts/demo-seed.mjs` (local-only demo account `demo@navi.local` / `test-password-123` with a realistic week; refuses non-local Supabase; run via `scripts/local-only.sh`), `scripts/ui-shots.mjs <outDir> <baseUrl> [paths]` (phone + desktop screenshots signed in as the demo account).
+- **Steps 2–6 running in parallel** (5 subagents, same tree, disjoint files, no commits by agents): A Today; B live streaming chat (only backend change: `/api/chat` streams step/text events) + chat/voice/onboarding UI; C Insights + daily review; D Inbox/Planner/Tasks/Projects; E Settings (+ "Navi's colour" picker saving `preferences.navi_color`), Memory, Notes, Activity, More, Login, Early access, Admin waitlist, Offline.
+- Next: integrate, full suite (tsc, lint, vitest, build, Playwright desktop+iPhone incl. axe), screenshots of every screen, PR.
+
 ## (stale, see update above) Job for the next session (owner-assigned, 2026-10-30 evening): Trigger.dev + Google sign-in
 The owner is adding these environment variables, then starting a new cloud session with "resume". The owner asked for both setups ("start a new cloud session and you can set that up"):
 `TRIGGER_ACCESS_TOKEN` (tr_pat_), `TRIGGER_PROJECT_REF` (proj_), `TRIGGER_SECRET_KEY` (now tr_prod_), `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` (see `.env.example`).

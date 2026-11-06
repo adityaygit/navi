@@ -359,7 +359,7 @@ body::before {
 .pebble-float { animation: pebble-float 4s ease-in-out infinite; }
 
 /* Listening: wide eyes with a catch-light, sound rings. */
-.pebble-listening .pebble-eye { width: 2.4em; height: 3.6em; top: 5.3em; animation: none; box-shadow: inset -0.5em 0.6em 0 -0.25em rgba(255, 255, 255, 0.85); }
+.pebble-listening .pebble-eye { width: 2.4em; height: 3.6em; top: 5.3em; animation: none; background: radial-gradient(circle at 68% 28%, rgba(255, 255, 255, 0.9) 0 17%, var(--navi-ink) 19%); }
 .pebble-listening .pebble-eye-l { left: 4.4em; }
 .pebble-listening::before,
 .pebble-listening::after {
