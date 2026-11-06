@@ -399,7 +399,7 @@ export default async function TodayPage() {
             )}
           </section>
 
-          <Link href="/insights" className="order-9 relative flex h-[190px] flex-col justify-end overflow-hidden rounded-[14px] border border-[#1d1e22] no-underline md:order-none">
+          <Link href="/insights?report=1" className="order-9 relative flex h-[190px] flex-col justify-end overflow-hidden rounded-[14px] border border-[#1d1e22] no-underline md:order-none">
             <Image src="/img/wall-dawn.jpg" alt="" fill sizes="(min-width: 768px) 800px, 100vw" className="object-cover" />
             <span aria-hidden className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.05),rgba(0,0,0,0.8))]" />
             <span className="relative flex items-end justify-between gap-3 p-5">

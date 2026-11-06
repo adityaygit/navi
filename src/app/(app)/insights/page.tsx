@@ -16,7 +16,7 @@ import { dayBars, hm, learnings, noticed, readWeek, type WeekBlock } from "@/com
 
 export const metadata = { title: "Insights · Navi" };
 
-export default async function InsightsPage({ searchParams }: { searchParams: Promise<{ end?: string }> }) {
+export default async function InsightsPage({ searchParams }: { searchParams: Promise<{ end?: string; report?: string }> }) {
   const ctx = await requireCtx();
   const zone = ctx.timezone;
   const today = nowIn(zone).toISODate()!;
@@ -73,7 +73,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
       />
 
       <div className="flex flex-wrap gap-2" role="group" aria-label="Reviews">
-        <InsightsStory slides={story} rangeLabel={rangeLabel} />
+        <InsightsStory slides={story} rangeLabel={rangeLabel} autoOpen={sp.report === "1"} />
         <Link href={`/review?date=${today}`} className="btn btn-sm">Daily review</Link>
         <ActionButton className="btn btn-sm" action={generateBriefingAction} args={["evening"]}>Review today now</ActionButton>
         <ActionButton className="btn btn-sm" action={generateBriefingAction} args={["weekly"]}>Weekly review now</ActionButton>
@@ -251,7 +251,8 @@ function storySlides(s: {
       : { kind: "text", title: "Not enough days yet for a score.", body: "Keep marking how your blocks went. Navi only scores a week once there's enough recorded to be fair." },
   );
   if (s.minutes.planned > 0) {
-    slides.push({ kind: "chart", title: `You finished ${hm(s.minutes.done)} of the ${hm(s.minutes.planned)} you planned.`, body: s.reading.join(" "), bars: s.bars });
+    slides.push({ kind: "chart", title: `You finished ${hm(s.minutes.done)} of the ${hm(s.minutes.planned)} you planned.`, body: s.reading[0] ?? "", bars: s.bars });
+    if (s.reading.length > 1) slides.push({ kind: "text", title: "The rest of the week", body: s.reading.slice(1).join(" ") });
   }
   const focusDay = [...s.focusDays].sort((a, b) => b.minutes - a.minutes)[0];
   if (s.focus > 0) slides.push({ kind: "text", title: `You spent ${hm(s.focus)} in focus sessions.`, body: `Your most focused day was ${focusDay.long}, with ${hm(focusDay.minutes)}.` });

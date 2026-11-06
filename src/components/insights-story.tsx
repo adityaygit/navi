@@ -15,10 +15,10 @@ export type StorySlide =
  * Every slide is built on the server from recorded data; this only shows them.
  * A native modal dialog: focus moves in and back, Escape closes, arrow keys step.
  */
-export function InsightsStory({ slides, rangeLabel }: { slides: StorySlide[]; rangeLabel: string }) {
+export function InsightsStory({ slides, rangeLabel, autoOpen = false }: { slides: StorySlide[]; rangeLabel: string; autoOpen?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [i, setI] = useState(0);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(autoOpen);
   const last = slides.length - 1;
   const slide = slides[Math.min(i, last)];
 
