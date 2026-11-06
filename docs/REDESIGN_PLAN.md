@@ -10,6 +10,9 @@ Product rules still come from `Navi_Product_Spec.md`. This file only covers how 
 - Follow-through score: one score with three explainable parts (Done, Focus, On time). Accent for Navi: amber.
 - **Navi gets a friendly character instead of a plain orb.** Three candidates on canvas page v3: Pebble (soft round face), Dots (three dots that form faces), Wisp (small guiding flame with a face). Each has states: idle, listening, working, speaking, done, needs your OK, gentle nudge, quiet hours. Choice pending.
 
+- **Update (later the same day): Pebble chosen.** Navi's face is Pebble (amber, two eyes), unchanged from canvas page v3.
+- **Current direction = canvas page "v5 · Landing style"** (Today, Navi chat, Insights; phone + desktop). It merges the landing page's system (`landing/src/styles.css`: near-black, hairlines, Instrument Sans with tight display and grey-gradient headlines, 14px surfaces / 8px controls / pill actions, landing photography such as `horizon.jpg` and `wall-dawn.jpg`, colour only as meaning: fixed `#f0f0f0`, flexible `#8fb8ff`, focus `#5fd39a`, recovery `#f2c46b`, clash `#ff8f8a`) with what was kept from Today C (follow-through 78 with Done/Focus/On time, deep-work ring by area, small area-colour dots, live action steps, approval card). Owner feedback applied: translucent cards with a little grain and soft colour glows instead of pitch black, and a liquid-glass treatment (gradient sheen, bright top edge, blur, soft underglow) reserved for the important pieces: follow-through, approvals, Navi's recap/composer, the dock. References: Fey (structure), Resend (precision), Public "Agents" and Anything (phone).
+
 The sections below are the original plan; where they conflict with these decisions (e.g. "glowing orb", "glass" look), the decisions win.
 
 ## Why
