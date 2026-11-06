@@ -74,10 +74,10 @@ export function ScheduleSettings({ profile }: { profile: Profile }) {
               </div>
               <div className="flex items-center gap-2">
                 <label className="sr-only" htmlFor={`w-s-${i}`}>From</label>
-                <input id={`w-s-${i}`} type="time" className="input min-w-0 flex-1 md:w-36 md:flex-none" value={w.start} onChange={(e) => updateWindow(i, { start: e.target.value })} />
+                <input id={`w-s-${i}`} type="time" className="input min-w-0 flex-1 px-2 sm:px-3.5 md:w-36 md:flex-none" value={w.start} onChange={(e) => updateWindow(i, { start: e.target.value })} />
                 <span aria-hidden className="dim">–</span>
                 <label className="sr-only" htmlFor={`w-e-${i}`}>To</label>
-                <input id={`w-e-${i}`} type="time" className="input min-w-0 flex-1 md:w-36 md:flex-none" value={w.end} onChange={(e) => updateWindow(i, { end: e.target.value })} />
+                <input id={`w-e-${i}`} type="time" className="input min-w-0 flex-1 px-2 sm:px-3.5 md:w-36 md:flex-none" value={w.end} onChange={(e) => updateWindow(i, { end: e.target.value })} />
                 <button type="button" className="btn btn-ghost btn-sm w-11 shrink-0 px-0 text-muted" aria-label={`Remove window ${i + 1}`} title="Remove" onClick={() => setWindows((ws) => ws.filter((_, j) => j !== i))}>
                   <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
                 </button>
