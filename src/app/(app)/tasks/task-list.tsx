@@ -85,7 +85,7 @@ function TaskRow({ task, children_, ctx, depth = 0 }: { task: Task; children_: T
             {task.status === "cancelled" && <span className="badge">cancelled</span>}
           </div>
           {(task.due_at || area || projectName || effort || task.recurrence || task.source !== "user") && (
-            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[13px] text-muted">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[13px] text-muted">
               <DueBadge t={task} zone={ctx.zone} />
               {area && (
                 <span className="flex items-center gap-1.5">
@@ -93,7 +93,7 @@ function TaskRow({ task, children_, ctx, depth = 0 }: { task: Task; children_: T
                   {area.name}
                 </span>
               )}
-              {projectName && <span>{area ? "· " : ""}{projectName}</span>}
+              {projectName && <span>{projectName}</span>}
               {effort && <span className="num text-dim">{effort}</span>}
               {task.recurrence && <span className="badge">repeats {task.recurrence.freq}</span>}
               {task.source !== "user" && <span className="badge" title="Where this came from">{task.source}</span>}

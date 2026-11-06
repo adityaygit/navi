@@ -4,6 +4,16 @@ import { createSpeechRecognition, speechRecognitionSupported, type SpeechRec } f
 import type { ToolEvent } from "@/lib/types";
 import { newClientId, offlineQueue } from "@/lib/offline-queue";
 import { READ_ONLY_TOOLS } from "@/lib/tool-names";
+import { Pebble, type PebbleMood } from "./pebble";
+
+/** Pebble's face for the voice state: listening while the mic is live, speaking while Navi talks. */
+function pebbleMood(status: Status, muted: boolean): PebbleMood {
+  if (status === "listening") return muted ? "quiet" : "listening";
+  if (status === "speaking") return "speaking";
+  if (status === "connecting") return "working";
+  if (status === "micpaused" || status === "reconnect" || status === "error") return "nudge";
+  return "idle";
+}
 
 type ToolReply = { id?: string; name?: string; response: Record<string, unknown> };
 
@@ -72,8 +82,9 @@ export function VoiceSession({ kind, conversationId, onClose, onTurnSaved }: { k
   const [lines, setLines] = useState<{ who: "you" | "navi"; text: string }[]>([]);
 
   return (
-    <section className="card flex flex-col gap-3 border-accent" aria-label="Voice conversation">
-      <div className="flex flex-wrap items-center gap-2">
+    <section className="lg lg-ask flex max-h-[60dvh] shrink-0 flex-col gap-3 overflow-y-auto p-4 md:p-5" aria-label="Voice conversation">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <Pebble size={40} mood={pebbleMood(status, muted)} glow={status === "listening" || status === "speaking"} />
         <h2 className="h2">Talk to Navi</h2>
         <span className={`badge ${status === "listening" ? "badge-ok" : status === "speaking" ? "badge-accent" : status === "error" || status === "reconnect" || status === "micpaused" ? "badge-danger" : ""}`} role="status" aria-live="polite">
           {mode === "browser" ? "Basic voice · " : ""}
@@ -82,7 +93,7 @@ export function VoiceSession({ kind, conversationId, onClose, onTurnSaved }: { k
         {(status === "listening" || status === "speaking") && !muted && (
           <span className="flex items-center gap-1 text-xs text-danger" aria-label="Microphone is on"><span className="h-2 w-2 animate-pulse rounded-full bg-danger" /> mic on</span>
         )}
-        <button type="button" className="btn btn-ghost btn-sm ml-auto" onClick={onClose}>Close</button>
+        <button type="button" className="btn btn-sm ml-auto" onClick={onClose}>Close</button>
       </div>
       {mode === null && (
         <ModePicker
@@ -108,13 +119,13 @@ export function VoiceSession({ kind, conversationId, onClose, onTurnSaved }: { k
       {notice && <p className="notice notice-warn text-xs">{notice}</p>}
       {error && <p role="alert" className="notice notice-danger text-sm">{error}</p>}
       {lines.length > 0 && (
-        <ol className="flex max-h-48 flex-col gap-1 overflow-y-auto text-sm" aria-label="Live transcript">
+        <ol className="well flex max-h-48 flex-col gap-1.5 overflow-y-auto px-3.5 py-3 text-[15px]" aria-label="Live transcript">
           {lines.slice(-12).map((l, i) => (
-            <li key={i}><span className="font-medium">{l.who === "you" ? "You" : "Navi"}:</span> {l.text}</li>
+            <li key={i}><span className={`font-semibold ${l.who === "navi" ? "text-navi-text" : ""}`}>{l.who === "you" ? "You" : "Navi"}:</span> {l.text}</li>
           ))}
         </ol>
       )}
-      <p className="muted text-xs">Voice audio is streamed to the voice provider for processing and isn't stored by Navi; transcripts are saved to this conversation. See Settings → Privacy for provider details.</p>
+      <p className="dim text-xs">Voice audio is streamed to the voice provider for processing and isn't stored by Navi; transcripts are saved to this conversation. See Settings → Privacy for provider details.</p>
     </section>
   );
 }
@@ -651,8 +662,8 @@ function LiveVoice({ kind, conversationId, muted, setMuted, setStatus: reportSta
       )}
       {showLevel && (
         <div className="flex items-center gap-2 text-xs">
-          <span aria-hidden="true" className="h-2 w-24 overflow-hidden rounded-full bg-surface-2">
-            <span className="block h-full rounded-full bg-ok transition-[width] duration-100" style={{ width: `${Math.round(level * 100)}%` }} />
+          <span aria-hidden="true" className="h-1.5 w-28 overflow-hidden rounded-full bg-white/10">
+            <span className="block h-full rounded-full bg-focus transition-[width] duration-100" style={{ width: `${Math.round(level * 100)}%` }} />
           </span>
           <span className="muted">{muted ? "Mic: muted" : status === "micpaused" ? "Mic: paused" : soundRecently ? "Mic: picking up sound" : "Mic: silent"}</span>
         </div>

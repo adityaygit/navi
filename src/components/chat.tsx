@@ -196,7 +196,7 @@ export function Chat({
   const quick = kind === "chat" && (
     <>
       {QUICK_PROMPTS.map((q) => (
-        <button key={q} type="button" className="surf inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full px-3.5 text-[14px] text-[#d8d9dc] transition-colors hover:text-text disabled:opacity-45" disabled={sending} onClick={() => void send(q, "text", false)}>
+        <button key={q} type="button" className="surf inline-flex h-9 shrink-0 items-center pointer-coarse:h-11 whitespace-nowrap rounded-full px-3.5 text-[14px] text-[#d8d9dc] transition-colors hover:text-text disabled:opacity-45" disabled={sending} onClick={() => void send(q, "text", false)}>
           {q}
         </button>
       ))}
@@ -222,8 +222,11 @@ export function Chat({
           stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
         }}
         className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain py-2 pr-1"
+        role="log"
         aria-live="polite"
         aria-label="Conversation"
+        // Scrollable, so reachable by keyboard.
+        tabIndex={0}
       >
         {messages.length === 0 && !live && (
           <div className="m-auto flex max-w-sm flex-col items-center gap-3 py-8 text-center">
@@ -249,9 +252,9 @@ export function Chat({
           }}
         />
       )}
-      {quick && <div className="-mx-1 flex gap-2 overflow-x-auto px-1 md:hidden">{quick}</div>}
+      {quick && !voiceOpen && <div className="-mx-1 flex shrink-0 gap-2 overflow-x-auto px-1 md:hidden">{quick}</div>}
       <form
-        className="lg flex flex-col gap-2 rounded-[22px] py-3 pl-4 pr-3 md:pl-5"
+        className="lg flex shrink-0 items-end gap-2 rounded-[22px] py-2 pl-4 pr-2 md:flex-col md:items-stretch md:py-3 md:pl-5 md:pr-3"
         onSubmit={(e) => {
           e.preventDefault();
           void send(text);
@@ -261,7 +264,7 @@ export function Chat({
         <textarea
           id={`chat-input-${kind}`}
           rows={1}
-          className="max-h-40 min-h-11 w-full resize-none bg-transparent py-2 text-[17px] leading-snug text-text outline-none [field-sizing:content] placeholder:text-dim focus-visible:outline-none"
+          className="max-h-40 min-h-11 w-full min-w-0 flex-1 resize-none bg-transparent py-2 text-[17px] leading-snug text-text outline-none [field-sizing:content] placeholder:text-dim focus-visible:outline-none"
           placeholder={placeholder ?? "Tell Navi anything…"}
           value={text}
           onChange={(e) => setDraft(e.target.value)}
@@ -272,7 +275,7 @@ export function Chat({
             }
           }}
         />
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <div className="hidden min-w-0 flex-1 flex-wrap gap-2 md:flex">{quick}</div>
           <div className="ml-auto flex items-center gap-2">
             <button

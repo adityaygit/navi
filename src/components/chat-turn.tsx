@@ -119,7 +119,7 @@ function ApprovalCard({ approval }: { approval: PendingApproval }) {
 
 const APPROVAL_REF = /Approval requested \(([0-9a-f]{8})\)/;
 
-/** A saved reply: its text, then the actions it took as ✓/✕ rows, and any open approvals. */
+/** A saved reply, in the order it streamed: the actions it took as ✓/✕ rows, its text, then any open approvals. */
 export function NaviMessage({ message, approvals }: { message: Message; approvals: PendingApproval[] }) {
   const events: ToolEvent[] = message.tool_events ?? [];
   const asks = events
@@ -129,7 +129,6 @@ export function NaviMessage({ message, approvals }: { message: Message; approval
   return (
     <div className="flex max-w-[720px] flex-col gap-3">
       <NaviHeader mood="idle" voice={message.modality === "voice"} />
-      {message.content && <p className="whitespace-pre-wrap text-[16px] leading-[1.5] text-[#e6e7ea] md:text-[17px]">{withBold(message.content)}</p>}
       {rows.length > 0 && (
         <StepsBox>
           {rows.map((e, i) => (
@@ -137,6 +136,7 @@ export function NaviMessage({ message, approvals }: { message: Message; approval
           ))}
         </StepsBox>
       )}
+      {message.content && <p className="whitespace-pre-wrap text-[16px] leading-[1.5] text-[#e6e7ea] md:text-[17px]">{withBold(message.content)}</p>}
       {asks.map((a) => (
         <ApprovalCard key={a.id} approval={a} />
       ))}

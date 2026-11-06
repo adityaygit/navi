@@ -85,11 +85,15 @@ export default async function ActivityPage() {
           <SectionHead id="ad-h" title="Past decisions" />
           <ul className={GROUP}>
             {decided.map((a) => (
-              <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 text-sm sm:px-5">
-                <span className={`badge ${STATUS_BADGE[a.status]}`}>{a.status}</span>
-                <span className="min-w-0 flex-1 basis-48 break-words">{a.summary}</span>
-                <span className="dim num text-[13px]">{fmt(a.decided_at ?? a.created_at)}</span>
-                {a.error && <span className="w-full text-[13px] text-danger">{a.error}</span>}
+              <li key={a.id} className="flex items-start gap-3 px-4 py-3 text-sm sm:px-5">
+                <span className={`badge mt-px w-[4.5rem] shrink-0 justify-center ${STATUS_BADGE[a.status]}`}>{a.status}</span>
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+                    <span className="break-words">{a.summary}</span>
+                    <span className="dim num shrink-0 text-[13px]">{fmt(a.decided_at ?? a.created_at)}</span>
+                  </div>
+                  {a.error && <span className="text-[13px] text-danger">{a.error}</span>}
+                </div>
               </li>
             ))}
           </ul>
@@ -108,12 +112,14 @@ export default async function ActivityPage() {
                 {day.entries.map((e) => {
                   const [who, cls] = ACTOR[e.actor] ?? ACTOR.user;
                   return (
-                    <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 text-sm sm:px-5">
-                      <span className={`badge w-[4.75rem] justify-center ${cls}`}>{who}</span>
-                      <span className={`min-w-0 flex-1 basis-48 break-words ${e.reverted_at ? "muted line-through" : ""}`}>{e.summary}</span>
-                      <span className="dim num text-[13px]">{time(e.created_at)}{e.reverted_at ? " · undone" : ""}</span>
+                    <li key={e.id} className="flex items-start gap-3 px-4 py-3 text-sm sm:px-5">
+                      <span className={`badge mt-px w-[4.5rem] shrink-0 justify-center ${cls}`}>{who}</span>
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+                        <span className={`break-words ${e.reverted_at ? "muted line-through" : ""}`}>{e.summary}</span>
+                        <span className="dim num shrink-0 text-[13px]">{time(e.created_at)}{e.reverted_at ? " · undone" : ""}</span>
+                      </div>
                       {e.reversible && !e.reverted_at && (
-                        <ActionButton className="btn btn-ghost btn-sm -my-1" confirm={`Undo: ${e.summary}?`} action={revertActivityAction} args={[e.id]}>Undo</ActionButton>
+                        <ActionButton className="btn btn-ghost btn-sm -my-1.5 shrink-0" confirm={`Undo: ${e.summary}?`} action={revertActivityAction} args={[e.id]}>Undo</ActionButton>
                       )}
                     </li>
                   );

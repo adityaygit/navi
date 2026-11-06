@@ -5,7 +5,7 @@ import { createTaskAction, updateTaskAction } from "@/app/(app)/client-actions";
 import { announceChange } from "@/lib/offline-queue";
 import type { Task } from "@/lib/types";
 
-type Opt = { id: string; name?: string; title?: string };
+type Opt = { id: string; name?: string; title?: string; color?: string | null };
 
 export function TaskForm({
   zone,
@@ -70,15 +70,15 @@ export function TaskForm({
   }
 
   return (
-    <form onSubmit={submit} className={task || parentId ? "flex flex-col gap-2" : "card flex flex-col gap-2"} aria-label={task ? "Edit task" : parentId ? "Add subtask" : "Add task"}>
+    <form onSubmit={submit} className={task || parentId ? "flex flex-col gap-3" : "card flex flex-col gap-3 p-3 pl-4 md:p-3 md:pl-5"} aria-label={task ? "Edit task" : parentId ? "Add subtask" : "Add task"}>
       <div className="flex gap-2">
         <label htmlFor={`title-${id}`} className="sr-only">Task</label>
-        <input id={`title-${id}`} required maxLength={500} className="input flex-1" placeholder={parentId ? "Add a subtask" : "Add a task"} value={title} onChange={(e) => setTitle(e.target.value)} />
-        <button className="btn btn-primary" disabled={pending || !title.trim()}>{task ? "Save" : "Add"}</button>
+        <input id={`title-${id}`} required maxLength={500} className={`input min-w-0 flex-1 ${task || parentId ? "" : "border-transparent bg-transparent px-1 text-[17px] focus:bg-black/20"}`} placeholder={parentId ? "Add a subtask" : "Add a task"} value={title} onChange={(e) => setTitle(e.target.value)} />
+        <button className="btn btn-primary min-w-20" disabled={pending || !title.trim()}>{task ? "Save" : "Add"}</button>
       </div>
-      {!more && !parentId && <button type="button" className="btn btn-ghost btn-sm self-start" onClick={() => setMore(true)}>More details</button>}
+      {!more && !parentId && <button type="button" className="btn btn-ghost btn-sm -mt-1 self-start px-1 text-muted" onClick={() => setMore(true)}>More details</button>}
       {more && (
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-4 pt-1 sm:grid-cols-3">
           <div><label className="label" htmlFor={`due-${id}`}>Due</label><input id={`due-${id}`} type="datetime-local" className="input" value={due} onChange={(e) => setDue(e.target.value)} /></div>
           <div><label className="label" htmlFor={`pri-${id}`}>Priority</label>
             <select id={`pri-${id}`} className="input" value={priority} onChange={(e) => setPriority(e.target.value)}>
@@ -101,7 +101,7 @@ export function TaskForm({
               <option value="">None</option>{goals.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}
             </select>
           </div>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={hard} onChange={(e) => setHard(e.target.checked)} /> Hard deadline</label>
+          <label className="flex min-h-11 items-center gap-2.5 self-end text-[15px]"><input type="checkbox" className="h-5 w-5 accent-[#f2f2f2]" checked={hard} onChange={(e) => setHard(e.target.checked)} /> Hard deadline</label>
           <div><label className="label" htmlFor={`rec-${id}`}>Repeats</label>
             <select id={`rec-${id}`} className="input" value={recur} onChange={(e) => setRecur(e.target.value)}>
               <option value="">Doesn't repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option>

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState, useSyncExternalStore, useTransition } from "react";
 import { deleteChatAction, renameChatAction } from "@/app/(app)/actions";
 
 export type ChatSummary = { id: string; title: string | null; updated_at: string };
@@ -15,6 +15,8 @@ function when(iso: string) {
   return d.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
+const noSubscribe = () => () => {};
+
 /** The user's chats: open, start, rename, delete, filter. */
 export function ChatList({ chats, currentId, onNavigate }: { chats: ChatSummary[]; currentId: string | null; onNavigate?: () => void }) {
   const router = useRouter();
@@ -23,6 +25,8 @@ export function ChatList({ chats, currentId, onNavigate }: { chats: ChatSummary[
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // Times are shown in the device's own time zone, so only once on the device (the server's zone may differ).
+  const onDevice = useSyncExternalStore(noSubscribe, () => true, () => false);
 
   const q = query.trim().toLowerCase();
   const shown = q ? chats.filter((c) => (c.title ?? "").toLowerCase().includes(q)) : chats;
@@ -99,7 +103,7 @@ export function ChatList({ chats, currentId, onNavigate }: { chats: ChatSummary[
                     className="flex min-h-12 min-w-0 flex-1 flex-col justify-center px-3 py-1.5"
                   >
                     <span className={`truncate text-[15px] ${current ? "font-semibold" : ""}`}>{title}</span>
-                    <span className={`num text-[13px] ${current ? "muted" : "dim"}`} suppressHydrationWarning>{when(c.updated_at)}</span>
+                    <span className={`num text-[13px] ${current ? "muted" : "dim"}`} >{onDevice ? when(c.updated_at) : "\u00a0"}</span>
                   </Link>
                   <span className={`flex shrink-0 ${current ? "" : "md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100"}`}>
                   <button
