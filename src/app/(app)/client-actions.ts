@@ -20,11 +20,24 @@ function safe<A extends unknown[], R>(action: (...args: A) => Promise<R>) {
   };
 }
 
+/**
+ * An id for one submit of a create form. A dropped connection can hide that
+ * the server did save the item, so make one id when the person submits, send
+ * it with that submit and every retry of it (createTaskAction({ id, ...task })),
+ * and make a new one only after it succeeded or the form was reset. A retry
+ * then returns the item the first attempt made instead of adding a duplicate.
+ */
+export function newSubmitId(): string {
+  return crypto.randomUUID();
+}
+
 export const createTaskAction = safe(server.createTaskAction);
 export const updateTaskAction = safe(server.updateTaskAction);
 export const completeTaskAction = safe(server.completeTaskAction);
 export const startFocusAction = safe(server.startFocusAction);
 export const endFocusAction = safe(server.endFocusAction);
+export const pauseFocusAction = safe(server.pauseFocusAction);
+export const resumeFocusAction = safe(server.resumeFocusAction);
 export const createItemAction = safe(server.createItemAction);
 export const updateItemAction = safe(server.updateItemAction);
 export const deleteItemAction = safe(server.deleteItemAction);

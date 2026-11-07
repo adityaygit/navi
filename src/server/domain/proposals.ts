@@ -251,25 +251,45 @@ export async function editProposal(ctx: Ctx, id: string, payload: Record<string,
 }
 
 /** Merge a task-like proposal into an existing task instead of creating a duplicate. */
+/**
+ * Merge a task-like proposal into an existing task instead of creating a
+ * duplicate. The proposal is claimed first, so a double tap merges once; the
+ * claim is undone if the task can't be updated.
+ */
 export async function mergeProposalIntoTask(ctx: Ctx, id: string, taskId: string) {
-  const { data: p } = await ctx.db.from("proposals").select("*").eq("id", id).single();
+  const { data: p, error: readErr } = await ctx.db.from("proposals").select("*").eq("id", id).maybeSingle();
+  if (readErr) throw new Error(readErr.message);
   if (!p) throw new Error("Proposal not found");
   const proposal = p as Proposal;
+  if (proposal.status === "merged" && proposal.result_id === taskId) return proposal;
   const task = await getEntity<{ notes: string | null; due_at: string | null; estimate_minutes: number | null; title: string }>(ctx, "tasks", taskId);
+  const { data: claimed, error: claimErr } = await ctx.db
+    .from("proposals")
+    .update({ status: "merged", decided_at: new Date().toISOString(), result_table: "tasks", result_id: taskId })
+    .eq("id", id)
+    .in("status", ["pending", "deferred"])
+    .select();
+  if (claimErr) throw new Error(claimErr.message);
+  if (!claimed?.length) {
+    const { data: now } = await ctx.db.from("proposals").select("*").eq("id", id).maybeSingle();
+    if (now?.status === "merged" && now.result_id === taskId) return now as Proposal;
+    throw new Error(`This item was already ${now?.status ?? "removed"}, so it wasn't merged.`);
+  }
   const patch: Record<string, unknown> = {};
   const extra = [proposal.payload.title, proposal.payload.notes, proposal.source_excerpt].filter(Boolean).join(" — ");
   if (extra) patch.notes = [task.notes, `Merged from inbox: ${extra}`].filter(Boolean).join("\n");
   if (!task.due_at && proposal.payload.due_at) patch.due_at = proposal.payload.due_at;
   if (!task.estimate_minutes && proposal.payload.estimate_minutes) patch.estimate_minutes = proposal.payload.estimate_minutes;
-  await updateEntity({ ...ctx, actor: "user" }, "tasks", taskId, patch, { summary: `Merged inbox item into “${task.title}”` });
-  const { data, error } = await ctx.db
-    .from("proposals")
-    .update({ status: "merged", decided_at: new Date().toISOString(), result_table: "tasks", result_id: taskId })
-    .eq("id", id)
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
-  return data as Proposal;
+  try {
+    await updateEntity({ ...ctx, actor: "user" }, "tasks", taskId, patch, { summary: `Merged inbox item into “${task.title}”` });
+  } catch (err) {
+    await ctx.db
+      .from("proposals")
+      .update({ status: proposal.status, decided_at: proposal.decided_at, result_table: proposal.result_table, result_id: proposal.result_id })
+      .eq("id", id);
+    throw err;
+  }
+  return claimed[0] as Proposal;
 }
 
 export function proposalTitle(p: Pick<Proposal, "kind" | "payload" | "source_excerpt">): string {
@@ -280,20 +300,41 @@ export function proposalTitle(p: Pick<Proposal, "kind" | "payload" | "source_exc
 // Order matters: parents must exist before children reference them.
 const ACCEPT_ORDER: ProposalKind[] = ["preference", "workspace", "goal", "project", "routine", "event", "task", "reminder", "memory", "note", "question"];
 
-/** Accept several proposals in dependency order. Returns per-item outcomes. */
-export async function acceptMany(ctx: Ctx, ids: string[]) {
-  const { data } = await ctx.db.from("proposals").select("*").in("id", ids);
+export type AcceptOutcome = { id: string; ok: boolean; title?: string; error?: string };
+
+/**
+ * Accept several proposals in dependency order. Returns one outcome per id
+ * asked for: an id that no longer exists, or an item someone else already
+ * rejected in the meantime, is a failure, not silently skipped.
+ */
+export async function acceptMany(ctx: Ctx, ids: string[]): Promise<AcceptOutcome[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await ctx.db.from("proposals").select("*").in("id", ids);
+  if (error) throw new Error(error.message);
   const proposals = ((data ?? []) as Proposal[]).sort(
     (a, b) => ACCEPT_ORDER.indexOf(a.kind) - ACCEPT_ORDER.indexOf(b.kind),
   );
-  const results: { id: string; ok: boolean; error?: string }[] = [];
+  const results: AcceptOutcome[] = [];
   for (const p of proposals) {
+    const title = proposalTitle(p);
     try {
-      await acceptProposal(ctx, p.id);
-      results.push({ id: p.id, ok: true });
+      const after = await acceptProposal(ctx, p.id);
+      if (after.status === "accepted" || after.status === "merged") results.push({ id: p.id, ok: true, title });
+      else results.push({ id: p.id, ok: false, title, error: `It was ${after.status} in the meantime` });
     } catch (err) {
-      results.push({ id: p.id, ok: false, error: err instanceof Error ? err.message : String(err) });
+      results.push({ id: p.id, ok: false, title, error: err instanceof Error ? err.message : String(err) });
     }
   }
+  const found = new Set(proposals.map((p) => p.id));
+  for (const id of new Set(ids)) if (!found.has(id)) results.push({ id, ok: false, error: "That item no longer exists" });
   return results;
+}
+
+/** What to tell the person when not every item was accepted; null when all were. */
+export function acceptManyProblem(results: AcceptOutcome[]): string | null {
+  const failed = results.filter((r) => !r.ok);
+  if (!failed.length) return null;
+  const list = failed.slice(0, 3).map((r) => `${r.title ? `“${r.title}”` : "An item"}: ${r.error}`).join(" ");
+  const more = failed.length > 3 ? ` (and ${failed.length - 3} more)` : "";
+  return `Accepted ${results.length - failed.length} of ${results.length}. ${failed.length} couldn't be accepted and ${failed.length === 1 ? "is" : "are"} still in your inbox. ${list}${more}`;
 }

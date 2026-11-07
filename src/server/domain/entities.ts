@@ -40,13 +40,24 @@ export async function createEntity<T = Record<string, unknown>>(
   ctx: Ctx,
   table: EntityTable,
   values: Record<string, unknown>,
-  opts: { summary?: string } = {},
+  /**
+   * `id`: a client-chosen uuid for the new row, so a retried create is
+   * idempotent: if a row with this id already exists and is the person's, it
+   * is returned as is (nothing new is created or logged).
+   */
+  opts: { summary?: string; id?: string } = {},
 ): Promise<T> {
   const { data, error } = await ctx.db
     .from(table)
-    .insert({ ...values, user_id: ctx.userId })
+    .insert({ ...values, ...(opts.id ? { id: opts.id } : {}), user_id: ctx.userId })
     .select()
     .single();
+  if (error && error.code === "23505" && opts.id) {
+    const { data: existing, error: readErr } = await ctx.db.from(table).select("*").eq("id", opts.id).eq("user_id", ctx.userId).maybeSingle();
+    if (readErr) throw new Error(readErr.message);
+    if (existing) return existing as T;
+    throw new Error(`Could not create ${LABEL[table]}: that id is already in use`);
+  }
   if (error) throw new Error(`Could not create ${LABEL[table]}: ${error.message}`);
   await logActivity(ctx, {
     action: "create",

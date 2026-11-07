@@ -3,7 +3,9 @@ import { useState, useTransition } from "react";
 import { announceChange } from "@/lib/offline-queue";
 import { connectionError } from "@/lib/connection";
 
-type Result = { ok: true; message?: string } | { ok: false; error: string };
+// `changed` on a failure: part of it went through (e.g. some of "accept all"),
+// so the error is shown and the other views still refresh.
+type Result = { ok: true; message?: string } | { ok: false; error: string; changed?: boolean };
 
 /** Button that runs a server action, shows progress and surfaces errors. */
 export function ActionButton<A extends unknown[]>({
@@ -43,8 +45,10 @@ export function ActionButton<A extends unknown[]>({
           start(async () => {
             try {
               const r = (await action(...((args ?? []) as A))) as Result;
-              if (r && "ok" in r && !r.ok) setError(r.error);
-              else {
+              if (r && "ok" in r && !r.ok) {
+                setError(r.error || "That didn't go through.");
+                if (r.changed) announceChange();
+              } else {
                 if (showResult && r && "message" in r && r.message) setResult(r.message);
                 announceChange();
               }

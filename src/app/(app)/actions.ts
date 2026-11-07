@@ -3,10 +3,11 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireApiCtx, type Ctx } from "@/server/context";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
-import { createTask, updateTask, completeTask, startFocus, endFocus } from "@/server/domain/tasks";
+import { createTask, updateTask, completeTask, startFocus, endFocus, pauseFocus, resumeFocus } from "@/server/domain/tasks";
 import { createEntity, deleteEntity, updateEntity, type EntityTable } from "@/server/domain/entities";
 import {
   acceptMany,
+  acceptManyProblem,
   acceptProposal,
   editProposal,
   mergeProposalIntoTask,
@@ -40,7 +41,16 @@ import { createConversation, deleteConversation, renameConversation } from "@/se
 // Server actions for every dashboard control. Each one goes through the same
 // domain functions the AI tools use, then refreshes all views.
 
-export type ActionResult<T = unknown> = { ok: true; data?: T; message?: string } | { ok: false, error: string };
+// `changed` on a failure: part of the request went through (e.g. some items of
+// "accept all"), so views should refresh even though it didn't fully succeed.
+export type ActionResult<T = unknown> = { ok: true; data?: T; message?: string } | { ok: false; error: string; changed?: boolean; data?: T };
+
+/** Thrown inside an action when only part of it went through: reported as a failure, but views still refresh. */
+class PartialFailure<T> extends Error {
+  constructor(message: string, public data: T) {
+    super(message);
+  }
+}
 
 async function act<T>(fn: (ctx: Ctx) => Promise<T>, message?: string | ((data: T, ctx: Ctx) => string)): Promise<ActionResult<T>> {
   try {
@@ -49,14 +59,22 @@ async function act<T>(fn: (ctx: Ctx) => Promise<T>, message?: string | ((data: T
     revalidatePath("/", "layout");
     return { ok: true, data, message: typeof message === "function" ? message(data, ctx) : message };
   } catch (err) {
+    if (err instanceof PartialFailure) {
+      revalidatePath("/", "layout");
+      return { ok: false, error: err.message, changed: true, data: err.data as T };
+    }
     const error = err instanceof z.ZodError ? err.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") : err instanceof Error ? err.message : String(err);
     return { ok: false, error };
   }
 }
 
 // ---- tasks & focus ---------------------------------------------------------
+// `id` (optional): a uuid the client makes once per submit and sends again on
+// every retry of that submit, so a retry returns the task it already made
+// instead of adding a second one. See newSubmitId in client-actions.
+const ClientId = z.object({ id: z.string().uuid().optional() });
 export async function createTaskAction(input: unknown) {
-  return act((ctx) => createTask(ctx, TaskCreate.parse(input)), "Task added");
+  return act((ctx) => createTask(ctx, TaskCreate.parse(input), { id: ClientId.parse(input ?? {}).id }), "Task added");
 }
 export async function updateTaskAction(id: string, input: unknown) {
   return act(async (ctx) => {
@@ -83,6 +101,13 @@ export async function endFocusAction(id: string, outcome: "completed" | "progres
     const v = FocusEnd.parse({ outcome, note, reason });
     return endFocus(ctx, id, v.outcome, v.note, v.reason);
   });
+}
+const SessionId = z.string().uuid();
+export async function pauseFocusAction(id: string) {
+  return act((ctx) => pauseFocus(ctx, SessionId.parse(id)), "Paused");
+}
+export async function resumeFocusAction(id: string) {
+  return act((ctx) => resumeFocus(ctx, SessionId.parse(id)), "Resumed");
 }
 
 // ---- structure -------------------------------------------------------------
@@ -119,8 +144,14 @@ export async function deleteItemAction(table: EntityTable, id: string) {
 export async function acceptProposalAction(id: string, edits?: Record<string, unknown>) {
   return act((ctx) => acceptProposal(ctx, id, edits), "Accepted");
 }
+/** Accept several items. If any couldn't be accepted it's reported as a failure naming them; the rest stay accepted. */
 export async function acceptManyAction(ids: string[]) {
-  return act((ctx) => acceptMany(ctx, ids));
+  return act(async (ctx) => {
+    const results = await acceptMany(ctx, z.array(z.string().uuid()).max(500).parse(ids));
+    const problem = acceptManyProblem(results);
+    if (problem) throw results.some((r) => r.ok) ? new PartialFailure(problem, results) : new Error(problem);
+    return results;
+  }, (results) => `Accepted ${results.length} item${results.length === 1 ? "" : "s"}`);
 }
 export async function setProposalStatusAction(id: string, status: "rejected" | "deferred" | "pending") {
   return act((ctx) => setProposalStatus(ctx, id, status));
