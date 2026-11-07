@@ -20,6 +20,8 @@ const eslintConfig = defineConfig([
     // The marketing page is a separate Vite project; public/landing is its build output.
     "landing/**",
     "public/landing/**",
+    // Local agent worktrees (copies of this repo).
+    ".claude/**",
   ]),
 ]);
 
