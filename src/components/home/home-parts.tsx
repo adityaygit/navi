@@ -10,23 +10,16 @@ import { announceChange } from "@/lib/offline-queue";
 /** Home's box: what you type here goes to Navi (the panel opens beside Home). */
 export function HomeComposer() {
   const panel = usePanel();
-  const router = useRouter();
   const [text, setText] = useState("");
   const send = () => {
     const v = text.trim();
     if (!v) return;
     setText("");
-    // Phones have no side panel: continue in the full chat page.
-    if (window.matchMedia("(max-width: 767.98px)").matches) {
-      try { localStorage.setItem("navi:chat-draft:chat:new", v); } catch {}
-      router.push("/chat?new=1");
-      return;
-    }
     panel.ask(v);
   };
   return (
     <form
-      className="sticky bottom-7 z-10 mx-auto mt-auto hidden h-[58px] w-full max-w-[660px] items-center gap-2.5 rounded-[29px] border border-white/[0.09] bg-[rgba(28,28,31,0.92)] pl-[22px] pr-2 shadow-[0_20px_50px_rgba(0,0,0,0.6)] md:flex"
+      className="sticky bottom-7 z-10 mx-auto mt-auto flex h-[58px] w-full max-w-[660px] items-center gap-2.5 rounded-[29px] border border-white/[0.09] bg-[rgba(28,28,31,0.92)] pl-[22px] pr-2 shadow-[0_20px_50px_rgba(0,0,0,0.6)]"
       onSubmit={(e) => {
         e.preventDefault();
         send();
@@ -47,7 +40,6 @@ export function HomeComposer() {
         <button
           type="button"
           onClick={() => {
-            if (window.matchMedia("(max-width: 767.98px)").matches) return router.push("/chat");
             panel.setHomeOpen(true);
             window.dispatchEvent(new Event("navi:start-voice"));
           }}

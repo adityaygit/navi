@@ -4,6 +4,7 @@ import { createSupabaseBrowser } from "@/lib/supabase/client";
 import { clearDevicePrivateData } from "@/lib/device-privacy";
 import { LOGIN_ERRORS, safeNext } from "@/lib/safe-next";
 import { Stone } from "@/components/shell/stone";
+import { naviDesktop } from "@/lib/desktop";
 
 type Mode = "email" | "code" | "password";
 const input = "h-[52px] w-full rounded-[26px] border border-white/[0.1] bg-[#0E0E10] px-5 text-[16px] text-text outline-none placeholder:text-dim focus:border-[color-mix(in_srgb,var(--navi-text)_55%,transparent)]";
@@ -27,6 +28,10 @@ export function LoginForm({ next, googleEnabled, error }: { next: string; google
   // Whoever signs in next shouldn't see pages cached for someone whose session
   // ended without signing out (e.g. it expired).
   useEffect(clearDevicePrivateData, []);
+  // Google refuses sign-in inside app windows ("disallowed user agent"): the desktop app uses email.
+  const [inDesktop, setInDesktop] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setInDesktop(!!naviDesktop()), []);
 
   // Fixed messages only: provider error text is never shown as-is.
   function explain(err: { message: string; status?: number; code?: string }) {
@@ -155,7 +160,7 @@ export function LoginForm({ next, googleEnabled, error }: { next: string; google
       <p className="mt-2 text-[17px] text-muted">{mode === "password" ? "Sign in with your password." : "Your days, planned with you."}</p>
       <div className="mt-9 flex w-full flex-col gap-3">
         {note}
-        {mode === "email" && googleEnabled && (
+        {mode === "email" && googleEnabled && !inDesktop && (
           <>
             <button type="button" onClick={google} disabled={busy} className="flex h-[52px] w-full items-center justify-center gap-2.5 rounded-[26px] border border-white/[0.1] bg-[#1C1C1F] text-[16px] font-semibold disabled:opacity-50">
               <svg aria-hidden width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" /><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" /><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z" /><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z" /></svg>

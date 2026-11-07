@@ -1,7 +1,7 @@
 name: CI
 
 # Typecheck, lint, unit + integration tests against a throwaway local Supabase,
-# production build, and browser tests (desktop + emulated iPhone) using the
+# production build, and desktop browser tests using the
 # labelled development simulator. No secrets or real AI providers involved.
 on:
   push:

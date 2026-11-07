@@ -115,7 +115,6 @@ export function PutItThere({ taskId, title, startsAt, minutes }: { taskId: strin
 /** "Place it" on a task that still needs a time: Navi finds the slot (and says what it did). */
 export function PlaceIt({ title, dayLabel }: { title: string; dayLabel: string }) {
   const panel = usePanel();
-  const router = useRouter();
   return (
     <button
       type="button"
@@ -123,12 +122,6 @@ export function PlaceIt({ title, dayLabel }: { title: string; dayLabel: string }
       aria-label={`Ask Navi to find a time for “${title}”`}
       onClick={() => {
         const ask = `Find a time ${dayLabel} for “${title}”`;
-        // Phones have no side panel: continue in the chat page.
-        if (window.matchMedia("(max-width: 767.98px)").matches) {
-          try { localStorage.setItem("navi:chat-draft:chat:new", ask); } catch {}
-          router.push("/chat?new=1");
-          return;
-        }
         panel.ask(ask);
       }}
     >

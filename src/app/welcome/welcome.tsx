@@ -19,6 +19,7 @@ import {
 } from "@/app/(app)/client-actions";
 import { announceChange } from "@/lib/offline-queue";
 import { enablePush, pushSupport, type PushSupport } from "@/lib/push-client";
+import { naviDesktop } from "@/lib/desktop";
 
 export type PlanRow =
   | { kind: "now"; time: string; label: string }
@@ -483,7 +484,7 @@ function Notify({ wake, bed, evening, pushConfigured, pending, onDone }: NonNull
       {!pushConfigured && <p className="mt-4 text-[14px] text-dim">Notifications aren&apos;t set up on this server yet. Your briefings still appear on Home.</p>}
       {state === "needs-install" && <p className="mt-4 text-[14px] text-dim">On iPhone, add Navi to your Home Screen first (Share → Add to Home Screen), then turn notifications on in Settings.</p>}
       {state === "denied" && <p className="mt-4 text-[14px] text-dim">Notifications are blocked for Navi in this browser. Allow them in the site settings, then turn them on in Settings.</p>}
-      {state === "unsupported" && <p className="mt-4 text-[14px] text-dim">This browser can&apos;t show notifications. Your briefings still appear on Home.</p>}
+      {state === "unsupported" && <p className="mt-4 text-[14px] text-dim">{naviDesktop() ? "Desktop notifications are coming to the Navi app soon." : "This browser can't show notifications."} Your briefings still appear on Home.</p>}
       <div className="mt-8 flex gap-3">
         {canPush && state !== "on" && (
           <button type="button" className={primary} onClick={() => void turnOn()} disabled={busy || pending}>

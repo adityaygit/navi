@@ -11,7 +11,7 @@ export default defineConfig({
   // Navi adopts the machine's timezone and time-based checks shift.
   use: { baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000", timezoneId: "UTC", trace: "retain-on-failure", screenshot: "only-on-failure" },
   projects: [
+    // Navi 1.5 is a desktop app (Windows and Mac), not a phone app (owner, 2026-11-07).
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },
-    { name: "iphone", use: { ...devices["iPhone 13"], browserName: "chromium" } },
   ],
 });

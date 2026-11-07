@@ -1,4 +1,5 @@
 import { publicEnv } from "./env";
+import { naviDesktop } from "./desktop";
 
 function urlBase64ToUint8Array(base64: string) {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
@@ -10,6 +11,8 @@ export type PushSupport = "unsupported" | "needs-install" | "denied" | "off" | "
 
 /** Whether this device can get Navi's notifications, and whether it already does. */
 export async function pushSupport(): Promise<PushSupport> {
+  // The desktop app has no browser push service; its notifications come another way.
+  if (naviDesktop()) return "unsupported";
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
   if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return ios && !standalone ? "needs-install" : "unsupported";

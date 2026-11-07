@@ -71,6 +71,13 @@ export async function proxy(request: NextRequest) {
 
   // Signed-out visitors at "/" see the marketing page (static build in public/landing); the URL stays "/".
   // The other marketing pages are rewritten the same way for everyone; the page reads the path to pick what to show.
+  // The Windows/Mac app opens on sign-in, never on the marketing page.
+  if (!signedIn && path === "/" && /\bNaviDesktop\//.test(request.headers.get("user-agent") ?? "")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
   if ((!signedIn && path === "/") || isMarketing(path)) {
     const rewrite = NextResponse.rewrite(new URL("/landing/index.html", request.url), { request: { headers: requestHeaders } });
     rewrite.headers.set("Content-Security-Policy", csp);

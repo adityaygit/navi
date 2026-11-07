@@ -22,6 +22,8 @@ const eslintConfig = defineConfig([
     "public/landing/**",
     // Local agent worktrees (copies of this repo).
     ".claude/**",
+    // The Windows/Mac desktop shell: a separate Node (Electron) project with its own tests.
+    "desktop/**",
   ]),
 ]);
 

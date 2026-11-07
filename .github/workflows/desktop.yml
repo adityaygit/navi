@@ -1,0 +1,64 @@
+name: Desktop app
+
+# Builds Navi for Windows (.exe installer) and Mac (.dmg) from desktop/.
+# Unsigned for now: Windows SmartScreen and macOS Gatekeeper will warn until
+# code-signing certificates are added (owner decision; they cost money).
+# Runs when desktop/ changes, or by hand with a different app address.
+on:
+  push:
+    branches: [main, "claude/**"]
+    paths: ["desktop/**", ".github/workflows/desktop.yml"]
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: "Address of the Navi web app the desktop app opens"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist:win
+          - os: macos-latest
+            script: dist:mac
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - name: Use a different app address
+        if: ${{ github.event.inputs.app_url != '' }}
+        shell: bash
+        run: node -e "const f='config.json';const c=require('./'+f);c.url=process.argv[1];require('fs').writeFileSync(f,JSON.stringify(c,null,2))" "${{ github.event.inputs.app_url }}"
+      - name: Build
+        run: npm run ${{ matrix.script }}
+        env:
+          # No signing identity yet: build unsigned instead of failing.
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: navi-${{ matrix.os }}
+          path: |
+            desktop/dist/*.exe
+            desktop/dist/*.dmg
+          if-no-files-found: error
+          retention-days: 14

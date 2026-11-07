@@ -168,3 +168,23 @@ See `docs/navi-1.5/RESUME_CLOUD.md` for the full resume brief: state, open owner
 - The waitlist approval email still sends a one-time sign-in link (now lands on `/welcome`); owner may want a code there too.
 - Drag-and-drop on My day not built (click "Put it there" / "Place it" instead). "Plan this week" button removed from My day (Navi can still plan the week in chat).
 - Old task editing for priority 1/2, project, goal, blocker is only on project pages now.
+
+## Session 3, part 2 (2026-11-07): owner answers → desktop app, hosted setup
+
+### Owner decisions
+- **Navi is a desktop app for Windows and Mac. Not for mobile at all.** "Windows version" = a packaged Windows .exe (and Mac app). This supersedes the V1 "iPhone-installable PWA" goal in the root CLAUDE.md.
+- **Hosted setup approved** (migrations + sign-in email).
+
+### Done
+- Mobile removed from the app: phone bottom dock, keyboard watcher, phone fallbacks; Playwright now desktop only (the PWA/service worker stays: offline capture, notifications in browsers).
+- **Desktop app** (`desktop/`, Electron 45): opens the Navi web app at `config.json.url` (now `https://www.meetnavi.app`; `NAVI_APP_URL` overrides; the build workflow takes an `app_url` input). One instance, remembered window size, min 1024×640, Mac hidden-inset title bar, dark, standard menus, offline screen with retry; links to other sites open in the default browser, non-web schemes blocked; microphone/notifications allowed only for Navi; user agent tagged `NaviDesktop/<version>` (server opens sign-in instead of the marketing page). No secrets in the app.
+  - Web app side: Google sign-in hidden inside the desktop app (Google blocks embedded sign-in); push reported as not available there.
+  - Verified here: unit tests (navigation/permissions, 5/5); the real app driven by Playwright under Xvfb against the local server (sign-in, Home, session kept across launches, external navigation kept out, mic permission); packaged Linux build launches. Windows/Mac installers build in GitHub Actions (`.github/workflows/desktop.yml`), unsigned.
+- **Hosted DB** (`gxfkumxjeemceoygtuod`): applied `focus_reliability` and `capture_claim` (before: 0 open focus sessions, so the data fix touched nothing). **Not applied yet:** `message_client_id` (failed: two migrations got the same timestamp version; nothing changed) and `reminders_dismissed` (the Supabase server asked a confirmation question that went unanswered; nothing changed). Hosted version numbers differ from the repo filenames (20261107144803/…804); align before using `supabase db push`.
+- **Hosted sign-in email: BLOCKED.** Supabase refuses template changes on the free plan with its built-in mailer. Hosted sends 8-digit codes (expiry 1h) and the email has only a link, so the new 6-digit code screen won't work on hosted yet. Needs: a custom SMTP sender (e.g. Resend with a verified meetnavi.app domain) or a paid Supabase plan. Then set OTP length 6, expiry 600 s, and a template with `{{ .Token }}` (keep the link until 1.5 replaces `main`). Nothing was changed (request rejected as a whole); previous settings saved in the session scratchpad.
+
+### Open / next
+- Which address should the desktop app open? Production `www.meetnavi.app` runs `main` (V1 UI) until 1.5 is deployed; deploying 1.5 (or a preview) needs owner approval.
+- Desktop notifications (briefings) for the desktop app: Electron has no web push; plan = native notifications from the app while it runs (tray/background), fed by the server.
+- Code signing (Windows certificate, Apple Developer ID + notarization) costs money: owner decision. Until then the installers show "unknown publisher" warnings.
+- Auto-update (electron-updater + GitHub Releases) once signing is decided.

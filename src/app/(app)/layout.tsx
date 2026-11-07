@@ -3,10 +3,8 @@ import { Suspense } from "react";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireCtx, getProfile } from "@/server/context";
-import { Nav } from "@/components/nav";
 import { QuickCapture } from "@/components/quick-capture";
 import { LiveRefresh } from "@/components/live-refresh";
-import { KeyboardWatch } from "@/components/keyboard-watch";
 import { BudgetBanner } from "@/components/budget-banner";
 import { Sidebar, type SpaceLink } from "@/components/shell/sidebar";
 import { NaviPanel } from "@/components/shell/navi-panel";
@@ -69,10 +67,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Sidebar name={firstName} spaces={spaces} counts={{ inbox: inbox.count ?? 0, approvals: approvals.count ?? 0 }} initialCollapsed={navCollapsed} focusLive={!!focusRow} />
         </Suspense>
         <div className="shell-main flex flex-col">
-          {/* Phones keep the bottom dock; desktop uses the sidebar. */}
-          <div className="md:hidden">
-            <Nav counts={{ inbox: inbox.count ?? 0, approvals: approvals.count ?? 0 }} />
-          </div>
           {budget && (budget.warn || budget.exceeded) && <BudgetBanner spent={budget.spentUsd} cap={budget.capUsd} exceeded={budget.exceeded} />}
           <main id="main" className="app-main mx-auto w-full max-w-[1120px] flex-1 px-4 pb-44 md:px-10 md:pb-16">{children}</main>
         </div>
@@ -88,7 +82,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </div>
       <CommandPalette />
       <QuickCapture userId={ctx.userId} />
-      <KeyboardWatch />
       <LiveRefresh adoptTimezone={profile.timezone === "UTC" && profile.onboarding_status === "not_started"} />
     </PanelProvider>
   );
