@@ -38,9 +38,10 @@ export function CalendarGrid({ days, zone, today, nowMs, hours }: { days: Calend
               const dt = DateTime.fromISO(d.date, { zone });
               const isToday = d.date === today;
               return (
-                <Link key={d.date} href={`/planner?date=${d.date}`} className="flex h-10 items-center gap-2 rounded-[12px] px-2 hover:bg-white/[0.04]" aria-label={`Open ${dt.toFormat("cccc, LLLL d")} as a timeline`}>
-                  <span className={`text-[13px] ${isToday ? "text-text" : "text-[#8E8E96]"}`}>{dt.toFormat("ccc")}</span>
-                  <span className={`flex h-7 min-w-7 items-center justify-center rounded-full px-1 text-[14px] font-semibold ${isToday ? "bg-text text-black" : "text-text"}`}>{dt.toFormat("d")}</span>
+                <Link key={d.date} href={`/planner?date=${d.date}`} className="relative flex h-10 items-center gap-2 rounded-[12px] px-2 hover:bg-white/[0.04]">
+                  <span className="sr-only">{`Open ${dt.toFormat("cccc, LLLL d")} as a timeline`}</span>
+                  <span aria-hidden="true" className={`text-[13px] ${isToday ? "text-text" : "text-[#8E8E96]"}`}>{dt.toFormat("ccc")}</span>
+                  <span aria-hidden="true" className={`flex h-7 min-w-7 items-center justify-center rounded-full px-1 text-[14px] font-semibold ${isToday ? "bg-text text-black" : "text-text"}`}>{dt.toFormat("d")}</span>
                 </Link>
               );
             })}
@@ -48,7 +49,7 @@ export function CalendarGrid({ days, zone, today, nowMs, hours }: { days: Calend
         </div>
 
         <div className="mt-0.5 flex">
-          <span className="flex w-14 shrink-0 items-center text-[11.5px] text-[#6E6E77]">all day</span>
+          <span className="flex w-14 shrink-0 items-center text-[11.5px] text-dim">all day</span>
           <div className="grid flex-1 gap-1.5" style={colTemplate}>
             {days.map((d) => (
               <ul key={d.date} className="flex min-h-[30px] flex-col justify-center gap-1 py-0.5" aria-label={`All day, ${DateTime.fromISO(d.date, { zone }).toFormat("cccc")}`}>
@@ -77,7 +78,7 @@ export function CalendarGrid({ days, zone, today, nowMs, hours }: { days: Calend
         <div className="mt-2 flex">
           <div className="relative w-14 shrink-0" style={{ height }} aria-hidden="true">
             {hourMarks.map((h) => (
-              <span key={h} className="absolute left-0 text-[11.5px] text-[#6E6E77]" style={{ top: (h - hours.from) * PX - 7 }}>{hourLabel(h)}</span>
+              <span key={h} className="absolute left-0 text-[11.5px] text-dim" style={{ top: (h - hours.from) * PX - 7 }}>{hourLabel(h)}</span>
             ))}
           </div>
           <div
@@ -109,10 +110,10 @@ export function CalendarGrid({ days, zone, today, nowMs, hours }: { days: Calend
                           href={`/planner?date=${d.date}`}
                           className={`flex h-full flex-col gap-px overflow-hidden rounded-[9px] ${long ? "px-2 py-1.5" : "px-2 py-px"} ${done || skipped ? "opacity-45" : ""}`}
                           style={style}
-                          aria-label={`${e.title}, ${dayName} ${fmtA(e.startMs)} to ${fmtA(e.endMs)}${e.look === "fixed" ? ", fixed" : e.look === "routine" ? ", routine" : ", flexible"}${done ? ", done" : ""}`}
                         >
                           <span className={`truncate text-[12.5px] font-semibold leading-tight ${done ? "line-through" : ""}`}>{e.title}</span>
-                          {long && <span className="whitespace-nowrap text-[11.5px] opacity-80">{fmt(e.startMs)} – {fmt(e.endMs)}</span>}
+                          <span className="sr-only">{`, ${dayName} ${fmtA(e.startMs)} to ${fmtA(e.endMs)}${e.look === "fixed" ? ", fixed" : e.look === "routine" ? ", routine" : ", flexible"}${done ? ", done" : ""}`}</span>
+                          {long && <span className="whitespace-nowrap text-[11.5px] opacity-80" aria-hidden="true">{fmt(e.startMs)} – {fmt(e.endMs)}</span>}
                         </Link>
                       </li>
                     );

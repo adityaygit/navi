@@ -79,7 +79,7 @@ export function Sidebar({
       className={`relative hidden shrink-0 flex-col gap-0.5 overflow-y-auto px-3 py-[18px] md:flex ${collapsed ? "w-[68px]" : "w-[236px]"}`}
     >
       <div className={`mb-4 flex h-[34px] items-center gap-2.5 ${collapsed ? "justify-center" : "px-2.5"}`}>
-        <button type="button" onClick={toggle} className="flex items-center gap-2.5 rounded-full" aria-label={collapsed ? "Expand the sidebar" : "Collapse the sidebar"} aria-expanded={!collapsed}>
+        <button type="button" onClick={toggle} className="flex items-center gap-2.5 rounded-full" aria-label={collapsed ? "Expand the sidebar" : "Navi, collapse the sidebar"} aria-expanded={!collapsed}>
           <Stone size={18} />
           {!collapsed && <span className="text-[16px] font-bold tracking-[-0.01em]">Navi</span>}
         </button>

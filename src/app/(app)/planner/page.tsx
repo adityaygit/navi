@@ -26,7 +26,7 @@ function Sentence({ line }: { line: Line }) {
   return (
     <>
       {line.map((s, i) => (
-        <span key={i} className={s.strong ? "text-text" : "text-[#6E6E77]"}>{s.text}</span>
+        <span key={i} className={s.strong ? "text-text" : "text-[#8E8E96]"}>{s.text}</span>
       ))}
     </>
   );
@@ -161,7 +161,7 @@ export default async function MyDayPage({ searchParams }: { searchParams: Promis
             dayData.map((dd) => {
               const items = dd.items.filter((i) => i.kind !== "routine" && !longEvent(i));
               const minutes = mergeSpans(plannedSpans(items)).reduce((t, s) => t + (s.end - s.start) / 60000, 0);
-              return { name: DateTime.fromISO(dd.date, { zone }).toFormat("cccc"), minutes, titles: items.map((i) => i.title) };
+              return { name: DateTime.fromISO(dd.date, { zone }).toFormat("cccc"), minutes, titles: items.map((i) => i.title), routines: dd.items.filter((i) => i.kind === "routine").length };
             }),
           )
         : myDayHeadline(plannedSpans(dayData[0].items.filter((i) => !longEvent(i))), awakeSpan(profile, date, zone), z.fmtHour, z.minuteOfDay);
@@ -231,7 +231,7 @@ export default async function MyDayPage({ searchParams }: { searchParams: Promis
   return (
     <div className="flex flex-col pt-1">
       <div className="flex flex-wrap items-center gap-2">
-        <nav aria-label="This week" className="flex gap-2 overflow-x-auto pb-1">
+        <nav aria-label="This week" className="flex min-w-0 max-w-full gap-2 overflow-x-auto pb-1">
           {strip.map(({ d, colors, dt }) => {
             const on = d === date;
             const isT = d === today;
@@ -240,11 +240,11 @@ export default async function MyDayPage({ searchParams }: { searchParams: Promis
                 key={d}
                 href={href({ date: d })}
                 aria-current={on ? "date" : undefined}
-                aria-label={`${dt.toFormat("cccc, LLLL d")}${isT ? ", today" : ""}`}
-                className={`flex h-16 w-[54px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-[20px] ${isT ? "bg-text text-black" : "bg-white/[0.05] text-[#C8C8CE] hover:bg-white/[0.08]"} ${on && !isT ? "ring-1 ring-white/40" : ""}`}
+                className={`relative flex h-16 w-[54px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-[20px] ${isT ? "bg-text text-black" : "bg-white/[0.05] text-[#C8C8CE] hover:bg-white/[0.08]"} ${on && !isT ? "ring-1 ring-white/40" : ""}`}
               >
-                <span className="text-[12px] opacity-75">{dt.toFormat("ccc")}</span>
-                <span className="text-[17px] font-semibold">{dt.toFormat("d")}</span>
+                <span className="sr-only">{`${dt.toFormat("cccc, LLLL d")}${isT ? ", today" : ""}`}</span>
+                <span className="text-[12px] opacity-75" aria-hidden="true">{dt.toFormat("ccc")}</span>
+                <span className="text-[17px] font-semibold" aria-hidden="true">{dt.toFormat("d")}</span>
                 <span className="flex h-1 gap-0.5" aria-hidden="true">{colors.map((c) => <span key={c} className="h-1 w-1 rounded-full" style={{ background: c }} />)}</span>
               </Link>
             );

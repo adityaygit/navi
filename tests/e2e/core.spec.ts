@@ -80,8 +80,11 @@ test("onboarding conversation → reviewed setup → plan → capture → inbox 
   await expect(page.getByRole("link", { name: "Startups" }).first()).toBeVisible();
   await expect(page.getByText("Tally").first()).toBeVisible();
   await expect(page.getByText("Get an A in chemistry class").first()).toBeVisible();
-  await page.goto("/planner");
-  await expect(page.getByText(/Soccer practice/i).first()).toBeVisible();
+  // Soccer is on Mondays and Wednesdays from now on: next week's calendar shows it whatever today is.
+  await page.goto(`/planner?view=calendar&date=${new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10)}`);
+  // Desktop shows the week grid; phones get a list of days.
+  const week = info.project.name === "iphone" ? page.getByRole("main") : page.getByRole("region", { name: "Week calendar" });
+  await expect(week.getByText(/Soccer practice/i).filter({ visible: true }).first()).toBeVisible();
 
   // Capture a brain dump → review inbox → accept → becomes a real task.
   await page.goto("/inbox");
@@ -89,7 +92,7 @@ test("onboarding conversation → reviewed setup → plan → capture → inbox 
   await page.getByLabel("What's on your mind?").fill("buy new cleats tomorrow. text coach about saturday");
   await page.getByRole("dialog").getByRole("button", { name: "Capture", exact: true }).click();
   await expect(page.getByText("Captured. Review it in your inbox.")).toBeVisible({ timeout: 30_000 });
-  await page.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
   await page.goto("/inbox");
   const card = page.getByRole("article", { name: /cleats/i });
   await expect(card).toBeVisible();
@@ -121,7 +124,7 @@ test("offline capture queues locally and syncs on reconnect", async ({ page, con
   await context.setOffline(false);
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
   await expect(page.getByText(/Waiting to sync/)).toBeHidden({ timeout: 30_000 });
-  await page.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
   await page.goto("/inbox");
   await expect(page.getByText(/reorganize closet/i).first()).toBeVisible();
 });

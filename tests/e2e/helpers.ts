@@ -79,6 +79,11 @@ export async function openCapture(page: Page, project: string) {
     await page.getByRole("button", { name: /\+ Capture/ }).click();
     return;
   }
-  await page.keyboard.press("Control+k");
-  await page.getByRole("option", { name: /Capture something/ }).click();
+  // Before the page has hydrated nothing listens for the shortcut yet: retry until the palette is open.
+  const palette = page.getByRole("dialog", { name: "Search and commands" });
+  await expect(async () => {
+    if (!(await palette.isVisible())) await page.keyboard.press("Control+k");
+    await expect(palette).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
+  await palette.getByRole("option", { name: /Capture something/ }).click();
 }

@@ -33,7 +33,7 @@ test("unsent offline captures stay with the person who made them on a shared dev
   await page.getByLabel("What's on your mind?").fill("private: call the clinic about results");
   await page.getByRole("dialog").getByRole("button", { name: "Capture", exact: true }).click();
   await expect(page.getByText(/Waiting to sync \(1\)/)).toBeVisible();
-  await page.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
   // Back online, but captures still can't get through before they sign out.
   await page.route("**/api/capture", (r) => r.abort());
   await context.setOffline(false);
@@ -49,7 +49,7 @@ test("unsent offline captures stay with the person who made them on a shared dev
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
   await openCapture(page, info.project.name);
   await expect(page.getByText(/Waiting to sync/)).toHaveCount(0);
-  await page.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
   await page.waitForTimeout(1000);
   expect(await capturesOf(second)).toEqual([]);
   await signOut(page);

@@ -155,7 +155,8 @@ See `docs/navi-1.5/RESUME_CLOUD.md` for the full resume brief: state, open owner
 
 ### Tests (2026-11-07, local)
 - `tsc` OK · `eslint` OK · `vitest run` **33 files / 289 passed** (was 29 / 264; new: sentences, quick-add, day-layout, focus break-through).
-- Playwright (prod build, desktop project): see "E2E" below.
+- Playwright (prod build, `NAVI_ALLOW_DEVSIM=true`, local DB): **58 tests, desktop + iPhone 13**. Last full run 57/58; the one failure was a timing flake in the e2e capture helper (Ctrl K pressed before hydration). The helper now retries, and the affected specs re-ran 6/6 twice. Specs were updated to the 1.5 UI (welcome flow, code sign-in, My day timeline/calendar, Focus page, palette capture).
+- Real issues found by e2e and fixed: phone pages were wider than the screen (Home glow, week-strip sr-only text) → `overflow-x: clip` on the main column + positioned day links; axe label/visible-text mismatches (sidebar collapse button, week strip, calendar blocks); grey text contrast on My day/Tasks/Calendar; login link not underlined; phone touch targets (task circle, Start/Mark, chips); "Plan next 7 days" restored on My day; "N days have nothing planned" no longer counts days that have routines.
 
 ### Hosted / owner actions still needed (not done; ask first)
 1. Apply migrations to hosted: `20261108000001..3` (session 1) and `20261109000001_reminders_dismissed`.

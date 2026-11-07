@@ -558,6 +558,8 @@ html {
 .shell-main {
   flex: 1;
   min-width: 0;
+  /* Decorative glows may be wider than a phone; never scroll sideways. */
+  overflow-x: clip;
 }
 @media (min-width: 768px) {
   .shell {
@@ -578,7 +580,7 @@ html {
 }
 
 .chip {
-  @apply inline-flex h-9 items-center gap-2 rounded-full px-4 text-[14px] text-muted transition-colors hover:text-text;
+  @apply inline-flex h-9 items-center gap-2 rounded-full px-4 text-[14px] text-muted transition-colors hover:text-text pointer-coarse:h-11;
   background: rgba(255, 255, 255, 0.06);
 }
 .chip[aria-pressed="true"],

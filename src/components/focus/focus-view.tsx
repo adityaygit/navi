@@ -133,7 +133,7 @@ export function FocusView({
               </div>
             </div>
           )}
-          <button type="button" onClick={() => { setEnding(false); setStopping(false); }} className="mt-1 text-[14px] text-dim underline underline-offset-4">Keep going</button>
+          <button type="button" onClick={() => { setEnding(false); setStopping(false); }} className="mt-1 text-[14px] text-dim underline underline-offset-4 pointer-coarse:min-h-11">Keep going</button>
         </div>
       )}
       {error && <p role="alert" className="mt-4 text-[14px] text-clash">{error}</p>}
@@ -219,7 +219,7 @@ export function FocusPicker({ tasks, ended, zone }: { tasks: PickTask[]; ended: 
         })}
       </ul>
       {tasks.length === 0 && <p className="mt-4 text-[15px] text-dim">Nothing due today. Pick a task from <Link href="/tasks" className="underline">Tasks</Link>, or just focus.</p>}
-      <button type="button" disabled={pending} onClick={() => go(null, minutes)} className="mt-4 self-start text-[15px] text-muted underline underline-offset-4 hover:text-text">
+      <button type="button" disabled={pending} onClick={() => go(null, minutes)} className="mt-4 self-start text-[15px] text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11">
         Just focus, no task ({minutes} min)
       </button>
       {error && <p role="alert" className="mt-4 text-[14px] text-clash">{error}</p>}

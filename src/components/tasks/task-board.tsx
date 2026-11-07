@@ -128,10 +128,16 @@ export function CheckCircle({ task, size = 22 }: { task: Pick<Task, "id" | "titl
         disabled={pending}
         aria-label={done ? `Mark ${task.title} not done` : `Complete ${task.title}`}
         aria-pressed={done}
-        className={`flex items-center justify-center rounded-full transition-colors pointer-coarse:scale-110 ${done ? "bg-[var(--navi-text)] text-[var(--navi-ink)]" : "border-[1.75px] border-[#6E6E77] text-transparent hover:border-[var(--navi-text)] hover:text-[var(--navi-text)]"}`}
-        style={{ width: size, height: size, fontSize: size * 0.55 }}
+        // The circle is drawn small; on touch screens the button around it is a full 44px target.
+        className="-m-1 flex items-center justify-center rounded-full p-1 pointer-coarse:-m-2.5 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
       >
-        <span aria-hidden="true" className="font-bold leading-none">✓</span>
+        <span
+          aria-hidden="true"
+          className={`flex items-center justify-center rounded-full font-bold leading-none transition-colors ${done ? "bg-[var(--navi-text)] text-[var(--navi-ink)]" : "border-[1.75px] border-[#6E6E77] text-transparent hover:border-[var(--navi-text)] hover:text-[var(--navi-text)]"}`}
+          style={{ width: size, height: size, fontSize: size * 0.55 }}
+        >
+          ✓
+        </span>
       </button>
       {error && <span role="alert" className="absolute left-0 top-full z-10 mt-1 w-64 rounded-lg bg-[#1C1C1F] px-2.5 py-1.5 text-[12.5px] text-clash">{error}</span>}
     </span>
@@ -144,7 +150,7 @@ function TaskRow({ task, space, zone, stepsCount, onOpen }: { task: Task; space:
   return (
     <div className={`group flex items-center gap-3.5 rounded-[16px] px-1 py-2.5 hover:bg-white/[0.03] ${done ? "opacity-50" : ""}`}>
       <CheckCircle task={task} />
-      <button type="button" onClick={onOpen} aria-expanded={false} className="flex min-w-0 flex-1 flex-col gap-0.5 text-left sm:flex-row sm:items-center sm:gap-3">
+      <button type="button" onClick={onOpen} aria-expanded={false} className="flex min-h-11 min-w-0 flex-1 flex-col justify-center gap-0.5 text-left sm:flex-row sm:items-center sm:gap-3">
         <span className={`min-w-0 flex-1 text-[15px] sm:truncate ${done ? "line-through decoration-white/40" : ""}`}>{task.title}</span>
         <span className="flex shrink-0 flex-wrap items-center gap-x-2 text-[13px] text-[#8E8E96] sm:text-[14px]">
           {due && !done && (

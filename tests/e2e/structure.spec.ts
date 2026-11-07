@@ -47,15 +47,15 @@ test("goals, projects, milestones and fixed commitments", async ({ page }, info)
   await page.goto("/planner");
   await page.getByText("Add a fixed commitment", { exact: true }).click();
   await page.getByRole("button", { name: "+ Add fixed commitment" }).click();
-  await page.getByLabel("What").fill("Dentist");
+  await page.getByLabel("What", { exact: true }).fill("Dentist");
   await page.getByLabel("Date").fill(tomorrow);
   await page.getByLabel("Start").fill("10:00");
   await page.getByLabel("End").fill("11:30");
   await addFor("What");
   await expect(page.getByText("Added")).toBeVisible();
-  await page.getByRole("button", { name: "Plan next 7 days" }).click();
-  await expect(page.getByText(/Practice drill \d+/).first()).toBeVisible();
-  await expect(page.getByText("Dentist").first()).toBeVisible();
+  const planWeek = page.getByRole("button", { name: "Plan next 7 days" });
+  await planWeek.click();
+  await expect(planWeek.locator("xpath=..").getByRole("status")).toContainText(/placed|no flexible blocks/);
 
   const dentistStart = `${tomorrow}T10:00:00Z`;
   const dentistEnd = `${tomorrow}T11:30:00Z`;
@@ -71,6 +71,7 @@ test("goals, projects, milestones and fixed commitments", async ({ page }, info)
   await page.goto(`/planner?date=${tomorrow}`);
   const dayRegion = page.getByRole("list", { name: "Timeline" });
   await expect(dayRegion.getByText(/Practice drill \d+/).first()).toBeVisible();
+  await expect(dayRegion.getByText("Dentist").first()).toBeVisible();
   const day = await dayRegion.innerText();
   const before = day.indexOf("Practice drill");
   const dentist = day.indexOf("Dentist");

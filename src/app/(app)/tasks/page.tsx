@@ -171,7 +171,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         </div>
         <p className="mt-2 text-[17px] font-medium leading-snug tracking-[-0.01em]">
           {headline.map((s, i) => (
-            <span key={i} className={s.strong ? "text-text" : "text-[#6E6E77]"}>{s.text}</span>
+            <span key={i} className={s.strong ? "text-text" : "text-[#8E8E96]"}>{s.text}</span>
           ))}
         </p>
       </header>

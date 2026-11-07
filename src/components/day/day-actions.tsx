@@ -32,7 +32,7 @@ function useRun() {
   return { pending, error, run };
 }
 
-const pill = "inline-flex h-[34px] items-center rounded-[17px] px-3.5 text-[14px] font-semibold disabled:opacity-50";
+const pill = "inline-flex h-[34px] items-center rounded-[17px] px-3.5 text-[14px] font-semibold disabled:opacity-50 pointer-coarse:h-11 pointer-coarse:rounded-[22px]";
 
 /** "Start" on a planned block: focus on its task for the block's length. */
 export function StartBlock({ blockId, taskId, minutes, primary }: { blockId: string; taskId: string; minutes: number; primary?: boolean }) {
@@ -57,7 +57,7 @@ export function StartBlock({ blockId, taskId, minutes, primary }: { blockId: str
 export function BlockOutcome({ blockId, title, open }: { blockId: string; title: string; open: boolean }) {
   const { pending, error, run } = useRun();
   const [menu, setMenu] = useState<"closed" | "open" | "skip">("closed");
-  const small = "inline-flex h-8 items-center rounded-full bg-white/[0.07] px-3 text-[13px] text-text hover:bg-white/[0.12] disabled:opacity-50";
+  const small = "inline-flex h-8 pointer-coarse:h-11 items-center rounded-full bg-white/[0.07] px-3 text-[13px] text-text hover:bg-white/[0.12] disabled:opacity-50";
   if (!open) {
     return (
       <button type="button" className="text-[13px] text-dim hover:text-text disabled:opacity-50" disabled={pending} onClick={() => run(() => blockOutcomeAction(blockId, "planned"))} aria-label={`Undo the mark on ${title}`}>
@@ -67,7 +67,7 @@ export function BlockOutcome({ blockId, title, open }: { blockId: string; title:
   }
   if (menu === "closed") {
     return (
-      <button type="button" className="text-[13px] text-dim hover:text-text" onClick={() => setMenu("open")} aria-label={`Mark how “${title}” went`} aria-expanded="false">
+      <button type="button" className="text-[13px] text-dim hover:text-text pointer-coarse:min-h-11 pointer-coarse:px-2" onClick={() => setMenu("open")} aria-label={`Mark how “${title}” went`} aria-expanded="false">
         Mark
       </button>
     );

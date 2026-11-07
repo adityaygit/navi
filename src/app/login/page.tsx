@@ -20,7 +20,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <LoginForm next={safeNext(typeof next === "string" ? next : null, CHECK_ORIGIN)} googleEnabled={publicEnv.googleAuthEnabled} error={errorText} />
       </main>
       <p className="relative z-[1] pb-10 text-center text-[13px] text-dim">
-        Navi is invite-only for now. Not on the list? <Link href="/early-access" className="text-[var(--navi-text)] hover:underline">Join the waitlist</Link>
+        Navi is invite-only for now. Not on the list? <Link href="/early-access" className="text-[var(--navi-text)] underline underline-offset-4">Join the waitlist</Link>
       </p>
     </div>
   );
