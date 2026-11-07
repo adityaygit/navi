@@ -44,7 +44,7 @@ export async function signInWithPassword(page: Page, email: string) {
 export async function freshSetUpAccount(page: Page, email: string) {
   const userId = await ensureAccount(email, { fresh: true });
   await signInWithPassword(page, email);
-  await expect(page).toHaveURL(/\/onboarding/);
+  await expect(page).toHaveURL(/\/welcome/);
   await admin
     .from("profiles")
     .update({ onboarding_status: "completed", timezone: "UTC", availability: [{ days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "23:59" }] })

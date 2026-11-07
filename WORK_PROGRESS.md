@@ -4,6 +4,8 @@ Resume doc for the 1.5 desktop rebuild. Product brief: the "navi-1.5-desktop-han
 
 ## Current checkpoint
 
+> **Latest: session 3 (cloud, 2026-11-07). See "Session 3" at the bottom.** The block below is the session-1 record.
+
 - **Date:** 2026-11-06 (session 1 of 1.5)
 - **Branch:** `claude/bold-cori-laltf6`. Fast-forwarded to `claude/trusting-rubin-pv5bgh` @ `ef55294` (approval-system work, see below). Baseline `main` = `2b330c9`.
 - **Environment:** Claude Code Cloud container. Docker started manually (`dockerd`), local Supabase running (`npm run db:start`), `.env.local` from `scripts/local-env.mjs` (devsim AI, local DB). All tests run through `scripts/local-only.sh` (strips hosted credentials).
@@ -123,3 +125,45 @@ Resume doc for the 1.5 desktop rebuild. Product brief: the "navi-1.5-desktop-han
 
 ## ▶ Pause point 2 (2026-11-06, end of local session) — resume in cloud
 See `docs/navi-1.5/RESUME_CLOUD.md` for the full resume brief: state, open owner decisions, next work, env setup.
+
+## Session 3 (cloud, 2026-11-07): owner approved round 4 + onboarding; build
+
+### Owner decisions (2026-11-07)
+- Approved design round 4 and the 11 onboarding boards. "Keep in mind a Windows version as well." Taken as: the desktop app must feel native on Windows, i.e. Ctrl K / Ctrl J shortcut labels (⌘ on Apple), thin dark scrollbars, installable desktop PWA from Edge/Chrome, scripts that run on Windows. **Ask the owner to confirm this reading.**
+- Calendar opens on **Week** by default.
+- Focus break-through rule confirmed: a fixed event starting within 10 minutes, or a hard deadline today.
+- Two new fields OK, **local migration only**: `tasks.remind_at` (+ `reminded_at`), `dismissed_suggestions`.
+- Not asked again / still open: P0-PROD-1; applying the 4 local migrations to hosted; hosted auth email template (below).
+
+### Built and verified (all on the local stack, devsim AI)
+| Item | Where | Verified |
+|---|---|---|
+| Windows fix: `npx` via `shell: true` on win32 | `scripts/local-env.mjs` | Code change only; not run on Windows (no Windows box in cloud) |
+| Local migration `20261109000001_reminders_dismissed.sql` (RLS owner-only) + tick sends task reminders once through quiet hours | `supabase/migrations`, `server/jobs/tick.ts` | Applied locally (`supabase migration up --local`); vitest |
+| Approved look: pure black, Figtree (self-hosted OFL), mint stone default (Pebble face retired) | `globals.css`, `app/layout.tsx`, `navi-colors.ts` | Screenshots vs boards |
+| **Onboarding gate in `(app)/layout.tsx`** (all app URLs; `/settings` allowed), path via `x-pathname` from proxy | `lib/onboarding.ts`, `proxy.ts` | Browser: unfinished user → `/tasks` redirected to `/welcome` |
+| **`/welcome`** full screen: Hello · Basics (name, confirmed TZ, wake/bed steppers → quiet hours bed→wake, morning briefing = wake, availability) · Talk (onboarding chat + live "What Navi's picked up" with source words, topic chips, "That's enough for now") · Review (grouped, unsure unchecked, inline edit, "Turn on N and plan my week") · Stay in touch (opt-in push, "Navi never") · First plan (today + data sentence). Resumable via `preferences.onboarding_step`; "Do this later" → skipped; Home shows "Finish setting up" | `app/welcome/*` | Full run in browser with a new account, sign-in → Home (screenshots w-0..w-8) |
+| Onboarding prompt: basics known, 4 topics, re-propose full draft as it grows; devsim keeps the live list in sync | `server/ai/prompts.ts`, `devsim.ts` | Integration tests (accuracy/flows/chats) pass |
+| **Sign-in**: 6-digit email code (default), optional password, Google; no links; invite-only kept | `app/login/*`, `supabase/templates/magic-link.html`, `config.toml` (otp_expiry 600) | Browser: real code from Mailpit → signed in |
+| **Shell**: left nav (Home, Tasks, My day, Inbox, Focus, Spaces with counts, collapsible, user menu with the other V1 pages), **layout-level Navi panel** (conversation + draft + voice survive navigation; "Looking at" chip sent as `viewing`; collapsed dock with draft/new badges and live voice + hang-up; Ctrl/⌘ J), **Ctrl/⌘ K palette** (Do / Tasks / Go to / Ask Navi) | `components/shell/*` | Browser: draft typed on Tasks kept after Home → Focus → Tasks |
+| **Home** to V3-Home: greeting + summary, day bar, continue card (open focus / last progress / next due), one insight from a fixed list with remembered "Not now" | `app/(app)/page.tsx`, `components/home/*` | Screenshot vs board |
+| Sentence builders for every page line (V4 sources contract) | `lib/sentences.ts` + tests | vitest |
+| **Tasks** to V3-Tasks/V4-Advanced (fork): tabs Today/Upcoming/Anytime/Someday (Someday = priority 4), quick-add with day/space chips, time-of-day groups, task card with steps, Focus/Find a time/Ask Navi, More details (hard deadline, estimate, repeat, reminder), one old-task nudge | `app/(app)/tasks`, `components/tasks/*`, `lib/quick-add.ts` + tests | Fork's 15 browser checks; screenshot |
+| **My day** timeline + **Calendar** week/day (fork): free gaps with "fits here / Put it there", still-needs-a-time, week grid, all-day row, now-line | `app/(app)/planner`, `components/day/*`, `lib/day-layout.ts` + tests | Fork's browser checks; screenshots |
+| **Focus** page: timer, Pause/Resume (focus_pause/resume RPCs), I'm done → outcome/stop reasons, "while you focused", break-through banner; panel auto-collapses with "N waiting" | `app/(app)/focus`, `components/focus/*`, `lib/focus.ts` + tests | Browser: start → pause → resume → end |
+| Client wiring: chat `clientMessageId` (reused on retry; 409 `turn_in_progress`/`turn_incomplete` handled), `newSubmitId()` in quick-add, steps and the old task form | `components/chat.tsx`, tasks | tsc/lint; integration tests for the server side |
+
+### Tests (2026-11-07, local)
+- `tsc` OK · `eslint` OK · `vitest run` **33 files / 289 passed** (was 29 / 264; new: sentences, quick-add, day-layout, focus break-through).
+- Playwright (prod build, desktop project): see "E2E" below.
+
+### Hosted / owner actions still needed (not done; ask first)
+1. Apply migrations to hosted: `20261108000001..3` (session 1) and `20261109000001_reminders_dismissed`.
+2. Hosted Supabase Auth: magic-link email template must show `{{ .Token }}` (the code), and OTP expiry 600 s, or email sign-in will send a link the app no longer uses. The local template is in `supabase/templates/magic-link.html`.
+3. P0-PROD-1 unchanged.
+
+### Known gaps / next
+- Mobile: phone bottom dock and `/chat` still work but weren't redesigned (out of scope); Home composer on phones opens `/chat`.
+- The waitlist approval email still sends a one-time sign-in link (now lands on `/welcome`); owner may want a code there too.
+- Drag-and-drop on My day not built (click "Put it there" / "Place it" instead). "Plan this week" button removed from My day (Navi can still plan the week in chat).
+- Old task editing for priority 1/2, project, goal, blocker is only on project pages now.

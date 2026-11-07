@@ -177,7 +177,7 @@ export async function decide(db: SupabaseClient, id: string, decision: "approve"
   const link = await db.auth.admin.generateLink({ type: "magiclink", email: row.email });
   let signIn = `${site}/login`;
   if (!link.error && link.data.properties?.hashed_token) {
-    signIn = `${site}/auth/confirm?token_hash=${encodeURIComponent(link.data.properties.hashed_token)}&type=magiclink&next=${encodeURIComponent("/onboarding")}`;
+    signIn = `${site}/auth/confirm?token_hash=${encodeURIComponent(link.data.properties.hashed_token)}&type=magiclink&next=${encodeURIComponent("/welcome")}`;
   } else if (link.error) {
     console.error("[waitlist] generateLink failed; sending plain sign-in link", link.error.message);
   }

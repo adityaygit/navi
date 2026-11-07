@@ -1,7 +1,7 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { DateTime } from "luxon";
-import { createTaskAction, updateTaskAction } from "@/app/(app)/client-actions";
+import { createTaskAction, newSubmitId, updateTaskAction } from "@/app/(app)/client-actions";
 import { announceChange } from "@/lib/offline-queue";
 import type { Task } from "@/lib/types";
 
@@ -42,6 +42,9 @@ export function TaskForm({
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const id = task?.id ?? parentId ?? "new";
+  // One id per submit: a retry of the same values (after a dropped connection)
+  // reuses it, so the server returns the task it already made instead of a duplicate.
+  const submitRef = useRef<{ sig: string; id: string } | null>(null);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -61,8 +64,13 @@ export function TaskForm({
     start(async () => {
       const r = task
         ? await updateTaskAction(task.id, { ...values, status, blocker: status === "blocked" ? blocker || null : null })
-        : await createTaskAction(values);
+        : await (() => {
+            const sig = JSON.stringify(values);
+            if (submitRef.current?.sig !== sig) submitRef.current = { sig, id: newSubmitId() };
+            return createTaskAction({ id: submitRef.current.id, ...values });
+          })();
       if (!r.ok) { setMsg(r.error); return; }
+      submitRef.current = null;
       announceChange();
       if (!task) { setTitle(""); setNotes(""); setDue(""); setEstimate(""); setMsg("Added"); }
       onDone?.();
