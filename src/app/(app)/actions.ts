@@ -13,8 +13,9 @@ import {
   setProposalStatus,
 } from "@/server/domain/proposals";
 import { confirmMemory, correctMemory, deleteMemory, rejectMemory, addMemory } from "@/server/domain/memory";
-import { decideApproval } from "@/server/domain/approvals";
-import { revertActivity } from "@/server/domain/activity";
+import { actionView, decideApproval, revertedAmong } from "@/server/domain/approvals";
+import { revertActivities, revertActivity } from "@/server/domain/activity";
+import type { ActionView } from "@/lib/actions";
 import { generateDayPlan, generateWeekPlan, recoverPlan, setBlockOutcome } from "@/server/planner/plan";
 import { summarizeDayPlan, summarizeWeekPlan } from "@/lib/plan-summary";
 import {
@@ -202,8 +203,40 @@ export async function deleteMemoryAction(id: string) {
 }
 
 // ---- approvals & activity --------------------------------------------------
-export async function decideApprovalAction(id: string, decision: "approve" | "reject") {
-  return act((ctx) => decideApproval(ctx, id, decision, createSupabaseAdmin()));
+/**
+ * Approve or decline an action card. Answers with the card as it really is
+ * afterwards: done (with what happened), failed, declined, expired, or
+ * unchanged when Navi revised it after the person last looked (`revision`).
+ * Tapping twice or retrying is safe: the action runs at most once.
+ */
+export async function decideApprovalAction(id: string, decision: "approve" | "reject", revision?: number): Promise<ActionResult<ActionView>> {
+  return act(
+    async (ctx) => {
+      const row = await decideApproval(ctx, id, decision, createSupabaseAdmin(), typeof revision === "number" ? revision : undefined);
+      const undo = Array.isArray((row.result as { undo?: unknown } | null)?.undo) ? ((row.result as { undo: string[] }).undo) : [];
+      return actionView(row, ctx.timezone, await revertedAmong(ctx, undo));
+    },
+    (v) => v.result ?? v.error ?? v.status,
+  );
+}
+/** Undo everything one of Navi's steps (or an approved action) changed. */
+export async function undoChangesAction(activityIds: string[]) {
+  return act(async (ctx) => {
+    const ids = z.array(z.string().uuid()).min(1).max(20).parse(activityIds);
+    return revertActivities(ctx, ids);
+  }, (r) => r.message);
+}
+/** Navi's autonomy: "auto" = low-risk changes happen right away; "ask" = every change waits for a tap. */
+export async function setAutonomyAction(value: "auto" | "ask") {
+  return act(async (ctx) => {
+    const autonomy = z.enum(["auto", "ask"]).parse(value);
+    const { data } = await ctx.db.from("profiles").select("preferences").eq("id", ctx.userId).single();
+    const preferences = { ...((data?.preferences as Record<string, unknown> | null) ?? {}), autonomy };
+    const { error } = await ctx.db.from("profiles").update({ preferences }).eq("id", ctx.userId);
+    if (error) throw new Error(error.message);
+    await logActivity(ctx, { action: "settings_updated", summary: autonomy === "ask" ? "Navi now asks before every change" : "Navi now makes low-risk changes on its own" });
+    return autonomy;
+  }, "Saved");
 }
 export async function revertActivityAction(id: string) {
   return act((ctx) => revertActivity(ctx, id));

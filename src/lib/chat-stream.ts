@@ -1,11 +1,14 @@
 import type { Message } from "./types";
+import type { ActionView } from "./actions";
 
 // The live chat protocol. POST /api/chat with `stream: true` answers with
 // newline-delimited JSON (application/x-ndjson), one event per line, in order:
 //
 //   user        the saved user message, and the chat it went to
 //   step_start  a tool step began                     (0..n, each later ends)
-//   step_end    that step finished, ok or not, with the tool's own summary
+//   step_end    that step finished, ok or not, with the tool's own summary;
+//               `action` when it became a card waiting for the person's OK,
+//               `undo` when it changed something on its own that can be undone
 //   text        a piece of reply text as it is written (segment = model pass;
 //               text in a pass that then runs tools is narration, not the reply)
 //   reset       discard what was shown live (the provider retried on a backup model)
@@ -18,7 +21,7 @@ import type { Message } from "./types";
 
 export type AgentEvent =
   | { type: "step_start"; id: string; name: string; label: string; readOnly: boolean }
-  | { type: "step_end"; id: string; name: string; ok: boolean; label: string; summary: string; readOnly: boolean }
+  | { type: "step_end"; id: string; name: string; ok: boolean; label: string; summary: string; readOnly: boolean; action?: ActionView; undo?: string[] }
   | { type: "text"; delta: string; segment: number }
   | { type: "reset" };
 
@@ -30,6 +33,8 @@ export type TurnDone = {
   mutated: boolean;
   simulated: boolean;
   error?: string;
+  /** Cards for the actions this reply proposed or changed, as they are now. */
+  actions?: Record<string, ActionView>;
 };
 
 export type ChatStreamEvent =

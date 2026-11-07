@@ -3,18 +3,18 @@ import Link from "next/link";
 import type { Message, ToolEvent } from "@/lib/types";
 import { readStepsLine, stepDone } from "@/lib/tool-labels";
 import { Pebble, type PebbleMood } from "./pebble";
-import { ActionButton } from "./action-button";
-import { decideApprovalAction } from "@/app/(app)/actions";
+import type { ActionView } from "@/lib/actions";
+import { ActionCard, UndoButton, useActions } from "./action-card";
 
 // How one turn of the conversation looks: the person's words in a light
 // bubble; Navi's reply under a small Pebble with its steps as hairline rows
-// and anything that needs the person's OK as a glowing card. A live turn is
+// (each change it made on its own can be undone right there) and anything that
+// needs the person's OK as an inline action card. A live turn is
 // drawn from stream events (see src/lib/chat-stream.ts) and is swapped for the
 // saved message when the turn finishes.
 
-export type PendingApproval = { id: string; summary: string; action_type: string };
-
-export type LiveStep = { kind: "step"; id: string; name: string; label: string; readOnly: boolean; status: "running" | "ok" | "failed"; doneLabel?: string; summary?: string };
+/** A live step. Undo appears once the reply is saved (live rows are hidden from screen readers, so they hold no controls). */
+export type LiveStep = { kind: "step"; id: string; name: string; label: string; readOnly: boolean; status: "running" | "ok" | "failed"; doneLabel?: string; summary?: string; action?: ActionView };
 export type LiveText = { kind: "text"; segment: number; chunks: { id: number; text: string }[] };
 export type LiveItem = LiveStep | LiveText;
 
@@ -59,8 +59,9 @@ function Check({ ok }: { ok: boolean }) {
   );
 }
 
-/** A finished step: ✓ or ✕, what kind of action it was, and the tool's own summary. */
-function StepRow({ ok, label, summary, animate = false }: { ok: boolean; label: string; summary: string; animate?: boolean }) {
+/** A finished step: ✓ or ✕, what kind of action it was, the tool's own summary, and Undo when it changed something on its own. */
+function StepRow({ ok, label, summary, animate = false, undo }: { ok: boolean; label: string; summary: string; animate?: boolean; undo?: string[] }) {
+  const { undone, markUndone } = useActions();
   // Most summaries already say what happened ("Added task “Essay”"); then the label would just repeat it.
   const firstWord = (t: string) => t.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
   const showLabel = !summary || !ok || firstWord(summary) !== firstWord(label);
@@ -71,6 +72,7 @@ function StepRow({ ok, label, summary, animate = false }: { ok: boolean; label: 
         {showLabel && <span className={`text-[13px] ${ok ? "dim" : "text-clash"}`}>{label}</span>}
         {summary && <span className="text-[15px] font-medium leading-snug [overflow-wrap:anywhere]">{summary}</span>}
       </div>
+      {ok && undo && undo.length > 0 && <UndoButton ids={undo} done={undo.every((id) => undone.has(id))} onDone={() => markUndone(undo)} label="Undo" />}
     </li>
   );
 }
@@ -97,50 +99,31 @@ function StepsBox({ children }: { children: React.ReactNode }) {
   return <ul className="well divide-hair px-4">{children}</ul>;
 }
 
-/** A request for the person's OK on something outside Navi (from request_external_action). */
-function ApprovalCard({ approval }: { approval: PendingApproval }) {
-  return (
-    <div className="lg lg-ask flex flex-col gap-4 p-4 md:flex-row md:flex-wrap md:items-center md:p-5">
-      <div className="flex flex-1 items-start gap-3 md:min-w-[260px]">
-        <Pebble size={40} mood="ask" />
-        <div className="flex min-w-0 flex-col gap-1">
-          <span className="eyebrow">Needs your OK</span>
-          <span className="text-[16px] font-semibold leading-snug [overflow-wrap:anywhere]">{approval.summary}</span>
-          <span className="muted text-[13px]">Nothing happens outside Navi until you approve.</span>
-        </div>
-      </div>
-      <div className="flex gap-2.5">
-        <ActionButton className="btn btn-primary min-w-28 flex-1" action={decideApprovalAction} args={[approval.id, "approve"]}>Approve</ActionButton>
-        <ActionButton className="btn min-w-28 flex-1" action={decideApprovalAction} args={[approval.id, "reject"]}>Decline</ActionButton>
-      </div>
-    </div>
-  );
-}
-
-const APPROVAL_REF = /Approval requested \(([0-9a-f]{8})\)/;
-
-/** A saved reply, in the order it streamed: the actions it took as ✓/✕ rows, its text, then any open approvals. */
-export function NaviMessage({ message, approvals }: { message: Message; approvals: PendingApproval[] }) {
+/** A saved reply, in the order it streamed: the actions it took as ✓/✕ rows, its text, then the cards waiting on (or showing the outcome of) the person's OK. */
+export function NaviMessage({ message }: { message: Message }) {
+  const { actions, latest } = useActions();
   const events: ToolEvent[] = message.tool_events ?? [];
-  const asks = events
-    .map((e) => (e.name === "request_external_action" && e.ok ? approvals.find((a) => a.id.startsWith(e.summary.match(APPROVAL_REF)?.[1] ?? "-")) : undefined))
-    .filter((a): a is PendingApproval => !!a);
-  const rows = events.filter((e) => !(e.name === "request_external_action" && asks.some((a) => e.summary.includes(a.id.slice(0, 8)))));
+  const cards = events.flatMap((e) => (e.action_id && actions[e.action_id] ? [actions[e.action_id]] : []));
+  const rows = events.filter((e) => !(e.action_id && actions[e.action_id]));
+  // Older messages from before cards were linked: the request is still in Activity.
+  const unlinked = rows.some((e) => !e.action_id && /approv/i.test(e.summary));
   return (
     <div className="flex max-w-[720px] flex-col gap-3">
       <NaviHeader mood="idle" voice={message.modality === "voice"} />
       {rows.length > 0 && (
         <StepsBox>
           {rows.map((e, i) => (
-            <StepRow key={i} ok={e.ok} label={stepDone(e.name, e.ok)} summary={e.summary} />
+            <StepRow key={i} ok={e.ok} label={stepDone(e.name, e.ok)} summary={e.summary} undo={e.undo} />
           ))}
         </StepsBox>
       )}
       {message.content && <p className="whitespace-pre-wrap text-[16px] leading-[1.5] text-[#e6e7ea] md:text-[17px]">{withBold(message.content)}</p>}
-      {asks.map((a) => (
-        <ApprovalCard key={a.id} approval={a} />
-      ))}
-      {events.some((e) => e.name === "request_external_action") && asks.length === 0 && (
+      {cards
+        .filter((c, i) => cards.findIndex((x) => x.id === c.id) === i)
+        .map((c) => (
+          <ActionCard key={c.id} view={c} compact={latest.get(c.id) !== message.id} />
+        ))}
+      {unlinked && (
         <Link href="/activity" className="muted text-[13px] underline underline-offset-2">See approvals in Activity</Link>
       )}
     </div>
@@ -154,6 +137,9 @@ export function NaviMessage({ message, approvals }: { message: Message; approval
  * replaces it is announced once instead of every piece.
  */
 export function LiveNavi({ items }: { items: LiveItem[] }) {
+  const { actions } = useActions();
+  // Cards go after the reply text, as in the saved message.
+  const cards: React.ReactNode[] = [];
   const working = items.some((i) => i.kind === "step" && i.status === "running");
   // Text in a pass that went on to run tools is narration; the last pass is the reply.
   const lastStepAt = items.map((i) => i.kind).lastIndexOf("step");
@@ -185,6 +171,12 @@ export function LiveNavi({ items }: { items: LiveItem[] }) {
         continue;
       }
       const s = run[j++];
+      if (s.action) {
+        // A step that became a card: the card stands on its own, between the rows around it.
+        if (rows.length) blocks.push(<StepsBox key={`s${s.id}-before`}>{rows.splice(0)}</StepsBox>);
+        cards.push(<ActionCard key={`c${s.id}`} view={actions[s.action.id] ?? s.action} />);
+        continue;
+      }
       rows.push(
         s.status === "running" ? (
           <RunningRow key={s.id} label={s.label} />
@@ -193,12 +185,16 @@ export function LiveNavi({ items }: { items: LiveItem[] }) {
         ),
       );
     }
-    blocks.push(<StepsBox key={`s${run[0].id}`}>{rows}</StepsBox>);
+    if (rows.length) blocks.push(<StepsBox key={`s${run[0].id}`}>{rows}</StepsBox>);
   }
   return (
-    <div className="flex max-w-[720px] flex-col gap-3" aria-hidden="true">
-      <NaviHeader mood={items.length === 0 || working ? "working" : "speaking"} />
-      {items.length === 0 ? <p className="shimmer-text text-[16px]">Thinking…</p> : blocks}
+    <div className="flex max-w-[720px] flex-col gap-3">
+      <div className="flex flex-col gap-3" aria-hidden="true">
+        <NaviHeader mood={items.length === 0 || working ? "working" : "speaking"} />
+        {items.length === 0 ? <p className="shimmer-text text-[16px]">Thinking…</p> : blocks}
+      </div>
+      {/* Cards can be tapped while the reply is still being written, so they stay reachable. */}
+      {cards}
     </div>
   );
 }

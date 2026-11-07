@@ -9,6 +9,9 @@ import { runTool } from "./tools";
 import { nowIn } from "@/lib/time";
 import { UserFacingError } from "@/server/http";
 import type { AgentEvent, ChatStreamEvent } from "@/lib/chat-stream";
+import type { ActionView } from "@/lib/actions";
+import { autonomyFrom } from "@/lib/actions";
+import { actionStatusForModel, actionViews, revertedAmong } from "@/server/domain/approvals";
 
 // Text and voice share each conversation's history: every turn is stored, so
 // the dashboard, chat and voice all see the same context. The user can keep
@@ -172,7 +175,34 @@ export type TurnResult = {
   mutated: boolean;
   simulated: boolean;
   error?: string;
+  actions?: Record<string, ActionView>;
 };
+
+/** Action cards and Undo state for these messages: what each card shows, and which automatic changes were undone. */
+export async function messageActions(ctx: Ctx, messages: Message[]): Promise<{ actions: Record<string, ActionView>; undone: string[] }> {
+  const events = messages.flatMap((m) => m.tool_events ?? []);
+  const [actions, reverted] = await Promise.all([
+    actionViews(ctx, events.flatMap((e) => (e.action_id ? [e.action_id] : []))),
+    revertedAmong(ctx, events.flatMap((e) => e.undo ?? [])),
+  ]);
+  return { actions, undone: [...reverted] };
+}
+
+/**
+ * What Navi did in an earlier reply, as its own history shows it. Cards say
+ * how they ended up (the person may have approved, declined or changed them
+ * since), and automatic changes the person undid say so, so the next reply
+ * acknowledges the decision instead of repeating or re-proposing it.
+ */
+function actionsTaken(m: Message, actions: Record<string, ActionView>, undone: Set<string>): string {
+  const lines = m.tool_events.map((e) => {
+    const card = e.action_id ? actions[e.action_id] : undefined;
+    if (card) return `${e.name}: ${card.verb} “${card.subject}” [action ${card.id}] — ${actionStatusForModel(card)}`;
+    const undoneNote = e.undo?.length && e.undo.every((id) => undone.has(id)) ? " — the user undid this" : "";
+    return `${e.name}: ${e.summary}${undoneNote}`;
+  });
+  return `${m.content}\n[Actions taken: ${lines.join("; ")}]`;
+}
 
 /**
  * One conversation turn: saves the user's message, runs Navi, saves the reply.
@@ -188,23 +218,23 @@ export async function handleTurn(
   const conversationId = await resolveConversation(ctx, input.kind, input.conversationId);
   const prior = await listMessages(ctx, conversationId, 24);
   if (input.kind === "chat" && !prior.some((m) => m.role === "user")) await nameNewChat(ctx, conversationId, input.text);
+  const before = await messageActions(ctx, prior);
+  const undone = new Set(before.undone);
   const history = prior
     .filter((m) => m.role !== "system" && m.content.trim())
     .map((m) => ({
       role: m.role as "user" | "assistant",
-      content: m.tool_events.length
-        ? `${m.content}\n[Actions taken: ${m.tool_events.map((e) => `${e.name}: ${e.summary}`).join("; ")}]`
-        : m.content,
+      content: m.tool_events.length ? actionsTaken(m, before.actions, undone) : m.content,
     }));
   const userMessage = await saveMessage(ctx, conversationId, "user", input.text, input.modality);
   if (onEvent) {
     const { data: named } = await ctx.db.from("conversations").select("title").eq("id", conversationId).maybeSingle();
     onEvent({ type: "user", userMessage, conversationId, title: named?.title ?? null });
   }
-  const turnCtx: Ctx = { ...ctx, conversationId };
+  const profile = await getProfile(ctx);
+  const turnCtx: Ctx = { ...ctx, conversationId, autonomy: autonomyFrom(profile.preferences) };
   const mode: AgentMode = input.kind === "onboarding" ? "onboarding" : "chat";
   const context = await buildContext(turnCtx, input.text, mode);
-  const profile = await getProfile(ctx);
   const result = await runAgent({
     ctx: turnCtx,
     mode,
@@ -217,6 +247,9 @@ export async function handleTurn(
     onEvent: onEvent ? (event: AgentEvent) => onEvent(event) : undefined,
   });
   const assistantMessage = await saveMessage(ctx, conversationId, "assistant", result.text, input.modality, result.toolEvents);
-  const { data: conv } = await ctx.db.from("conversations").select("title").eq("id", conversationId).maybeSingle();
-  return { conversationId, title: conv?.title ?? null, userMessage, assistantMessage, mutated: result.mutated, simulated: result.simulated, error: result.error };
+  const [{ data: conv }, after] = await Promise.all([
+    ctx.db.from("conversations").select("title").eq("id", conversationId).maybeSingle(),
+    messageActions(ctx, [assistantMessage]),
+  ]);
+  return { conversationId, title: conv?.title ?? null, userMessage, assistantMessage, mutated: result.mutated, simulated: result.simulated, error: result.error, actions: after.actions };
 }

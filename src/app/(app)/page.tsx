@@ -54,7 +54,7 @@ export default async function TodayPage() {
     ctx.db.from("focus_sessions").select("id,started_at,planned_minutes,task_id,tasks(title)").is("ended_at", null).maybeSingle(),
     ctx.db.from("briefings").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle(),
     ctx.db.from("proposals").select("id", { count: "exact", head: true }).eq("status", "pending").is("batch", null),
-    ctx.db.from("approvals").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    ctx.db.from("approvals").select("id", { count: "exact", head: true }).eq("status", "proposed").gt("expires_at", new Date().toISOString()),
     ctx.db.from("events").select("*").neq("status", "cancelled"),
     ctx.db.from("routines").select("*").eq("active", true),
     // Yesterday's blocks nobody said anything about: one compact prompt to mark them.

@@ -205,18 +205,28 @@ export type Message = {
   created_at: string;
 };
 
-export type ToolEvent = { name: string; ok: boolean; summary: string };
+/**
+ * One action Navi took (or asked to take) in a reply. `action_id` links to the
+ * approvals row it is waiting on (shown as an inline card); `undo` lists the
+ * activity-log entries that undo what it changed on its own.
+ */
+export type ToolEvent = { name: string; ok: boolean; summary: string; action_id?: string; undo?: string[] };
 
 export type Approval = {
   id: string;
+  user_id: string;
   action_type: string;
   summary: string;
   details: Record<string, unknown>;
   idempotency_key: string;
-  status: "pending" | "approved" | "rejected" | "executing" | "executed" | "failed" | "expired";
+  status: import("./actions").ActionStatus;
   result: Record<string, unknown> | null;
   error: string | null;
+  conversation_id: string | null;
+  revision: number;
   created_at: string;
+  updated_at: string;
+  expires_at: string;
   decided_at: string | null;
   executed_at: string | null;
 };

@@ -59,16 +59,18 @@ test("focus, recovery, memory, approvals and settings", async ({ page }, info) =
     user_id: userId,
     action_type: "internal.delete.tasks",
     summary: "Delete task “Old errand”",
-    details: { op: "delete", table: "tasks", id: doomed!.id },
+    details: { op: "delete", table: "tasks", id: doomed!.id, subject: "Old errand", reason: "deleting can't be undone" },
     idempotency_key: `e2e-${Date.now()}:1`,
   });
   await page.goto("/");
   await page.getByRole("link", { name: "Approvals waiting (1)" }).click();
   await expect(page).toHaveURL(/\/activity/);
-  const card = page.getByRole("article").filter({ hasText: "Delete task “Old errand”" });
+  const card = page.getByRole("group", { name: "Delete task: Old errand" });
   await card.getByRole("button", { name: "Approve" }).click();
+  await expect(card.getByText("Deleted task “Old errand”")).toBeVisible();
+  await page.reload();
   await expect(page.getByText("Nothing waiting.")).toBeVisible();
-  await expect(page.locator("li", { hasText: "Delete task “Old errand”" }).getByText("executed")).toBeVisible();
+  await expect(page.locator("li", { hasText: "Deleted task “Old errand”" }).getByText("done", { exact: true })).toBeVisible();
   const { data: gone } = await admin.from("tasks").select("id").eq("id", doomed!.id);
   expect(gone).toHaveLength(0);
   await page.goto("/");

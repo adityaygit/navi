@@ -163,8 +163,11 @@ describe("approval boundary", () => {
 
     const approvalId = (del as { approvalId: string }).approvalId;
     const done = await decideApproval(user, approvalId, "approve", admin());
-    expect(done.status).toBe("executed");
-    await expect(decideApproval(user, approvalId, "approve", admin())).rejects.toThrow(/already decided/);
+    expect(done.status).toBe("completed");
+    // A second tap just answers with the real state; nothing runs again.
+    const again = await decideApproval(user, approvalId, "approve", admin());
+    expect(again.status).toBe("completed");
+    expect(again.executed_at).toBe(done.executed_at);
     const { data: gone } = await db.from("tasks").select("id").eq("id", t.id);
     expect(gone).toHaveLength(0);
   });
@@ -195,7 +198,7 @@ describe("approval boundary", () => {
   // Security review M3: each protection is judged against the row as it is,
   // so Navi can't first remove it and then make the protected change.
   const naviCtx = () => ({ ...ctxFor(db, userId, zone), actor: "navi" as const });
-  const sentForApproval = (r: { ok: boolean; summary: string }) => r.ok && /sent to the user for approval/.test(r.summary);
+  const sentForApproval = (r: { ok: boolean; summary: string; actionId?: string }) => r.ok && /needs the user's OK/.test(r.summary) && !!r.actionId;
 
   it("won't let Navi soften a hard deadline and then move it", async () => {
     const user = ctxFor(db, userId, zone);
@@ -285,7 +288,7 @@ describe("approval boundary", () => {
     // The model claims a statement the user never made.
     const t2 = await createTask(user, { title: "Lab report" });
     const claimed = await runTool({ ...naviCtx(), userMessage: "what's on my plate today?" }, "complete_task", { id: t2.id, user_statement: "I finished the lab report" });
-    expect(claimed.summary).toMatch(/Not marked done.*confirm with one tap/);
+    expect(claimed.summary).toMatch(/Not marked done.*waits for their tap/);
     // Quoting the user but not saying it's finished doesn't count either.
     const vague = await runTool({ ...naviCtx(), userMessage: "the lab report is hard" }, "complete_task", { id: t2.id, user_statement: "the lab report" });
     expect(vague.summary).toMatch(/Not marked done/);
@@ -295,10 +298,10 @@ describe("approval boundary", () => {
     const { data: open } = await db.from("tasks").select("status").eq("id", t2.id).single();
     expect(open!.status).toBe("todo");
 
-    const { data: pending } = await db.from("approvals").select("id,status,action_type").eq("action_type", "internal.complete.tasks").eq("status", "pending");
+    const { data: pending } = await db.from("approvals").select("id,status,action_type").eq("action_type", "internal.complete.tasks").eq("status", "proposed");
     expect(pending).toHaveLength(1); // the repeats reuse one request
     const approved = await decideApproval(user, pending![0].id, "approve", admin());
-    expect(approved.status).toBe("executed");
+    expect(approved.status).toBe("completed");
     const { data: finished } = await db.from("tasks").select("status,completed_at").eq("id", t2.id).single();
     expect(finished!.status).toBe("done");
     expect(finished!.completed_at).not.toBeNull();

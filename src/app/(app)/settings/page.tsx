@@ -1,4 +1,6 @@
 import type { CSSProperties } from "react";
+import { AutonomySettings } from "./autonomy-settings";
+import { autonomyFrom } from "@/lib/actions";
 import Link from "next/link";
 import { requireCtx, getProfile } from "@/server/context";
 import { canApproveBudgetOverride, getBudgetStatus } from "@/server/ai/budget";
@@ -23,6 +25,7 @@ export const metadata = { title: "Settings · Navi" };
 const SECTIONS: [string, string][] = [
   ["schedule", "You & your schedule"],
   ["colour", "Navi's colour"],
+  ["autonomy", "What Navi does on its own"],
   ["notifications", "Notifications"],
   ["budget", "AI & testing budget"],
   ["privacy", "Privacy & your data"],
@@ -85,6 +88,8 @@ export default async function SettingsPage() {
         <ScheduleSettings profile={profile} />
 
         <NaviColorPicker saved={color} />
+
+        <AutonomySettings saved={autonomyFrom(profile.preferences)} />
 
         <section id="notifications" className="flex scroll-mt-24 flex-col gap-3" aria-labelledby="notif-h">
           <SectionHead id="notif-h" title="Notifications" desc="Briefings, reviews and deadline reminders go to devices you turn on, never during your quiet hours." />

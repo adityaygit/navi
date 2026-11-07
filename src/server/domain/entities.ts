@@ -1,7 +1,7 @@
 import "server-only";
 import { DateTime } from "luxon";
 import type { Ctx } from "@/server/context";
-import { logActivity } from "./activity";
+import { logActivity, sameValue } from "./activity";
 import { requestApproval } from "./approvals";
 
 // Generic create/update/delete for the user's structured items, with an
@@ -20,7 +20,7 @@ export type EntityTable =
   | "notes"
   | "plan_blocks";
 
-const LABEL: Record<EntityTable, string> = {
+export const LABEL: Record<EntityTable, string> = {
   tasks: "task",
   projects: "project",
   goals: "goal",
@@ -32,7 +32,7 @@ const LABEL: Record<EntityTable, string> = {
   plan_blocks: "plan block",
 };
 
-function nameOf(row: Record<string, unknown>): string {
+export function nameOf(row: Record<string, unknown>): string {
   return String(row.title ?? row.name ?? row.body ?? "item").slice(0, 80);
 }
 
@@ -67,23 +67,6 @@ export async function getEntity<T = Record<string, unknown>>(ctx: Ctx, table: En
   return data as T;
 }
 
-/** Same value, allowing for equivalent spellings of times and timestamps. */
-function sameValue(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (a == null || b == null) return a == null && b == null;
-  if (typeof a === "string" && typeof b === "string") {
-    const time = /^\d{2}:\d{2}(:\d{2})?$/;
-    if (time.test(a) && time.test(b)) return a.padEnd(8, ":00").slice(0, 8) === b.padEnd(8, ":00").slice(0, 8);
-    if (a.includes("T") && b.includes("T")) {
-      const ta = Date.parse(a);
-      const tb = Date.parse(b);
-      if (!Number.isNaN(ta) && !Number.isNaN(tb)) return ta === tb;
-    }
-    return false;
-  }
-  return JSON.stringify(a) === JSON.stringify(b);
-}
-
 /** Does the patch actually change any of these columns? (Unknown spellings count as a change.) */
 function changes(before: Record<string, unknown>, patch: Record<string, unknown>, keys: string[]): boolean {
   return keys.some((k) => k in patch && !sameValue(patch[k], before[k]));
@@ -99,6 +82,7 @@ function changes(before: Record<string, unknown>, patch: Record<string, unknown>
 function needsApproval(table: EntityTable, before: Record<string, unknown>, patch: Record<string, unknown>): string | null {
   if (table === "tasks") {
     if (before.due_is_hard && changes(before, patch, ["due_at", "due_is_hard"])) return "changes a hard deadline";
+    if (patch.status === "cancelled" && before.status !== "cancelled") return "cancels a task";
   }
   if (table === "events") {
     if (before.external_ref) return "modifies an event owned by a connected external calendar";
@@ -142,12 +126,18 @@ export async function updateEntity<T = Record<string, unknown>>(
   const before = await getEntity<Record<string, unknown>>(ctx, table, id);
   if (ctx.actor === "navi") {
     if (table === "tasks" && patch.status === "done" && before.status !== "done") throw new Error("Only you can mark a task done.");
-    const reason = needsApproval(table, before, patch);
+    const rule = needsApproval(table, before, patch);
+    const reason = rule ? `it ${rule}` : ctx.autonomy === "ask" ? "you chose to approve every change" : null;
     if (reason) {
+      // `expect`: the values this change was based on. If the item no longer
+      // has them when the person approves, the action expires instead of
+      // overwriting their newer edit.
+      const expect: Record<string, unknown> = {};
+      for (const k of Object.keys(patch)) expect[k] = before[k] ?? null;
       const approval = await requestApproval(ctx, {
         actionType: `internal.update.${table}`,
-        summary: opts.summary ?? `Update ${LABEL[table]} “${nameOf(before)}” (${reason})`,
-        details: { op: "update", table, id, patch, reason },
+        summary: opts.summary ?? `${patch.status === "cancelled" ? "Cancel" : "Update"} ${LABEL[table]} “${nameOf(before)}”`,
+        details: { op: "update", table, id, patch, reason, subject: nameOf(before), expect },
       });
       return { kind: "approval_requested", approvalId: approval.id, reason };
     }
@@ -187,7 +177,7 @@ export async function deleteEntity(ctx: Ctx, table: EntityTable, id: string): Pr
     const approval = await requestApproval(ctx, {
       actionType: `internal.delete.${table}`,
       summary: `Delete ${LABEL[table]} “${nameOf(before)}”`,
-      details: { op: "delete", table, id },
+      details: { op: "delete", table, id, subject: nameOf(before), reason: "deleting can't be undone" },
     });
     return { kind: "approval_requested", approvalId: approval.id };
   }

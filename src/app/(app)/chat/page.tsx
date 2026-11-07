@@ -1,5 +1,5 @@
 import { requireCtx } from "@/server/context";
-import { findChat, listConversations, listMessages } from "@/server/ai/chat";
+import { findChat, listConversations, listMessages, messageActions } from "@/server/ai/chat";
 import { aiAvailability, voiceAvailability } from "@/server/ai/config";
 import { Chat } from "@/components/chat";
 import { ChatShell } from "@/components/chat-shell";
@@ -15,11 +15,9 @@ export default async function ChatPage({ searchParams }: { searchParams: Promise
   const chats = await listConversations(ctx);
   const requested = sp.c ? (chats.find((c) => c.id === sp.c) ?? (await findChat(ctx, sp.c))) : null;
   const current = requested ?? (sp.c || sp.new ? null : (chats[0] ?? null));
-  const [messages, approvals] = await Promise.all([
-    current ? listMessages(ctx, current.id) : Promise.resolve([]),
-    // Open approvals show as cards on the reply that asked for them.
-    ctx.db.from("approvals").select("id,summary,action_type").eq("status", "pending").order("created_at", { ascending: false }).limit(50),
-  ]);
+  const messages = current ? await listMessages(ctx, current.id) : [];
+  // Each action card shows on the reply that proposed it, in its current state (survives reloads).
+  const { actions, undone } = await messageActions(ctx, messages);
   const ai = aiAvailability();
   return (
     <ChatShell chats={chats} currentId={current?.id ?? null} title={current?.title || "New chat"}>
@@ -28,7 +26,8 @@ export default async function ChatPage({ searchParams }: { searchParams: Promise
         kind="chat"
         conversationId={current?.id ?? null}
         initialMessages={messages}
-        approvals={approvals.data ?? []}
+        initialActions={actions}
+        initialUndone={undone}
         ai={ai.ready ? { ready: true, mode: ai.mode } : { ready: false, mode: "none", reason: ai.reason }}
         voice={voiceAvailability()}
       />

@@ -4,9 +4,10 @@ import type { ToolEvent } from "@/lib/types";
 import { getProfile } from "@/server/context";
 import { recordUsage } from "./budget";
 import { runTool } from "./tools";
-import { areaFor, detectAreas, extractAvailability, extractGoals, extractItems, extractName, extractProjects, extractRoutines, extractWeeklyCommitments } from "./heuristics";
+import { parseDue, areaFor, detectAreas, extractAvailability, extractGoals, extractItems, extractName, extractProjects, extractRoutines, extractWeeklyCommitments } from "./heuristics";
 import type { AgentRequest, AgentResult } from "./agent";
-import { emitter, stepEndEvent, stepStartEvent } from "./live";
+import { emitter, stepEndEvent, stepStartEvent, toolEventOf } from "./live";
+import { actionViews } from "@/server/domain/approvals";
 
 // Development simulator: a deterministic stand-in for the model so the full
 // product loop (onboarding, capture, inbox, planning) can be exercised and
@@ -50,12 +51,13 @@ export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
     emit(stepStartEvent(id, name));
     if (live) await pause(350 + Math.random() * 250);
     const r = await runTool(ctx, name, input);
-    emit(stepEndEvent(id, name, r.ok, r.summary));
+    const action = r.actionId && req.onEvent ? (await actionViews(req.ctx, [r.actionId]))[r.actionId] : undefined;
+    emit(stepEndEvent(id, name, r.ok, r.summary, { action, undo: r.actionId ? undefined : r.undo }));
     return r;
   };
   const call = async (name: string, input: unknown) => {
     const r = await step(name, input);
-    events.push({ name, ok: r.ok, summary: r.summary });
+    events.push(toolEventOf(name, r));
     if (r.mutated) mutated = true;
     return r;
   };
@@ -67,6 +69,14 @@ export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
   const wrapped = req.userText.match(/"""\n([\s\S]*)\n"""/);
   const text = (req.mode === "capture" && wrapped ? wrapped[1] : req.userText).trim();
   let reply = "";
+  // The newest action in this chat still waiting for the person's OK. The simulator
+  // only knows a few fixed phrases for it; the real model reads intent freely.
+  const pending =
+    req.mode === "chat" && ctx.conversationId
+      ? (await ctx.db.from("approvals").select("id").eq("conversation_id", ctx.conversationId).eq("status", "proposed").order("created_at", { ascending: false }).limit(1).maybeSingle()).data
+      : null;
+  const addTask = req.mode === "chat" ? text.match(/^(?:please\s+)?(?:add|create)\s+(?:a\s+)?task\s+(?:to\s+)?(.+?)[.!]?$/i) : null;
+  const dropTask = req.mode === "chat" ? text.match(/^(?:please\s+)?(cancel|delete|remove)\s+(?:the\s+|my\s+)?(?:task\s+)?["“]?(.+?)["”]?[.!]?$/i) : null;
 
   if (req.mode === "onboarding") {
     const userTurns = req.history.filter((m) => m.role === "user").map((m) => m.content);
@@ -111,6 +121,41 @@ export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
     const category = /sick|tired|rest/i.test(text) ? "rest" : /estimate|took longer/i.test(text) ? "estimate" : "interruption";
     const r = await call("recover_plan", { description: text.slice(0, 400), category });
     reply = `That happens. ${r.summary} Nothing unfinished was dropped.`;
+  } else if (pending && /^(no|nope|nah|don'?t|never ?mind|forget it|decline)\b/i.test(text)) {
+    const r = await call("decline_action", { action_id: pending.id });
+    reply = r.ok ? "Okay, I won't do that. Nothing was changed." : r.summary;
+  } else if (pending && /\b(instead|change it|make it|rename it|call it)\b/i.test(text)) {
+    const changes: Record<string, unknown> = {};
+    const name = text.match(/\b(?:rename it|call it)\s+(?:to\s+)?["“]?(.+?)["”]?(?:\s+instead)?[.!]?$/i);
+    if (name) changes.title = name[1];
+    const est = text.match(/\b(\d{1,3})\s*(min|minutes|hours?|h)\b/i);
+    if (est) changes.estimate_minutes = est[2].toLowerCase().startsWith("h") ? Number(est[1]) * 60 : Number(est[1]);
+    const due = name ? null : parseDue(text, now);
+    if (due) changes.due_at = due.iso;
+    const r = await call("revise_action", { action_id: pending.id, changes });
+    reply = r.ok ? "Updated the card. Tap Approve when it looks right." : r.summary;
+  } else if (addTask) {
+    const words = addTask[1];
+    const due = parseDue(words, now);
+    const est = words.match(/\b(\d{1,3})\s*(min|minutes|hours?|h)\b/i);
+    const title = (due ? words.replace(new RegExp(`\\s*(?:due\\s+|by\\s+|on\\s+)?${due.phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}.*$`, "i"), "") : words).replace(/\s+for\s+\d.*$/, "").trim() || words;
+    await step("search_items", { query: title.slice(0, 60) });
+    const r = await call("create_task", {
+      title,
+      due_at: due?.iso ?? null,
+      due_is_hard: /\bhard deadline\b/i.test(text) ? true : null,
+      estimate_minutes: est ? (est[2].toLowerCase().startsWith("h") ? Number(est[1]) * 60 : Number(est[1])) : null,
+      user_command: text.slice(0, 300),
+    });
+    reply = !r.ok ? r.summary : r.actionId ? "Here it is. Approve it and I'll add it, or tell me what to change." : `${r.summary.split(":")[0]}.`;
+  } else if (dropTask) {
+    const { data: task } = await ctx.db.from("tasks").select("id,title").ilike("title", `%${dropTask[2].replace(/[%_\\]/g, "\\$&")}%`).neq("status", "cancelled").limit(1).maybeSingle();
+    if (!task) {
+      reply = `I couldn't find a task called “${dropTask[2]}”.`;
+    } else {
+      const r = /cancel/i.test(dropTask[1]) ? await call("update_task", { id: task.id, status: "cancelled" }) : await call("delete_item", { table: "tasks", id: task.id });
+      reply = r.ok ? (r.actionId ? `That needs your OK first, so it's on the card below.` : r.summary) : r.summary;
+    }
   } else if (req.mode === "chat" && /^remember (that )?/i.test(text)) {
     const content = text.replace(/^remember (that )?/i, "");
     await call("remember", { kind: "profile", content, origin: "stated", confidence: 1 });
@@ -137,7 +182,7 @@ export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
       });
       reply = `I put ${items.length} item${items.length === 1 ? "" : "s"} in your review inbox. Nothing is committed until you accept it.`;
     } else {
-      reply = "Noted. (The simulator only understands brain dumps, “plan my day/week”, “my plan broke…”, and “remember that…”.)";
+      reply = "Noted. (The simulator only understands brain dumps, “add a task to…”, “cancel/delete …”, “plan my day/week”, “my plan broke…”, and “remember that…”.)";
     }
   }
 

@@ -25,6 +25,15 @@ export type Ctx = {
    * model wrote.
    */
   userMessage?: string;
+  /**
+   * Navi's autonomy setting for this turn. "ask": every change Navi would make
+   * becomes an inline card first. Unset is treated as "auto".
+   */
+  autonomy?: "auto" | "ask";
+  /** Told about each activity-log entry written (so a tool call can offer Undo). */
+  onActivity?: (entry: { id: string; reversible: boolean }) => void;
+  /** Told about each action a step proposed (so its reply can show the card). */
+  onAction?: (approvalId: string) => void;
 };
 
 export class AuthError extends Error {}
