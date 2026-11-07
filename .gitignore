@@ -53,3 +53,4 @@ supabase/.temp
 /landing/assets-src/*.jpg
 /landing/assets-src/*.png
 /landing/assets-src.log
+.claude/worktrees/
