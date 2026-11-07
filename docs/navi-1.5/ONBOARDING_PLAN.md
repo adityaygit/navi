@@ -1,6 +1,6 @@
 # Navi 1.5 — Sign-in and onboarding plan
 
-Status: **PROPOSED, awaiting owner approval.** Mockups come after approval.
+Status: **Plan approved with answers below. Storyboard (10 screens) shown in chat 2026-11-06; awaiting approval before full-size canvas boards.**
 
 ## What exists today (verified in code, 2026-11-06)
 
@@ -27,7 +27,7 @@ Open app
 
 ## Steps
 
-0. **Sign in.** Google or email. Email sends a link **and** a 6-digit code (a link opened on a phone can't sign in the desktop). Not invited → "You're on the list" (existing early-access page).
+0. **Sign in.** Google, or email with a 6-digit code; a password is the optional second way. Not invited → "You're on the list" (existing early-access page).
 1. **Hello.** The stone fades in. "Hi, I'm Navi." One line on what Navi does. Continue. (One idea per screen, like Opal and Claude.)
 2. **The basics.** Three quick answers, no typing beyond your name: name (pre-filled from Google), timezone (detected, confirm), wake-up and bedtime (hour steppers). Wake/bed feeds the "free time" maths on My day (see sources board).
 3. **Talk it through** (the heart, text or voice). Split screen: conversation on the left; on the right **"What Navi's picked up"** fills in live (spaces, fixed things, routines, goals, tasks), each with the words it came from. Navi steers through four topics, shown as chips that tick off: *Your week · Fixed things · What you're working toward · What's on your mind*. "That's enough for now →" is always available.
@@ -58,9 +58,10 @@ Open app
 
 Sign in · Email code · Hello · The basics · Talk it through (early and late) · Review · Stay in touch · First plan · Home with "Finish setting up".
 
-## Owner questions
+## Owner answers (2026-11-06)
 
-1. Keep invite-only sign-in for the alpha?
-2. Email: link + code (recommended), code only, or keep the password option too?
-3. Ask wake-up and bedtime as their own step, or let Navi get them in the conversation?
-4. Notifications during onboarding, or ask later (e.g. after the first evening)?
+1. Invite-only sign-in for the alpha: **yes**.
+2. Email: **two options — a 6-digit code (default) or a password (optional)**. No email link. (Supersedes "link and code" in step 0.)
+3. Wake-up and bedtime: **their own quick step** (step 2).
+4. Notifications: **during onboarding** (step 5).
+5. Process: **show the screens first** (storyboard in chat), then put them on the design canvas, then code.
