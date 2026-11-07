@@ -314,26 +314,32 @@ function LiveVoice({ kind, conversationId, muted, setMuted, setStatus: reportSta
     outRef.current = null;
   }, [flushPlayback, releaseMic]);
 
+  // The id of a turn that failed to save; its retry (with what came after) reuses it so the server replaces, not duplicates.
+  const unsavedTurnId = useRef<string | null>(null);
   /** Saves the turn so far; false if it couldn't be saved (it's kept for the next try). */
   const saveTurn = useCallback(async (interrupted = false) => {
     const t = turnRef.current;
     if (!convRef.current || (!t.user.trim() && !t.navi.trim() && !t.tools.length && !t.inSec && !t.inTok)) return true;
     turnRef.current = { user: "", navi: "", tools: [], inSec: 0, outSec: 0, inTok: 0, outTok: 0, marks: [] };
+    const clientTurnId = unsavedTurnId.current ?? crypto.randomUUID();
+    unsavedTurnId.current = null;
     try {
       const res = await fetch("/api/voice/turn", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ conversationId: convRef.current, voiceSessionId: voiceSessionRef.current, userText: t.user, assistantText: t.navi, toolEvents: t.tools, inputAudioSeconds: t.inSec, outputAudioSeconds: t.outSec, inputTokens: t.inTok, outputTokens: t.outTok, interrupted }),
+        body: JSON.stringify({ conversationId: convRef.current, voiceSessionId: voiceSessionRef.current, clientTurnId, userText: t.user, assistantText: t.navi, toolEvents: t.tools, inputAudioSeconds: t.inSec, outputAudioSeconds: t.outSec, inputTokens: t.inTok, outputTokens: t.outTok, interrupted }),
       });
-      const body = await res.json();
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? `Server error ${res.status}`);
       onTurnSaved();
       if (body.budgetExceeded) {
         setError("Today's AI testing budget is used up, so voice was stopped. Your transcript is saved.");
         stopAll();
       }
       return true;
-    } catch {
-      setError("Couldn't save the last voice turn (network). Keep talking; it will retry with the next turn.");
+    } catch (err) {
+      unsavedTurnId.current ??= clientTurnId;
+      setError(`Couldn't save the last voice turn (${err instanceof TypeError ? "network" : err instanceof Error ? err.message : "error"}). Keep talking; it will retry with the next turn.`);
       // Put the whole turn back, including tool results and audio time (which counts toward the budget).
       const now = turnRef.current;
       turnRef.current = {
