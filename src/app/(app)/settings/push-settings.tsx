@@ -1,13 +1,7 @@
 "use client";
 import { connectionError } from "@/lib/connection";
 import { useEffect, useState } from "react";
-import { publicEnv } from "@/lib/env";
-
-function urlBase64ToUint8Array(base64: string) {
-  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
-  const raw = atob((base64 + padding).replace(/-/g, "+").replace(/_/g, "/"));
-  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
-}
+import { enablePush, pushSupport } from "@/lib/push-client";
 
 /** Opt-in web push for this device, with honest platform guidance. */
 export function PushSettings({ configured }: { configured: boolean }) {
@@ -16,32 +10,16 @@ export function PushSettings({ configured }: { configured: boolean }) {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    (async () => {
-      const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
-      const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
-      if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
-        setState(ios && !standalone ? "needs-install" : "unsupported");
-        return;
-      }
-      if (Notification.permission === "denied") return setState("denied");
-      const reg = await navigator.serviceWorker.getRegistration();
-      const sub = await reg?.pushManager.getSubscription();
-      setState(sub ? "on" : "off");
-    })();
+    void pushSupport().then(setState);
   }, []);
 
   async function enable() {
     setBusy(true);
     setMsg(null);
     try {
-      const reg = (await navigator.serviceWorker.getRegistration()) ?? (await navigator.serviceWorker.register("/sw.js", { scope: "/" }));
-      await navigator.serviceWorker.ready;
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") { setState(permission === "denied" ? "denied" : "off"); return; }
-      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicEnv.vapidPublicKey) });
-      const res = await fetch("/api/push/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(sub.toJSON()) });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Couldn't save subscription");
-      setState("on");
+      const next = await enablePush();
+      setState(next);
+      if (next !== "on") return;
       setMsg("Notifications enabled on this device.");
     } catch (err) {
       setMsg(err instanceof Error ? err.message : "Couldn't enable notifications");

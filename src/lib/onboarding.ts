@@ -28,6 +28,7 @@ const isStep = (v: unknown): v is WelcomeStep => typeof v === "string" && (WELCO
 export function resumeStep(status: Profile["onboarding_status"], saved: unknown): WelcomeStep | null {
   if (status === "completed") return saved === "notify" || saved === "plan" ? saved : null;
   if (status === "reviewing") return "review";
-  if (isStep(saved) && saved !== "review" && saved !== "notify" && saved !== "plan") return saved;
+  if (saved === "review") return "talk"; // the review needs a fresh draft: back to talking
+  if (isStep(saved) && saved !== "notify" && saved !== "plan") return saved;
   return status === "in_progress" ? "talk" : "hello";
 }

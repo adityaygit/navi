@@ -47,11 +47,11 @@ export function partOf(minuteOfDay: number): DayPart {
   return minuteOfDay < 12 * 60 ? "morning" : minuteOfDay < 17 * 60 ? "afternoon" : "evening";
 }
 
-/** The clearly busiest part (≥ 1 hour, and at least a quarter more than the next), else null. */
-export function busiestPart(minutes: Record<DayPart, number>): DayPart | null {
+/** The clearly busiest part (at least `min` minutes, and a quarter more than the next), else null. */
+export function busiestPart(minutes: Record<DayPart, number>, min = 60): DayPart | null {
   const ranked = (Object.entries(minutes) as [DayPart, number][]).sort((a, b) => b[1] - a[1]);
   const [top, second] = ranked;
-  if (top[1] < 60 || top[1] < second[1] * 1.25) return null;
+  if (top[1] < min || top[1] < second[1] * 1.25) return null;
   return top[0];
 }
 
@@ -138,7 +138,8 @@ export function myDayHeadline(
   for (const s of merged) {
     for (let t = s.start; t < s.end; t += 15 * 60000) byPart[partOf(minuteOfDay(t))] += Math.min(15, (s.end - t) / 60000);
   }
-  const busiest = busiestPart(byPart);
+  // "A full afternoon" needs the afternoon to really be full: three hours or more.
+  const busiest = busiestPart(byPart, 180);
   const line: Line = [];
   if (busiest) line.push({ text: `A full ${PART_WORD[busiest]}. `, strong: true });
   const plannedText = hoursText(planned);

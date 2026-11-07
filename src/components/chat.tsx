@@ -63,6 +63,7 @@ export function Chat({
   onReply,
   endVoiceSignal = 0,
   startVoiceSignal = 0,
+  emptyState,
 }: {
   kind: "chat" | "onboarding";
   /** The chat being continued; null starts a new chat on the first message. Unused for onboarding. */
@@ -87,6 +88,8 @@ export function Chat({
   endVoiceSignal?: number;
   /** Changing this number starts voice from outside (the dock's microphone). */
   startVoiceSignal?: number;
+  /** Shown instead of the default hint while there are no messages. */
+  emptyState?: React.ReactNode;
 }) {
   const panel = usePanelOptional();
   const isPanel = variant === "panel";
@@ -366,7 +369,8 @@ export function Chat({
         // Scrollable, so reachable by keyboard.
         tabIndex={0}
       >
-        {messages.length === 0 && !live && (
+        {messages.length === 0 && !live && emptyState}
+        {messages.length === 0 && !live && !emptyState && (
           <div className="m-auto flex max-w-sm flex-col items-center gap-3 py-8 text-center">
             {!isPanel && <Pebble size={56} mood="idle" float />}
             <p className="muted text-[15px]">

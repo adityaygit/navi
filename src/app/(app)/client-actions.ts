@@ -70,3 +70,7 @@ export const generateBriefingAction = safe(server.generateBriefingAction);
 export const searchTasksAction = safe(server.searchTasksAction);
 export const dismissSuggestionAction = safe(server.dismissSuggestionAction);
 export const createChatAction = safe(server.createChatAction);
+export const saveWelcomeStepAction = safe(server.saveWelcomeStepAction);
+export const saveBasicsAction = safe(server.saveBasicsAction);
+export const finishTalkAction = safe(server.finishTalkAction);
+export const skipWelcomeAction = safe(server.skipWelcomeAction);

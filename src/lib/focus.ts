@@ -27,3 +27,30 @@ export function focusElapsedSeconds(s: Pick<FocusSession, "started_at" | "paused
   const current = s.paused_at ? Math.max(0, now - Date.parse(s.paused_at)) / 1000 : 0;
   return Math.max(0, Math.floor((now - Date.parse(s.started_at)) / 1000 - (s.paused_seconds ?? 0) - current));
 }
+
+/**
+ * What may interrupt focus (owner decision, 2026-11-07): a fixed event that
+ * starts within the next 10 minutes, or a task with a hard deadline today.
+ * Everything else waits until focus ends.
+ */
+export type BreakThrough =
+  | { kind: "event"; id: string; title: string; at: number }
+  | { kind: "deadline"; id: string; title: string; at: number };
+
+export const BREAK_THROUGH_MINUTES = 10;
+
+export function breakThroughs(
+  now: number,
+  fixedEvents: { id: string; title: string; startMs: number }[],
+  hardDeadlines: { id: string; title: string; dueMs: number }[],
+  dayStartMs: number,
+  dayEndMs: number,
+): BreakThrough[] {
+  const soon = fixedEvents
+    .filter((e) => e.startMs >= now && e.startMs - now <= BREAK_THROUGH_MINUTES * 60000)
+    .map((e): BreakThrough => ({ kind: "event", id: e.id, title: e.title, at: e.startMs }));
+  const today = hardDeadlines
+    .filter((t) => t.dueMs >= dayStartMs && t.dueMs <= dayEndMs)
+    .map((t): BreakThrough => ({ kind: "deadline", id: t.id, title: t.title, at: t.dueMs }));
+  return [...soon, ...today].sort((a, b) => a.at - b.at);
+}

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { LoginForm } from "./login-form";
-import { HorizonBackdrop, Wordmark } from "./backdrop";
 import { publicEnv } from "@/lib/env";
 import { loginErrorMessage, safeNext } from "@/lib/safe-next";
+import { naviColorVars } from "@/lib/navi-colors";
 
 export const metadata = { title: "Sign in · Navi" };
 
@@ -14,22 +14,14 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   // Error codes map to fixed messages; the query string's own text is never shown.
   const errorText = loginErrorMessage(typeof error === "string" ? error : null);
   return (
-    <>
-      <HorizonBackdrop />
-      <main className="relative z-[1] mx-auto flex min-h-dvh w-full max-w-[400px] flex-col items-stretch justify-center gap-7 px-4 pb-10 pt-[calc(env(safe-area-inset-top)+40px)]">
-        <div className="flex justify-center"><Wordmark glow /></div>
-        <div className="flex flex-col gap-6 rounded-[20px] border border-white/10 bg-[rgba(10,11,14,0.78)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_40px_100px_-30px_rgba(0,0,0,0.9)] backdrop-blur-2xl sm:p-8">
-          <div className="flex flex-col gap-2 text-center">
-            <h1 className="gh text-[28px] font-semibold leading-tight tracking-[-0.03em]">Sign in to Navi</h1>
-            <p className="muted text-[15px]">Your personal operating system. Access is invite-only right now.</p>
-          </div>
-          {errorText && <p role="alert" className="notice notice-danger">{errorText}</p>}
-          <LoginForm next={safeNext(typeof next === "string" ? next : null, CHECK_ORIGIN)} googleEnabled={publicEnv.googleAuthEnabled} />
-        </div>
-        <p className="muted text-center text-sm">
-          No invite yet? <Link href="/early-access" className="font-medium text-text underline-offset-4 hover:underline">Request early access</Link>
-        </p>
+    <div className="relative flex min-h-dvh flex-col bg-black" style={naviColorVars(null) as React.CSSProperties}>
+      <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-[-120px] h-[640px] w-[980px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,color-mix(in_srgb,var(--navi-text)_8%,transparent)_0%,transparent_65%)]" />
+      <main className="relative z-[1] mx-auto flex w-full max-w-[380px] flex-1 flex-col justify-center px-4 py-16">
+        <LoginForm next={safeNext(typeof next === "string" ? next : null, CHECK_ORIGIN)} googleEnabled={publicEnv.googleAuthEnabled} error={errorText} />
       </main>
-    </>
+      <p className="relative z-[1] pb-10 text-center text-[13px] text-dim">
+        Navi is invite-only for now. Not on the list? <Link href="/early-access" className="text-[var(--navi-text)] hover:underline">Join the waitlist</Link>
+      </p>
+    </div>
   );
 }

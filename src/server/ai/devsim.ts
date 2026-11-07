@@ -87,6 +87,11 @@ export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
     if (greeting.test(text)) {
       reply = ONBOARDING_QUESTIONS[0];
     } else if (answers < ONBOARDING_QUESTIONS.length - 1 && !wantsProposal) {
+      // Keep the live "What Navi's picked up" list in sync as answers come in
+      // (the full draft so far, replacing the previous one; no review yet).
+      const soFar = [...userTurns.filter((t) => !greeting.test(t.trim())), text].join("\n");
+      const draft = buildOnboardingProposals(soFar, now).filter((i) => i.kind !== "preference");
+      if (draft.length) await call("propose_items", { items: draft, batch: "onboarding" });
       reply = ONBOARDING_QUESTIONS[answers + 1];
     } else {
       const all = [...userTurns.filter((t) => !greeting.test(t.trim())), text].join("\n");

@@ -104,9 +104,10 @@ export function Sidebar({
             <span className="relative">
               {i.icon}
               {collapsed && n > 0 && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[var(--navi-text)]" />}
-              {i.href === "/focus" && focusLive && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-focus" aria-label="Focus is running" />}
+              {i.href === "/focus" && focusLive && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-focus" aria-hidden="true" />}
             </span>
-            {!collapsed && <span className="flex-1">{i.label}</span>}
+            {!collapsed ? <span className="flex-1">{i.label}</span> : <span className="sr-only">{i.label}</span>}
+            {i.href === "/focus" && focusLive && <span className="sr-only">, running</span>}
             {!collapsed && n > 0 && (
               <span className="rounded-[10px] bg-[var(--navi-text)] px-[7px] py-px text-[12px] font-semibold text-black" aria-label={`${n} to review`}>{n}</span>
             )}

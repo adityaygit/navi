@@ -608,3 +608,18 @@ html {
   @apply inline-flex h-5 min-w-5 items-center justify-center rounded-[6px] px-1.5 text-[11px] text-dim;
   background: rgba(255, 255, 255, 0.08);
 }
+
+@keyframes fadein {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Navi 1.5: Navi is the stone, without a face. Pebble keeps its shape, colour
+   and mood motion (listening rings, working dots); the face parts are retired. */
+.pebble-eye,
+.pebble-mouth,
+.pebble-brow,
+.pebble-blush,
+.pebble-z {
+  display: none !important;
+}

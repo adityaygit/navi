@@ -237,7 +237,8 @@ max_frequency = "1s"
 # Number of characters used in the email OTP.
 otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
-otp_expiry = 3600
+# Navi 1.5 signs in with a 6-digit code (no links); the screen says it works for 10 minutes.
+otp_expiry = 600
 
 # Use a production-ready SMTP server
 # [auth.email.smtp]
@@ -248,6 +249,12 @@ otp_expiry = 3600
 # pass = "env(SENDGRID_API_KEY)"
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
+
+# Sign-in email: the 6-digit code only (Navi 1.5 has no email links). The hosted
+# project needs the same template set in the dashboard (owner action).
+[auth.email.template.magic_link]
+subject = "Your Navi sign-in code"
+content_path = "./supabase/templates/magic-link.html"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]
