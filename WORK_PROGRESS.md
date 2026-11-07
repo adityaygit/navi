@@ -188,3 +188,11 @@ See `docs/navi-1.5/RESUME_CLOUD.md` for the full resume brief: state, open owner
 - Desktop notifications (briefings) for the desktop app: Electron has no web push; plan = native notifications from the app while it runs (tray/background), fed by the server.
 - Code signing (Windows certificate, Apple Developer ID + notarization) costs money: owner decision. Until then the installers show "unknown publisher" warnings.
 - Auto-update (electron-updater + GitHub Releases) once signing is decided.
+
+## Session 3, part 3 — 1.5 is live (2026-11-07)
+
+- Owner: "push it to main", and go for the hosted migrations.
+- Hosted DB: `message_client_id` and `reminders_dismissed` applied (one transaction, via the management API; additive only). Hosted migration versions now match the repo files (20261108000001/2/3, 20261109000001), so `supabase db push` will line up.
+- main fast-forwarded to 32234e4 (main's 2 build-log commits merged in first; tsc, lint, vitest 33/289 green; CI green on the branch). Vercel production deploy READY.
+- Verified live: a normal browser at www.meetnavi.app gets the landing page; the desktop app (NaviDesktop user agent) is redirected to /login, which serves the 1.5 sign-in. The installers already built (Actions run 42384617232) open the new version; no rebuild needed.
+- Still open: sign-in by email code needs custom SMTP (owner setting up Resend). Once Resend SMTP is saved in Supabase: set OTP length 6, expiry 600 s, subject + template with `{{ .Token }}` (payload in session scratchpad `auth-patch.json`; link kept for old sessions). Until then: password sign-in (set one in Settings while signed in on the web).
