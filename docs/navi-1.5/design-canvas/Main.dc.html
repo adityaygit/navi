@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi structure prototype</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#222;background:#F3F3F3}
+a{color:#333}a:hover{color:#000}
+button{font:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #222;outline-offset:2px}
+</style>
+</helmet>
+<div style="display: flex; min-height: 900px; width: 100%; background: #F3F3F3; font-size: 14px">
+
+  <!-- LEFT NAV -->
+  <nav aria-label="Main" style="width: {{navW}}; flex-shrink: 0; background: #FAFAFA; border-right: 1px solid #D9D9D9; display: flex; flex-direction: column; padding: 12px 10px; gap: 4px; box-sizing: border-box">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 44px; padding: 0 6px">
+      <sc-if value="{{navOpen}}" hint-placeholder-val="{{ true }}"><span style="font-weight: 700; font-size: 16px">Navi</span></sc-if>
+      <button type="button" onClick="{{toggleNav}}" aria-label="{{navLabel}}" style="width: 36px; height: 36px; border: 1px solid #D9D9D9; background: #fff; border-radius: 8px; display: flex; align-items: center; justify-content: center">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><line x1="9" y1="4" x2="9" y2="20"></line></svg>
+      </button>
+    </div>
+    <sc-for list="{{navItems}}" as="n" hint-placeholder-count="6">
+      <button type="button" onClick="{{n.go}}" aria-current="{{n.current}}" aria-label="{{n.label}}" style="height: 40px; border: 0; border-radius: 8px; background: {{n.bg}}; font-weight: {{n.weight}}; color: #222; display: flex; align-items: center; gap: 10px; padding: 0 10px; text-align: left">
+        <span style="width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid #555; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700">{{n.glyph}}</span>
+        <sc-if value="{{navOpen}}" hint-placeholder-val="{{ true }}"><span style="flex: 1">{{n.label}}</span></sc-if>
+        <sc-if value="{{n.showBadge}}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; background: #222; color: #fff; border-radius: 10px; padding: 1px 7px">{{n.badge}}</span></sc-if>
+      </button>
+    </sc-for>
+    <sc-if value="{{navOpen}}" hint-placeholder-val="{{ true }}">
+      <div style="margin-top: 20px; padding: 0 10px; font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.04em">Recent chats</div>
+      <div style="padding: 6px 10px; color: #444">Plan for Saturday</div>
+      <div style="padding: 6px 10px; color: #444">Budget draft questions</div>
+    </sc-if>
+    <div style="flex: 1"></div>
+    <div style="display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-top: 1px solid #E4E4E4">
+      <span style="width: 28px; height: 28px; border-radius: 50%; background: #D9D9D9; flex-shrink: 0"></span>
+      <sc-if value="{{navOpen}}" hint-placeholder-val="{{ true }}"><span style="color: #444">Settings</span></sc-if>
+    </div>
+  </nav>
+
+  <!-- CENTER -->
+  <main style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+    <div style="height: 56px; border-bottom: 1px solid #E0E0E0; display: flex; align-items: center; padding: 0 28px; gap: 12px; background: #fff">
+      <span style="font-weight: 600; font-size: 15px">{{title}}</span>
+      <span style="color: #666">{{subtitle}}</span>
+      <span style="flex: 1"></span>
+      <span style="font-size: 12px; color: #666; border: 1px dashed #BBB; border-radius: 6px; padding: 3px 8px">Sample data · structure only</span>
+    </div>
+
+    <sc-if value="{{isHome}}" hint-placeholder-val="{{ true }}">
+      <div style="flex: 1; display: flex; flex-direction: column; align-items: center; padding: 72px 32px 40px; gap: 28px">
+        <div aria-hidden="true" style="width: 120px; height: 120px; border-radius: 50%; background: #CFCFCF; border: 2px solid #B5B5B5"></div>
+        <div style="text-align: center; display: flex; flex-direction: column; gap: 6px">
+          <h1 style="margin: 0; font-size: 28px; font-weight: 600">Good afternoon. Pick up where you left off?</h1>
+          <p style="margin: 0; color: #555">You stopped 12 minutes into “Finish the quarterly budget draft”.</p>
+        </div>
+        <div style="width: 100%; max-width: 620px; background: #fff; border: 1px solid #D9D9D9; border-radius: 12px; padding: 18px 20px; display: flex; align-items: center; gap: 16px; box-sizing: border-box">
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 4px">
+            <span style="font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.04em">Continue</span>
+            <span style="font-weight: 600">Finish the quarterly budget draft</span>
+            <span style="color: #555">Focus block until 3:30 · 18 min left · Project: Work</span>
+          </div>
+          <button type="button" onClick="{{goFocus}}" style="height: 44px; padding: 0 18px; border-radius: 10px; border: 0; background: #222; color: #fff; font-weight: 600">Resume focus</button>
+        </div>
+        <div style="width: 100%; max-width: 620px; border: 1px dashed #BBB; border-radius: 12px; padding: 14px 20px; display: flex; align-items: center; gap: 12px; box-sizing: border-box; color: #444">
+          <span style="flex: 1">One thing: “Book dentist appointment” is due tomorrow and isn't scheduled yet.</span>
+          <button type="button" style="height: 36px; padding: 0 12px; border-radius: 8px; border: 1px solid #BBB; background: #fff">Find a slot</button>
+          <button type="button" aria-label="Dismiss" style="height: 36px; width: 36px; border-radius: 8px; border: 1px solid #BBB; background: #fff">×</button>
+        </div>
+        <div style="width: 100%; max-width: 620px; display: flex; gap: 8px; margin-top: 12px">
+          <label for="homeInput" style="position: absolute; left: -9999px">Talk to Navi</label>
+          <input id="homeInput" value="{{draft}}" onChange="{{onDraft}}" placeholder="Tell Navi anything — a task, a worry, a plan…" style="flex: 1; height: 52px; border-radius: 26px; border: 1px solid #BBB; padding: 0 20px; font: inherit; background: #fff">
+          <button type="button" aria-label="Start voice" style="width: 52px; height: 52px; border-radius: 50%; border: 1px solid #BBB; background: #fff">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#222" stroke-width="2" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>
+          </button>
+        </div>
+        <p style="margin: 0; font-size: 12px; color: #666">Home has no side panel: the companion lives here and shrinks to the orb in workspaces. Your draft carries over.</p>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isTasks}}" hint-placeholder-val="{{ false }}">
+      <div style="padding: 24px 28px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap">
+          <button type="button" style="height: 34px; padding: 0 12px; border-radius: 17px; border: 1px solid #222; background: #222; color: #fff">All</button>
+          <button type="button" style="height: 34px; padding: 0 12px; border-radius: 17px; border: 1px solid #BBB; background: #fff">Today</button>
+          <button type="button" style="height: 34px; padding: 0 12px; border-radius: 17px; border: 1px solid #BBB; background: #fff">Unscheduled</button>
+          <button type="button" style="height: 34px; padding: 0 12px; border-radius: 17px; border: 1px solid #BBB; background: #fff">Done</button>
+          <span style="flex: 1"></span>
+          <button type="button" style="height: 34px; padding: 0 14px; border-radius: 8px; border: 0; background: #222; color: #fff">+ New task</button>
+        </div>
+        <div style="background: #fff; border: 1px solid #D9D9D9; border-radius: 12px">
+          <sc-for list="{{tasks}}" as="t" hint-placeholder-count="5">
+            <div style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-bottom: 1px solid #EEE">
+              <button type="button" onClick="{{t.toggle}}" aria-label="{{t.checkLabel}}" aria-pressed="{{t.done}}" style="width: 22px; height: 22px; border-radius: 6px; border: 1.5px solid #555; background: {{t.boxBg}}; color: #fff; font-size: 13px; padding: 0">{{t.mark}}</button>
+              <div style="flex: 1; display: flex; flex-direction: column; gap: 2px">
+                <span style="text-decoration: {{t.strike}}; color: {{t.color}}">{{t.title}}</span>
+                <span style="font-size: 12px; color: #666">{{t.meta}}</span>
+              </div>
+              <span style="font-size: 12px; border: 1px solid #BBB; border-radius: 6px; padding: 2px 8px; color: #444">{{t.sched}}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isPlanner}}" hint-placeholder-val="{{ false }}">
+      <div style="padding: 24px 28px; display: flex; gap: 20px">
+        <div style="flex: 1; background: #fff; border: 1px solid #D9D9D9; border-radius: 12px; padding: 12px 16px; display: flex; flex-direction: column">
+          <div style="display: flex; gap: 6px; margin-bottom: 12px"><span style="font-weight: 600">Friday 6</span><span style="color: #666">· Week view ›</span></div>
+          <sc-for list="{{hours}}" as="h" hint-placeholder-count="9">
+            <div style="display: flex; gap: 12px; min-height: 52px; border-top: 1px solid #EEE; align-items: stretch">
+              <span style="width: 44px; font-size: 12px; color: #666; padding-top: 4px">{{h.label}}</span>
+              <div style="flex: 1; padding: 4px 0">
+                <sc-if value="{{h.has}}" hint-placeholder-val="{{ false }}">
+                  <div style="border: {{h.border}}; background: {{h.bg}}; border-radius: 8px; padding: 8px 10px; display: flex; gap: 8px; align-items: center">
+                    <span style="font-weight: 600">{{h.title}}</span><span style="font-size: 12px; color: #555">{{h.kind}}</span>
+                  </div>
+                </sc-if>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="width: 220px; display: flex; flex-direction: column; gap: 8px">
+          <span style="font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.04em">Unscheduled</span>
+          <div style="background: #fff; border: 1px solid #D9D9D9; border-radius: 10px; padding: 10px 12px">Book dentist appointment<br><span style="font-size: 12px; color: #666">due tomorrow · drag to plan</span></div>
+          <div style="background: #fff; border: 1px solid #D9D9D9; border-radius: 10px; padding: 10px 12px">Call Sam about the move</div>
+          <div style="margin-top: 12px; font-size: 12px; color: #444; display: flex; flex-direction: column; gap: 6px">
+            <span>▭ solid = fixed event</span><span>┅ dashed = flexible block</span>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isInbox}}" hint-placeholder-val="{{ false }}">
+      <div style="padding: 24px 28px; display: flex; flex-direction: column; gap: 14px; max-width: 760px">
+        <p style="margin: 0; color: #555">From your note at 2:14 PM: “need to finish the budget draft tomorrow and sort the move sometime this weekend”</p>
+        <div style="background: #fff; border: 1px solid #D9D9D9; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+          <span style="font-size: 12px; color: #666">Draft task · clear</span>
+          <span style="font-weight: 600">Finish the budget draft</span>
+          <span style="color: #555">Due tomorrow · Project: Work</span>
+          <div style="display: flex; gap: 8px"><button type="button" style="height: 36px; padding: 0 14px; border: 0; border-radius: 8px; background: #222; color: #fff">Add task</button><button type="button" style="height: 36px; padding: 0 14px; border: 1px solid #BBB; border-radius: 8px; background: #fff">Edit</button><button type="button" style="height: 36px; padding: 0 14px; border: 1px solid #BBB; border-radius: 8px; background: #fff">Discard</button></div>
+        </div>
+        <div style="background: #fff; border: 1px solid #D9D9D9; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+          <span style="font-size: 12px; color: #666">Draft task · timing unclear (“sometime this weekend”) — not scheduled</span>
+          <span style="font-weight: 600">Sort out the move</span>
+          <div style="display: flex; gap: 8px"><button type="button" style="height: 36px; padding: 0 14px; border: 0; border-radius: 8px; background: #222; color: #fff">Add task</button><button type="button" style="height: 36px; padding: 0 14px; border: 1px solid #BBB; border-radius: 8px; background: #fff">Edit</button><button type="button" style="height: 36px; padding: 0 14px; border: 1px solid #BBB; border-radius: 8px; background: #fff">Discard</button></div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isProjects}}" hint-placeholder-val="{{ false }}">
+      <div style="padding: 24px 28px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px">
+        <div style="background: #fff; border: 1px solid #D9D9D9; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 6px"><span style="font-weight: 600">Work</span><span style="color: #555">Next: Finish the quarterly budget draft</span><span style="font-size: 12px; color: #666">4 open · 2 done this week</span></div>
+        <div style="background: #fff; border: 1px solid #D9D9D9; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 6px"><span style="font-weight: 600">Moving house</span><span style="color: #555">Next: Call Sam about the move</span><span style="font-size: 12px; color: #666">3 open</span></div>
+        <div style="background: #fff; border: 1px solid #D9D9D9; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 6px"><span style="font-weight: 600">Health</span><span style="color: #555">Next: Book dentist appointment</span><span style="font-size: 12px; color: #666">1 open</span></div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isFocus}}" hint-placeholder-val="{{ false }}">
+      <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 40px">
+        <span style="font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.06em">Focusing on</span>
+        <span style="font-size: 24px; font-weight: 600">Finish the quarterly budget draft</span>
+        <span style="font-size: 72px; font-weight: 300; font-variant-numeric: tabular-nums">18:04</span>
+        <div style="display: flex; gap: 10px">
+          <button type="button" style="height: 44px; padding: 0 20px; border-radius: 10px; border: 1px solid #BBB; background: #fff">Pause</button>
+          <button type="button" style="height: 44px; padding: 0 20px; border-radius: 10px; border: 0; background: #222; color: #fff">Mark done</button>
+          <button type="button" onClick="{{goTasks}}" style="height: 44px; padding: 0 20px; border-radius: 10px; border: 1px solid #BBB; background: #fff">End focus</button>
+        </div>
+        <p style="margin: 0; color: #666; font-size: 12px; max-width: 420px; text-align: center">Panel docked automatically on entry (your saved choice is untouched). Non-urgent suggestions wait until you finish.</p>
+      </div>
+    </sc-if>
+  </main>
+
+  <!-- RIGHT NAVI PANEL (workspaces only) -->
+  <sc-if value="{{showPanel}}" hint-placeholder-val="{{ false }}">
+    <aside aria-label="Navi" style="width: 360px; flex-shrink: 0; background: #FAFAFA; border-left: 1px solid #D9D9D9; display: flex; flex-direction: column">
+      <div style="height: 56px; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid #E0E0E0">
+        <span aria-hidden="true" style="width: 28px; height: 28px; border-radius: 50%; background: #CFCFCF; border: 2px solid #B5B5B5"></span>
+        <span style="font-weight: 600">Navi</span><span style="color: #666; font-size: 12px">· idle</span>
+        <span style="flex: 1"></span>
+        <button type="button" onClick="{{togglePanel}}" aria-label="Collapse Navi panel" style="width: 36px; height: 36px; border-radius: 8px; border: 1px solid #D9D9D9; background: #fff">›</button>
+      </div>
+      <div style="flex: 1; padding: 14px; display: flex; flex-direction: column; gap: 10px; overflow: auto">
+        <sc-for list="{{msgs}}" as="m" hint-placeholder-count="3">
+          <div style="align-self: {{m.align}}; max-width: 85%; background: {{m.bg}}; color: {{m.fg}}; border: 1px solid #D9D9D9; border-radius: 12px; padding: 10px 12px; line-height: 1.4">{{m.text}}</div>
+        </sc-for>
+        <div style="border: 1px solid #BBB; background: #fff; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px">
+          <span style="font-size: 12px; color: #666">Waiting for you · action card</span>
+          <span style="font-weight: 600">Plan “Sort out the move” Sat 10:00–11:00</span>
+          <div style="display: flex; gap: 6px"><button type="button" style="height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: #222; color: #fff">Approve</button><button type="button" style="height: 32px; padding: 0 12px; border: 1px solid #BBB; border-radius: 8px; background: #fff">Not now</button></div>
+        </div>
+      </div>
+      <div style="padding: 12px; border-top: 1px solid #E0E0E0; display: flex; gap: 8px">
+        <label for="panelInput" style="position: absolute; left: -9999px">Message Navi</label>
+        <input id="panelInput" value="{{draft}}" onChange="{{onDraft}}" placeholder="Message Navi…" style="flex: 1; height: 44px; border-radius: 22px; border: 1px solid #BBB; padding: 0 16px; font: inherit; background: #fff">
+        <button type="button" aria-label="Start voice" style="width: 44px; height: 44px; border-radius: 50%; border: 1px solid #BBB; background: #fff">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#222" stroke-width="2" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>
+        </button>
+        <button type="button" onClick="{{send}}" aria-label="Send" style="width: 44px; height: 44px; border-radius: 50%; border: 0; background: #222; color: #fff">↑</button>
+      </div>
+    </aside>
+  </sc-if>
+
+  <sc-if value="{{showDock}}" hint-placeholder-val="{{ false }}">
+    <div style="width: 64px; flex-shrink: 0; border-left: 1px solid #D9D9D9; background: #FAFAFA; display: flex; flex-direction: column; align-items: center; padding-top: 12px; gap: 8px">
+      <button type="button" onClick="{{togglePanel}}" aria-label="Open Navi panel" style="width: 44px; height: 44px; border-radius: 50%; border: 2px solid #B5B5B5; background: #CFCFCF"></button>
+      <sc-if value="{{hasDraft}}" hint-placeholder-val="{{ false }}"><span style="font-size: 11px; color: #555; text-align: center">draft<br>kept</span></sc-if>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      view: 'home', navOpen: true, panelPref: true, focusPanel: false, draft: '',
+      done: { 0: false, 1: false, 2: false, 3: true, 4: false },
+      msgs: [
+        { me: false, text: 'Morning! You have 3 things today. The budget draft is the one that matters most.' },
+        { me: true, text: 'Can you find time for the move this weekend?' },
+        { me: false, text: 'Saturday 10–11 is free. Want me to hold it? (card below)' }
+      ]
+    };
+  }
+  renderVals() {
+    const s = this.state;
+    const go = (v) => () => this.setState(v === 'focus' ? { view: v, focusPanel: false } : { view: v });
+    const items = [
+      ['home', 'Home', 'H'], ['planner', 'Planner', 'P'], ['tasks', 'Tasks', 'T'],
+      ['projects', 'Projects', 'Pr'], ['inbox', 'Inbox', 'In'], ['focus', 'Focus', 'F']
+    ];
+    const titles = { home: ['Home', ''], planner: ['Planner', 'Friday, Nov 6'], tasks: ['Tasks', '5 open'], projects: ['Projects', '3 active'], inbox: ['Inbox', '2 drafts to review'], focus: ['Focus', 'In session'] };
+    const taskData = [
+      ['Finish the quarterly budget draft', 'Work · due today', 'Today 2:00–3:30'],
+      ['Book dentist appointment', 'Health · due tomorrow', 'Unscheduled'],
+      ['Call Sam about the move', 'Moving house', 'Unscheduled'],
+      ['Renew library books', 'done yesterday', 'Done'],
+      ['Draft weekly review notes', 'Personal · Sunday', 'Sun 6:00 PM']
+    ];
+    const blocks = { 1: ['Team sync', 'fixed event', 'solid'], 4: ['Budget draft', 'flexible block · linked task', 'dashed'], 5: ['Budget draft', 'continues', 'dashed'], 7: ['Dentist call window', 'flexible block', 'dashed'] };
+    const inWorkspace = s.view !== 'home';
+    const panelOpen = s.view === 'focus' ? s.focusPanel : s.panelPref;
+    return {
+      navOpen: s.navOpen,
+      navW: s.navOpen ? '248px' : '68px',
+      navLabel: s.navOpen ? 'Collapse sidebar' : 'Expand sidebar',
+      toggleNav: () => this.setState({ navOpen: !s.navOpen }),
+      navItems: items.map(([id, label, glyph]) => ({
+        label, glyph, go: go(id), current: s.view === id ? 'page' : 'false',
+        bg: s.view === id ? '#E4E4E4' : 'transparent', weight: s.view === id ? 600 : 400,
+        showBadge: id === 'inbox', badge: '2'
+      })),
+      title: titles[s.view][0], subtitle: titles[s.view][1],
+      isHome: s.view === 'home', isTasks: s.view === 'tasks', isPlanner: s.view === 'planner',
+      isInbox: s.view === 'inbox', isProjects: s.view === 'projects', isFocus: s.view === 'focus',
+      showPanel: inWorkspace && panelOpen, showDock: inWorkspace && !panelOpen,
+      togglePanel: () => this.setState(s.view === 'focus' ? { focusPanel: !s.focusPanel } : { panelPref: !s.panelPref }),
+      goFocus: go('focus'), goTasks: go('tasks'),
+      draft: s.draft, hasDraft: s.draft.length > 0,
+      onDraft: (e) => this.setState({ draft: e.target.value }),
+      send: () => { if (!s.draft.trim()) return; this.setState({ draft: '', msgs: s.msgs.concat([{ me: true, text: s.draft }]) }); },
+      msgs: s.msgs.map((m) => ({ text: m.text, align: m.me ? 'flex-end' : 'flex-start', bg: m.me ? '#222' : '#fff', fg: m.me ? '#fff' : '#222' })),
+      tasks: taskData.map(([title, meta, sched], i) => {
+        const done = !!s.done[i];
+        return {
+          title, meta, sched: done ? 'Done' : sched, done: done ? 'true' : 'false',
+          mark: done ? '✓' : '', boxBg: done ? '#222' : '#fff', strike: done ? 'line-through' : 'none', color: done ? '#666' : '#222',
+          checkLabel: (done ? 'Reopen ' : 'Complete ') + title,
+          toggle: () => this.setState({ done: Object.assign({}, s.done, { [i]: !done }) })
+        };
+      }),
+      hours: [9, 10, 11, 12, 13, 14, 15, 16, 17].map((h, i) => {
+        const b = blocks[i];
+        return {
+          label: (h > 12 ? h - 12 : h) + (h >= 12 ? ' PM' : ' AM'), has: !!b,
+          title: b ? b[0] : '', kind: b ? b[1] : '',
+          border: b && b[2] === 'solid' ? '1.5px solid #555' : '1.5px dashed #777', bg: b && b[2] === 'solid' ? '#E8E8E8' : '#F7F7F7'
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

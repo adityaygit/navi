@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi Focus</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#9FE6B8}a:hover{color:#C9F5D8}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; background: #0A0A0B; color: #EDEDEF; font-family: Inter, sans-serif; font-size: 13px; letter-spacing: -0.005em; font-feature-settings: 'cv11', 'ss01', 'tnum'">
+
+  <nav aria-label="Main" style="width: 60px; display: flex; flex-direction: column; align-items: center; padding-top: 18px; gap: 6px">
+    <span aria-hidden="true" style="width: 16px; height: 15px; margin-bottom: 18px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #9FE6B8 30%, #2E7D63 100%)"></span>
+    <a href="#" aria-label="Home" style="width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #8B8B93"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20H4z"></path></svg></a>
+    <a href="#" aria-label="Inbox" style="width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #8B8B93"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 13h5l1.5 3h5L16 13h5"></path><path d="M5 5h14l2 8v6H3v-6z"></path></svg></a>
+    <a href="#" aria-label="Tasks" style="width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #8B8B93"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg></a>
+    <a href="#" aria-label="Planner" style="width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #8B8B93"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"></rect><path d="M4 10h16M9 3v4M15 3v4"></path></svg></a>
+    <a href="#" aria-label="Projects" style="width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #8B8B93"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 7h6l2 2h8v10H4z"></path></svg></a>
+    <a href="#" aria-current="page" aria-label="Focus" style="width: 36px; height: 36px; border-radius: 8px; background: #1A1A1D; display: flex; align-items: center; justify-content: center; color: #EDEDEF"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle></svg></a>
+  </nav>
+
+  <main style="flex: 1; margin: 8px 0; background: #0E0E10; border: 1px solid #1A1A1D; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; overflow: hidden">
+    <div style="position: absolute; top: 16px; left: 20px; right: 20px; display: flex; color: #8B8B93">
+      <span>Focus</span><span style="flex: 1"></span><span>Ends at 2:48 PM</span>
+    </div>
+
+    <span style="font-size: 12px; font-weight: 500; color: #8B8B93; letter-spacing: 0.02em">Work · Budget</span>
+    <h1 style="margin: 8px 0 0; font-size: 22px; font-weight: 500; letter-spacing: -0.02em">Finish the quarterly budget draft</h1>
+
+    <div style="position: relative; width: 320px; height: 320px; margin-top: 34px; display: flex; align-items: center; justify-content: center">
+      <svg width="320" height="320" viewBox="0 0 320 320" aria-hidden="true" style="position: absolute; left: 0; top: 0"><circle cx="160" cy="160" r="150" fill="none" stroke="#1C1C20" stroke-width="2"></circle><circle cx="160" cy="160" r="150" fill="none" stroke="#9FE6B8" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="565 943" transform="rotate(-90 160 160)"></circle></svg>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 4px">
+        <span style="font-size: 92px; font-weight: 200; letter-spacing: -0.04em; line-height: 1; color: #F4F4F6">17:52</span>
+        <span style="color: #8B8B93">left of 45 min</span>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 8px; margin-top: 36px">
+      <span style="height: 40px; padding: 0 18px; border-radius: 10px; border: 1px solid #2A2A2F; display: flex; align-items: center; gap: 10px">Pause <span style="font-size: 11px; color: #8B8B93">Space</span></span>
+      <span style="height: 40px; padding: 0 18px; border-radius: 10px; background: #9FE6B8; color: #0B2117; font-weight: 600; display: flex; align-items: center">Mark done</span>
+      <span style="height: 40px; padding: 0 14px; color: #A1A1A9; display: flex; align-items: center">End session</span>
+    </div>
+
+    <div style="position: absolute; bottom: 22px; display: flex; align-items: center; gap: 10px; color: #8B8B93">
+      <span aria-hidden="true" style="width: 10px; height: 9px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #9FE6B8 35%, #2E7D63 100%)"></span>
+      Navi is holding 2 things that can wait until you're done.
+    </div>
+  </main>
+
+  <aside aria-label="Navi (docked during focus)" style="width: 60px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; padding-top: 16px; gap: 14px">
+    <span role="img" aria-label="Open Navi" style="width: 30px; height: 27px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 33% 27%, #F4FFF8 0%, #C6F4D6 12%, #7FD8A8 38%, #2F8566 75%, #133C31 100%); opacity: 0.85"></span>
+    <span aria-label="Start voice" style="width: 34px; height: 34px; border-radius: 9px; border: 1px solid #26262B; display: flex; align-items: center; justify-content: center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C9C9CF" stroke-width="1.6" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"></path></svg></span>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

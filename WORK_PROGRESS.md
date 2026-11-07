@@ -89,3 +89,18 @@ Resume doc for the 1.5 desktop rebuild. Product brief: the "navi-1.5-desktop-han
 ## Continuation prompt
 
 "Resume Navi 1.5 desktop work from `WORK_PROGRESS.md`, read `CLAUDE.md`, verify the current branch and test state, then continue the highest-priority next action. Keep the parallel audit/engineering and owner-guided design tracks coordinated; do not deploy production or assume unverified success."
+
+## ▶ Pause point (end of cloud session 1, 2026-11-06) — resume LOCALLY
+
+- Handoff specs saved in `docs/navi-1.5/handoff/` (START_HERE.md, CLAUDE.md, 01–11). Read these first.
+- Design canvas source saved in `docs/navi-1.5/design-canvas/` (`.dc.html` artboards + canvas.json). Live canvas: https://claude.ai/artifact/52ooLVKUB77ZxGF1tGH267 (owner-private).
+- **Approved direction:** Round 3 (V3-Home, V3-Tasks, V3-Planner = "My Day"): pure black, Figtree, mint Navi stone, Navi sentence per page, time-of-day task groups, life Spaces, vertical day timeline.
+- **Owner's round-4 refinements (in progress, only #2/#3 partly applied to V3-Home):**
+  1. My Day stays the default timeline, plus a full interactive Day/Week calendar view (toggle "Timeline · Calendar").
+  2. Don't repeat the same recommendation in Home headline and action card. (Applied to V3-Home.)
+  3. Every contextual sentence must come from real data/actions; Navi only claims an action if it's in activity_log (with Undo). V3-Planner still says "I kept your evening clear for dinner with Maya" — replace with data-derived text, e.g. "A full afternoon. 9 hours planned, 3½ free — most of it before 2."
+  4. Navi panel keeps state + workspace awareness when expanded/collapsed (context chip "Looking at: My day · Friday", draft kept, live voice shown on dock, badge for reply/action, Focus auto-collapse holding non-urgent items).
+  5. Advanced features via progressive disclosure (task "More details": hard deadline, estimate, repeat, reminder; ⌘K command palette; calendar view) without cluttering default UI.
+  Planned new boards: Calendar (week), Panel states, Advanced (⌘K + task details), "Where each sentence comes from" rules. Owner then approves → implement.
+- Owner wants it to feel like a personal companion, not a productivity tool. Don't over-redesign what works.
+- Still open owner decisions: P0-PROD-1 (prod approval mismatch: ship approval branch vs roll back migration); applying the 3 new local migrations to hosted.

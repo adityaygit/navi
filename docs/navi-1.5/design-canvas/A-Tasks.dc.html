@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Direction A Paper Tasks</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#2F6B57}a:hover{color:#1F4A3C}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; background: #F5F2EC; color: #22201C; font-family: Manrope, sans-serif; font-size: 15px">
+  <nav aria-label="Main" style="width: 248px; padding: 20px 14px; display: flex; flex-direction: column; gap: 2px; box-sizing: border-box">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 0 10px 22px"><span style="width: 22px; height: 22px; border-radius: 50%; background: {{accent}}"></span><span style="font-weight: 700; font-size: 17px">Navi</span></div>
+    <a href="#" style="height: 40px; display: flex; align-items: center; padding: 0 12px; border-radius: 10px; color: #4A453E; text-decoration: none">Home</a>
+    <a href="#" style="height: 40px; display: flex; align-items: center; padding: 0 12px; border-radius: 10px; color: #4A453E; text-decoration: none">Planner</a>
+    <a href="#" style="height: 40px; display: flex; align-items: center; padding: 0 12px; border-radius: 10px; background: #EAE5DB; color: #22201C; text-decoration: none; font-weight: 600">Tasks</a>
+    <a href="#" style="height: 40px; display: flex; align-items: center; padding: 0 12px; border-radius: 10px; color: #4A453E; text-decoration: none">Projects</a>
+    <a href="#" style="height: 40px; display: flex; align-items: center; padding: 0 12px; border-radius: 10px; color: #4A453E; text-decoration: none">Inbox · 2</a>
+    <a href="#" style="height: 40px; display: flex; align-items: center; padding: 0 12px; border-radius: 10px; color: #4A453E; text-decoration: none">Focus</a>
+  </nav>
+  <main style="flex: 1; margin: 12px 0 12px 0; background: #FFFDF8; border-radius: 20px; border: 1px solid #E6E0D4; display: flex; flex-direction: column; padding: 32px 40px; gap: 20px; box-sizing: border-box; min-width: 0">
+    <div style="display: flex; align-items: baseline; gap: 14px">
+      <h1 style="margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.02em">Tasks</h1><span style="color: #6B655C">5 open · 1 done today</span>
+      <span style="flex: 1"></span>
+      <a href="#" style="height: 40px; padding: 0 16px; border-radius: 20px; background: {{accent}}; color: #FFFDF8; font-weight: 600; display: flex; align-items: center; text-decoration: none">New task</a>
+    </div>
+    <div style="display: flex; gap: 6px">
+      <span style="padding: 7px 14px; border-radius: 18px; background: #22201C; color: #FFFDF8; font-weight: 600">All</span>
+      <span style="padding: 7px 14px; border-radius: 18px; background: #F0EBE1">Today</span>
+      <span style="padding: 7px 14px; border-radius: 18px; background: #F0EBE1">Unscheduled</span>
+      <span style="padding: 7px 14px; border-radius: 18px; background: #F0EBE1">Done</span>
+    </div>
+    <div style="display: flex; flex-direction: column">
+      <div style="font-size: 12px; font-weight: 700; color: #6B655C; padding: 8px 0">TODAY</div>
+      <div style="display: flex; align-items: center; gap: 14px; padding: 14px 4px; border-top: 1px solid #ECE6DA">
+        <span style="width: 22px; height: 22px; border-radius: 50%; border: 2px solid #8E877B; box-sizing: border-box"></span>
+        <span style="flex: 1; font-weight: 600">Finish the quarterly budget draft</span><span style="color: #6B655C">Work</span>
+        <span style="font-size: 13px; padding: 3px 10px; border-radius: 12px; background: #E4EEE9; color: #1F4A3C">2:00–3:30</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px; padding: 14px 4px; border-top: 1px solid #ECE6DA">
+        <span style="width: 22px; height: 22px; border-radius: 50%; background: {{accent}}; color: #fff; font-size: 13px; display: flex; align-items: center; justify-content: center">✓</span>
+        <span style="flex: 1; color: #8E877B; text-decoration: line-through">Reply to the landlord</span><span style="color: #8E877B">Moving</span>
+      </div>
+      <div style="font-size: 12px; font-weight: 700; color: #6B655C; padding: 18px 0 8px">UPCOMING</div>
+      <div style="display: flex; align-items: center; gap: 14px; padding: 14px 4px; border-top: 1px solid #ECE6DA">
+        <span style="width: 22px; height: 22px; border-radius: 50%; border: 2px solid #8E877B; box-sizing: border-box"></span>
+        <span style="flex: 1">Book dentist appointment</span><span style="color: #6B655C">Health · due tomorrow</span>
+        <span style="font-size: 13px; padding: 3px 10px; border-radius: 12px; border: 1px dashed #B5AD9F; color: #6B655C">Unscheduled</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px; padding: 14px 4px; border-top: 1px solid #ECE6DA">
+        <span style="width: 22px; height: 22px; border-radius: 50%; border: 2px solid #8E877B; box-sizing: border-box"></span>
+        <span style="flex: 1">Call Sam about the move</span><span style="color: #6B655C">Moving</span>
+        <span style="font-size: 13px; padding: 3px 10px; border-radius: 12px; border: 1px dashed #B5AD9F; color: #6B655C">Unscheduled</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px; padding: 14px 4px; border-top: 1px solid #ECE6DA; border-bottom: 1px solid #ECE6DA">
+        <span style="width: 22px; height: 22px; border-radius: 50%; border: 2px solid #8E877B; box-sizing: border-box"></span>
+        <span style="flex: 1">Draft weekly review notes</span><span style="color: #6B655C">Personal · Sunday</span>
+        <span style="font-size: 13px; padding: 3px 10px; border-radius: 12px; background: #E4EEE9; color: #1F4A3C">Sun 6:00 PM</span>
+      </div>
+    </div>
+  </main>
+  <aside aria-label="Navi" style="width: 368px; padding: 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 6px 6px 4px">
+      <span aria-hidden="true" style="width: 30px; height: 28px; border-radius: 52% 48% 46% 54% / 55% 52% 48% 45%; background: {{accent}}"></span>
+      <span style="font-weight: 700">Navi</span><span style="color: #6B655C; font-size: 13px">here when you need it</span>
+      <span style="flex: 1"></span>
+      <span aria-label="Collapse panel" style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #6B655C">›</span>
+    </div>
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 10px; padding: 4px 6px; overflow: hidden">
+      <div style="align-self: flex-end; max-width: 85%; background: #22201C; color: #FFFDF8; border-radius: 16px 16px 4px 16px; padding: 10px 14px; line-height: 1.45">Can you find time for the move this weekend?</div>
+      <div style="max-width: 90%; line-height: 1.5">Saturday 10–11 is free and nothing else is planned around it. I've drafted it — nothing's on your calendar until you approve.</div>
+      <div style="background: #FFFDF8; border: 1px solid #DCD5C7; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px">
+        <span style="font-size: 12px; font-weight: 700; color: #6B655C">PLAN · WAITING FOR YOU</span>
+        <span style="font-weight: 600">Call Sam about the move</span>
+        <span style="color: #4A453E">Sat Nov 7 · 10:00–11:00 · flexible block</span>
+        <div style="display: flex; gap: 8px; margin-top: 4px"><span style="padding: 8px 16px; border-radius: 18px; background: {{accent}}; color: #FFFDF8; font-weight: 600">Approve</span><span style="padding: 8px 16px; border-radius: 18px; background: #F0EBE1">Change</span><span style="padding: 8px 12px; color: #6B655C">Not now</span></div>
+      </div>
+    </div>
+    <div style="height: 54px; border-radius: 27px; background: #fff; border: 1px solid #DCD5C7; display: flex; align-items: center; padding: 0 6px 0 18px; gap: 6px">
+      <span style="flex: 1; color: #6B655C">Message Navi…</span>
+      <span style="width: 42px; height: 42px; border-radius: 50%; background: #F5F2EC; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22201C" stroke-width="1.8" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg></span>
+    </div>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#2F6B57","options":["#2F6B57","#B4532A","#3A4E8C","#22201C"]},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return { accent: this.props.accent ?? '#2F6B57' }; }
+}
+</script>
+</body>
+</html>

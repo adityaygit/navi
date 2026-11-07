@@ -1,0 +1,31 @@
+{
+  "project": "Navi 1.5 desktop alpha",
+  "package_type": "implementation handoff (not code audit)",
+  "version": "1.0",
+  "read_first": [
+    "START_HERE.md",
+    "CLAUDE.md"
+  ],
+  "files": [
+    "01_PRODUCT_DIRECTION.md",
+    "02_DESKTOP_UX.md",
+    "03_FUNCTIONAL_SCOPE.md",
+    "04_V1_AUDIT.md",
+    "05_ARCHITECTURE_AND_DATA.md",
+    "06_DESIGN_COLLABORATION.md",
+    "07_EXECUTION_PLAN.md",
+    "08_ACCEPTANCE_AND_QA.md",
+    "09_SAFETY_AND_BOUNDARIES.md",
+    "10_DECISIONS_AND_OPEN_QUESTIONS.md",
+    "11_PROGRESS_TEMPLATE.md",
+    "CLAUDE.md",
+    "KICKOFF_PROMPT.md",
+    "START_HERE.md"
+  ],
+  "notes": [
+    "Desktop only",
+    "Visual styling owner-led",
+    "Audit real V1 before assuming reliability",
+    "Protected preview; no unapproved production changes"
+  ]
+}

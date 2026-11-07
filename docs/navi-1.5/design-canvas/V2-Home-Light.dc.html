@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi Home light</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#1F7A55}a:hover{color:#145C3F}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; background: #F3F3F1; color: #18181B; font-family: Inter, sans-serif; font-size: 13px; letter-spacing: -0.005em; font-feature-settings: 'cv11', 'ss01', 'tnum'">
+
+  <nav aria-label="Main" style="width: 232px; padding: 14px 10px; display: flex; flex-direction: column; gap: 1px; box-sizing: border-box">
+    <div style="display: flex; align-items: center; gap: 9px; height: 32px; padding: 0 8px; margin-bottom: 14px">
+      <span aria-hidden="true" style="width: 16px; height: 15px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #7FD8A8 30%, #2E7D63 100%)"></span>
+      <span style="font-weight: 600; font-size: 14px">Navi</span>
+    </div>
+    <a href="#" aria-current="page" style="height: 30px; display: flex; align-items: center; gap: 10px; padding: 0 8px; border-radius: 6px; background: #E6E6E3; color: #18181B; text-decoration: none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20H4z"></path></svg>Home</a>
+    <a href="#" style="height: 30px; display: flex; align-items: center; gap: 10px; padding: 0 8px; border-radius: 6px; color: #55555C; text-decoration: none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 13h5l1.5 3h5L16 13h5"></path><path d="M5 5h14l2 8v6H3v-6z"></path></svg><span style="flex: 1">Inbox</span><span style="color: #6B6B73">2</span></a>
+    <a href="#" style="height: 30px; display: flex; align-items: center; gap: 10px; padding: 0 8px; border-radius: 6px; color: #55555C; text-decoration: none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg>Tasks</a>
+    <a href="#" style="height: 30px; display: flex; align-items: center; gap: 10px; padding: 0 8px; border-radius: 6px; color: #55555C; text-decoration: none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"></rect><path d="M4 10h16M9 3v4M15 3v4"></path></svg>Planner</a>
+    <a href="#" style="height: 30px; display: flex; align-items: center; gap: 10px; padding: 0 8px; border-radius: 6px; color: #55555C; text-decoration: none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 7h6l2 2h8v10H4z"></path></svg>Projects</a>
+    <a href="#" style="height: 30px; display: flex; align-items: center; gap: 10px; padding: 0 8px; border-radius: 6px; color: #55555C; text-decoration: none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle></svg><span style="flex: 1">Focus</span><span style="width: 6px; height: 6px; border-radius: 50%; background: #1F7A55"></span></a>
+    <div style="margin: 22px 0 6px; padding: 0 8px; font-size: 11.5px; color: #6B6B73; font-weight: 500">Conversations</div>
+    <a href="#" style="height: 30px; display: flex; align-items: center; padding: 0 8px; color: #55555C; text-decoration: none">Planning Saturday</a>
+    <a href="#" style="height: 30px; display: flex; align-items: center; padding: 0 8px; color: #55555C; text-decoration: none">Budget draft questions</a>
+    <a href="#" style="height: 30px; display: flex; align-items: center; padding: 0 8px; color: #55555C; text-decoration: none">Moving checklist</a>
+  </nav>
+
+  <main style="flex: 1; margin: 8px 8px 8px 0; background: #FFFFFF; border: 1px solid #E5E5E2; border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); display: flex; flex-direction: column; align-items: center; box-sizing: border-box; position: relative">
+    <span style="position: absolute; top: 14px; right: 16px; color: #6B6B73">Friday, November 6</span>
+    <div style="display: flex; flex-direction: column; align-items: center; margin-top: 108px">
+      <div aria-hidden="true" style="width: 108px; height: 98px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 33% 27%, #FFFFFF 0%, #D6F7E2 10%, #8FDDB2 36%, #3A9572 72%, #1C5543 100%); box-shadow: inset -10px -12px 22px rgba(0,0,0,0.22), inset 6px 7px 16px rgba(255,255,255,0.4), 0 22px 40px rgba(31,122,85,0.18)"></div>
+      <div aria-hidden="true" style="width: 84px; height: 12px; margin-top: 10px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0) 70%)"></div>
+      <span style="margin-top: 14px; font-size: 12px; font-weight: 500; color: #1F7A55; letter-spacing: 0.02em">Steady afternoon</span>
+    </div>
+    <h1 style="margin: 18px 0 0; font-size: 30px; font-weight: 500; letter-spacing: -0.025em">Pick up the budget draft?</h1>
+    <p style="margin: 8px 0 0; font-size: 14px; color: #6B6B73">You got 27 minutes in before lunch. About 20 to go.</p>
+    <div style="margin-top: 30px; width: 640px; height: 54px; border-radius: 14px; background: #FFFFFF; border: 1px solid #E2E2DE; box-shadow: 0 8px 24px rgba(0,0,0,0.06); display: flex; align-items: center; gap: 8px; padding: 0 8px 0 18px; box-sizing: border-box">
+      <span style="flex: 1; color: #6B6B73; font-size: 14px">Tell Navi what's on your mind…</span>
+      <span style="font-size: 11px; color: #6B6B73; border: 1px solid #E2E2DE; border-radius: 5px; padding: 2px 6px">⌘K</span>
+      <span aria-label="Start voice" style="width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3A3A40" stroke-width="1.6" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"></path></svg></span>
+    </div>
+    <div style="margin-top: 40px; width: 640px; display: flex; flex-direction: column">
+      <div style="font-size: 11.5px; font-weight: 500; color: #6B6B73; padding: 0 2px 8px">Continue</div>
+      <div style="display: flex; align-items: center; gap: 14px; height: 56px; padding: 0 14px; border-radius: 10px; background: #F7F7F5; border: 1px solid #ECECE8">
+        <svg width="28" height="28" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15" fill="none" stroke="#E2E2DE" stroke-width="3"></circle><circle cx="18" cy="18" r="15" fill="none" stroke="#1F7A55" stroke-width="3" stroke-linecap="round" stroke-dasharray="54 94" transform="rotate(-90 18 18)"></circle></svg>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 13.5px; font-weight: 500">Finish the quarterly budget draft</span><span style="color: #6B6B73">Focus · 27 of 45 min · Work</span></div>
+        <span style="height: 30px; padding: 0 12px; border-radius: 8px; background: #1F7A55; color: #FFFFFF; font-weight: 600; display: flex; align-items: center; gap: 8px">Resume <span style="font-weight: 500; opacity: 0.75">↵</span></span>
+      </div>
+      <div style="font-size: 11.5px; font-weight: 500; color: #6B6B73; padding: 22px 2px 4px">Later today</div>
+      <div style="display: flex; align-items: center; gap: 14px; height: 38px; padding: 0 14px; border-bottom: 1px solid #EFEFEC"><span style="width: 58px; color: #6B6B73">3:30 PM</span><span style="width: 3px; height: 16px; border-radius: 2px; background: #3E6FD8"></span><span style="flex: 1">Call with the landlord</span><span style="color: #6B6B73">30 min</span></div>
+      <div style="display: flex; align-items: center; gap: 14px; height: 38px; padding: 0 14px; border-bottom: 1px solid #EFEFEC"><span style="width: 58px; color: #6B6B73">5:00 PM</span><span style="width: 3px; height: 16px; border-radius: 2px; border: 1px dashed #1F7A55; box-sizing: border-box"></span><span style="flex: 1">Reply to Sam about the move</span><span style="color: #6B6B73">15 min</span></div>
+      <div style="margin-top: 18px; display: flex; align-items: center; gap: 12px; padding: 0 14px; color: #3A3A40">
+        <span aria-hidden="true" style="width: 12px; height: 11px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #FFFFFF 0%, #7FD8A8 35%, #2E7D63 100%)"></span>
+        <span style="flex: 1">Dentist booking is due <span style="color: #A65F00">tomorrow</span> and has no time yet.</span>
+        <a href="#" style="text-decoration: none; font-weight: 500">Find a slot</a>
+        <a href="#" style="color: #6B6B73; text-decoration: none">Not now</a>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

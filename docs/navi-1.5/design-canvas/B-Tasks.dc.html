@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Direction B Night Planner</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#F0A44B}a:hover{color:#F7C27E}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; background: #0D0E11; color: #ECEAE6; font-family: 'Instrument Sans', sans-serif; font-size: 14px">
+  <nav aria-label="Main" style="width: 72px; border-right: 1px solid #1F2127; display: flex; flex-direction: column; align-items: center; padding: 18px 0; gap: 8px">
+    <span style="width: 26px; height: 26px; border-radius: 50%; background: {{accent}}; margin-bottom: 18px"></span>
+    <span style="width: 44px; height: 44px; border-radius: 12px"></span>
+    <span style="width: 44px; height: 44px; border-radius: 12px; background: #1E2026"></span>
+    <span style="width: 44px; height: 44px; border-radius: 12px"></span>
+    <span style="width: 44px; height: 44px; border-radius: 12px"></span>
+  </nav>
+  <main style="flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 28px 32px; gap: 18px">
+    <div style="display: flex; align-items: center; gap: 12px">
+      <h1 style="margin: 0; font-size: 26px; font-weight: 600">Planner</h1>
+      <span style="color: #A19D96">Week of Nov 2</span>
+      <span style="flex: 1"></span>
+      <span style="padding: 8px 14px; border-radius: 10px; background: #1E2026">Day</span>
+      <span style="padding: 8px 14px; border-radius: 10px; border: 1px solid #33363F">Week</span>
+    </div>
+    <div style="display: grid; grid-template-columns: 56px repeat(3, minmax(0, 1fr)); gap: 0 10px; flex: 1">
+      <div style="display: flex; flex-direction: column; gap: 0; color: #8E8A83; font-size: 12px">
+        <span style="height: 40px"></span><span style="height: 70px">9 AM</span><span style="height: 70px">10 AM</span><span style="height: 70px">11 AM</span><span style="height: 70px">12 PM</span><span style="height: 70px">1 PM</span><span style="height: 70px">2 PM</span><span style="height: 70px">3 PM</span><span style="height: 70px">4 PM</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <span style="height: 34px; font-weight: 600; color: {{accent}}">Fri 6 · today</span>
+        <div style="height: 58px; margin-top: 70px; border-radius: 12px; background: #23262D; border: 1px solid #3A3E48; padding: 8px 12px; box-sizing: border-box"><b>Team sync</b><br><span style="color: #A19D96">fixed · 10:00</span></div>
+        <div style="height: 2px; background: {{accent}}; margin-top: 150px; position: relative"><span style="position: absolute; left: -4px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: {{accent}}"></span></div>
+        <div style="height: 130px; margin-top: 70px; border-radius: 12px; border: 1.5px dashed {{accent}}; background: rgba(240,164,75,0.08); padding: 8px 12px; box-sizing: border-box"><b>Budget draft</b><br><span style="color: #A19D96">flexible · linked task · 2:00–3:30</span></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <span style="height: 34px; font-weight: 600">Sat 7</span>
+        <div style="height: 64px; margin-top: 76px; border-radius: 12px; border: 1.5px dashed #6A6E78; padding: 8px 12px; box-sizing: border-box; color: #A19D96"><b style="color: #ECEAE6">Call Sam</b><br>proposed · not saved</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <span style="height: 34px; font-weight: 600">Sun 8</span>
+        <div style="height: 60px; margin-top: 420px; border-radius: 12px; background: #23262D; border: 1px solid #3A3E48; padding: 8px 12px; box-sizing: border-box"><b>Weekly review</b><br><span style="color: #A19D96">flexible · 6 PM</span></div>
+      </div>
+    </div>
+    <div style="display: flex; gap: 10px; align-items: center; padding-top: 6px; border-top: 1px solid #1F2127">
+      <span style="color: #A19D96; font-size: 12px; letter-spacing: 0.06em">UNSCHEDULED</span>
+      <span style="padding: 8px 12px; border-radius: 10px; background: #16181D; border: 1px solid #262931">Book dentist appointment · due tomorrow</span>
+      <span style="padding: 8px 12px; border-radius: 10px; background: #16181D; border: 1px solid #262931">Renew passport</span>
+    </div>
+  </main>
+  <aside aria-label="Navi" style="width: 360px; background: #121317; border-left: 1px solid #1F2127; display: flex; flex-direction: column">
+    <div style="height: 62px; display: flex; align-items: center; gap: 10px; padding: 0 16px; border-bottom: 1px solid #1F2127">
+      <span aria-hidden="true" style="width: 30px; height: 30px; border-radius: 50%; background: radial-gradient(circle at 38% 34%, #FFD9A8 0%, {{accent}} 45%, #7A3E0E 100%); box-shadow: 0 0 18px rgba(240,164,75,0.4)"></span>
+      <span style="font-weight: 600">Navi</span><span style="color: #8E8A83; font-size: 12px">listening</span>
+      <span style="flex: 1"></span>
+      <span style="font-size: 12px; padding: 4px 10px; border-radius: 10px; border: 1px solid #3A3E48">End voice</span>
+    </div>
+    <div style="flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+      <div style="align-self: flex-end; max-width: 85%; background: #23262D; border-radius: 14px; padding: 10px 14px">put the call with Sam on saturday morning, an hour</div>
+      <div style="line-height: 1.5; color: #D9D6D0">Saturday 10–11 works; nothing else is there. Here's the block — it isn't saved until you say so.</div>
+      <div style="border: 1px solid #3A3E48; background: #16181D; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px">
+        <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; color: {{accent}}">WAITING FOR YOU</span>
+        <span style="font-weight: 600">Plan “Call Sam about the move”</span>
+        <span style="color: #A19D96">Sat Nov 7 · 10:00–11:00</span>
+        <div style="display: flex; gap: 8px"><span style="padding: 8px 16px; border-radius: 10px; background: {{accent}}; color: #1A1206; font-weight: 700">Approve</span><span style="padding: 8px 14px; border-radius: 10px; border: 1px solid #3A3E48">Change</span></div>
+      </div>
+    </div>
+    <div style="padding: 14px; border-top: 1px solid #1F2127"><div style="height: 50px; border-radius: 25px; background: #16181D; border: 1px solid #2C2F38; display: flex; align-items: center; padding: 0 18px; color: #8E8A83">Message Navi…</div></div>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#F0A44B","options":["#F0A44B","#8FB8FF","#7FD1AE","#E58FB5"]},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return { accent: this.props.accent ?? '#F0A44B' }; }
+}
+</script>
+</body>
+</html>

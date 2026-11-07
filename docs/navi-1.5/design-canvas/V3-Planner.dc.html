@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi My day round 3</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#A7EBC0}a:hover{color:#D2F6DF}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; background: #000000; color: #F5F5F7; font-family: Figtree, sans-serif; font-size: 14px; font-feature-settings: 'tnum'; overflow: hidden">
+
+  <nav aria-label="Main" style="width: 236px; padding: 18px 12px; display: flex; flex-direction: column; gap: 2px; box-sizing: border-box">
+    <div style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; margin-bottom: 16px">
+      <span aria-hidden="true" style="width: 18px; height: 16px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%)"></span>
+      <span style="font-weight: 700; font-size: 16px">Navi</span>
+    </div>
+    <a href="#" style="height: 36px; display: flex; align-items: center; gap: 12px; padding: 0 12px; border-radius: 12px; color: #A0A0A8; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20H4z"></path></svg>Home</a>
+    <a href="#" style="height: 36px; display: flex; align-items: center; gap: 12px; padding: 0 12px; border-radius: 12px; color: #A0A0A8; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg>Tasks</a>
+    <a href="#" aria-current="page" style="height: 36px; display: flex; align-items: center; gap: 12px; padding: 0 12px; border-radius: 12px; background: rgba(255,255,255,0.08); color: #F5F5F7; text-decoration: none; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3"></path><circle cx="12" cy="12" r="4"></circle></svg>My day</a>
+    <a href="#" style="height: 36px; display: flex; align-items: center; gap: 12px; padding: 0 12px; border-radius: 12px; color: #A0A0A8; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 13h5l1.5 3h5L16 13h5"></path><path d="M5 5h14l2 8v6H3v-6z"></path></svg><span style="flex: 1">Inbox</span><span style="font-size: 12px; color: #000; background: #A7EBC0; border-radius: 10px; padding: 1px 7px; font-weight: 600">2</span></a>
+    <a href="#" style="height: 36px; display: flex; align-items: center; gap: 12px; padding: 0 12px; border-radius: 12px; color: #A0A0A8; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle></svg>Focus</a>
+    <div style="margin: 26px 0 8px; padding: 0 12px; font-size: 12.5px; color: #7C7C85; font-weight: 500">Spaces</div>
+    <a href="#" style="height: 34px; display: flex; align-items: center; gap: 12px; padding: 0 12px; color: #C8C8CE; text-decoration: none"><span style="width: 10px; height: 10px; border-radius: 50%; background: #9DB8FF"></span>School</a>
+    <a href="#" style="height: 34px; display: flex; align-items: center; gap: 12px; padding: 0 12px; color: #C8C8CE; text-decoration: none"><span style="width: 10px; height: 10px; border-radius: 50%; background: #F2A7A0"></span>Health</a>
+    <a href="#" style="height: 34px; display: flex; align-items: center; gap: 12px; padding: 0 12px; color: #C8C8CE; text-decoration: none"><span style="width: 10px; height: 10px; border-radius: 50%; background: #C7A6F7"></span>Hobbies</a>
+    <a href="#" style="height: 34px; display: flex; align-items: center; gap: 12px; padding: 0 12px; color: #C8C8CE; text-decoration: none"><span style="width: 10px; height: 10px; border-radius: 50%; background: #F4B37A"></span>Friends</a>
+    <a href="#" style="height: 34px; display: flex; align-items: center; gap: 12px; padding: 0 12px; color: #C8C8CE; text-decoration: none"><span style="width: 10px; height: 10px; border-radius: 50%; background: #E9C46A"></span>Home</a>
+    <a href="#" style="height: 34px; display: flex; align-items: center; gap: 12px; padding: 0 12px; color: #C8C8CE; text-decoration: none"><span style="width: 10px; height: 10px; border-radius: 50%; background: #8EC5E6"></span>Work</a>
+  </nav>
+
+  <main style="flex: 1; min-width: 0; padding: 26px 32px 0 36px; display: flex; flex-direction: column; overflow: hidden">
+    <div style="display: flex; gap: 8px">
+      <sc-for list="{{week}}" as="d" hint-placeholder-count="7">
+        <span style="width: 54px; height: 64px; border-radius: 20px; background: {{d.bg}}; color: {{d.fg}}; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px">
+          <span style="font-size: 12px; opacity: 0.75">{{d.name}}</span>
+          <span style="font-size: 17px; font-weight: 600">{{d.num}}</span>
+          <span style="display: flex; gap: 2px; height: 4px"><sc-for list="{{d.dots}}" as="x" hint-placeholder-count="2"><span style="width: 4px; height: 4px; border-radius: 50%; background: {{x.c}}"></span></sc-for></span>
+        </span>
+      </sc-for>
+    </div>
+
+    <div style="margin-top: 22px; display: flex; flex-direction: column; gap: 6px">
+      <h1 style="margin: 0; font-size: 32px; font-weight: 700; letter-spacing: -0.03em">Friday</h1>
+      <p style="margin: 0; font-size: 17px; font-weight: 500; letter-spacing: -0.01em"><span style="color: #F5F5F7">A full afternoon.</span><span style="color: #6E6E77"> I kept your evening clear for dinner with Maya.</span></p>
+    </div>
+
+    <div style="flex: 1; display: flex; gap: 28px; margin-top: 18px; min-height: 0">
+      <div style="flex: 1; min-width: 0; position: relative; display: flex; flex-direction: column">
+        <span aria-hidden="true" style="position: absolute; left: 83px; top: 30px; bottom: 0; width: 2px; background: rgba(255,255,255,0.07)"></span>
+        <sc-for list="{{rows}}" as="r" hint-placeholder-count="10">
+          <sc-if value="{{r.isHeader}}" hint-placeholder-val="{{ false }}">
+            <div style="height: 34px; display: flex; align-items: center; gap: 8px; padding-left: 4px; color: #8E8E96; font-size: 13px; font-weight: 600">{{r.label}}</div>
+          </sc-if>
+          <sc-if value="{{r.isItem}}" hint-placeholder-val="{{ true }}">
+            <div style="min-height: {{r.h}}; display: flex; align-items: center; gap: 0; opacity: {{r.op}}">
+              <span style="width: 64px; color: #8E8E96; font-size: 13px">{{r.time}}</span>
+              <span style="width: 40px; height: 40px; border-radius: 20px; background: {{r.bubble}}; border: {{r.ring}}; box-sizing: border-box; display: flex; align-items: center; justify-content: center; color: {{r.ic}}; font-size: 13px; font-weight: 700; position: relative; z-index: 1">{{r.mark}}</span>
+              <div style="flex: 1; margin-left: 14px; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 18px; background: {{r.card}}; border: {{r.cardBorder}}">
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 2px">
+                  <span style="font-size: 15px; font-weight: 600; text-decoration: {{r.strike}}">{{r.title}}</span>
+                  <span style="color: #8E8E96; font-size: 13px">{{r.sub}}</span>
+                </div>
+                <sc-if value="{{r.hasAction}}" hint-placeholder-val="{{ false }}"><span style="height: 34px; padding: 0 14px; border-radius: 17px; background: {{r.actBg}}; color: {{r.actFg}}; font-weight: 600; display: flex; align-items: center">{{r.action}}</span></sc-if>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{r.isFree}}" hint-placeholder-val="{{ false }}">
+            <div style="height: 44px; display: flex; align-items: center">
+              <span style="width: 64px; color: #F5F5F7; font-size: 13px; font-weight: 600">{{r.time}}</span>
+              <span style="width: 40px; display: flex; justify-content: center; position: relative; z-index: 1"><span style="width: 12px; height: 12px; border-radius: 50%; background: {{r.dot}}; box-shadow: {{r.glow}}"></span></span>
+              <span style="margin-left: 14px; color: #8E8E96; flex: 1">{{r.label}}</span>
+              <sc-if value="{{r.hasAction}}" hint-placeholder-val="{{ false }}"><a href="#" style="text-decoration: none; font-weight: 600; padding-right: 6px">{{r.action}}</a></sc-if>
+            </div>
+          </sc-if>
+        </sc-for>
+      </div>
+
+      <div style="width: 290px; display: flex; flex-direction: column; gap: 10px">
+        <span style="font-size: 13px; color: #8E8E96; font-weight: 600; padding: 8px 4px 2px">Still needs a time</span>
+        <div style="border-radius: 18px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.07); padding: 12px 14px; display: flex; flex-direction: column; gap: 3px"><span style="font-weight: 600">Book the dentist</span><span style="color: #8E8E96; font-size: 13px">10 min · before <span style="color: #F0B868">Monday</span></span></div>
+        <div style="border-radius: 18px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.07); padding: 12px 14px; display: flex; flex-direction: column; gap: 3px"><span style="font-weight: 600">Get Maya a birthday gift</span><span style="color: #8E8E96; font-size: 13px">45 min · before Sunday</span></div>
+        <div style="border-radius: 18px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.07); padding: 12px 14px; display: flex; flex-direction: column; gap: 3px"><span style="font-weight: 600">Plan the Lisbon trip</span><span style="color: #8E8E96; font-size: 13px">whenever · 3 steps</span></div>
+        <span style="color: #7C7C85; font-size: 12.5px; padding: 4px">Drag one onto your day, or ask Navi to place it.</span>
+        <span style="flex: 1"></span>
+        <div style="border-radius: 20px; background: rgba(255,255,255,0.035); padding: 14px 16px; margin-bottom: 18px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: #A0A0A8">
+          <span style="display: flex; align-items: center; gap: 10px"><span style="width: 18px; height: 18px; border-radius: 9px; background: rgba(255,255,255,0.12); color: #F5F5F7; font-size: 9px; display: flex; align-items: center; justify-content: center">●</span>Fixed — class, shifts, plans with people</span>
+          <span style="display: flex; align-items: center; gap: 10px"><span style="width: 18px; height: 18px; border-radius: 9px; border: 1.5px solid #A7EBC0; box-sizing: border-box"></span>Flexible — time you set aside</span>
+          <span style="display: flex; align-items: center; gap: 10px"><span style="width: 18px; height: 18px; border-radius: 9px; border: 1.5px dashed #6E6E77; box-sizing: border-box"></span>Routine — the shape of your day</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <aside aria-label="Navi (docked)" style="width: 68px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; padding-top: 26px; gap: 14px">
+    <span role="img" aria-label="Open Navi — 1 suggestion" style="position: relative; width: 34px; height: 31px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 33% 27%, #FFFFFF 0%, #CFF6DD 12%, #8BDDAF 38%, #2F8566 75%, #0F3328 100%); box-shadow: 0 0 20px rgba(139,221,175,0.3)"><span style="position: absolute; right: -6px; top: -5px; width: 16px; height: 16px; border-radius: 8px; background: #F5F5F7; color: #000; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 2px solid #000">1</span></span>
+    <span aria-label="Start voice" style="width: 40px; height: 40px; border-radius: 20px; background: rgba(255,255,255,0.07); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5F5F7" stroke-width="1.8" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"></path></svg></span>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const S = { School: '#9DB8FF', Health: '#F2A7A0', Hobbies: '#C7A6F7', Friends: '#F4B37A', Home: '#E9C46A', Work: '#8EC5E6', Routine: '#6E6E77' };
+    const tint = (hex, a) => {
+      const n = parseInt(hex.slice(1), 16);
+      return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+    };
+    const head = (label) => ({ isHeader: true, label });
+    const item = (time, title, sub, space, kind, o) => {
+      const opt = o || {};
+      const c = S[space];
+      return {
+        isItem: true, time, title, sub, h: opt.tall ? '70px' : '56px', op: opt.done ? 0.45 : 1,
+        bubble: kind === 'fixed' ? tint(c, 0.85) : 'transparent',
+        ring: kind === 'fixed' ? '0' : (kind === 'routine' ? '1.5px dashed ' + c : '1.5px solid ' + c),
+        ic: kind === 'fixed' ? '#000' : c, mark: opt.done ? '✓' : '',
+        card: opt.hi ? 'rgba(167,235,192,0.07)' : 'rgba(255,255,255,0.04)',
+        cardBorder: opt.hi ? '1px solid rgba(167,235,192,0.25)' : '1px solid transparent',
+        strike: opt.done ? 'line-through' : 'none',
+        hasAction: !!opt.action, action: opt.action || '',
+        actBg: opt.hi ? '#F5F5F7' : 'rgba(255,255,255,0.08)', actFg: opt.hi ? '#000' : '#F5F5F7'
+      };
+    };
+    const free = (time, label, action, now) => ({
+      isFree: true, time, label, hasAction: !!action, action: action || '',
+      dot: now ? '#F5F5F7' : 'rgba(255,255,255,0.18)', glow: now ? '0 0 0 5px rgba(255,255,255,0.12)' : 'none'
+    });
+    const day = (name, num, dots, today) => ({
+      name, num, bg: today ? '#F5F5F7' : 'rgba(255,255,255,0.05)', fg: today ? '#000' : '#C8C8CE',
+      dots: dots.map((s) => ({ c: S[s] }))
+    });
+    return {
+      week: [
+        day('Mon', '2', ['School', 'Work']), day('Tue', '3', ['School']), day('Wed', '4', ['School', 'Health']),
+        day('Thu', '5', ['Work']), day('Fri', '6', ['School', 'Work', 'Friends'], true), day('Sat', '7', ['Friends']), day('Sun', '8', ['Home'])
+      ],
+      rows: [
+        head('Morning'),
+        item('8:00', 'Morning run', '30 min · Health', 'Health', 'flex', { done: true }),
+        item('8:45', 'Modern History', 'Class until 11:00 · Room 204', 'School', 'fixed'),
+        head('Afternoon'),
+        free('1:10', 'Now — free until 2:00', '', true),
+        item('2:00', 'Essay: write the intro', '90 min · linked to History essay', 'School', 'flex', { hi: true, action: 'Start', tall: true }),
+        free('3:30', '30 free minutes — the dentist call fits here.', 'Fit it in'),
+        item('4:00', 'Shift at the café', 'Until 7:00', 'Work', 'fixed'),
+        head('Evening'),
+        item('7:30', 'Dinner with Maya', 'Lupa, Elm St · until 9:30', 'Friends', 'fixed'),
+        item('10:00', 'Practise the new song', '20 min', 'Hobbies', 'flex'),
+        item('10:30', 'Wind down', 'No screens · bed by 11:30', 'Routine', 'routine')
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

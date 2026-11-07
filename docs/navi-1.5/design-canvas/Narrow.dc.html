@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Narrow desktop behavior</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#222}
+a{color:#333}a:hover{color:#000}
+</style>
+</helmet>
+<div style="width: 1100px; height: 900px; display: flex; background: #F3F3F3; font-size: 14px; position: relative; overflow: hidden">
+  <nav aria-label="Main" style="width: 68px; background: #FAFAFA; border-right: 1px solid #D9D9D9; display: flex; flex-direction: column; align-items: center; padding-top: 16px; gap: 10px">
+    <span style="width: 36px; height: 36px; border-radius: 8px; border: 1px solid #D9D9D9; background: #fff"></span>
+    <span style="width: 36px; height: 36px; border-radius: 8px; background: #E4E4E4"></span>
+    <span style="width: 36px; height: 36px; border-radius: 8px; border: 1px solid #E4E4E4"></span>
+    <span style="width: 36px; height: 36px; border-radius: 8px; border: 1px solid #E4E4E4"></span>
+    <span style="width: 36px; height: 36px; border-radius: 8px; border: 1px solid #E4E4E4"></span>
+  </nav>
+  <main style="flex: 1; display: flex; flex-direction: column">
+    <div style="height: 56px; border-bottom: 1px solid #E0E0E0; background: #fff; display: flex; align-items: center; padding: 0 24px; font-weight: 600">Tasks</div>
+    <div style="padding: 24px; display: flex; flex-direction: column; gap: 10px">
+      <div style="height: 54px; background: #fff; border: 1px solid #D9D9D9; border-radius: 10px"></div>
+      <div style="height: 54px; background: #fff; border: 1px solid #D9D9D9; border-radius: 10px"></div>
+      <div style="height: 54px; background: #fff; border: 1px solid #D9D9D9; border-radius: 10px"></div>
+      <div style="height: 54px; background: #fff; border: 1px solid #D9D9D9; border-radius: 10px"></div>
+    </div>
+  </main>
+  <aside aria-label="Navi (overlay)" style="position: absolute; right: 16px; top: 16px; bottom: 16px; width: 360px; background: #FAFAFA; border: 1px solid #BBB; border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,0.18); display: flex; flex-direction: column">
+    <div style="height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid #E0E0E0">
+      <span style="width: 26px; height: 26px; border-radius: 50%; background: #CFCFCF; border: 2px solid #B5B5B5"></span><span style="font-weight: 600">Navi</span><span style="flex: 1"></span><span style="font-size: 12px; color: #555">Esc to close</span>
+    </div>
+    <div style="flex: 1"></div>
+    <div style="padding: 12px; border-top: 1px solid #E0E0E0"><div style="height: 44px; border-radius: 22px; border: 1px solid #BBB; background: #fff"></div></div>
+  </aside>
+  <div style="position: absolute; left: 92px; bottom: 24px; width: 560px; background: #fff; border: 1px dashed #888; border-radius: 10px; padding: 14px 16px; line-height: 1.5; color: #333">
+    <strong>Proposed rule (needs your OK):</strong> below ~1280px wide the sidebar auto-switches to the icon rail, and below ~1180px the Navi panel opens as an overlay over the workspace instead of squeezing it. Your saved “open/closed” choice still applies; Esc or the orb closes it. Workspace keeps its full width.
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1100,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

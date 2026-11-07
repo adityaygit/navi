@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi Planner, panel docked</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#9FE6B8}a:hover{color:#C9F5D8}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; background: #0A0A0B; color: #EDEDEF; font-family: Inter, sans-serif; font-size: 13px; letter-spacing: -0.005em; font-feature-settings: 'cv11', 'ss01', 'tnum'">
+
+  <nav aria-label="Main" style="width: 220px; padding: 14px 10px; display: flex; flex-direction: column; gap: 1px; box-sizing: border-box">
+    <div style="display: flex; align-items: center; gap: 9px; height: 32px; padding: 0 8px; margin-bottom: 14px">
+      <span aria-hidden="true" style="width: 16px; height: 15px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #9FE6B8 30%, #2E7D63 100%)"></span>
+      <span style="font-weight: 600; font-size: 14px">Navi</span>
+    </div>
+    <a href="#" style="height: 30px; display: flex; align-items: center; gap: 10px; padding: 0 8px; border-radius: 6px; color: #A1A1A9; text-decoration: none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20H4z"></path></svg>Home</a>
+    <a href="#" style="height: 30px; display: flex; align-items: center; gap: 10px; padding: 0 8px; border-radius: 6px; color: #A1A1A9; text-decoration: none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 13h5l1.5 3h5L16 13h5"></path><path d="M5 5h14l2 8v6H3v-6z"></path></svg><span style="flex: 1">Inbox</span><span style="color: #8B8B93">2</span></a>
+    <a href="#" style="height: 30px; display: flex; align-items: center; gap: 10px; padding: 0 8px; border-radius: 6px; color: #A1A1A9; text-decoration: none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg>Tasks</a>
+    <a href="#" aria-current="page" style="height: 30px; display: flex; align-items: center; gap: 10px; padding: 0 8px; border-radius: 6px; background: #1A1A1D; color: #EDEDEF; text-decoration: none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"></rect><path d="M4 10h16M9 3v4M15 3v4"></path></svg>Planner</a>
+    <a href="#" style="height: 30px; display: flex; align-items: center; gap: 10px; padding: 0 8px; border-radius: 6px; color: #A1A1A9; text-decoration: none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 7h6l2 2h8v10H4z"></path></svg>Projects</a>
+    <a href="#" style="height: 30px; display: flex; align-items: center; gap: 10px; padding: 0 8px; border-radius: 6px; color: #A1A1A9; text-decoration: none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle></svg>Focus</a>
+  </nav>
+
+  <main style="flex: 1; min-width: 0; margin: 8px 0; background: #111113; border: 1px solid #1E1E22; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden">
+    <div style="height: 48px; display: flex; align-items: center; gap: 12px; padding: 0 16px 0 20px; border-bottom: 1px solid #1C1C1F">
+      <span style="font-weight: 500; font-size: 14px">November</span><span style="color: #8B8B93">Fri 6 – Sun 8</span>
+      <span style="display: flex; gap: 2px; margin-left: 8px; color: #A1A1A9"><span style="width: 26px; height: 26px; display: flex; align-items: center; justify-content: center">‹</span><span style="height: 26px; padding: 0 8px; border-radius: 6px; border: 1px solid #2A2A2F; display: flex; align-items: center">Today</span><span style="width: 26px; height: 26px; display: flex; align-items: center; justify-content: center">›</span></span>
+      <span style="flex: 1"></span>
+      <span style="display: flex; gap: 2px"><span style="height: 26px; padding: 0 10px; border-radius: 6px; color: #A1A1A9; display: flex; align-items: center">Day</span><span style="height: 26px; padding: 0 10px; border-radius: 6px; background: #1E1E22; display: flex; align-items: center">3 days</span><span style="height: 26px; padding: 0 10px; border-radius: 6px; color: #A1A1A9; display: flex; align-items: center">Week</span></span>
+    </div>
+    <div style="flex: 1; display: flex; min-height: 0">
+      <div style="width: 248px; border-right: 1px solid #1C1C1F; padding: 14px 12px; display: flex; flex-direction: column; gap: 6px; box-sizing: border-box">
+        <span style="font-size: 11.5px; font-weight: 500; color: #8B8B93; padding: 0 4px 4px">Unscheduled · drag onto a day</span>
+        <div style="padding: 9px 10px; border-radius: 8px; background: #17171A; border: 1px solid #222226; display: flex; flex-direction: column; gap: 3px"><span>Book dentist appointment</span><span style="color: #E8B062; font-size: 12px">Due tomorrow · 15 min</span></div>
+        <div style="padding: 9px 10px; border-radius: 8px; background: #17171A; border: 1px solid #222226; display: flex; flex-direction: column; gap: 3px"><span>Collect quotes from two movers</span><span style="color: #8B8B93; font-size: 12px">Due Mon · 45 min</span></div>
+        <div style="padding: 9px 10px; border-radius: 8px; background: #17171A; border: 1px solid #222226; display: flex; flex-direction: column; gap: 3px"><span>Renew passport</span><span style="color: #8B8B93; font-size: 12px">Due Dec 12 · 30 min</span></div>
+        <span style="flex: 1"></span>
+        <div style="display: flex; flex-direction: column; gap: 7px; padding: 10px 4px 0; border-top: 1px solid #1C1C1F; color: #A1A1A9; font-size: 12px">
+          <span style="display: flex; align-items: center; gap: 8px"><span style="width: 3px; height: 12px; border-radius: 2px; background: #8AB4F8"></span>Fixed — events you can't move</span>
+          <span style="display: flex; align-items: center; gap: 8px"><span style="width: 3px; height: 12px; border-radius: 2px; background: #9FE6B8"></span>Flexible — time you set aside</span>
+          <span style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 3px; border: 1px dashed #9FE6B8; box-sizing: border-box"></span>Proposed — not saved yet</span>
+        </div>
+      </div>
+      <div style="flex: 1; display: flex; flex-direction: column; min-width: 0">
+        <div style="height: 40px; display: flex; border-bottom: 1px solid #1C1C1F">
+          <span style="width: 56px"></span>
+          <span style="flex: 1; display: flex; align-items: center; gap: 8px; padding: 0 12px"><span style="color: #A1A1A9">Fri</span><span style="height: 22px; min-width: 22px; padding: 0 6px; border-radius: 11px; background: #9FE6B8; color: #0B2117; font-weight: 600; display: flex; align-items: center; justify-content: center; box-sizing: border-box">6</span></span>
+          <span style="flex: 1; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-left: 1px solid #1C1C1F"><span style="color: #A1A1A9">Sat</span><span>7</span></span>
+          <span style="flex: 1; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-left: 1px solid #1C1C1F"><span style="color: #A1A1A9">Sun</span><span>8</span></span>
+        </div>
+        <div style="flex: 1; display: flex; position: relative">
+          <div style="width: 56px; display: flex; flex-direction: column">
+            <sc-for list="{{hours}}" as="h" hint-placeholder-count="11"><span style="height: 70px; font-size: 11px; color: #8B8B93; text-align: right; padding-right: 10px; transform: translateY(-7px)">{{h}}</span></sc-for>
+          </div>
+          <sc-for list="{{days}}" as="d" hint-placeholder-count="3">
+            <div style="flex: 1; position: relative; border-left: 1px solid #1C1C1F; background-image: repeating-linear-gradient(to bottom, #19191C 0, #19191C 1px, transparent 1px, transparent 70px)">
+              <sc-for list="{{d.events}}" as="e" hint-placeholder-count="2">
+                <div style="position: absolute; left: {{e.left}}; right: 6px; top: {{e.top}}; height: {{e.h}}; border-radius: 7px; background: {{e.bg}}; border: {{e.border}}; box-shadow: {{e.bar}}; padding: 6px 9px 6px 11px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; gap: 2px">
+                  <span style="font-weight: 500; color: {{e.fg}}">{{e.title}}</span>
+                  <span style="font-size: 11.5px; color: {{e.sub}}">{{e.meta}}</span>
+                </div>
+              </sc-for>
+              <sc-if value="{{d.today}}" hint-placeholder-val="{{ false }}">
+                <div style="position: absolute; left: 0; right: 0; top: 364px; height: 1.5px; background: #9FE6B8"><span style="position: absolute; left: -4px; top: -3px; width: 7px; height: 7px; border-radius: 50%; background: #9FE6B8"></span></div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <aside aria-label="Navi (docked)" style="width: 60px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; padding-top: 16px; gap: 14px">
+    <span role="img" aria-label="Open Navi — 1 action waiting" style="position: relative; width: 30px; height: 27px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 33% 27%, #F4FFF8 0%, #C6F4D6 12%, #7FD8A8 38%, #2F8566 75%, #133C31 100%); box-shadow: 0 0 16px rgba(127,216,168,0.25)"><span style="position: absolute; right: -6px; top: -5px; min-width: 16px; height: 16px; border-radius: 8px; background: #EDEDEF; color: #0A0A0B; font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; border: 2px solid #0A0A0B">1</span></span>
+    <span aria-label="Start voice" style="width: 34px; height: 34px; border-radius: 9px; border: 1px solid #26262B; display: flex; align-items: center; justify-content: center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C9C9CF" stroke-width="1.6" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"></path></svg></span>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const H = 70, start = 8;
+    const y = (t) => ((t - start) * H) + 'px';
+    const ev = (kind, title, meta, s, e, extra) => {
+      const k = {
+        fixed: { bg: 'rgba(138,180,248,0.12)', border: '0', bar: 'inset 3px 0 0 #8AB4F8', fg: '#DCE7FD', sub: '#9DB6E6' },
+        flex: { bg: 'rgba(159,230,184,0.10)', border: '0', bar: 'inset 3px 0 0 #9FE6B8', fg: '#DDF7E6', sub: '#93C9A7' },
+        proposed: { bg: 'transparent', border: '1px dashed #9FE6B8', bar: 'none', fg: '#DDF7E6', sub: '#93C9A7' },
+        conflict: { bg: 'rgba(138,180,248,0.12)', border: '1px solid #E8B062', bar: 'inset 3px 0 0 #8AB4F8', fg: '#DCE7FD', sub: '#E8B062' }
+      }[kind];
+      return Object.assign({ title, meta, top: y(s), h: ((e - s) * H - 3) + 'px', left: (extra && extra.left) || '6px' }, k);
+    };
+    return {
+      hours: ['8 AM', '9 AM', '10 AM', '11 AM', '12 PM', '1 PM', '2 PM', '3 PM', '4 PM', '5 PM', '6 PM'],
+      days: [
+        { today: true, events: [
+          ev('fixed', 'Team sync', '10:00 – 10:30', 10, 10.5),
+          ev('flex', 'Budget draft', '2:00 – 3:30 · linked task', 14, 15.5),
+          ev('conflict', 'Call with landlord', 'Overlaps Budget draft by 15 min', 15.25, 15.75, { left: '46%' }),
+          ev('flex', 'Reply to Sam', '5:00 – 5:15', 17, 17.4)
+        ] },
+        { today: false, events: [
+          ev('proposed', 'Call Sam about the move', 'Proposed · waiting for you', 10, 11),
+          ev('fixed', 'Lunch with Maya', '12:30 – 2:00', 12.5, 14)
+        ] },
+        { today: false, events: [
+          ev('flex', 'Long walk', '9:00 – 10:00 · routine', 9, 10),
+          ev('flex', 'Weekly review', '5:00 – 5:45', 17, 17.75)
+        ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
