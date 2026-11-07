@@ -178,6 +178,21 @@ export function recoveryOutcome(category: RecoveryCategory, description: string)
 }
 
 /**
+ * A time given for "my plan broke", in the person's timezone: a clock time
+ * typed on the form ("14:30" means 14:30 today where they live, wherever the
+ * browser or server is), or an ISO date-time (one without an offset is read
+ * in their zone too, not the server's). Null if empty or invalid.
+ */
+export function readRecoveryTime(value: string | null | undefined, zone: string, today: string): DateTime | null {
+  if (!value) return null;
+  const clock = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  const d = clock
+    ? DateTime.fromISO(today, { zone }).set({ hour: Number(clock[1]), minute: Number(clock[2]), second: 0, millisecond: 0 })
+    : DateTime.fromISO(value, { zone });
+  return d.isValid && (!clock || (Number(clock[1]) < 24 && Number(clock[2]) < 60)) ? d.setZone(zone) : null;
+}
+
+/**
  * "My plan broke": record what happened, mark the blocks the disruption
  * actually covered (from when it started, default now, until the user is free
  * again), keep the underlying tasks open so nothing is lost, re-plan the rest
@@ -193,10 +208,7 @@ export async function recoverPlan(
   const zone = profile.timezone;
   const now = DateTime.now().setZone(zone);
   const today = now.toISODate()!;
-  const parse = (iso?: string | null) => {
-    const d = iso ? DateTime.fromISO(iso).setZone(zone) : null;
-    return d && d.isValid ? d : null;
-  };
+  const parse = (value?: string | null) => readRecoveryTime(value, zone, today);
   let windowStart = parse(input.since) ?? now;
   let windowEnd = parse(input.availableFrom) ?? now;
   if (windowEnd < windowStart) [windowStart, windowEnd] = [windowEnd, windowStart];
