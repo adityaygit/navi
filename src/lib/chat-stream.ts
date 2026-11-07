@@ -35,13 +35,16 @@ export type TurnDone = {
   error?: string;
   /** Cards for the actions this reply proposed or changed, as they are now. */
   actions?: Record<string, ActionView>;
+  /** The message was sent before (same clientMessageId): this is the saved reply; Navi wasn't run again. */
+  replayed?: boolean;
 };
 
 export type ChatStreamEvent =
   | AgentEvent
   | { type: "user"; userMessage: Message; conversationId: string; title: string | null }
   | ({ type: "done" } & TurnDone)
-  | { type: "error"; message: string; status: number };
+  // `code` "turn_in_progress" | "turn_incomplete" (status 409): this clientMessageId was sent before and has no reply yet.
+  | { type: "error"; message: string; status: number; code?: string; conversationId?: string };
 
 export const CHAT_STREAM_CONTENT_TYPE = "application/x-ndjson";
 

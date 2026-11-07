@@ -15,6 +15,11 @@ const Body = z.object({
   conversationId: z.string().uuid().nullish(),
   // Ask for live progress (see src/lib/chat-stream.ts) instead of one JSON reply.
   stream: z.boolean().optional(),
+  // A uuid the device makes once per message and sends again with every retry
+  // of it. A repeat doesn't run Navi again: it gets the saved reply
+  // (`replayed: true`) or, while there's none yet, a 409 with `code`
+  // "turn_in_progress" | "turn_incomplete" and the message's `conversationId`.
+  clientMessageId: z.string().uuid().nullish(),
 });
 
 export async function POST(request: NextRequest) {
@@ -56,8 +61,14 @@ export async function POST(request: NextRequest) {
         } catch (err) {
           // Same wording and status the JSON response would have used.
           const res = apiError(err);
-          const detail = (await res.json().catch(() => ({}))) as { error?: string };
-          send({ type: "error", message: detail.error ?? "Something went wrong on the server.", status: res.status });
+          const detail = (await res.json().catch(() => ({}))) as { error?: string; code?: string; conversationId?: string };
+          send({
+            type: "error",
+            message: detail.error ?? "Something went wrong on the server.",
+            status: res.status,
+            ...(detail.code ? { code: detail.code } : {}),
+            ...(detail.conversationId ? { conversationId: detail.conversationId } : {}),
+          });
         } finally {
           if (!closed) {
             closed = true;

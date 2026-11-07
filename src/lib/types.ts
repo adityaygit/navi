@@ -203,6 +203,8 @@ export type Message = {
   modality: "text" | "voice";
   tool_events: ToolEvent[];
   created_at: string;
+  /** The sending device's id for this message (a reply: "<that id>:reply"); null for older rows. */
+  client_id?: string | null;
 };
 
 /**

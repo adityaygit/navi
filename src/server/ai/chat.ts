@@ -138,15 +138,74 @@ export async function saveMessage(
   content: string,
   modality: "text" | "voice",
   toolEvents: ToolEvent[] = [],
+  /** The device's id for this message (see messages.client_id); a second save with it fails with DuplicateMessageError. */
+  clientId?: string | null,
 ): Promise<Message> {
   const { data, error } = await ctx.db
     .from("messages")
-    .insert({ user_id: ctx.userId, conversation_id: conversationId, role, content, modality, tool_events: toolEvents })
+    .insert({ user_id: ctx.userId, conversation_id: conversationId, role, content, modality, tool_events: toolEvents, ...(clientId ? { client_id: clientId } : {}) })
     .select()
     .single();
+  if (error?.code === "23505" && clientId) throw new DuplicateMessageError(clientId);
   if (error) throw new Error(error.message);
-  await ctx.db.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
+  await touchConversation(ctx, conversationId);
   return data as Message;
+}
+
+async function touchConversation(ctx: Ctx, conversationId: string) {
+  await ctx.db.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
+}
+
+export class DuplicateMessageError extends Error {
+  constructor(public clientId: string) {
+    super("That message was already sent");
+  }
+}
+
+/** The client id of the reply to the message the device sent with `clientId`. */
+export const replyClientId = (clientId: string) => `${clientId}:reply`;
+
+/** The person's message with this device id, if it was saved. */
+export async function messageByClientId(ctx: Ctx, clientId: string): Promise<Message | null> {
+  const { data, error } = await ctx.db.from("messages").select("*").eq("user_id", ctx.userId).eq("client_id", clientId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as Message | null) ?? null;
+}
+
+/**
+ * Save a voice turn's message under the device's id for it, replacing what an
+ * earlier attempt with the same id saved. A voice turn that failed to save is
+ * resent with the words that came after it, so the newer text is a superset;
+ * replacing (not appending) keeps one message per turn however many retries.
+ * Returns whether anything changed.
+ */
+export async function upsertMessage(
+  ctx: Ctx,
+  conversationId: string,
+  role: "user" | "assistant",
+  content: string,
+  modality: "text" | "voice",
+  toolEvents: ToolEvent[],
+  clientId: string,
+  retry = true,
+): Promise<{ message: Message; changed: boolean }> {
+  const existing = await messageByClientId(ctx, clientId);
+  if (existing) {
+    if (existing.conversation_id !== conversationId) throw new UserFacingError("That voice turn belongs to another chat.", 409);
+    const same = existing.content === content && JSON.stringify(existing.tool_events ?? []) === JSON.stringify(toolEvents);
+    if (same) return { message: existing, changed: false };
+    const { data, error } = await ctx.db.from("messages").update({ content, tool_events: toolEvents }).eq("id", existing.id).select().single();
+    if (error) throw new Error(error.message);
+    await touchConversation(ctx, conversationId);
+    return { message: data as Message, changed: true };
+  }
+  try {
+    return { message: await saveMessage(ctx, conversationId, role, content, modality, toolEvents, clientId), changed: true };
+  } catch (err) {
+    // A simultaneous retry saved it first: compare with (or update) that one.
+    if (err instanceof DuplicateMessageError && retry) return upsertMessage(ctx, conversationId, role, content, modality, toolEvents, clientId, false);
+    throw err;
+  }
 }
 
 const PLANNER_CUES = /\b(plan|schedule|week|prioriti|reorgani|broke|behind|overwhelm|review|goal|deadline|realistic|strategy)\b/i;
@@ -176,6 +235,8 @@ export type TurnResult = {
   simulated: boolean;
   error?: string;
   actions?: Record<string, ActionView>;
+  /** This message was sent before (same clientMessageId): the saved reply, Navi wasn't run again. */
+  replayed?: boolean;
 };
 
 /** Action cards and Undo state for these messages: what each card shows, and which automatic changes were undone. */
@@ -204,17 +265,65 @@ function actionsTaken(m: Message, actions: Record<string, ActionView>, undone: S
   return `${m.content}\n[Actions taken: ${lines.join("; ")}]`;
 }
 
+/** Longer than a turn may run (the chat route's maxDuration is 120 s). */
+const TURN_LIMIT_MS = 150_000;
+
+/**
+ * The answer to a message the device sent before (same clientMessageId): the
+ * saved reply, without running Navi again. If there's no reply yet, a 409 that
+ * says whether it's still being answered or the earlier attempt died.
+ */
+async function replayTurn(ctx: Ctx, sent: Message): Promise<TurnResult> {
+  const clientId = sent.client_id;
+  if (sent.role !== "user" || !clientId) throw new UserFacingError("That message id is already used.", 409);
+  const reply = await messageByClientId(ctx, replyClientId(clientId));
+  if (!reply) {
+    const stillRunning = Date.now() - Date.parse(sent.created_at) < TURN_LIMIT_MS;
+    throw new UserFacingError(
+      stillRunning ? "Navi is still answering that message." : "That message was saved, but Navi's reply didn't finish. Send it again to try again.",
+      409,
+      { code: stillRunning ? "turn_in_progress" : "turn_incomplete", conversationId: sent.conversation_id, userMessage: sent },
+    );
+  }
+  const [{ data: conv }, after] = await Promise.all([
+    ctx.db.from("conversations").select("title").eq("id", sent.conversation_id).maybeSingle(),
+    messageActions(ctx, [reply]),
+  ]);
+  return {
+    conversationId: sent.conversation_id,
+    title: conv?.title ?? null,
+    userMessage: sent,
+    assistantMessage: reply,
+    mutated: (reply.tool_events ?? []).length > 0,
+    simulated: false,
+    actions: after.actions,
+    replayed: true,
+  };
+}
+
 /**
  * One conversation turn: saves the user's message, runs Navi, saves the reply.
+ * `clientMessageId` (optional, a uuid the device makes once per message and
+ * reuses on every retry of it) makes the turn idempotent: if a message with
+ * that id was already saved, Navi isn't run again — the saved reply comes back
+ * (`replayed: true`, in that message's chat even when no conversationId was
+ * given), or a 409 if it's still being answered.
  * `onEvent` (optional) receives live progress for a streaming client: the
  * saved user message, then each step and piece of text as it happens. The
  * result and what is stored are the same with or without it.
  */
 export async function handleTurn(
   ctx: Ctx,
-  input: { kind: "chat" | "onboarding"; text: string; modality: "text" | "voice"; conversationId?: string | null },
+  input: { kind: "chat" | "onboarding"; text: string; modality: "text" | "voice"; conversationId?: string | null; clientMessageId?: string | null },
   onEvent?: (event: Exclude<ChatStreamEvent, { type: "done" } | { type: "error" }>) => void,
 ): Promise<TurnResult> {
+  const clientId = input.clientMessageId ?? null;
+  if (clientId) {
+    const sent = await messageByClientId(ctx, clientId);
+    if (sent) return replayTurn(ctx, sent);
+  }
+  // A brand-new chat made for this turn is removed again if the turn turns out to be a repeat.
+  const isNewChat = input.kind === "chat" && !input.conversationId;
   const conversationId = await resolveConversation(ctx, input.kind, input.conversationId);
   const prior = await listMessages(ctx, conversationId, 24);
   if (input.kind === "chat" && !prior.some((m) => m.role === "user")) await nameNewChat(ctx, conversationId, input.text);
@@ -226,27 +335,45 @@ export async function handleTurn(
       role: m.role as "user" | "assistant",
       content: m.tool_events.length ? actionsTaken(m, before.actions, undone) : m.content,
     }));
-  const userMessage = await saveMessage(ctx, conversationId, "user", input.text, input.modality);
+  let userMessage: Message;
+  try {
+    userMessage = await saveMessage(ctx, conversationId, "user", input.text, input.modality, [], clientId);
+  } catch (err) {
+    if (!(err instanceof DuplicateMessageError)) throw err;
+    // The same message arrived twice at once and the other request saved it first.
+    if (isNewChat && !prior.length) await ctx.db.from("conversations").delete().eq("id", conversationId).eq("kind", "chat");
+    const sent = await messageByClientId(ctx, err.clientId);
+    if (!sent) throw err;
+    return replayTurn(ctx, sent);
+  }
   if (onEvent) {
     const { data: named } = await ctx.db.from("conversations").select("title").eq("id", conversationId).maybeSingle();
     onEvent({ type: "user", userMessage, conversationId, title: named?.title ?? null });
   }
-  const profile = await getProfile(ctx);
-  const turnCtx: Ctx = { ...ctx, conversationId, autonomy: autonomyFrom(profile.preferences) };
-  const mode: AgentMode = input.kind === "onboarding" ? "onboarding" : "chat";
-  const context = await buildContext(turnCtx, input.text, mode);
-  const result = await runAgent({
-    ctx: turnCtx,
-    mode,
-    role: mode === "onboarding" || PLANNER_CUES.test(input.text) ? "planner" : "fast",
-    system: mode === "onboarding" ? ONBOARDING_SYSTEM : CHAT_SYSTEM,
-    context: `${context}\nUser's local time: ${nowIn(profile.timezone).toFormat("cccc yyyy-LL-dd HH:mm ZZ")}`,
-    history,
-    userText: input.text,
-    purpose: mode === "onboarding" ? "onboarding" : "chat",
-    onEvent: onEvent ? (event: AgentEvent) => onEvent(event) : undefined,
-  });
-  const assistantMessage = await saveMessage(ctx, conversationId, "assistant", result.text, input.modality, result.toolEvents);
+  let result: Awaited<ReturnType<typeof runAgent>>;
+  try {
+    const profile = await getProfile(ctx);
+    const turnCtx: Ctx = { ...ctx, conversationId, autonomy: autonomyFrom(profile.preferences) };
+    const mode: AgentMode = input.kind === "onboarding" ? "onboarding" : "chat";
+    const context = await buildContext(turnCtx, input.text, mode);
+    result = await runAgent({
+      ctx: turnCtx,
+      mode,
+      role: mode === "onboarding" || PLANNER_CUES.test(input.text) ? "planner" : "fast",
+      system: mode === "onboarding" ? ONBOARDING_SYSTEM : CHAT_SYSTEM,
+      context: `${context}\nUser's local time: ${nowIn(profile.timezone).toFormat("cccc yyyy-LL-dd HH:mm ZZ")}`,
+      history,
+      userText: input.text,
+      purpose: mode === "onboarding" ? "onboarding" : "chat",
+      onEvent: onEvent ? (event: AgentEvent) => onEvent(event) : undefined,
+    });
+  } catch (err) {
+    // No reply will follow: free the id so sending the message again runs the turn
+    // (instead of being told forever that it's still being answered).
+    if (clientId) await ctx.db.from("messages").update({ client_id: null }).eq("id", userMessage.id);
+    throw err;
+  }
+  const assistantMessage = await saveMessage(ctx, conversationId, "assistant", result.text, input.modality, result.toolEvents, clientId ? replyClientId(clientId) : null);
   const [{ data: conv }, after] = await Promise.all([
     ctx.db.from("conversations").select("title").eq("id", conversationId).maybeSingle(),
     messageActions(ctx, [assistantMessage]),

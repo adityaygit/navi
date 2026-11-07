@@ -5,7 +5,8 @@ import { AuthError } from "@/server/context";
 
 /** An error whose message was written for the person using the app (safe to show). */
 export class UserFacingError extends Error {
-  constructor(message: string, public status = 400) {
+  /** `details`: extra fields for the JSON body next to `error` (e.g. a machine-readable `code`). */
+  constructor(message: string, public status = 400, public details?: Record<string, unknown>) {
     super(message);
   }
 }
@@ -20,7 +21,7 @@ export function apiError(err: unknown) {
   if (err instanceof z.ZodError) {
     return NextResponse.json({ error: err.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") }, { status: 400 });
   }
-  if (err instanceof UserFacingError) return NextResponse.json({ error: err.message }, { status: err.status });
+  if (err instanceof UserFacingError) return NextResponse.json({ ...err.details, error: err.message }, { status: err.status });
   const ref = Math.random().toString(36).slice(2, 10);
   console.error(`[api error ${ref}]`, err);
   const detail = process.env.NODE_ENV === "production" ? null : err instanceof Error ? err.message : null;

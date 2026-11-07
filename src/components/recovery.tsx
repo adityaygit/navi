@@ -35,14 +35,9 @@ export function RecoveryButton({ className = "btn" }: { className?: string }) {
               onSubmit={(e) => {
                 e.preventDefault();
                 start(async () => {
-                  const at = (hhmm: string) => {
-                    if (!hhmm) return null;
-                    const [h, m] = hhmm.split(":").map(Number);
-                    const d = new Date();
-                    d.setHours(h, m, 0, 0);
-                    return d.toISOString();
-                  };
-                  const r = await recoverPlanAction({ description: description || CATEGORIES.find((c) => c[0] === category)![1], category, availableFrom: at(freeAt), since: at(since) });
+                  // Times are sent as the clock time typed ("14:30"); the server reads them
+                  // as today in the person's profile timezone, not this browser's zone.
+                  const r = await recoverPlanAction({ description: description || CATEGORIES.find((c) => c[0] === category)![1], category, availableFrom: freeAt || null, since: since || null });
                   if (r.ok) {
                     setResult((r.data as { summary: string }).summary);
                     announceChange();

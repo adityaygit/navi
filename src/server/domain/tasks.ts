@@ -7,6 +7,10 @@ import { logActivity } from "./activity";
 import { TaskCreate, TaskUpdate, compact } from "./schemas";
 import { OUTCOMES, STOPPED_NO_REASON, withNote } from "@/lib/outcomes";
 import { refreshStoredReview } from "@/server/jobs/briefings";
+import { UserFacingError } from "@/server/http";
+import type { FocusSession } from "@/lib/focus";
+
+export type { FocusSession };
 
 /** Why a focus session was stopped early, if the user said. */
 export type StopReason = "rest" | "missing_info" | "estimate";
@@ -24,11 +28,16 @@ export function focusBlockOutcome(outcome: "completed" | "progress" | "interrupt
   return { status: "skipped", reason: withNote(STOPPED_NO_REASON, note) };
 }
 
-export async function createTask(ctx: Ctx, input: TaskCreate): Promise<Task> {
+/**
+ * Create a task. `opts.id` (optional uuid, chosen by the client once per
+ * submit) makes it idempotent: a retry with the same id returns the task the
+ * first attempt made instead of adding a duplicate.
+ */
+export async function createTask(ctx: Ctx, input: TaskCreate, opts: { id?: string } = {}): Promise<Task> {
   const values: Record<string, unknown> = compact(TaskCreate.parse(input));
   // "Not given" for columns that have defaults (the schema allows null, the table doesn't).
   for (const k of ["due_is_hard", "priority"]) if (values[k] === null) delete values[k];
-  return createEntity<Task>(ctx, "tasks", { ...values, source: ctx.actor === "navi" ? "navi" : "user" });
+  return createEntity<Task>(ctx, "tasks", { ...values, source: ctx.actor === "navi" ? "navi" : "user" }, { id: opts.id });
 }
 
 export async function updateTask(ctx: Ctx, id: string, input: TaskUpdate) {
@@ -88,46 +97,94 @@ export async function completeTask(ctx: Ctx, id: string, actualMinutes?: number 
   return result;
 }
 
-export async function startFocus(ctx: Ctx, input: { task_id?: string | null; block_id?: string | null; planned_minutes?: number | null }) {
-  const { data: active } = await ctx.db.from("focus_sessions").select("id").is("ended_at", null).maybeSingle();
-  if (active) throw new Error("A focus session is already running. End it first.");
+const RUNNING_ELSEWHERE = "A focus session is already running. End it first.";
+
+/**
+ * Start focus. The database allows one open session per person, so a double
+ * tap (or two devices) can't start two: the repeated request gets the session
+ * the first one started. Asking to focus on something else while a session is
+ * open is refused, not silently ignored.
+ */
+export async function startFocus(ctx: Ctx, input: { task_id?: string | null; block_id?: string | null; planned_minutes?: number | null }): Promise<FocusSession> {
+  const want = { task_id: input.task_id ?? null, block_id: input.block_id ?? null };
   const { data, error } = await ctx.db
     .from("focus_sessions")
-    .insert({ user_id: ctx.userId, task_id: input.task_id ?? null, block_id: input.block_id ?? null, planned_minutes: input.planned_minutes ?? null })
+    .insert({ user_id: ctx.userId, ...want, planned_minutes: input.planned_minutes ?? null })
     .select()
     .single();
-  if (error) throw new Error(error.message);
-  if (input.task_id) await ctx.db.from("tasks").update({ status: "in_progress" }).eq("id", input.task_id).eq("status", "todo");
-  if (input.block_id) await ctx.db.from("plan_blocks").update({ status: "in_progress" }).eq("id", input.block_id).eq("status", "planned");
+  if (error) {
+    if (error.code !== "23505") throw new Error(`Could not start focus: ${error.message}`);
+    const { data: open, error: readErr } = await ctx.db.from("focus_sessions").select("*").eq("user_id", ctx.userId).is("ended_at", null).maybeSingle();
+    if (readErr) throw new Error(readErr.message);
+    if (!open) throw new Error("Could not start focus. Try again.");
+    if (open.task_id !== want.task_id || open.block_id !== want.block_id) throw new UserFacingError(RUNNING_ELSEWHERE, 409);
+    return open as FocusSession;
+  }
+  if (want.task_id) {
+    const { error: e } = await ctx.db.from("tasks").update({ status: "in_progress" }).eq("id", want.task_id).eq("status", "todo");
+    if (e) throw new Error(e.message);
+  }
+  if (want.block_id) {
+    const { error: e } = await ctx.db.from("plan_blocks").update({ status: "in_progress" }).eq("id", want.block_id).eq("status", "planned");
+    if (e) throw new Error(e.message);
+  }
   await logActivity(ctx, { action: "focus_started", summary: "Started a focus session" });
-  return data;
+  return data as FocusSession;
 }
 
-/** End focus: records actual time against the task (real data for estimates and reviews). */
+async function readSession(ctx: Ctx, sessionId: string): Promise<FocusSession> {
+  const { data, error } = await ctx.db.from("focus_sessions").select("*").eq("id", sessionId).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new UserFacingError("Focus session not found", 404);
+  return data as FocusSession;
+}
+
+/** The row a focus_* database function returned, if this call changed it. */
+async function focusRpc(ctx: Ctx, fn: "focus_pause" | "focus_resume" | "focus_end", args: Record<string, unknown>, what: string) {
+  const { data, error } = await ctx.db.rpc(fn, args);
+  if (error) throw new Error(`Could not ${what}: ${error.message}`);
+  return ((data ?? []) as FocusSession[])[0] ?? null;
+}
+
+/** Pause a running session. Pausing one that's already paused (or ended) changes nothing. */
+export async function pauseFocus(ctx: Ctx, sessionId: string): Promise<FocusSession> {
+  const row = await focusRpc(ctx, "focus_pause", { p_session: sessionId }, "pause focus");
+  if (!row) return readSession(ctx, sessionId);
+  await logActivity(ctx, { action: "focus_paused", summary: "Paused focus" });
+  return row;
+}
+
+/** Resume a paused session; the time it was paused doesn't count as focus. */
+export async function resumeFocus(ctx: Ctx, sessionId: string): Promise<FocusSession> {
+  const row = await focusRpc(ctx, "focus_resume", { p_session: sessionId }, "resume focus");
+  if (!row) return readSession(ctx, sessionId);
+  await logActivity(ctx, { action: "focus_resumed", summary: "Resumed focus" });
+  return row;
+}
+
+/**
+ * End focus: records actual time (minus pauses) against the task — real data
+ * for estimates and reviews. The end is claimed in the database, and the task's
+ * minutes are added in the same statement, so if "end" arrives twice (double
+ * tap, retry) only the first counts; the second gets the ended session back.
+ */
 export async function endFocus(
   ctx: Ctx,
   sessionId: string,
   outcome: "completed" | "progress" | "interrupted" | "abandoned",
   note?: string | null,
   reason?: StopReason | null,
-) {
-  const { data: s } = await ctx.db.from("focus_sessions").select("*").eq("id", sessionId).single();
-  if (!s) throw new Error("Focus session not found");
-  if (s.ended_at) return s;
-  const ended = new Date();
-  const minutes = Math.max(1, Math.round((ended.getTime() - Date.parse(s.started_at)) / 60000));
-  await ctx.db.from("focus_sessions").update({ ended_at: ended.toISOString(), actual_minutes: minutes, outcome, note: note ?? null }).eq("id", sessionId);
-  if (s.task_id) {
-    const task = await getEntity<Task>(ctx, "tasks", s.task_id);
-    await ctx.db.from("tasks").update({ actual_minutes: task.actual_minutes + minutes }).eq("id", s.task_id);
-    if (outcome === "completed") await completeTask({ ...ctx, actor: "user" }, s.task_id);
-  }
+): Promise<FocusSession> {
+  const s = await focusRpc(ctx, "focus_end", { p_session: sessionId, p_outcome: outcome, p_note: note ?? null }, "end focus");
+  if (!s) return readSession(ctx, sessionId); // already ended (or not the person's: then "not found")
+  if (s.task_id && outcome === "completed") await completeTask({ ...ctx, actor: "user" }, s.task_id);
   let block: { status: string; reason: string | null } | null = null;
   if (s.block_id) {
     block = focusBlockOutcome(outcome, note, reason);
-    const { data: b } = await ctx.db.from("plan_blocks").update({ status: block.status, outcome_reason: block.reason }).eq("id", s.block_id).select("plan_date").maybeSingle();
+    const { data: b, error } = await ctx.db.from("plan_blocks").update({ status: block.status, outcome_reason: block.reason }).eq("id", s.block_id).select("plan_date").maybeSingle();
+    if (error) throw new Error(error.message);
     if (b) await refreshStoredReview(ctx.db, ctx.userId, b.plan_date);
   }
-  await logActivity(ctx, { action: "focus_ended", summary: `Focus session ended after ${minutes} min (${outcome}${block?.reason ? `: ${block.reason}` : ""})` });
-  return { ...s, actual_minutes: minutes, outcome };
+  await logActivity(ctx, { action: "focus_ended", summary: `Focus session ended after ${s.actual_minutes} min (${outcome}${block?.reason ? `: ${block.reason}` : ""})` });
+  return s;
 }
