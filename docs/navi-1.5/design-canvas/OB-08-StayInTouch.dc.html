@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi onboarding notifications</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#A7EBC0}a:hover{color:#D2F6DF}
+button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; background: #000000; color: #F5F5F7; font-family: Figtree, sans-serif; font-size: 15px; display: flex; flex-direction: column; overflow: hidden">
+  <header style="height: 80px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 40px">
+    <span style="display: flex; align-items: center; gap: 10px"><span aria-hidden="true" style="width: 18px; height: 16px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%)"></span><span style="font-weight: 700; font-size: 16px">Navi</span></span>
+    <div role="img" aria-label="Step 5 of 5" style="display: flex; gap: 6px"><span style="width: 28px; height: 3px; border-radius: 2px; background: #F5F5F7"></span><span style="width: 28px; height: 3px; border-radius: 2px; background: #F5F5F7"></span><span style="width: 28px; height: 3px; border-radius: 2px; background: #F5F5F7"></span><span style="width: 28px; height: 3px; border-radius: 2px; background: #F5F5F7"></span><span style="width: 28px; height: 3px; border-radius: 2px; background: #F5F5F7"></span></div>
+    <span></span>
+  </header>
+
+  <main style="flex: 1; display: flex; flex-direction: column; align-items: center; padding-top: 60px">
+    <div aria-hidden="true" style="width: 64px; height: 64px; border-radius: 32px; background: rgba(167,235,192,0.1); display: flex; align-items: center; justify-content: center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#A7EBC0" stroke-width="1.7"><path d="M6 10a6 6 0 0 1 12 0c0 5 2 6.5 2 6.5H4S6 15 6 10z"></path><path d="M10 19.5a2 2 0 0 0 4 0"></path></svg></div>
+    <h1 style="margin: 24px 0 0; font-size: 36px; font-weight: 700; letter-spacing: -0.03em">Can I check in with you?</h1>
+    <p style="margin: 10px 0 0; color: #8E8E96; font-size: 17px">A short note to start the day and one to wrap it up. Nothing else unless you ask.</p>
+
+    <div style="margin-top: 40px; width: 560px; display: flex; flex-direction: column; gap: 12px">
+      <div style="border-radius: 20px; background: #0C0C0D; border: 1px solid rgba(255,255,255,0.08); padding: 16px 18px; display: flex; align-items: center; gap: 14px">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E9C46A" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"></path></svg>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 600">Morning briefing</span><span style="color: #8E8E96; font-size: 13.5px">When you wake up: today's plan and anything due</span></div>
+        <button type="button" style="height: 40px; padding: 0 16px; border-radius: 20px; background: rgba(255,255,255,0.07); font-weight: 600">7:00 AM</button>
+      </div>
+      <div style="border-radius: 20px; background: #0C0C0D; border: 1px solid rgba(255,255,255,0.08); padding: 16px 18px; display: flex; align-items: center; gap: 14px">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9DB8FF" stroke-width="1.8" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"></path></svg>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 600">Evening wrap-up</span><span style="color: #8E8E96; font-size: 13.5px">What got done, and a look at tomorrow</span></div>
+        <button type="button" style="height: 40px; padding: 0 16px; border-radius: 20px; background: rgba(255,255,255,0.07); font-weight: 600">9:00 PM</button>
+      </div>
+      <div style="border-radius: 20px; background: #0C0C0D; border: 1px solid rgba(255,255,255,0.08); padding: 16px 18px; display: flex; align-items: center; gap: 14px">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A0A0A8" stroke-width="1.8" aria-hidden="true"><path d="M6 10a6 6 0 0 1 12 0c0 5 2 6.5 2 6.5H4S6 15 6 10z"></path><path d="M4 4l16 16"></path></svg>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 600">Quiet hours</span><span style="color: #8E8E96; font-size: 13.5px">From your bedtime to when you wake up</span></div>
+        <button type="button" style="height: 40px; padding: 0 16px; border-radius: 20px; background: rgba(255,255,255,0.07); font-weight: 600">11:30 PM – 7:00 AM</button>
+      </div>
+
+      <div style="margin-top: 6px; border-radius: 20px; background: rgba(167,235,192,0.05); border: 1px solid rgba(167,235,192,0.15); padding: 14px 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px">
+        <span style="font-weight: 600; color: #D2F6DF">Navi never</span>
+        <span style="color: #A0A0A8">messages anyone for you without asking first</span>
+        <span style="color: #A0A0A8">shares or sells your data</span>
+        <span style="color: #A0A0A8">keeps voice recordings. Only the text of what you said is saved.</span>
+      </div>
+    </div>
+
+    <div style="margin-top: 30px; display: flex; gap: 10px">
+      <a href="OB-09-FirstPlan.dc.html" style="height: 54px; padding: 0 30px; border-radius: 27px; background: #F5F5F7; color: #000000; font-weight: 600; font-size: 16px; text-decoration: none; display: flex; align-items: center">Turn on notifications</a>
+      <a href="OB-09-FirstPlan.dc.html" style="height: 54px; padding: 0 24px; border-radius: 27px; background: rgba(255,255,255,0.07); color: #F5F5F7; font-size: 16px; text-decoration: none; display: flex; align-items: center">Not now</a>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

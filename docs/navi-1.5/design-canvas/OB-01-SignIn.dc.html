@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi sign in</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#A7EBC0}a:hover{color:#D2F6DF}
+button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; background: #000000; color: #F5F5F7; font-family: Figtree, sans-serif; font-size: 15px; display: flex; flex-direction: column; align-items: center; overflow: hidden">
+  <div aria-hidden="true" style="position: absolute; left: 50%; top: -280px; width: 900px; height: 640px; margin-left: -450px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(167,235,192,0.10) 0%, rgba(167,235,192,0.03) 40%, rgba(0,0,0,0) 70%)"></div>
+
+  <div aria-hidden="true" style="margin-top: 150px; width: 76px; height: 69px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 33% 27%, #FFFFFF 0%, #CFF6DD 9%, #8BDDAF 34%, #2F8566 70%, #0F3328 100%); box-shadow: inset -8px -9px 18px rgba(0,0,0,0.5), inset 5px 6px 12px rgba(255,255,255,0.25), 0 30px 70px rgba(139,221,175,0.2); position: relative"></div>
+  <h1 style="margin: 30px 0 0; font-size: 36px; font-weight: 700; letter-spacing: -0.03em; position: relative">Welcome to Navi</h1>
+  <p style="margin: 10px 0 0; color: #8E8E96; font-size: 17px; position: relative">Your days, planned with you.</p>
+
+  <div style="margin-top: 40px; width: 380px; display: flex; flex-direction: column; gap: 12px; position: relative">
+    <button type="button" style="height: 50px; border-radius: 25px; background: #1C1C1F; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F5F5F7" stroke-width="2" aria-hidden="true"><path d="M20 12.2c0-.6 0-1.1-.1-1.7H12v3.3h4.5a3.9 3.9 0 0 1-1.7 2.5v2.1h2.7c1.6-1.5 2.5-3.6 2.5-6.2z"></path><path d="M12 20.5c2.3 0 4.2-.8 5.5-2.1l-2.7-2.1c-.7.5-1.7.8-2.8.8-2.2 0-4-1.5-4.7-3.5H4.5v2.2a8.5 8.5 0 0 0 7.5 4.7z"></path></svg>Continue with Google</button>
+    <div style="display: flex; align-items: center; gap: 12px; color: #6E6E77; font-size: 13px; margin: 4px 0"><span style="flex: 1; height: 1px; background: rgba(255,255,255,0.08)"></span>or with email<span style="flex: 1; height: 1px; background: rgba(255,255,255,0.08)"></span></div>
+    <label for="email" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Email</label>
+    <input id="email" type="email" value="alex@example.com" autocomplete="email" style="height: 50px; border-radius: 25px; background: #0E0E10; border: 1px solid rgba(255,255,255,0.12); color: #F5F5F7; font: inherit; padding: 0 20px; outline: none">
+    <a href="OB-02-Code.dc.html" style="height: 50px; border-radius: 25px; background: #F5F5F7; color: #000000; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Send me a code</a>
+    <a href="OB-01b-Password.dc.html" style="align-self: center; margin-top: 6px; color: #A0A0A8; font-size: 14px; text-decoration: underline; text-underline-offset: 3px">Use a password instead</a>
+  </div>
+
+  <p style="position: absolute; bottom: 40px; margin: 0; color: #6E6E77; font-size: 13px">Navi is invite-only for now. Not on the list? <a href="#" style="text-decoration: none">Join the waitlist</a></p>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

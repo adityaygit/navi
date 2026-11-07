@@ -1,6 +1,6 @@
 # Navi 1.5 — Sign-in and onboarding plan
 
-Status: **Plan approved with answers below. Storyboard (10 screens) shown in chat 2026-11-06; awaiting approval before full-size canvas boards.**
+Status: **Plan and storyboard approved 2026-11-06. Full-size boards on the design canvas (OB-*.dc.html).**
 
 ## What exists today (verified in code, 2026-11-06)
 
@@ -32,7 +32,7 @@ Open app
 2. **The basics.** Three quick answers, no typing beyond your name: name (pre-filled from Google), timezone (detected, confirm), wake-up and bedtime (hour steppers). Wake/bed feeds the "free time" maths on My day (see sources board).
 3. **Talk it through** (the heart, text or voice). Split screen: conversation on the left; on the right **"What Navi's picked up"** fills in live (spaces, fixed things, routines, goals, tasks), each with the words it came from. Navi steers through four topics, shown as chips that tick off: *Your week · Fixed things · What you're working toward · What's on your mind*. "That's enough for now →" is always available.
 4. **Review.** The existing grouped review, restyled: Spaces · Fixed things & routines · Goals & projects · Tasks · Things Navi will remember. Uncertain guesses start unchecked; tap to edit. "Activate 14 and plan my week". Unchecked items go to the Inbox.
-5. **Stay in touch** (optional). Turn on notifications for the 6:00 morning and 21:00 evening briefings, with quiet hours. A short "what Navi never does" privacy panel. Skip is fine.
+5. **Stay in touch** (optional). Turn on notifications for the morning briefing (at your wake-up time) and the 21:00 evening briefing, with quiet hours. A short "what Navi never does" privacy panel. Skip is fine.
 6. **Your first plan.** Today's timeline with its Navi sentence (built from the data just activated), then "Go to Home".
 
 **"Do this later"** at any step sets `skipped` and lands on Home, where the one insight slot says "Finish setting up Navi" until done (also in Settings). Finishing later resumes where you left.
@@ -65,3 +65,4 @@ Sign in · Email code · Hello · The basics · Talk it through (early and late)
 3. Wake-up and bedtime: **their own quick step** (step 2).
 4. Notifications: **during onboarding** (step 5).
 5. Process: **show the screens first** (storyboard in chat), then put them on the design canvas, then code.
+6. Morning briefing: **defaults to your wake-up time**, not 06:00. Evening 21:00. Quiet hours = bedtime to wake-up.

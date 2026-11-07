@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi onboarding talk start</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#A7EBC0}a:hover{color:#D2F6DF}
+button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; background: #000000; color: #F5F5F7; font-family: Figtree, sans-serif; font-size: 15px; display: flex; flex-direction: column; overflow: hidden">
+  <header style="height: 80px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 40px">
+    <span style="display: flex; align-items: center; gap: 10px"><span aria-hidden="true" style="width: 18px; height: 16px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%)"></span><span style="font-weight: 700; font-size: 16px">Navi</span></span>
+    <div role="img" aria-label="Step 3 of 5" style="display: flex; gap: 6px"><span style="width: 28px; height: 3px; border-radius: 2px; background: #F5F5F7"></span><span style="width: 28px; height: 3px; border-radius: 2px; background: #F5F5F7"></span><span style="width: 28px; height: 3px; border-radius: 2px; background: #F5F5F7"></span><span style="width: 28px; height: 3px; border-radius: 2px; background: #2A2A2E"></span><span style="width: 28px; height: 3px; border-radius: 2px; background: #2A2A2E"></span></div>
+    <a href="OB-10-HomeLater.dc.html" style="justify-self: end; color: #8E8E96; text-decoration: none">Do this later</a>
+  </header>
+
+  <div style="flex: 1; display: flex; gap: 24px; padding: 8px 40px 32px; min-height: 0">
+    <main style="flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 0">
+      <div style="width: 680px; flex: 1; display: flex; flex-direction: column; gap: 18px">
+        <div style="display: flex; gap: 8px; justify-content: center">
+          <span style="height: 32px; padding: 0 14px; border-radius: 16px; background: rgba(255,255,255,0.1); color: #F5F5F7; font-size: 13.5px; font-weight: 600; display: flex; align-items: center">Your week</span>
+          <span style="height: 32px; padding: 0 14px; border-radius: 16px; background: rgba(255,255,255,0.04); color: #7C7C85; font-size: 13.5px; display: flex; align-items: center">Fixed things</span>
+          <span style="height: 32px; padding: 0 14px; border-radius: 16px; background: rgba(255,255,255,0.04); color: #7C7C85; font-size: 13.5px; display: flex; align-items: center">What you're working toward</span>
+          <span style="height: 32px; padding: 0 14px; border-radius: 16px; background: rgba(255,255,255,0.04); color: #7C7C85; font-size: 13.5px; display: flex; align-items: center">What's on your mind</span>
+        </div>
+
+        <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 22px; text-align: center">
+          <div aria-hidden="true" style="width: 70px; height: 64px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 33% 27%, #FFFFFF 0%, #CFF6DD 9%, #8BDDAF 34%, #2F8566 70%, #0F3328 100%); box-shadow: 0 24px 60px rgba(139,221,175,0.2)"></div>
+          <p style="margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.35; max-width: 560px">Tell me about a normal week, Alex. What's fixed — classes, shifts, plans with people?</p>
+          <p style="margin: 0; color: #8E8E96; font-size: 15px">Talk or type, as messy as you like. Nothing is set up until you review it.</p>
+        </div>
+
+        <div style="height: 64px; border-radius: 32px; background: rgba(28,28,31,0.92); border: 1px solid rgba(255,255,255,0.09); display: flex; align-items: center; gap: 10px; padding: 0 8px 0 24px">
+          <label for="talk" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Message Navi</label>
+          <input id="talk" type="text" placeholder="Monday I have history at 8:45…" style="flex: 1; height: 44px; background: transparent; border: 0; outline: none; color: #F5F5F7; font: inherit; font-size: 16px">
+          <a href="OB-06-TalkLater.dc.html" aria-label="Talk to Navi" style="height: 48px; padding: 0 20px; border-radius: 24px; background: #A7EBC0; color: #00140A; font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 8px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#00140A" stroke-width="2" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"></path></svg>Talk</a>
+        </div>
+      </div>
+    </main>
+
+    <aside aria-label="What Navi's picked up" style="width: 400px; flex-shrink: 0; border-radius: 26px; background: #0C0C0D; border: 1px solid rgba(255,255,255,0.07); padding: 22px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px">
+      <span style="font-weight: 600; font-size: 16px">What Navi's picked up</span>
+      <span style="color: #7C7C85; font-size: 13.5px; line-height: 1.45">Things you mention show up here as you go, each with the words they came from.</span>
+      <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px; color: #4A4A52">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"></rect><path d="M8 10h8M8 14h5"></path></svg>
+        <span style="font-size: 14px">Nothing yet</span>
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

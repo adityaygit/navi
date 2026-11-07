@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi onboarding first plan</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#A7EBC0}a:hover{color:#D2F6DF}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; background: #000000; color: #F5F5F7; font-family: Figtree, sans-serif; font-size: 15px; display: flex; flex-direction: column; align-items: center; overflow: hidden">
+  <div aria-hidden="true" style="position: absolute; left: 50%; top: -260px; width: 900px; height: 620px; margin-left: -450px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(167,235,192,0.10) 0%, rgba(167,235,192,0.03) 38%, rgba(0,0,0,0) 70%)"></div>
+
+  <div style="margin-top: 80px; display: flex; align-items: center; gap: 18px; position: relative">
+    <div aria-hidden="true" style="width: 62px; height: 56px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 33% 27%, #FFFFFF 0%, #CFF6DD 9%, #8BDDAF 34%, #2F8566 70%, #0F3328 100%); box-shadow: 0 24px 60px rgba(139,221,175,0.22)"></div>
+    <h1 style="margin: 0; font-size: 36px; font-weight: 700; letter-spacing: -0.03em">You're set, Alex. Here's today.</h1>
+  </div>
+  <p style="margin: 14px 0 0; font-size: 18px; font-weight: 500; position: relative"><span style="color: #F5F5F7">A busy day.</span><span style="color: #6E6E77"> 6¾ hours planned, and your evening's free after 7.</span></p>
+
+  <div style="margin-top: 36px; width: 640px; position: relative; display: flex; flex-direction: column; gap: 10px">
+    <span aria-hidden="true" style="position: absolute; left: 83px; top: 20px; bottom: 20px; width: 2px; background: rgba(255,255,255,0.07)"></span>
+    <sc-for list="{{rows}}" as="r" hint-placeholder-count="6">
+      <sc-if value="{{r.isNow}}" hint-placeholder-val="{{ false }}">
+        <div style="height: 34px; display: flex; align-items: center">
+          <span style="width: 64px; color: #F5F5F7; font-size: 13px; font-weight: 600">{{r.time}}</span>
+          <span style="width: 40px; display: flex; justify-content: center; position: relative; z-index: 1"><span style="width: 12px; height: 12px; border-radius: 50%; background: #F5F5F7; box-shadow: 0 0 0 5px rgba(255,255,255,0.12)"></span></span>
+          <span style="margin-left: 14px; color: #8E8E96">{{r.label}}</span>
+        </div>
+      </sc-if>
+      <sc-if value="{{r.isItem}}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; align-items: center; opacity: {{r.op}}">
+          <span style="width: 64px; color: #8E8E96; font-size: 13px">{{r.time}}</span>
+          <span style="width: 40px; height: 40px; border-radius: 20px; background: {{r.bubble}}; border: {{r.ring}}; box-sizing: border-box; position: relative; z-index: 1"></span>
+          <div style="flex: 1; margin-left: 14px; padding: 10px 14px; border-radius: 18px; background: {{r.card}}; border: {{r.cardBorder}}; display: flex; flex-direction: column; gap: 2px">
+            <span style="font-size: 15px; font-weight: 600">{{r.title}}</span>
+            <span style="color: #8E8E96; font-size: 13px">{{r.sub}}</span>
+          </div>
+        </div>
+      </sc-if>
+    </sc-for>
+  </div>
+
+  <p style="margin: 26px 0 0; color: #7C7C85; font-size: 14px; position: relative">I placed the essay in your free afternoon. Move it anytime, or ask me to.</p>
+  <a href="V3-Home.dc.html" style="margin-top: 22px; height: 54px; padding: 0 36px; border-radius: 27px; background: #F5F5F7; color: #000000; font-weight: 600; font-size: 16px; text-decoration: none; display: flex; align-items: center; position: relative">Go to Home</a>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const S = { School: '#9DB8FF', Work: '#8EC5E6', Routine: '#6E6E77' };
+    const tint = (hex, a) => { const n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'; };
+    const item = (time, title, sub, space, kind, o) => {
+      const opt = o || {}; const c = S[space];
+      return {
+        isItem: true, time, title, sub, op: opt.past ? 0.45 : 1,
+        bubble: kind === 'fixed' ? tint(c, 0.85) : 'transparent',
+        ring: kind === 'fixed' ? '0' : (kind === 'routine' ? '1.5px dashed ' + c : '1.5px solid ' + c),
+        card: opt.hi ? 'rgba(167,235,192,0.07)' : 'rgba(255,255,255,0.04)',
+        cardBorder: opt.hi ? '1px solid rgba(167,235,192,0.25)' : '1px solid transparent'
+      };
+    };
+    return {
+      rows: [
+        item('8:45', 'Modern History', 'Class until 11:00', 'School', 'fixed', { past: true }),
+        { isNow: true, time: '1:10', label: 'Now — free until 2:00' },
+        item('2:00', 'Essay: write the intro', '90 min · new, placed by Navi', 'School', 'flex', { hi: true }),
+        item('4:00', 'Shift at the café', 'Until 7:00', 'Work', 'fixed'),
+        item('11:00', 'Wind down', 'Bed by 11:30', 'Routine', 'routine')
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
