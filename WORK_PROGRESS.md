@@ -105,7 +105,7 @@ Resume doc for the 1.5 desktop rebuild. Product brief: the "navi-1.5-desktop-han
 - Owner wants it to feel like a personal companion, not a productivity tool. Don't over-redesign what works.
 - Still open owner decisions: P0-PROD-1 (prod approval mismatch: ship approval branch vs roll back migration); applying the 3 new local migrations to hosted.
 
-## Session 2 (local, Windows, 2026-11-06) — round 4 design, PARTIAL (stopped at usage limit)
+## Session 2 (local, Windows, 2026-11-06) — round 4 design (complete, awaiting approval)
 
 - Local setup verified: Node 22.23, Docker, local Supabase (10 migrations), `.env.local` = local DB + devsim. `npm run env:local` fails on Windows (`execFileSync("npx")` needs `shell: true` on win32); worked around with a preload shim outside the repo. Script fix still TODO.
 - Tests: `tsc` OK, `eslint` OK, `vitest run` **29 files / 264 passed** (matches session 1).
@@ -113,5 +113,8 @@ Resume doc for the 1.5 desktop rebuild. Product brief: the "navi-1.5-desktop-han
   - DONE: V3-Planner sentence now data-derived ("A full afternoon. 9½ hours planned, 3½ free — most of it before 2."); Timeline · Calendar toggle (links to the new board); small ⌘K search icon in the sidebar on Home/Tasks/My day; Tasks panel header "Looking at · Tasks, Today".
   - DONE: `V4-Calendar.dc.html` (week view; Day/Week toggle; all-day row with due chip + birthday; ghost "Dentist call fits" slot; now-line).
   - DONE: `V4-Panel-States.dc.html` (open on My day with context chip, Undo action row and proposal card; same panel after switching to Tasks with draft kept; collapsed dock: draft kept / new badge / live voice with mute + end; Focus: auto-collapsed, "2 waiting", what breaks through).
-  - TODO next: `V4-Advanced.dc.html` (⌘K palette with Do/Tasks/Go to/Ask Navi groups; task card default vs "More details": hard deadline = `tasks.due_is_hard`, estimate = `estimate_minutes`, repeat = `recurrence`, reminder = NEW field, not in schema). `V4-Sources.dc.html` ("where each sentence comes from" table + rules: numbers count real rows; Navi claims an action only with an `activity_log` row actor='navi', Undo if `reversible`; no inferred feelings; drop a clause when data is missing; inline suggestions need a dismissals store (new)). Then add both to canvas.json (row 2 at y=1243, after the Panel board; Sources is tall, so shift the R2 rows down) and update the stickies.
-  - Then: owner approval → implement the shell + clientMessageId / newSubmitId / focus pause-resume wiring.
+  - DONE (version 19): `V4-Advanced.dc.html` (⌘K palette with Do / Tasks / Go to / Ask Navi groups over a dimmed page; task card default vs "More details": hard deadline = `tasks.due_is_hard` + `due_at`, estimate = `estimate_minutes`, repeat = `recurrence`, reminder = NEW field, not in schema).
+  - DONE (version 19): `V4-Sources.dc.html` (5 rules; 15-row table: where / what Navi says / data it's built from / what happens when data is missing; "Navi never says" list including the old My day line). This is the contract for every page sentence in the build.
+  - Canvas layout: row 1 = Home, Tasks, My day Timeline, Calendar; row 2 = Panel states, Advanced, Sources; R2 rows moved down. Stickies list the round-4 changes and the open calls.
+- **Round 4 status: AWAITING OWNER APPROVAL.** Open calls for the owner: Calendar opens on Week or the last view used; keep the sidebar search icon for ⌘K; is the Focus break-through rule right (fixed event within 10 min, hard deadline today); OK to add two small fields (task reminder, dismissed suggestions), local first.
+- Next after approval: implement the desktop shell against real data (left nav, companion Home, persistent Navi panel, Tasks, My day + calendar, Focus) + client wiring for clientMessageId / newSubmitId / focus pause-resume. Also fix `scripts/local-env.mjs` for Windows.

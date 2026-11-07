@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Where Navi's sentences come from</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#A7EBC0}a:hover{color:#D2F6DF}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1900px; box-sizing: border-box; padding: 56px 64px; display: flex; flex-direction: column; gap: 28px; background: #000000; color: #F5F5F7; font-family: Figtree, sans-serif; font-size: 14px; overflow: hidden">
+
+  <div style="display: flex; align-items: center; gap: 16px">
+    <span aria-hidden="true" style="width: 34px; height: 31px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 33% 27%, #FFFFFF 0%, #CFF6DD 12%, #8BDDAF 38%, #2F8566 75%, #0F3328 100%); box-shadow: 0 0 20px rgba(139,221,175,0.3)"></span>
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <h1 style="margin: 0; font-size: 32px; font-weight: 700; letter-spacing: -0.03em">Where each Navi sentence comes from</h1>
+      <span style="color: #8E8E96; font-size: 15px">Every line Navi writes on a page is built from your data. If the data isn't there, Navi says less.</span>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px">
+    <sc-for list="{{rules}}" as="r" hint-placeholder-count="5">
+      <div style="border-radius: 18px; background: rgba(167,235,192,0.06); border: 1px solid rgba(167,235,192,0.16); padding: 16px; display: flex; flex-direction: column; gap: 6px">
+        <span style="color: #A7EBC0; font-size: 13px; font-weight: 700">{{r.n}}</span>
+        <span style="font-weight: 600; line-height: 1.35">{{r.title}}</span>
+        <span style="color: #A0A0A8; font-size: 13px; line-height: 1.45">{{r.body}}</span>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="display: flex; flex-direction: column; border-radius: 20px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden">
+    <div style="display: grid; grid-template-columns: 150px 330px minmax(0, 1fr) 260px; gap: 20px; padding: 12px 20px; background: rgba(255,255,255,0.05); color: #8E8E96; font-size: 12.5px; font-weight: 600">
+      <span>Where</span><span>Navi says</span><span>Built from</span><span>When data is missing</span>
+    </div>
+    <sc-for list="{{rows}}" as="x" hint-placeholder-count="15">
+      <div style="display: grid; grid-template-columns: 150px 330px minmax(0, 1fr) 260px; gap: 20px; padding: 14px 20px; border-top: 1px solid rgba(255,255,255,0.06); line-height: 1.45; font-size: 13.5px">
+        <span style="color: #C8C8CE; font-weight: 600">{{x.where}}</span>
+        <span style="color: #F5F5F7">{{x.says}}</span>
+        <span style="color: #A0A0A8">{{x.from}}</span>
+        <span style="color: #8E8E96">{{x.missing}}</span>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="border-radius: 20px; background: rgba(242,167,160,0.05); border: 1px solid rgba(242,167,160,0.18); padding: 20px 22px; display: flex; flex-direction: column; gap: 12px">
+    <span style="font-weight: 700; color: #FAD3CF">Navi never says</span>
+    <sc-for list="{{never}}" as="v" hint-placeholder-count="4">
+      <div style="display: grid; grid-template-columns: 420px minmax(0, 1fr); gap: 20px; line-height: 1.45">
+        <span style="color: #C8C8CE; text-decoration: line-through; text-decoration-color: rgba(242,167,160,0.6)">{{v.says}}</span>
+        <span style="color: #8E8E96">{{v.why}}</span>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const row = (where, says, from, missing) => ({ where, says, from, missing });
+    return {
+      rules: [
+        { n: '1', title: 'Numbers are real counts', body: 'Hours, tasks and gaps are counted from rows in your account, never estimated for effect.' },
+        { n: '2', title: '“I did” needs a record', body: 'Navi only says it did something if the activity log has that action by Navi, with Undo when it can be undone.' },
+        { n: '3', title: 'No mind-reading', body: 'Nothing about feelings or habits unless you said it, or it is a saved memory you can see and delete.' },
+        { n: '4', title: 'Missing data, shorter line', body: 'If a value is missing, the clause is dropped. Navi never guesses to fill the sentence.' },
+        { n: '5', title: 'One suggestion, from a fixed list', body: 'At most one suggestion per page, from known checks. “Not now” sticks; it never comes back the same way.' }
+      ],
+      rows: [
+        row('Home · greeting', 'Morning, Alex.', 'profiles: your name and timezone. Local time picks morning, afternoon or evening.', 'No name: “Morning.”'),
+        row('Home · summary', 'Four things today, one already done. Your afternoon is the busy part.', 'tasks scheduled or due today (count, and how many are done). Planned minutes of events + plan_blocks before noon / noon–5 / after 5; the biggest part is named.', 'No tasks: “Nothing on your list today.” Even split: second sentence dropped.'),
+        row('Home · day bar', 'Class, Essay, Run, Maya on a 7 AM – 11 PM bar', 'events + plan_blocks for today (start, end, space). Now-line from the clock.', 'Empty day: no bar, just “Your day is open.”'),
+        row('Home · continue', 'Last worked on last night, 45 min. Next step: write the intro.', 'Latest focus_sessions row with outcome “progress” (task, actual_minutes, ended_at) + the first unfinished step (subtask).', 'No session in 7 days: shows the next task due, without the “last worked” line.'),
+        row('Home · one insight', 'Maya’s birthday is on your calendar for Sunday and there’s no gift task yet.', 'Check: an event in the next 7 days with no task linked to it. Shown only if not dismissed before.', 'Nothing found: no insight row. Needs a new “dismissed suggestions” record.'),
+        row('Tasks · headline', '4 left. The essay’s the big one — everything else takes under 15 minutes.', 'Today’s tasks not done (count). Largest estimate_minutes; the others compared with 15.', 'Estimates missing: just “4 left.”'),
+        row('Tasks · nudge', '“Plan the Lisbon trip” has waited two weeks. Split it into three small steps?', 'tasks: created 14+ days ago, still to do, no steps, not dismissed. The split itself is a proposal you accept.', 'No old tasks: no nudge.'),
+        row('My day · headline', 'A full afternoon. 9½ hours planned, 3½ free — most of it before 2.', 'events + plan_blocks today: total planned time; gaps between wake-up and bedtime (routines) = free; where the biggest gap sits; busiest part of the day.', 'No wake/bed routine: free time not counted, only “9½ hours planned.” Nothing planned: “Nothing planned yet.”'),
+        row('My day · free slot', '30 free minutes — the dentist call fits here.', 'A gap between blocks + an unscheduled task whose estimate_minutes fits, earliest due first.', 'No task fits or no estimates: “30 free minutes.”'),
+        row('Calendar · headline', 'Friday’s the full one — 9½ hours planned. Saturday has just brunch with Jo.', 'Planned minutes per day for the week (events + plan_blocks); busiest and quietest day; the quietest day’s items.', 'Even week: “About the same every day this week.”'),
+        row('Panel · “Looking at”', 'Looking at · My day, Friday', 'The page and date you have open in the app (not stored). Sent with each message so Navi answers about what you see.', '—'),
+        row('Panel · action', 'Moved “Practise the new song” to 10:00 PM · Undo', 'activity_log row: actor = navi, summary, reversible. Undo puts back the saved “before”.', 'No row: Navi does not say it did anything.'),
+        row('Panel · proposal', 'Yes. 3:30 to 4:00 is free, and you estimated the call at 10 minutes.', 'Gaps in today’s plan + tasks.estimate_minutes. Nothing changes until you press “Put it there”.', 'No estimate: Navi asks how long it takes.'),
+        row('Focus · waiting', '2 waiting — 2 new items in your inbox, from your 1:40 capture', 'Pending proposals and notifications created while a focus_sessions row is open.', 'Nothing new: no count on the dock.'),
+        row('Task · More details', 'Navi won’t move it past this, and will tell you early if it’s at risk.', 'tasks.due_is_hard + due_at, estimate_minutes, recurrence. Reminder needs a new field (not in the database yet).', '—')
+      ],
+      never: [
+        { says: 'I kept your evening clear for dinner with Maya.', why: 'Claims an action with no activity log entry. (Was on round 3 My day; replaced.)' },
+        { says: 'You seem stressed today.', why: 'A feeling nobody stated.' },
+        { says: 'You usually skip your run on Fridays.', why: 'Only allowed from a saved memory you can see and delete.' },
+        { says: 'Big day — you’ve got this!', why: 'Filler with nothing behind it.' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
