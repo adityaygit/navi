@@ -19,7 +19,8 @@ a{color:#A7EBC0}a:hover{color:#D2F6DF}
   <nav aria-label="Main" style="width: 236px; padding: 18px 12px; display: flex; flex-direction: column; gap: 2px; box-sizing: border-box">
     <div style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; margin-bottom: 16px">
       <span aria-hidden="true" style="width: 18px; height: 16px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%)"></span>
-      <span style="font-weight: 700; font-size: 16px">Navi</span>
+      <span style="font-weight: 700; font-size: 16px; flex: 1">Navi</span>
+      <a href="V4-Advanced.dc.html" aria-label="Search and commands, ⌘K" style="width: 30px; height: 30px; border-radius: 15px; display: flex; align-items: center; justify-content: center; color: #7C7C85"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4 4"></path></svg></a>
     </div>
     <a href="#" style="height: 36px; display: flex; align-items: center; gap: 12px; padding: 0 12px; border-radius: 12px; color: #A0A0A8; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20H4z"></path></svg>Home</a>
     <a href="#" style="height: 36px; display: flex; align-items: center; gap: 12px; padding: 0 12px; border-radius: 12px; color: #A0A0A8; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg>Tasks</a>
@@ -36,7 +37,7 @@ a{color:#A7EBC0}a:hover{color:#D2F6DF}
   </nav>
 
   <main style="flex: 1; min-width: 0; padding: 26px 32px 0 36px; display: flex; flex-direction: column; overflow: hidden">
-    <div style="display: flex; gap: 8px">
+    <div style="display: flex; gap: 8px; align-items: center">
       <sc-for list="{{week}}" as="d" hint-placeholder-count="7">
         <span style="width: 54px; height: 64px; border-radius: 20px; background: {{d.bg}}; color: {{d.fg}}; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px">
           <span style="font-size: 12px; opacity: 0.75">{{d.name}}</span>
@@ -44,11 +45,16 @@ a{color:#A7EBC0}a:hover{color:#D2F6DF}
           <span style="display: flex; gap: 2px; height: 4px"><sc-for list="{{d.dots}}" as="x" hint-placeholder-count="2"><span style="width: 4px; height: 4px; border-radius: 50%; background: {{x.c}}"></span></sc-for></span>
         </span>
       </sc-for>
+      <span style="flex: 1"></span>
+      <div role="group" aria-label="View" style="display: flex; padding: 3px; border-radius: 19px; background: rgba(255,255,255,0.06)">
+        <a href="#" aria-current="true" style="height: 32px; padding: 0 16px; border-radius: 16px; background: #F5F5F7; color: #000000; font-weight: 600; text-decoration: none; display: flex; align-items: center">Timeline</a>
+        <a href="V4-Calendar.dc.html" style="height: 32px; padding: 0 16px; border-radius: 16px; color: #C8C8CE; text-decoration: none; display: flex; align-items: center">Calendar</a>
+      </div>
     </div>
 
     <div style="margin-top: 22px; display: flex; flex-direction: column; gap: 6px">
       <h1 style="margin: 0; font-size: 32px; font-weight: 700; letter-spacing: -0.03em">Friday</h1>
-      <p style="margin: 0; font-size: 17px; font-weight: 500; letter-spacing: -0.01em"><span style="color: #F5F5F7">A full afternoon.</span><span style="color: #6E6E77"> I kept your evening clear for dinner with Maya.</span></p>
+      <p style="margin: 0; font-size: 17px; font-weight: 500; letter-spacing: -0.01em"><span style="color: #F5F5F7">A full afternoon.</span><span style="color: #6E6E77"> 9½ hours planned, 3½ free — most of it before 2.</span></p>
     </div>
 
     <div style="flex: 1; display: flex; gap: 28px; margin-top: 18px; min-height: 0">

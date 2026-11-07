@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi panel states</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#A7EBC0}a:hover{color:#D2F6DF}
+button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 1920px; height: 900px; box-sizing: border-box; padding: 40px 44px; display: flex; gap: 48px; background: #000000; color: #F5F5F7; font-family: Figtree, sans-serif; font-size: 14px; font-feature-settings: 'tnum'; overflow: hidden">
+
+  <section aria-label="Open on My day" style="width: 368px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0">
+    <div style="display: flex; flex-direction: column; gap: 4px; height: 58px">
+      <span style="font-size: 17px; font-weight: 600">Open, on My day</span>
+      <span style="color: #8E8E96; font-size: 13px; line-height: 1.4">Navi knows which page and day you're on. Anything it did shows with Undo.</span>
+    </div>
+    <div style="flex: 1; border-radius: 26px; background: #0C0C0D; border: 1px solid rgba(255,255,255,0.07); display: flex; flex-direction: column; overflow: hidden">
+      <div style="height: 64px; display: flex; align-items: center; gap: 12px; padding: 0 18px">
+        <span aria-hidden="true" style="width: 26px; height: 24px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 33% 27%, #FFFFFF 0%, #CFF6DD 12%, #8BDDAF 38%, #2F8566 75%, #0F3328 100%); box-shadow: 0 0 18px rgba(139,221,175,0.3)"></span>
+        <div style="display: flex; flex-direction: column; gap: 3px">
+          <span style="font-weight: 600; font-size: 15px">Navi</span>
+          <span style="display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; border-radius: 11px; background: rgba(255,255,255,0.06); color: #A0A0A8; font-size: 12px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3"></path><circle cx="12" cy="12" r="4"></circle></svg>Looking at · My day, Friday</span>
+        </div>
+        <span style="flex: 1"></span>
+        <button type="button" aria-label="Collapse Navi" style="width: 32px; height: 32px; border-radius: 16px; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; color: #A0A0A8"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9.5 6 6 6-6 6"></path></svg></button>
+      </div>
+      <div style="flex: 1; padding: 8px 18px; display: flex; flex-direction: column; gap: 14px; overflow: hidden; justify-content: flex-end">
+        <div style="align-self: flex-end; max-width: 82%; background: rgba(255,255,255,0.08); border-radius: 20px 20px 6px 20px; padding: 10px 14px; line-height: 1.45; font-size: 14.5px">move guitar practice to after dinner</div>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,0.035); color: #C8C8CE; font-size: 13.5px">
+          <span style="width: 18px; height: 18px; border-radius: 9px; background: rgba(167,235,192,0.2); color: #A7EBC0; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"></path></svg></span>
+          <span style="flex: 1">Moved “Practise the new song” to 10:00 PM</span>
+          <a href="#" style="text-decoration: none; font-weight: 600">Undo</a>
+        </div>
+        <div style="align-self: flex-end; max-width: 82%; background: rgba(255,255,255,0.08); border-radius: 20px 20px 6px 20px; padding: 10px 14px; line-height: 1.45; font-size: 14.5px">can I fit the dentist call in today?</div>
+        <p style="margin: 0; line-height: 1.55; color: #D6D6DA; font-size: 14.5px">Yes. 3:30 to 4:00 is free, and you estimated the call at 10 minutes.</p>
+        <div style="border-radius: 20px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); padding: 14px 16px; display: flex; flex-direction: column; gap: 12px">
+          <div style="display: flex; flex-direction: column; gap: 3px">
+            <span style="font-weight: 600">Book the dentist</span>
+            <span style="color: #8E8E96; font-size: 13px">Today · 3:30 PM · 10 min</span>
+          </div>
+          <div style="display: flex; gap: 8px">
+            <button type="button" style="height: 36px; padding: 0 16px; border-radius: 18px; background: #A7EBC0; color: #00140A; font-weight: 600">Put it there</button>
+            <button type="button" style="height: 36px; padding: 0 14px; border-radius: 18px; background: rgba(255,255,255,0.07)">Another time</button>
+          </div>
+        </div>
+      </div>
+      <div style="margin: 10px 12px 12px; min-height: 52px; border-radius: 26px; background: rgba(255,255,255,0.06); display: flex; align-items: center; gap: 8px; padding: 0 6px 0 18px">
+        <span style="flex: 1; color: #F5F5F7; font-size: 14.5px">and remind me to text Maya<span style="display: inline-block; width: 1.5px; height: 16px; background: #A7EBC0; vertical-align: middle; margin-left: 1px"></span></span>
+        <button type="button" aria-label="Start voice" style="width: 40px; height: 40px; border-radius: 20px; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5F5F7" stroke-width="1.8" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"></path></svg></button>
+      </div>
+    </div>
+  </section>
+
+  <section aria-label="After switching to Tasks" style="width: 368px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0">
+    <div style="display: flex; flex-direction: column; gap: 4px; height: 58px">
+      <span style="font-size: 17px; font-weight: 600">After switching to Tasks</span>
+      <span style="color: #8E8E96; font-size: 13px; line-height: 1.4">Only the “Looking at” line changes. Conversation, draft and voice carry over.</span>
+    </div>
+    <div style="flex: 1; border-radius: 26px; background: #0C0C0D; border: 1px solid rgba(255,255,255,0.07); display: flex; flex-direction: column; overflow: hidden">
+      <div style="height: 64px; display: flex; align-items: center; gap: 12px; padding: 0 18px">
+        <span aria-hidden="true" style="width: 26px; height: 24px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 33% 27%, #FFFFFF 0%, #CFF6DD 12%, #8BDDAF 38%, #2F8566 75%, #0F3328 100%); box-shadow: 0 0 18px rgba(139,221,175,0.3)"></span>
+        <div style="display: flex; flex-direction: column; gap: 3px">
+          <span style="font-weight: 600; font-size: 15px">Navi</span>
+          <span style="display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; border-radius: 11px; background: rgba(255,255,255,0.06); color: #A0A0A8; font-size: 12px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg>Looking at · Tasks, Today</span>
+        </div>
+        <span style="flex: 1"></span>
+        <button type="button" aria-label="Collapse Navi" style="width: 32px; height: 32px; border-radius: 16px; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; color: #A0A0A8"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9.5 6 6 6-6 6"></path></svg></button>
+      </div>
+      <div style="flex: 1; padding: 8px 18px; display: flex; flex-direction: column; gap: 14px; overflow: hidden; justify-content: flex-end">
+        <p style="margin: 0; line-height: 1.55; color: #6E6E77; font-size: 14.5px">Yes. 3:30 to 4:00 is free, and you estimated the call at 10 minutes.</p>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,0.035); color: #C8C8CE; font-size: 13.5px">
+          <span style="width: 18px; height: 18px; border-radius: 9px; background: rgba(167,235,192,0.2); color: #A7EBC0; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"></path></svg></span>
+          <span style="flex: 1">Put “Book the dentist” at 3:30 PM today</span>
+          <a href="#" style="text-decoration: none; font-weight: 600">Undo</a>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; color: #6E6E77; font-size: 12.5px">
+          <span style="flex: 1; height: 1px; background: rgba(255,255,255,0.07)"></span>
+          <span>Now looking at Tasks · Today</span>
+          <span style="flex: 1; height: 1px; background: rgba(255,255,255,0.07)"></span>
+        </div>
+      </div>
+      <div style="margin: 10px 12px 12px; min-height: 52px; border-radius: 26px; background: rgba(255,255,255,0.06); display: flex; align-items: center; gap: 8px; padding: 0 6px 0 18px">
+        <span style="flex: 1; color: #F5F5F7; font-size: 14.5px">and remind me to text Maya<span style="display: inline-block; width: 1.5px; height: 16px; background: #A7EBC0; vertical-align: middle; margin-left: 1px"></span></span>
+        <button type="button" aria-label="Start voice" style="width: 40px; height: 40px; border-radius: 20px; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5F5F7" stroke-width="1.8" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"></path></svg></button>
+      </div>
+    </div>
+  </section>
+
+  <section aria-label="Collapsed" style="width: 470px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0">
+    <div style="display: flex; flex-direction: column; gap: 4px; height: 58px">
+      <span style="font-size: 17px; font-weight: 600">Collapsed to the dock</span>
+      <span style="color: #8E8E96; font-size: 13px; line-height: 1.4">Closing the panel never loses anything. The dock says what's waiting.</span>
+    </div>
+    <div style="flex: 1; display: flex; gap: 22px">
+
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 14px">
+        <div style="height: 420px; border-radius: 20px; background: #050506; border: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: flex-end; overflow: hidden">
+          <div style="width: 68px; border-left: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; align-items: center; padding-top: 26px; gap: 14px">
+            <span style="position: relative; width: 34px; height: 31px">
+              <a href="#" aria-label="Open Navi, draft saved" style="display: block; width: 34px; height: 31px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 33% 27%, #FFFFFF 0%, #CFF6DD 12%, #8BDDAF 38%, #2F8566 75%, #0F3328 100%); box-shadow: 0 0 20px rgba(139,221,175,0.3)"></a>
+              <span aria-hidden="true" style="position: absolute; right: -7px; bottom: -6px; width: 18px; height: 18px; border-radius: 9px; background: #2A2A2E; border: 2px solid #050506; display: flex; align-items: center; justify-content: center; color: #C8C8CE"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg></span>
+            </span>
+            <button type="button" aria-label="Start voice" style="width: 40px; height: 40px; border-radius: 20px; background: rgba(255,255,255,0.07); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5F5F7" stroke-width="1.8" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"></path></svg></button>
+          </div>
+        </div>
+        <span style="font-weight: 600">Draft kept</span>
+        <span style="color: #8E8E96; font-size: 13px; line-height: 1.45">Half-typed message waits. Opening the panel puts you back in it.</span>
+      </div>
+
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 14px">
+        <div style="height: 420px; border-radius: 20px; background: #050506; border: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: flex-end; overflow: hidden">
+          <div style="width: 68px; border-left: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; align-items: center; padding-top: 26px; gap: 14px">
+            <span style="position: relative; width: 34px; height: 31px">
+              <a href="#" aria-label="Open Navi, 1 new" style="display: block; width: 34px; height: 31px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 33% 27%, #FFFFFF 0%, #CFF6DD 12%, #8BDDAF 38%, #2F8566 75%, #0F3328 100%); box-shadow: 0 0 20px rgba(139,221,175,0.3)"></a>
+              <span aria-hidden="true" style="position: absolute; right: -6px; top: -5px; width: 16px; height: 16px; border-radius: 8px; background: #F5F5F7; color: #000; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 2px solid #050506">1</span>
+            </span>
+            <button type="button" aria-label="Start voice" style="width: 40px; height: 40px; border-radius: 20px; background: rgba(255,255,255,0.07); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5F5F7" stroke-width="1.8" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"></path></svg></button>
+          </div>
+        </div>
+        <span style="font-weight: 600">Something new</span>
+        <span style="color: #8E8E96; font-size: 13px; line-height: 1.45">A reply or suggestion arrived while closed. A quiet badge, never a pop-up.</span>
+      </div>
+
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 14px">
+        <div style="height: 420px; border-radius: 20px; background: #050506; border: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: flex-end; overflow: hidden">
+          <div style="width: 68px; border-left: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; align-items: center; padding-top: 26px; gap: 12px">
+            <a href="#" aria-label="Open Navi, voice call live" style="display: block; width: 34px; height: 31px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 33% 27%, #FFFFFF 0%, #CFF6DD 12%, #8BDDAF 38%, #2F8566 75%, #0F3328 100%); box-shadow: 0 0 0 5px rgba(167,235,192,0.18), 0 0 26px rgba(139,221,175,0.5)"></a>
+            <span aria-hidden="true" style="display: flex; align-items: center; gap: 2px; height: 14px; margin-top: 4px">
+              <span style="width: 3px; height: 6px; border-radius: 2px; background: #A7EBC0"></span>
+              <span style="width: 3px; height: 12px; border-radius: 2px; background: #A7EBC0"></span>
+              <span style="width: 3px; height: 9px; border-radius: 2px; background: #A7EBC0"></span>
+              <span style="width: 3px; height: 14px; border-radius: 2px; background: #A7EBC0"></span>
+              <span style="width: 3px; height: 5px; border-radius: 2px; background: #A7EBC0"></span>
+            </span>
+            <span style="font-size: 12px; color: #A7EBC0; font-weight: 600">2:14</span>
+            <button type="button" aria-label="Mute microphone" style="width: 40px; height: 40px; border-radius: 20px; background: rgba(255,255,255,0.07); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5F5F7" stroke-width="1.8" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"></path></svg></button>
+            <button type="button" aria-label="End voice" style="width: 40px; height: 40px; border-radius: 20px; background: #F2A7A0; display: flex; align-items: center; justify-content: center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2A0B08" stroke-width="2" aria-hidden="true"><path d="M4 14.5c4.5-4 11.5-4 16 0l-2 2.5-3-1.2v-2.3a10 10 0 0 0-6 0v2.3L6 17z"></path></svg></button>
+          </div>
+        </div>
+        <span style="font-weight: 600">Talking</span>
+        <span style="color: #8E8E96; font-size: 13px; line-height: 1.45">Voice keeps going while you work or switch pages. Mute or hang up right here.</span>
+      </div>
+    </div>
+  </section>
+
+  <section aria-label="During focus" style="width: 456px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0">
+    <div style="display: flex; flex-direction: column; gap: 4px; height: 58px">
+      <span style="font-size: 17px; font-weight: 600">During focus</span>
+      <span style="color: #8E8E96; font-size: 13px; line-height: 1.4">Focus closes the panel. Non-urgent things wait. It reopens after, if it was open before.</span>
+    </div>
+    <div style="height: 420px; border-radius: 20px; background: #050506; border: 1px solid rgba(255,255,255,0.06); display: flex; overflow: hidden">
+      <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px">
+        <span style="color: #8E8E96; font-size: 13px">Focus · School</span>
+        <span style="font-size: 19px; font-weight: 600">Essay: write the intro</span>
+        <span style="font-size: 64px; font-weight: 600; letter-spacing: -0.03em; margin: 6px 0">32:10</span>
+        <div style="display: flex; gap: 8px">
+          <button type="button" style="height: 40px; padding: 0 18px; border-radius: 20px; background: rgba(255,255,255,0.08)">Pause</button>
+          <button type="button" style="height: 40px; padding: 0 18px; border-radius: 20px; background: #F5F5F7; color: #000000; font-weight: 600">I'm done</button>
+        </div>
+      </div>
+      <div style="width: 68px; border-left: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; align-items: center; padding-top: 26px; gap: 10px">
+        <a href="#" aria-label="Open Navi, 2 waiting until focus ends" style="display: block; width: 30px; height: 27px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 33% 27%, #E8E8EA 0%, #9DA8A2 40%, #3C4A44 100%); opacity: 0.7"></a>
+        <span style="font-size: 11.5px; color: #8E8E96; text-align: center; line-height: 1.3">2<br>waiting</span>
+      </div>
+    </div>
+    <div style="border-radius: 20px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+      <span style="color: #8E8E96; font-size: 13px; font-weight: 600">When focus ends · while you focused</span>
+      <span style="display: flex; gap: 10px; align-items: baseline"><span style="width: 6px; height: 6px; border-radius: 3px; background: #A7EBC0; flex-shrink: 0; transform: translateY(-2px)"></span><span style="flex: 1">2 new items in your inbox, from your 1:40 capture</span><a href="#" style="text-decoration: none; font-weight: 600">Review</a></span>
+      <span style="display: flex; gap: 10px; align-items: baseline"><span style="width: 6px; height: 6px; border-radius: 3px; background: #A7EBC0; flex-shrink: 0; transform: translateY(-2px)"></span><span style="flex: 1">Reminder: Text Maya about Sunday</span><a href="#" style="text-decoration: none; font-weight: 600">Open</a></span>
+      <span style="color: #6E6E77; font-size: 12.5px; line-height: 1.45">Breaks through focus: a fixed event starting in 10 minutes (“Shift at the café”), or a hard deadline today.</span>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
