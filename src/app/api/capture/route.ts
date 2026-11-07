@@ -14,13 +14,15 @@ const Body = z.object({
 });
 
 // Stores the raw capture first (idempotent on client_id), then extracts
-// proposals for the review inbox. Safe for the offline queue to retry.
+// proposals for the review inbox. Safe for the offline queue to retry: a
+// retry of a capture that's already sorted, or still being sorted by an
+// earlier request (status "processing"), doesn't sort it again.
 export async function POST(request: NextRequest) {
   try {
     const ctx = await requireApiCtx();
     const body = Body.parse(await request.json());
     const { capture, duplicate } = await saveCapture(ctx, body);
-    if (duplicate && capture.status !== "pending") {
+    if (duplicate && (capture.status === "processed" || capture.status === "needs_ai")) {
       return NextResponse.json({ capture_id: capture.id, duplicate: true, status: capture.status });
     }
     const result = await processCapture(ctx, capture.id);
