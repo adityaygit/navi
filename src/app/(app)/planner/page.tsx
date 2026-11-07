@@ -1,316 +1,321 @@
-import { Fragment } from "react";
 import Link from "next/link";
 import { DateTime } from "luxon";
 import { requireCtx, getProfile } from "@/server/context";
-import type { CalendarEvent, PlanBlock, Routine, Task } from "@/lib/types";
-import { buildDayAgenda } from "@/server/planner/agenda";
-import { deadlineRisks } from "@/server/planner/deadlines";
-import { formatTime, minutesBetween, nowIn } from "@/lib/time";
+import type { PlanBlock, Task } from "@/lib/types";
+import { awakeSpan, dayFrom, loadSources, wakeBed, zoneHelpers, type DayItem } from "@/server/day";
+import { freeGaps, mergeSpans, myDayHeadline, weekHeadline, type Line, type Span } from "@/lib/sentences";
+import { findFits, gridHours, weekOf, type FitCandidate } from "@/lib/day-layout";
+import { spaceColor } from "@/lib/space-color";
 import { ActionButton } from "@/components/action-button";
-import { PlanBlockRow, type TimelineInfo, type TimelineKind } from "@/components/plan-block";
-import { PlannerFixedRow, PlannerGapRow, PlannerNowRow, PlannerWeekStrip, type StripDay } from "@/components/planner-rows";
-import { planDayAction, planWeekAction } from "../actions";
+import { RecoveryButton } from "@/components/recovery";
+import { DayTimeline, Legend, type Kind, type TimelineEntry } from "@/components/day/timeline";
+import { CalendarGrid, type CalendarDay } from "@/components/day/calendar";
+import { PlaceIt } from "@/components/day/day-actions";
+import { planDayAction } from "../actions";
 import { AddCommitment } from "./add-commitment";
 
-export const metadata = { title: "Planner · Navi" };
+export const metadata = { title: "My day · Navi" };
 
-type Area = { name: string; color: string | null };
-type BlockRow = PlanBlock & { tasks: { workspace_id: string | null } | null; routines: { workspace_id: string | null; is_fixed: boolean } | null };
-type DueTask = Pick<Task, "id" | "title" | "status" | "priority" | "due_at" | "due_is_hard" | "estimate_minutes" | "workspace_id">;
+const ISO = /^\d{4}-\d{2}-\d{2}$/;
+const NAVI = "#A7EBC0";
+const ROUTINE = "#6E6E77";
 
-const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+type Search = { date?: string; start?: string; view?: string; span?: string };
 
-export default async function PlannerPage({ searchParams }: { searchParams: Promise<{ start?: string; view?: string }> }) {
+function Sentence({ line }: { line: Line }) {
+  return (
+    <>
+      {line.map((s, i) => (
+        <span key={i} className={s.strong ? "text-text" : "text-[#6E6E77]"}>{s.text}</span>
+      ))}
+    </>
+  );
+}
+
+function href(p: { date: string; view?: "calendar" | null; span?: "day" | "week" | null }) {
+  const q = new URLSearchParams({ date: p.date });
+  if (p.view === "calendar") q.set("view", "calendar");
+  if (p.view === "calendar" && p.span === "day") q.set("span", "day");
+  return `/planner?${q.toString()}`;
+}
+
+const chev = (dir: "l" | "r") => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d={dir === "l" ? "m14.5 6-6 6 6 6" : "m9.5 6 6 6-6 6"} /></svg>
+);
+const roundBtn = "flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.06] text-[#C8C8CE] hover:bg-white/[0.1] hover:text-text";
+const pillBtn = "flex h-9 items-center rounded-full bg-white/[0.06] px-3.5 text-[14px] text-[#C8C8CE] hover:bg-white/[0.1] hover:text-text";
+
+function Segmented({ label, items }: { label: string; items: { label: string; href: string; on: boolean; strong?: boolean }[] }) {
+  return (
+    <nav aria-label={label} className="flex rounded-[19px] bg-white/[0.06] p-[3px]">
+      {items.map((i) => (
+        <Link
+          key={i.label}
+          href={i.href}
+          aria-current={i.on ? "page" : undefined}
+          className={`flex h-8 items-center rounded-2xl px-4 text-[14px] ${i.on ? (i.strong ? "bg-text font-semibold text-black" : "bg-white/[0.14] font-semibold text-text") : "text-[#C8C8CE] hover:text-text"}`}
+        >
+          {i.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+/**
+ * My day: the day as a timeline (default), or the calendar (week by default,
+ * owner decision 2026-11-07). Every headline comes from the sentence builders
+ * (src/lib/sentences.ts), so it only says what the rows say.
+ */
+export default async function MyDayPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireCtx();
   const profile = await getProfile(ctx);
   const zone = profile.timezone;
   const sp = await searchParams;
-  const now = nowIn(zone);
+  const now = DateTime.now().setZone(zone);
   const nowMs = now.toMillis();
   const today = now.toISODate()!;
-  const view = sp.view === "day" ? "day" : "week";
-  const start = sp.start && /^\d{4}-\d{2}-\d{2}$/.test(sp.start) ? sp.start : today;
-  const startDt = DateTime.fromISO(start, { zone });
-  const days = Array.from({ length: view === "day" ? 1 : 7 }, (_, i) => startDt.plus({ days: i }).toISODate()!);
-  // The strip shows the days on screen (week) or the Mon–Sun week around the chosen day.
-  const stripStart = view === "week" ? startDt : startDt.minus({ days: (startDt.weekday + 6) % 7 });
-  const stripDays = Array.from({ length: 7 }, (_, i) => stripStart.plus({ days: i }).toISODate()!);
-  const from = [days[0], stripDays[0]].sort()[0];
-  const to = [days[days.length - 1], stripDays[6]].sort()[1];
-  const rangeEnd = DateTime.fromISO(to, { zone }).endOf("day");
-  const horizon = Math.max(0, Math.ceil(rangeEnd.diff(now.startOf("day"), "days").days));
+  const requested = [sp.date, sp.start].find((d) => d && ISO.test(d) && DateTime.fromISO(d, { zone }).isValid);
+  const date = requested ?? today;
+  const view: "timeline" | "calendar" = sp.view === "calendar" ? "calendar" : "timeline";
+  const span: "day" | "week" = view === "calendar" && sp.span === "day" ? "day" : "week";
+  const week = weekOf(date, zone);
+  const z = zoneHelpers(zone);
 
-  const [blocksRes, eventsRes, routinesRes, focusRes, areasRes, dueRes, risks] = await Promise.all([
-    ctx.db.from("plan_blocks").select("*, tasks(workspace_id), routines(workspace_id,is_fixed)").gte("plan_date", from).lte("plan_date", to).order("starts_at"),
-    ctx.db.from("events").select("*").neq("status", "cancelled"),
-    ctx.db.from("routines").select("*").eq("active", true),
+  const [src, focusRes, openTasksRes, scheduledRes, stepsRes] = await Promise.all([
+    loadSources(ctx, week[0], week[6]),
     ctx.db.from("focus_sessions").select("id").is("ended_at", null).maybeSingle(),
-    ctx.db.from("workspaces").select("id,name,color"),
     ctx.db
       .from("tasks")
-      .select("id,title,status,priority,due_at,due_is_hard,estimate_minutes,workspace_id")
+      .select("id,title,status,due_at,due_is_hard,estimate_minutes,workspace_id,created_at")
+      .is("parent_task_id", null)
       .in("status", ["todo", "in_progress", "blocked"])
-      .not("due_at", "is", null)
-      .lte("due_at", rangeEnd.toUTC().toISO()!)
-      .order("due_at"),
-    rangeEnd > now ? deadlineRisks(ctx.db, ctx.userId, zone, DateTime.now(), horizon) : Promise.resolve([]),
+      .order("due_at", { ascending: true, nullsFirst: false })
+      .limit(200),
+    ctx.db.from("plan_blocks").select("task_id").gte("plan_date", today).in("status", ["planned", "in_progress"]).not("task_id", "is", null),
+    ctx.db.from("tasks").select("parent_task_id").not("parent_task_id", "is", null).in("status", ["todo", "in_progress", "blocked"]),
   ]);
-  const blockRows = (blocksRes.data ?? []) as BlockRow[];
-  const blocks: PlanBlock[] = blockRows.map((row) => {
-    const b: Partial<BlockRow> = { ...row };
-    delete b.tasks;
-    delete b.routines;
-    return b as PlanBlock;
+  const blockById = new Map(src.blocks.map((b) => [b.id, b]));
+  const routineFixed = new Map(src.routines.map((r) => [r.id, r.is_fixed]));
+  const openTasks = (openTasksRes.data ?? []) as Pick<Task, "id" | "title" | "status" | "due_at" | "due_is_hard" | "estimate_minutes" | "workspace_id" | "created_at">[];
+  const scheduled = new Set(((scheduledRes.data ?? []) as { task_id: string }[]).map((b) => b.task_id));
+  const steps = new Map<string, number>();
+  for (const s of (stepsRes.data ?? []) as { parent_task_id: string }[]) steps.set(s.parent_task_id, (steps.get(s.parent_task_id) ?? 0) + 1);
+
+  const toEntry = (i: DayItem): TimelineEntry => {
+    const block: PlanBlock | null = i.kind === "block" ? (blockById.get(i.id) ?? null) : null;
+    const look: Kind =
+      i.kind === "event" ? "fixed"
+      : i.kind === "routine" ? (routineFixed.get(i.id) ? "fixed" : "routine")
+      : block?.routine_id ? (routineFixed.get(block.routine_id) ? "fixed" : "routine")
+      : block && !block.is_flexible ? "fixed"
+      : "flex";
+    const space = i.spaceId ? src.spaces.get(i.spaceId) : undefined;
+    return { ...i, look, block, color: space ? spaceColor(space) : look === "routine" ? ROUTINE : look === "flex" ? NAVI : "#C8C8CE", spaceName: space?.name ?? null };
+  };
+  // What counts as "planned" in the headlines: events and plan blocks (V4 sources contract).
+  const plannedSpans = (items: DayItem[]): Span[] => items.filter((i) => i.kind !== "routine").map((i) => ({ start: i.startMs, end: i.endMs }));
+  const wb = wakeBed(profile);
+  const toMinute = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+
+  // ---- shared header bits
+  const shiftDays = (n: number) => DateTime.fromISO(date, { zone }).plus({ days: n }).toISODate()!;
+  const viewToggle = (
+    <Segmented
+      label="View"
+      items={[
+        { label: "Timeline", href: href({ date }), on: view === "timeline", strong: true },
+        { label: "Calendar", href: href({ date, view: "calendar" }), on: view === "calendar", strong: true },
+      ]}
+    />
+  );
+
+  if (view === "calendar") {
+    const days = span === "day" ? [date] : week;
+    const step = span === "day" ? 1 : 7;
+    const dayData = days.map((d) => dayFrom(src, d));
+    const longEvent = (i: DayItem) => i.kind === "event" && i.endMs - i.startMs >= 20 * 3600000;
+    const dueByDay = new Map<string, typeof openTasks>();
+    for (const t of openTasks) {
+      if (!t.due_at) continue;
+      const d = DateTime.fromISO(t.due_at, { zone }).toISODate()!;
+      if (!days.includes(d)) continue;
+      dueByDay.set(d, [...(dueByDay.get(d) ?? []), t]);
+    }
+    const calDays: CalendarDay[] = dayData.map((dd) => ({
+      date: dd.date,
+      entries: dd.items.filter((i) => !longEvent(i)).map(toEntry),
+      allDay: [
+        ...dd.items.filter(longEvent).map((i) => {
+          const e = toEntry(i);
+          return { key: `e${i.id}`, label: i.title, kind: "event" as const, color: e.color, href: href({ date: dd.date }) };
+        }),
+        ...(dueByDay.get(dd.date) ?? []).map((t) => ({ key: `t${t.id}`, label: t.title, kind: "due" as const, color: "", href: `/tasks?open=${t.id}` })),
+      ],
+    }));
+    const allMinutes = calDays.flatMap((d) => d.entries.map((e) => ({ start: z.minuteOfDay(e.startMs), end: z.minuteOfDay(e.endMs) || 24 * 60 })));
+    const hours = gridHours(wb ? { wakeMinute: toMinute(wb.wake), bedMinute: toMinute(wb.bed) } : null, allMinutes);
+    const headline =
+      span === "week"
+        ? weekHeadline(
+            dayData.map((dd) => {
+              const items = dd.items.filter((i) => i.kind !== "routine" && !longEvent(i));
+              const minutes = mergeSpans(plannedSpans(items)).reduce((t, s) => t + (s.end - s.start) / 60000, 0);
+              return { name: DateTime.fromISO(dd.date, { zone }).toFormat("cccc"), minutes, titles: items.map((i) => i.title) };
+            }),
+          )
+        : myDayHeadline(plannedSpans(dayData[0].items.filter((i) => !longEvent(i))), awakeSpan(profile, date, zone), z.fmtHour, z.minuteOfDay);
+    const first = DateTime.fromISO(days[0], { zone });
+    const last = DateTime.fromISO(days[days.length - 1], { zone });
+    const title = span === "day" ? (date === today ? "Today" : first.toFormat("cccc")) : week.includes(today) ? "This week" : `Week of ${first.toFormat("LLL d")}`;
+    const range = span === "day" ? first.toFormat("LLLL d") : `${first.toFormat("LLL d")} – ${last.toFormat(first.month === last.month ? "d" : "LLL d")}`;
+    const unit = span === "day" ? "day" : "week";
+
+    return (
+      <div className="flex flex-col pt-1">
+        <header className="flex flex-wrap items-center gap-2.5">
+          <h1 className="text-[32px] font-bold tracking-[-0.03em]">{title}</h1>
+          <span className="ml-1 text-[15px] text-dim">{range}</span>
+          <span className="flex-1" />
+          <Link href={href({ date: shiftDays(-step), view: "calendar", span })} className={roundBtn} aria-label={`Previous ${unit}`}>{chev("l")}</Link>
+          <Link href={href({ date: shiftDays(step), view: "calendar", span })} className={roundBtn} aria-label={`Next ${unit}`}>{chev("r")}</Link>
+          <Link href={href({ date: today, view: "calendar", span })} className={pillBtn}>Today</Link>
+          <Segmented
+            label="Range"
+            items={[
+              { label: "Day", href: href({ date, view: "calendar", span: "day" }), on: span === "day" },
+              { label: "Week", href: href({ date, view: "calendar" }), on: span === "week" },
+            ]}
+          />
+          {viewToggle}
+        </header>
+        <p className="mt-2 text-[17px] font-medium tracking-[-0.01em]"><Sentence line={headline} /></p>
+        <div className="mt-[18px]">
+          <CalendarGrid days={calDays} zone={zone} today={today} nowMs={nowMs} hours={hours} />
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Timeline
+  const day = dayFrom(src, date);
+  const entries = day.items.map(toEntry);
+  const isToday = date === today;
+  const isPast = date < today;
+  const awake = awakeSpan(profile, date, zone);
+  const headline = myDayHeadline(plannedSpans(day.items), awake, z.fmtHour, z.minuteOfDay);
+
+  // Free stretches still ahead (whole day for future days), between everything on the line.
+  const windowStart = awake?.start ?? DateTime.fromISO(`${date}T07:00`, { zone }).toMillis();
+  const windowEnd = awake?.end ?? DateTime.fromISO(`${date}T23:00`, { zone }).toMillis();
+  const from = isToday ? Math.max(windowStart, Math.ceil(nowMs / (5 * 60000)) * 5 * 60000) : windowStart;
+  const gaps = isPast ? [] : freeGaps(entries.map((e) => ({ start: e.startMs, end: e.endMs })), from, windowEnd);
+  const unscheduled = openTasks.filter((t) => !scheduled.has(t.id));
+  const candidates: FitCandidate[] = unscheduled.map((t) => ({ id: t.id, title: t.title, estimate: t.estimate_minutes, dueMs: t.due_at ? Date.parse(t.due_at) : null }));
+  const fits = findFits(gaps, candidates);
+
+  // Week strip: each day with dots for the spaces it touches.
+  const strip = week.map((d) => {
+    const items = dayFrom(src, d).items;
+    const colors = [...new Set(items.map((i) => toEntry(i)).filter((e) => e.spaceName).map((e) => e.color))].slice(0, 3);
+    return { d, colors, dt: DateTime.fromISO(d, { zone }) };
   });
-  const events = (eventsRes.data ?? []) as CalendarEvent[];
-  const routines = (routinesRes.data ?? []) as Routine[];
-  const dueTasks = (dueRes.data ?? []) as DueTask[];
-  const risk = new Map(risks.map((r) => [r.task_id, r]));
-  const areas = new Map(((areasRes.data ?? []) as { id: string; name: string; color: string | null }[]).map((w) => [w.id, { name: w.name, color: w.color }]));
-  const areaOf = (id: string | null | undefined): Area | null => (id ? (areas.get(id) ?? null) : null);
-  const eventArea = new Map(events.map((e) => [e.id, e.workspace_id]));
-  const routineArea = new Map(routines.map((r) => [r.id, r.workspace_id]));
-  const step = view === "day" ? 1 : 7;
-  const nav = (d: string, v = view) => `/planner?start=${d}&view=${v}`;
 
-  const agendaFor = (d: string) => buildDayAgenda({ date: d, zone, events, routines, blocks, tasks: dueTasks as Task[] });
-  const timeParts = (iso: string) => {
-    const [t, m] = formatTime(iso, zone).split(" ");
-    return { start: t, meridiem: m ?? "" };
+  const needsTime = unscheduled.slice(0, 5);
+  const dayWord = isToday ? "today" : `on ${DateTime.fromISO(date, { zone }).toFormat("cccc")}`;
+  const dueWord = (iso: string) => {
+    const d = DateTime.fromISO(iso, { zone });
+    return d.toISODate() === today ? "today" : d.toISODate() === shiftDays(1) && isToday ? "tomorrow" : d.toFormat("cccc");
   };
-  const range = (s: string, e: string) => {
-    const a = formatTime(s, zone);
-    const b = formatTime(e, zone);
-    return a.slice(-2) === b.slice(-2) ? `${a.slice(0, -3)}–${b}` : `${a}–${b}`;
-  };
-  const blockKind = (b: BlockRow): { kind: TimelineKind; label: string } => {
-    if (!b.is_flexible) return { kind: "fixed", label: "Fixed" };
-    if (b.status === "rest") return { kind: "recovery", label: "Rest" };
-    if (b.routine_id) return { kind: "recovery", label: b.routines?.is_fixed ? "Fixed routine" : "Routine" };
-    return { kind: "flex", label: "Flexible" };
-  };
-  const overdue = dueTasks.filter((t) => Date.parse(t.due_at!) < nowMs);
-  const isRisky = (t: DueTask) => Date.parse(t.due_at!) < nowMs || risk.has(t.id);
-
-  // ---- Week strip ----
-  const strip: StripDay[] = stripDays.map((d) => {
-    const dt = DateTime.fromISO(d, { zone });
-    const a = agendaFor(d);
-    const fixed = a.entries.filter((e) => e.kind !== "block" && e.start).length;
-    const flexible = a.entries.filter((e) => e.kind === "block").length;
-    const due = a.due.length + (d === today ? overdue.length : 0);
-    const riskDay = a.due.some((t) => isRisky(t as DueTask)) || (d === today && overdue.length > 0);
-    const bits = [fixed && plural(fixed, "fixed commitment"), flexible && plural(flexible, "planned block"), due && `${due} due`, riskDay && "deadline at risk"].filter(Boolean);
-    return {
-      date: d,
-      weekday: dt.toFormat("ccc"),
-      dayNum: dt.toFormat("d"),
-      label: `${dt.toFormat("cccc LLL d")}${d === today ? ", today" : ""}${bits.length ? `: ${bits.join(", ")}` : ": nothing scheduled"}`,
-      href: nav(d, "day"),
-      selected: view === "day" && d === start,
-      today: d === today,
-      fixed,
-      flexible,
-      due,
-      risk: riskDay,
-    };
-  });
-
-  // ---- Deadlines in view ----
-  const inView = (t: DueTask) => days.includes(DateTime.fromISO(t.due_at!).setZone(zone).toISODate()!);
-  const deadlines = [...(days.includes(today) ? overdue : []), ...dueTasks.filter((t) => Date.parse(t.due_at!) >= nowMs && inView(t))];
-  const deadlineTitle = view === "week" ? "Deadlines this week" : start === today ? "Due today" : `Due ${startDt.toFormat("ccc LLL d")}`;
-
-  const rangeLabel =
-    view === "day"
-      ? startDt.toFormat("cccc, LLLL d")
-      : `${startDt.toFormat("LLL d")} – ${startDt.plus({ days: 6 }).toFormat(startDt.month === startDt.plus({ days: 6 }).month ? "d" : "LLL d")}`;
 
   return (
-    <div className="flex flex-col gap-8 md:gap-10">
-      <header className="flex flex-col gap-6">
-        <div className="flex flex-wrap items-end gap-x-4 gap-y-5">
-          <div className="mr-auto flex flex-col gap-1.5">
-            <h1 className="h1">Planner</h1>
-            <p className="text-[17px] text-muted">{rangeLabel}{days.includes(today) && view === "day" ? " · today" : ""}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="surf flex rounded-full p-1" role="group" aria-label="View">
-              <Link href={nav(start, "day")} className={`btn btn-sm border-transparent ${view === "day" ? "btn-primary" : "bg-transparent"}`} aria-current={view === "day" ? "page" : undefined}>Day</Link>
-              <Link href={nav(start, "week")} className={`btn btn-sm border-transparent ${view === "week" ? "btn-primary" : "bg-transparent"}`} aria-current={view === "week" ? "page" : undefined}>Week</Link>
-            </div>
-            <div className="flex gap-1">
-              <Link href={nav(startDt.minus({ days: step }).toISODate()!)} className="btn btn-sm w-11 px-0" aria-label="Previous">←</Link>
-              <Link href={nav(today)} className="btn btn-sm">Today</Link>
-              <Link href={nav(startDt.plus({ days: step }).toISODate()!)} className="btn btn-sm w-11 px-0" aria-label="Next">→</Link>
-            </div>
-            {view === "day" ? (
-              <ActionButton className="btn btn-primary btn-sm" action={planDayAction} args={[start]} showResult>Plan this day</ActionButton>
-            ) : (
-              <ActionButton className="btn btn-primary btn-sm" action={planWeekAction} showResult>Plan next 7 days</ActionButton>
-            )}
-          </div>
-        </div>
-        <PlannerWeekStrip days={strip} />
-      </header>
+    <div className="flex flex-col pt-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <nav aria-label="This week" className="flex gap-2 overflow-x-auto pb-1">
+          {strip.map(({ d, colors, dt }) => {
+            const on = d === date;
+            const isT = d === today;
+            return (
+              <Link
+                key={d}
+                href={href({ date: d })}
+                aria-current={on ? "date" : undefined}
+                aria-label={`${dt.toFormat("cccc, LLLL d")}${isT ? ", today" : ""}`}
+                className={`flex h-16 w-[54px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-[20px] ${isT ? "bg-text text-black" : "bg-white/[0.05] text-[#C8C8CE] hover:bg-white/[0.08]"} ${on && !isT ? "ring-1 ring-white/40" : ""}`}
+              >
+                <span className="text-[12px] opacity-75">{dt.toFormat("ccc")}</span>
+                <span className="text-[17px] font-semibold">{dt.toFormat("d")}</span>
+                <span className="flex h-1 gap-0.5" aria-hidden="true">{colors.map((c) => <span key={c} className="h-1 w-1 rounded-full" style={{ background: c }} />)}</span>
+              </Link>
+            );
+          })}
+        </nav>
+        <span className="flex-1" />
+        <Link href={href({ date: shiftDays(-1) })} className={roundBtn} aria-label="Previous day">{chev("l")}</Link>
+        <Link href={href({ date: shiftDays(1) })} className={roundBtn} aria-label="Next day">{chev("r")}</Link>
+        {!isToday && <Link href={href({ date: today })} className={pillBtn}>Today</Link>}
+        {viewToggle}
+      </div>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:grid-rows-[auto_1fr] lg:gap-x-10">
-        {/* Deadlines first on a phone; beside the timeline on a wide screen. */}
-        <section aria-labelledby="due-h" className="flex flex-col gap-3 lg:col-start-2 lg:row-start-1">
-          <h2 id="due-h" className="eyebrow">{deadlineTitle}</h2>
-          {deadlines.length === 0 ? (
-            <p className="text-[15px] text-dim">No deadlines {view === "week" ? "in these 7 days" : "on this day"}.</p>
+      <div className="mt-[22px] flex flex-col gap-1.5">
+        <h1 className="text-[32px] font-bold tracking-[-0.03em]">
+          {DateTime.fromISO(date, { zone }).toFormat("cccc")}
+          {!isToday && <span className="ml-2 text-[17px] font-medium text-dim">{DateTime.fromISO(date, { zone }).toFormat("LLLL d")}</span>}
+        </h1>
+        <p className="text-[17px] font-medium tracking-[-0.01em]"><Sentence line={headline} /></p>
+      </div>
+
+      <div className="mt-[18px] flex flex-col gap-7 lg:flex-row">
+        <section aria-label="Timeline" className="min-w-0 flex-1">
+          <h2 className="sr-only">Timeline</h2>
+          <DayTimeline entries={entries} fits={fits} zone={zone} nowMs={nowMs} isToday={isToday} isPast={isPast} focusOpen={!!focusRes.data} />
+          {day.untimed.length > 0 && (
+            <p className="mt-3 text-[13px] text-dim">Any time: {day.untimed.map((e) => e.title).join(", ")} (routines with no set time)</p>
+          )}
+        </section>
+
+        <aside className="flex w-full flex-col gap-2.5 lg:w-[290px] lg:shrink-0" aria-labelledby="needs-time">
+          <h2 id="needs-time" className="px-1 pb-0.5 pt-2 text-[13px] font-semibold text-[#8E8E96]">Still needs a time</h2>
+          {needsTime.length === 0 ? (
+            <p className="px-1 text-[14px] text-dim">Everything open has a time.</p>
           ) : (
-            <ul className="flex flex-col gap-2">
-              {deadlines.map((t) => {
-                const due = DateTime.fromISO(t.due_at!).setZone(zone);
-                const late = Date.parse(t.due_at!) < nowMs;
-                const r = risk.get(t.id);
-                const alarm = late || (r && t.due_is_hard);
-                const area = areaOf(t.workspace_id);
-                const dayWord = due.toISODate() === today ? "Today" : due.toFormat("ccc");
-                const withDay = view === "week" || late;
-                const when = due.hour === 23 && due.minute === 59 ? (withDay ? `${dayWord}, end of day` : "End of day") : withDay ? `${dayWord} ${due.toFormat("h:mm a")}` : due.toFormat("h:mm a");
+            <ul className="flex flex-col gap-2.5">
+              {needsTime.map((t) => {
+                const n = steps.get(t.id) ?? 0;
                 return (
-                  <li key={t.id} className={`flex items-start gap-3 rounded-[14px] border px-4 py-3 ${alarm ? "border-[1.5px] border-clash bg-[rgba(255,143,138,0.08)]" : "border-border bg-white/[0.02]"}`}>
+                  <li key={t.id} className="flex items-start gap-2 rounded-[18px] border border-white/[0.07] bg-white/[0.05] px-3.5 py-3">
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <Link href="/tasks" className="text-[16px] font-semibold leading-snug break-words hover:underline">{t.title}</Link>
-                      <span className={`flex flex-wrap items-center gap-x-1.5 text-[13px] ${alarm ? "text-[#ffc2bd]" : "text-muted"}`}>
-                        {area && <span className="dot h-[7px] w-[7px]" style={{ background: area.color ?? "#8b8e95" }} aria-hidden />}
-                        {area && <span>{area.name} ·</span>}
-                        <span className="num">{late ? `was due ${when}` : when}</span>
-                        {t.due_is_hard && <span>· hard deadline</span>}
+                      <Link href={`/tasks?open=${t.id}`} className="font-semibold hover:underline">{t.title}</Link>
+                      <span className="text-[13px] text-[#8E8E96]">
+                        {t.estimate_minutes ? `${t.estimate_minutes} min` : n ? `${n} step${n === 1 ? "" : "s"}` : "no estimate"}
+                        {" · "}
+                        {t.due_at ? <>before <span className="text-due">{dueWord(t.due_at)}</span></> : "whenever"}
                       </span>
-                      {r && !late && <span className="text-[13px] text-muted">Needs ~{r.shortMinutes} min more than is planned before then.</span>}
                     </div>
-                    {late ? (
-                      <span className="shrink-0 rounded-full bg-clash px-2.5 py-0.5 text-xs font-semibold text-[#060608]">Overdue</span>
-                    ) : r ? (
-                      <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${t.due_is_hard ? "bg-clash text-[#060608]" : "badge-warn"}`}>At risk</span>
-                    ) : null}
+                    {!isPast && <PlaceIt title={t.title} dayLabel={dayWord} />}
                   </li>
                 );
               })}
             </ul>
           )}
-        </section>
+          {!isPast && needsTime.length > 0 && <p className="px-1 text-[12.5px] text-dim">Put one in a free stretch, or ask Navi to place it.</p>}
 
-        <div className="flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-span-2 lg:row-start-1">
-          {days.map((d) => {
-            const dt = DateTime.fromISO(d, { zone });
-            const isToday = d === today;
-            const agenda = agendaFor(d);
-            type Item =
-              | { type: "fixed"; at: number; end: number; e: (typeof agenda.entries)[number] }
-              | { type: "block"; at: number; end: number; b: BlockRow };
-            const items: Item[] = [
-              ...agenda.entries.filter((e) => e.kind !== "block" && e.start).map((e) => ({ type: "fixed" as const, at: Date.parse(e.start!), end: Date.parse(e.end!), e })),
-              ...blockRows.filter((b) => b.plan_date === d).map((b) => ({ type: "block" as const, at: Date.parse(b.starts_at), end: Date.parse(b.ends_at), b })),
-            ].sort((a, b) => a.at - b.at);
-            const anyTime = agenda.entries.filter((e) => e.kind === "routine" && !e.start);
-            const open = (i: Item) => i.type === "fixed" || i.b.status === "planned" || i.b.status === "in_progress";
-            const current = isToday ? items.find((i) => open(i) && i.at <= nowMs && i.end > nowMs) ?? null : null;
-            const next = isToday ? items.find((i) => open(i) && i.at > nowMs) ?? null : null;
-            const fixedCount = items.filter((i) => i.type === "fixed").length;
-            const blockCount = items.length - fixedCount;
-            const doneCount = items.filter((i) => i.type === "block" && i.b.status === "done").length;
-            const summary = [fixedCount && `${fixedCount} fixed`, blockCount && `${blockCount} planned${doneCount ? `, ${doneCount} done` : ""}`].filter(Boolean).join(" · ");
-
-            const rows: { key: string; node: React.ReactNode }[] = [];
-            let lastEnd: number | null = null;
-            let nowPlaced = !isToday || current !== null || items.length === 0;
-            const placeNow = () => {
-              const t = timeParts(now.toISO()!);
-              rows.push({ key: "now", node: <PlannerNowRow start={t.start} meridiem={t.meridiem} /> });
-              nowPlaced = true;
-            };
-            items.forEach((i, idx) => {
-              if (!nowPlaced && i.at > nowMs) placeNow();
-              // A free stretch of 30+ minutes between two things (still ahead, on today).
-              if (lastEnd !== null && d >= today && i.at - lastEnd >= 30 * 60000 && (!isToday || i.at > nowMs)) {
-                const gapFrom = isToday ? Math.max(lastEnd, nowMs) : lastEnd;
-                const mins = Math.round((i.at - gapFrom) / 60000);
-                if (mins >= 30) {
-                  const t = timeParts(new Date(gapFrom).toISOString());
-                  rows.push({ key: `gap${idx}`, node: <PlannerGapRow start={t.start} meridiem={t.meridiem} minutes={mins} /> });
-                }
-              }
-              lastEnd = Math.max(lastEnd ?? 0, i.end);
-              const marker = i === current ? ("Now" as const) : i === next ? ("Next" as const) : null;
-              if (i.type === "fixed") {
-                const e = i.e;
-                const kind: TimelineKind = e.fixed ? "fixed" : "recovery";
-                const area = areaOf(e.kind === "event" ? eventArea.get(e.id) : routineArea.get(e.id));
-                const timeline: TimelineInfo = { ...timeParts(e.start!), range: range(e.start!, e.end!), minutes: minutesBetween(e.start!, e.end!), area, marker, kind, kindLabel: e.label };
-                rows.push({ key: `f${e.id}${idx}`, node: <PlannerFixedRow title={e.title} label={e.label} timeline={timeline} /> });
-              } else {
-                const b = i.b;
-                const { kind, label } = blockKind(b);
-                const area = areaOf(b.tasks?.workspace_id ?? b.routines?.workspace_id);
-                const timeline: TimelineInfo = { ...timeParts(b.starts_at), range: range(b.starts_at, b.ends_at), minutes: minutesBetween(b.starts_at, b.ends_at), area, marker, kind, kindLabel: label };
-                rows.push({
-                  key: b.id,
-                  node: <PlanBlockRow block={blocks[blockRows.indexOf(b)]} time={`${formatTime(b.starts_at, zone)}–${formatTime(b.ends_at, zone)}`} canFocus={!focusRes.data && isToday} timeline={timeline} />,
-                });
-              }
-            });
-            if (!nowPlaced) placeNow();
-
-            if (view === "week" && items.length === 0 && anyTime.length === 0) {
-              // An empty day stays one quiet line, so the busy days stand out.
-              return (
-                <section key={d} aria-label={dt.toFormat("cccc LLL d")} className="flex flex-wrap items-center gap-x-3 rounded-[14px] border border-border px-5 py-2 md:px-6">
-                  <h2 className="text-[17px] font-semibold">
-                    {dt.toFormat("cccc")}
-                    <span className="font-normal text-muted">, {dt.toFormat("LLL d")}</span>
-                  </h2>
-                  <p className="order-last basis-full pb-1 text-[15px] text-dim sm:order-none sm:basis-auto sm:pb-0">Nothing scheduled.</p>
-                  <Link href={nav(d, "day")} className="btn btn-ghost btn-sm ml-auto" aria-label={`Open ${dt.toFormat("cccc LLL d")}`}>Open</Link>
-                </section>
-              );
-            }
-            return (
-              <section key={d} className={view === "week" ? "card md:p-6" : ""} aria-label={dt.toFormat("cccc LLL d")}>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <h2 className={view === "week" ? "h2" : "sr-only"}>
-                    {dt.toFormat("cccc")}
-                    <span className="font-normal text-muted">, {dt.toFormat("LLL d")}</span>
-                  </h2>
-                  {view === "week" && isToday && <span className="rounded-full bg-[#f2f2f2] px-2.5 py-0.5 text-xs font-semibold text-[#060608]">Today</span>}
-                  {summary && <span className="num text-sm text-dim">{summary}</span>}
-                  {view === "week" && <Link href={nav(d, "day")} className="btn btn-ghost btn-sm ml-auto" aria-label={`Open ${dt.toFormat("cccc LLL d")}`}>Open</Link>}
-                </div>
-                {items.length === 0 ? (
-                  <p className={`text-[15px] text-dim ${view === "week" ? "mt-2" : "mt-1 rounded-[14px] border border-dashed border-[#3a3c42] px-4 py-6 text-center"}`}>Nothing scheduled.</p>
-                ) : (
-                  // One timeline: fixed commitments and flexible blocks in time order.
-                  <ul className="mt-4 flex flex-col gap-2.5">{rows.map((r) => <Fragment key={r.key}>{r.node}</Fragment>)}</ul>
-                )}
-                {anyTime.length > 0 && (
-                  <p className="mt-3 text-sm text-muted">Any time: {anyTime.map((e) => e.title).join(", ")} <span className="text-dim">(routine{anyTime.length === 1 ? "" : "s"} with no set time)</span></p>
-                )}
-              </section>
-            );
-          })}
-        </div>
-
-        <aside className="flex flex-col gap-6 lg:col-start-2 lg:row-start-2" aria-label="About the planner">
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {!isPast && <ActionButton className="btn btn-sm" action={planDayAction} args={[date]} showResult>Plan {isToday ? "my day" : "this day"}</ActionButton>}
+            {isToday && <RecoveryButton className="btn btn-sm btn-ghost" />}
+          </div>
           {profile.availability.length === 0 && (
-            <p className="notice notice-warn text-sm">
-              Navi won&apos;t invent free time. Set when you&apos;re available in <Link className="underline" href="/settings">Settings</Link> (or tell Navi) so it can schedule flexible work.
+            <p className="text-[13px] text-dim">
+              Navi won&apos;t invent free time. Set when you&apos;re available in <Link className="underline" href="/settings">Settings</Link> so it can plan flexible work.
             </p>
           )}
-          <ul className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-[13px] text-muted" aria-label="Colour key">
-            <li className="flex items-center gap-2"><span className="h-3.5 w-5 rounded-[5px] bg-[#f0f0f0]" aria-hidden />Fixed</li>
-            <li className="flex items-center gap-2"><span className="h-3.5 w-5 rounded-[5px] border-[1.5px] border-flex" aria-hidden />Flexible</li>
-            <li className="flex items-center gap-2"><span className="h-3.5 w-5 rounded-[5px] border-[1.5px] border-recovery" aria-hidden />Routine / rest</li>
-            <li className="flex items-center gap-2"><span className="h-3.5 w-5 rounded-[5px] border border-dashed border-[#5a5c62]" aria-hidden />Free</li>
-          </ul>
-          <p className="text-[13px] leading-relaxed text-dim">Fixed commitments never move automatically. Flexible blocks are placed by Navi and can be re-planned any time. Due dates are deadlines, not scheduled times.</p>
-          <AddCommitment zone={zone} defaultDate={start} />
+          <details className="mt-1">
+            <summary className="cursor-pointer px-1 text-[13px] text-dim hover:text-text">Add a fixed commitment</summary>
+            <div className="mt-2"><AddCommitment zone={zone} defaultDate={date} /></div>
+          </details>
+          <div className="mt-3"><Legend /></div>
         </aside>
       </div>
     </div>
   );
 }
-
