@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
 import { assertLocalSupabase } from "../local-guard";
-import { ensureAccount, signInWithPassword } from "./helpers";
+import { ensureAccount, openCapture, signInWithPassword } from "./helpers";
 
 config({ path: ".env.local", quiet: true });
 assertLocalSupabase();
@@ -18,7 +18,7 @@ async function signIn(page: Page, email: string) {
 /** Lets a test run on its own: skips the setup conversation for an existing account. */
 async function signInSetUp(page: Page, email: string) {
   await signIn(page, email);
-  await page.waitForURL(/\/(onboarding)?$/);
+  await page.waitForURL(/\/(welcome)?$/);
   const { data } = await admin.auth.admin.listUsers();
   const u = data.users.find((x) => x.email === email)!;
   const { data: p } = await admin.from("profiles").select("onboarding_status").eq("id", u.id).single();
@@ -41,9 +41,17 @@ test("onboarding conversation → reviewed setup → plan → capture → inbox 
   await resetAccount(email);
   await signIn(page, email);
 
-  // First run lands in the conversational setup, not a form wizard.
-  await expect(page).toHaveURL(/\/onboarding/);
-  await expect(page.getByRole("heading", { name: "Let's set up Navi" })).toBeVisible();
+  // First run lands in the full-screen setup, and every app page sends you back to it.
+  await expect(page).toHaveURL(/\/welcome/);
+  await page.goto("/tasks");
+  await expect(page).toHaveURL(/\/welcome/);
+  await expect(page.getByRole("heading", { name: /I'm Navi/ })).toBeVisible();
+  await page.getByRole("button", { name: "Let's go" }).click();
+  // The basics are three quick answers, not a form wizard; the rest is a conversation.
+  await expect(page.getByRole("heading", { name: "A few basics" })).toBeVisible();
+  await page.getByLabel("What should I call you?").fill("Dev");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("list", { name: "Topics" })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/rule-based simulator, not a real AI model/)).toBeVisible();
   await say(page, "hi");
   await expect(page.getByText(/main areas of your life/)).toBeVisible();
@@ -51,32 +59,33 @@ test("onboarding conversation → reviewed setup → plan → capture → inbox 
   await say(page, "I have soccer practice mon and wed at 4pm. I go to the gym every morning at 7.");
   await say(page, "I'm free after 6pm on weekdays and free from 10am to 2pm on weekends. Quiet 10pm to 7am. That's it.");
 
-  // Review screen: inferred vs stated is labelled; approve and activate.
-  await page.reload();
-  await expect(page.getByRole("heading", { name: "Review your setup" })).toBeVisible();
-  await expect(page.getByText("Navi inferred").first()).toBeVisible();
-  await expect(page.getByText("You said this").first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Goals & projects" })).toBeVisible();
+  // Review: grouped, nothing real until it's turned on.
+  await expect(page.getByRole("heading", { name: "Here's what I'd set up" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("region", { name: "Goals and projects" })).toBeVisible();
   await expect(page.getByText("Get an A in chemistry class", { exact: true })).toBeVisible();
   await expect(page.getByText("Go to the gym", { exact: true })).toBeVisible();
   await page.screenshot({ path: `test-results/${info.project.name}-review.png`, fullPage: true });
-  await page.getByRole("button", { name: /Activate \d+ items? and plan my week/ }).click();
+  await page.getByRole("button", { name: /Turn on \d+ and plan my week/ }).click();
 
-  // Populated dashboard with real data.
+  // Stay in touch (optional), then the first plan, then Home with real data.
+  await expect(page.getByRole("heading", { name: "Can I check in with you?" })).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("button", { name: /^(Not now|Continue)$/ }).click();
+  await expect(page.getByRole("heading", { name: /You're set, Dev/ })).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Go to Home" }).click();
   await expect(page).toHaveURL(/\/$/, { timeout: 30_000 });
-  await expect(page.getByRole("heading", { name: "Today's plan" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(/(Morning|Afternoon|Evening), Dev\./);
   await page.screenshot({ path: `test-results/${info.project.name}-today.png`, fullPage: true });
   await page.goto("/projects");
-  await expect(page.getByRole("link", { name: "School" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Startups" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "School" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Startups" }).first()).toBeVisible();
   await expect(page.getByText("Tally").first()).toBeVisible();
   await expect(page.getByText("Get an A in chemistry class").first()).toBeVisible();
   await page.goto("/planner");
   await expect(page.getByText(/Soccer practice/i).first()).toBeVisible();
 
   // Capture a brain dump → review inbox → accept → becomes a real task.
-  await page.goto("/");
-  await page.getByRole("button", { name: /\+ Capture/ }).click();
+  await page.goto("/inbox");
+  await openCapture(page, info.project.name);
   await page.getByLabel("What's on your mind?").fill("buy new cleats tomorrow. text coach about saturday");
   await page.getByRole("dialog").getByRole("button", { name: "Capture", exact: true }).click();
   await expect(page.getByText("Captured. Review it in your inbox.")).toBeVisible({ timeout: 30_000 });
@@ -86,7 +95,8 @@ test("onboarding conversation → reviewed setup → plan → capture → inbox 
   await expect(card).toBeVisible();
   await card.getByRole("button", { name: "Accept" }).click();
   await expect(card).toBeHidden({ timeout: 15_000 });
-  await page.goto("/tasks");
+  // Due tomorrow, so it's under Upcoming.
+  await page.goto("/tasks?tab=upcoming");
   await expect(page.getByText(/Buy new cleats/i)).toBeVisible();
   await page.screenshot({ path: `test-results/${info.project.name}-tasks.png`, fullPage: true });
 
@@ -103,7 +113,7 @@ test("offline capture queues locally and syncs on reconnect", async ({ page, con
   // Let the page hydrate and load its scripts before the network goes away.
   await page.waitForLoadState("networkidle");
   await context.setOffline(true);
-  await page.getByRole("button", { name: /\+ Capture/ }).click();
+  await openCapture(page, info.project.name);
   await page.getByLabel("What's on your mind?").fill("offline idea: reorganize closet");
   await page.getByRole("dialog").getByRole("button", { name: "Capture", exact: true }).click();
   await expect(page.getByText(/Saved offline/)).toBeVisible();
@@ -151,7 +161,7 @@ test("dictated capture keeps the spoken words and is marked as voice", async ({ 
   });
   const email = info.project.name === "iphone" ? "alice@navi.test" : "dev@navi.test";
   await signInSetUp(page, email);
-  await page.getByRole("button", { name: /\+ Capture/ }).click();
+  await openCapture(page, info.project.name);
   await page.getByRole("button", { name: "Dictate" }).click();
   await expect(page.getByLabel("What's on your mind?")).toHaveValue("renew library card by saturday");
   await page.getByRole("dialog").getByRole("button", { name: "Capture", exact: true }).click();

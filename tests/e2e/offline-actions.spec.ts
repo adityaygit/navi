@@ -7,7 +7,7 @@ import { admin, freshSetUpAccount } from "./helpers";
 test("actions taken while offline fail visibly and safely", async ({ page, context }, info) => {
   const userId = await freshSetUpAccount(page, `offline-actions-${info.project.name}@navi.test`);
   await admin.from("tasks").insert({ user_id: userId, title: "Return the drill" });
-  await page.goto("/tasks");
+  await page.goto("/tasks?tab=anytime");
   await page.waitForLoadState("networkidle");
   await context.setOffline(true);
   await page.getByRole("button", { name: "Complete Return the drill" }).click();
@@ -30,7 +30,7 @@ test("actions taken while offline fail visibly and safely", async ({ page, conte
   expect(count).toBe(0);
 
   await context.setOffline(false);
-  await page.goto("/tasks");
+  await page.goto("/tasks?tab=anytime");
   await page.getByRole("button", { name: "Complete Return the drill" }).click();
   await expect.poll(async () => (await admin.from("tasks").select("status").eq("user_id", userId).eq("title", "Return the drill").single()).data!.status).toBe("done");
 });

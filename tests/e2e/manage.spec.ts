@@ -13,19 +13,24 @@ test("focus, recovery, memory, approvals and settings", async ({ page }, info) =
   const { data: task } = await admin.from("tasks").insert({ user_id: userId, title: "Write lab report", estimate_minutes: 30, priority: 2 }).select("id").single();
   const { data: doomed } = await admin.from("tasks").insert({ user_id: userId, title: "Old errand", estimate_minutes: 15 }).select("id").single();
 
-  // Plan today, focus on the planned block, finish it.
-  await page.goto("/");
-  await page.getByRole("button", { name: "Re-plan today" }).click();
-  const plan = page.getByRole("region", { name: "Today's plan" });
+  // Plan today on My day, focus on the planned block, finish it.
+  await page.goto("/planner");
+  await page.getByRole("button", { name: "Plan my day" }).click();
+  const plan = page.getByRole("list", { name: "Timeline" });
   await expect(plan.getByText("Write lab report")).toBeVisible();
-  await plan.locator("li", { hasText: "Write lab report" }).getByRole("button", { name: "Focus" }).click();
-  const focus = page.getByRole("region", { name: "Focus session" });
+  await plan.locator("li", { hasText: "Write lab report" }).getByRole("button", { name: "Start" }).click();
+  await expect(page).toHaveURL(/\/focus/);
+  const focus = page.getByRole("region", { name: "Focus" });
   await expect(focus.getByText("Write lab report")).toBeVisible();
-  await focus.getByRole("button", { name: "Finished the task" }).click();
-  await expect(focus).toBeHidden();
-  await expect(plan.getByText(/1\/\d+ done/)).toBeVisible();
-  const { data: doneTask } = await admin.from("tasks").select("status").eq("id", task!.id).single();
-  expect(doneTask!.status).toBe("done");
+  // Pause and resume: paused time doesn't count.
+  await focus.getByRole("button", { name: "Pause" }).click();
+  await expect(focus.getByRole("button", { name: "Resume" })).toBeVisible();
+  await focus.getByRole("button", { name: "Resume" }).click();
+  await focus.getByRole("button", { name: "I'm done" }).click();
+  await focus.getByRole("button", { name: "Finished it" }).click();
+  await expect(page).toHaveURL(/\/focus\?ended=/);
+  await expect.poll(async () => (await admin.from("tasks").select("status").eq("id", task!.id).single()).data!.status).toBe("done");
+  await page.goto("/planner");
 
   // "My plan broke": say why, get a re-plan, nothing unfinished is dropped.
   await page.getByRole("button", { name: "My plan broke" }).click();
@@ -62,9 +67,7 @@ test("focus, recovery, memory, approvals and settings", async ({ page }, info) =
     details: { op: "delete", table: "tasks", id: doomed!.id, subject: "Old errand", reason: "deleting can't be undone" },
     idempotency_key: `e2e-${Date.now()}:1`,
   });
-  await page.goto("/");
-  await page.getByRole("link", { name: "Approvals waiting (1)" }).click();
-  await expect(page).toHaveURL(/\/activity/);
+  await page.goto("/activity");
   const card = page.getByRole("group", { name: "Delete task: Old errand" });
   await card.getByRole("button", { name: "Approve" }).click();
   await expect(card.getByText("Deleted task “Old errand”")).toBeVisible();
@@ -73,8 +76,8 @@ test("focus, recovery, memory, approvals and settings", async ({ page }, info) =
   await expect(page.locator("li", { hasText: "Deleted task “Old errand”" }).getByText("done", { exact: true })).toBeVisible();
   const { data: gone } = await admin.from("tasks").select("id").eq("id", doomed!.id);
   expect(gone).toHaveLength(0);
-  await page.goto("/");
-  await expect(page.getByRole("region", { name: "Today's plan" }).getByText("Old errand")).toHaveCount(0);
+  await page.goto("/planner");
+  await expect(page.getByRole("list", { name: "Timeline" }).getByText("Old errand")).toHaveCount(0);
 
   // Settings: name shows up on Today.
   await page.goto("/settings");

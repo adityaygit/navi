@@ -45,6 +45,7 @@ test("goals, projects, milestones and fixed commitments", async ({ page }, info)
   // Free only tomorrow 09:00–13:00, so the plan has to work around the dentist.
   await admin.from("profiles").update({ availability: [{ days: [tomorrowDt.weekday % 7], start: "09:00", end: "13:00" }] }).eq("id", userId);
   await page.goto("/planner");
+  await page.getByText("Add a fixed commitment", { exact: true }).click();
   await page.getByRole("button", { name: "+ Add fixed commitment" }).click();
   await page.getByLabel("What").fill("Dentist");
   await page.getByLabel("Date").fill(tomorrow);
@@ -67,7 +68,8 @@ test("goals, projects, milestones and fixed commitments", async ({ page }, info)
   expect(tomorrowBlocks.some((b) => Date.parse(b.starts_at) >= Date.parse(dentistEnd))).toBe(true);
   // The day reads in time order: work before the dentist, the dentist, work after.
   // The result message names the planned tasks before the day list refreshes, so wait for the day itself.
-  const dayRegion = page.getByRole("region", { name: tomorrowDt.toFormat("cccc LLL d") });
+  await page.goto(`/planner?date=${tomorrow}`);
+  const dayRegion = page.getByRole("list", { name: "Timeline" });
   await expect(dayRegion.getByText(/Practice drill \d+/).first()).toBeVisible();
   const day = await dayRegion.innerText();
   const before = day.indexOf("Practice drill");

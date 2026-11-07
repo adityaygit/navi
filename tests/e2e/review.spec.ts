@@ -58,24 +58,23 @@ test("daily review: mark yesterday, see the review, plan ahead", async ({ page }
   await expect(page.getByRole("region", { name: "3. Plan tomorrow" }).getByRole("status")).toContainText(/placed|no flexible blocks/);
 
   // Stopping focus asks why; with no reason the block counts as skipped.
-  await page.goto("/");
-  const today = page.getByRole("region", { name: "Today's plan" });
-  const replan = page.getByRole("button", { name: "Re-plan today" });
+  await page.goto("/planner");
+  const replan = page.getByRole("button", { name: "Plan my day" });
   await replan.click();
   await expect(replan.locator("xpath=..").getByRole("status")).toContainText(/\w{3} \w{3} \d+: (placed \d+ blocks?|no flexible blocks placed)/);
   // A block running right now (made by the person, so re-planning leaves it), whatever the time of day.
   const start = new Date(Date.now() - 5 * 60_000);
   await admin.from("plan_blocks").insert({ user_id: userId, title: "Focus drill", task_id: task!.id, plan_date: new Date().toISOString().slice(0, 10), starts_at: start.toISOString(), ends_at: new Date(start.getTime() + 30 * 60_000).toISOString(), created_by: "user" });
   await page.reload();
-  await today.locator("li", { hasText: "Focus drill" }).getByRole("button", { name: "Focus" }).click();
-  const focus = page.getByRole("region", { name: "Focus session" });
+  await page.getByRole("list", { name: "Timeline" }).locator("li", { hasText: "Focus drill" }).getByRole("button", { name: "Start" }).click();
+  await expect(page).toHaveURL(/\/focus/);
+  const focus = page.getByRole("region", { name: "Focus" });
+  await focus.getByRole("button", { name: "I'm done" }).click();
   await focus.getByRole("button", { name: "Stop" }).click();
-  await expect(focus.getByText("Why stop? Without a reason, this block counts as skipped.")).toBeVisible();
-  await focus.getByRole("button", { name: "No reason, just stop" }).click();
-  await expect(focus).toBeHidden();
-  await expect(today.locator("li", { hasText: "Focus drill" }).getByText("skipped", { exact: true })).toBeVisible();
-  const { data: drill } = await admin.from("plan_blocks").select("status,outcome_reason").eq("user_id", userId).eq("title", "Focus drill").single();
-  expect(drill).toEqual({ status: "skipped", outcome_reason: "Stopped the focus session without a reason" });
+  await expect(focus.getByText("Why stop? Without a reason, this counts as skipped.")).toBeVisible();
+  await focus.getByRole("button", { name: "No reason" }).click();
+  await expect(page).toHaveURL(/\/focus\?ended=/);
+  await expect.poll(async () => (await admin.from("plan_blocks").select("status,outcome_reason").eq("user_id", userId).eq("title", "Focus drill").single()).data).toEqual({ status: "skipped", outcome_reason: "Stopped the focus session without a reason" });
 
   // An observed pattern shows the evidence behind it.
   await page.goto("/memory");

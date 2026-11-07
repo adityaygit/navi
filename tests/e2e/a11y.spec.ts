@@ -3,7 +3,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
 import { assertLocalSupabase } from "../local-guard";
-import { ensureAccount, middayTimezone, PASSWORD } from "./helpers";
+import { ensureAccount, middayTimezone, openCapture, PASSWORD } from "./helpers";
 
 // Automated WCAG 2.1 A/AA checks (axe) on every main page, with real data on
 // screen, plus a check that no page scrolls sideways (on the iPhone profile
@@ -14,7 +14,7 @@ config({ path: ".env.local", quiet: true });
 assertLocalSupabase();
 const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
 
-const PAGES = ["/", "/chat", "/inbox", "/planner", "/tasks", "/projects", "/insights", "/review", "/memory", "/notes", "/activity", "/settings", "/more"];
+const PAGES = ["/", "/chat", "/inbox", "/planner", "/tasks", "/projects", "/insights", "/review", "/memory", "/notes", "/activity", "/settings", "/more", "/focus", "/planner?view=calendar"];
 
 /** Elements sticking out past the right edge of the screen (sideways scrolling). */
 async function overflow(page: Page, label: string) {
@@ -67,8 +67,13 @@ test("main pages have no automatically detectable WCAG A/AA violations", async (
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/onboarding/);
-  problems.push(...(await audit(page, "/onboarding")));
+  await expect(page).toHaveURL(/\/welcome/);
+  problems.push(...(await audit(page, "/welcome")));
+  // The setup conversation screen too.
+  await admin.from("profiles").update({ onboarding_status: "in_progress", preferences: { onboarding_step: "talk" } }).eq("id", userId);
+  await page.reload();
+  await expect(page.getByRole("list", { name: "Topics" })).toBeVisible();
+  problems.push(...(await audit(page, "/welcome (talk)")));
 
   await admin.from("profiles").update({ onboarding_status: "completed", timezone: middayTimezone(), availability: [{ days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "23:59" }] }).eq("id", userId);
   const { data: ws } = await admin.from("workspaces").insert({ user_id: userId, name: "School" }).select("id").single();
@@ -89,8 +94,8 @@ test("main pages have no automatically detectable WCAG A/AA violations", async (
   await admin.from("proposals").insert({ user_id: userId, kind: "task", payload: { title: "Buy cleats" }, source_excerpt: "buy cleats", origin: "inferred", confidence: 0.5 });
   await admin.from("approvals").insert({ user_id: userId, action_type: "external.gmail.send", summary: "Email coach about Saturday", details: { to: "coach@example.com" }, idempotency_key: `a11y-${Date.now()}:1` });
 
-  await page.goto("/");
-  await page.getByRole("button", { name: "Re-plan today" }).click();
+  await page.goto("/planner");
+  await page.getByRole("button", { name: "Plan my day" }).click();
   await expect(page.getByText("Read chapter 4").first()).toBeVisible();
   for (const path of PAGES) {
     await page.goto(path);
@@ -119,8 +124,15 @@ test("main pages have no automatically detectable WCAG A/AA violations", async (
   await page.emulateMedia({ colorScheme: "light" });
   // Dialogs too.
   await page.goto("/");
-  await page.getByRole("button", { name: /\+ Capture/ }).click();
+  await openCapture(page, info.project.name);
   problems.push(...(await audit(page, "capture dialog")));
+  if (info.project.name === "desktop") {
+    // The Ctrl/⌘ K palette.
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Control+k");
+    await expect(page.getByRole("dialog", { name: "Search and commands" })).toBeVisible();
+    problems.push(...(await audit(page, "command palette")));
+  }
 
   expect(problems, problems.join("\n")).toEqual([]);
 });

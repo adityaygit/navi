@@ -26,7 +26,7 @@ export function HomeComposer() {
   };
   return (
     <form
-      className="sticky bottom-24 z-10 mx-auto mt-auto flex h-[58px] w-full max-w-[660px] items-center gap-2.5 rounded-[29px] border border-white/[0.09] bg-[rgba(28,28,31,0.92)] pl-[22px] pr-2 shadow-[0_20px_50px_rgba(0,0,0,0.6)] md:bottom-7"
+      className="sticky bottom-7 z-10 mx-auto mt-auto hidden h-[58px] w-full max-w-[660px] items-center gap-2.5 rounded-[29px] border border-white/[0.09] bg-[rgba(28,28,31,0.92)] pl-[22px] pr-2 shadow-[0_20px_50px_rgba(0,0,0,0.6)] md:flex"
       onSubmit={(e) => {
         e.preventDefault();
         send();
@@ -134,9 +134,9 @@ export function Insight({ insight }: { insight: InsightView }) {
       );
     case "unmarked":
       return row(
-        `${insight.count === 1 ? "One plan block" : `${insight.count} plan blocks`} from yesterday ${insight.count === 1 ? "isn't" : "aren't"} marked yet.`,
+        `${insight.count} block${insight.count === 1 ? "" : "s"} from yesterday ${insight.count === 1 ? "isn't" : "aren't"} marked yet.`,
         <>
-          <Link href={`/review?date=${insight.date}`} className={link}>Mark {insight.count === 1 ? "it" : "them"}</Link>
+          <Link href={`/review?date=${insight.date}`} className={link}>Mark yesterday</Link>
           <button type="button" className={quiet} disabled={pending} onClick={() => dismiss(insight.key)}>Not now</button>
         </>,
       );

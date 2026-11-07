@@ -11,7 +11,7 @@ import { RecoveryButton } from "@/components/recovery";
 import { DayTimeline, Legend, type Kind, type TimelineEntry } from "@/components/day/timeline";
 import { CalendarGrid, type CalendarDay } from "@/components/day/calendar";
 import { PlaceIt } from "@/components/day/day-actions";
-import { planDayAction } from "../actions";
+import { planDayAction, planWeekAction } from "../actions";
 import { AddCommitment } from "./add-commitment";
 
 export const metadata = { title: "My day · Navi" };
@@ -302,6 +302,7 @@ export default async function MyDayPage({ searchParams }: { searchParams: Promis
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {!isPast && <ActionButton className="btn btn-sm" action={planDayAction} args={[date]} showResult>Plan {isToday ? "my day" : "this day"}</ActionButton>}
+            {!isPast && <ActionButton className="btn btn-sm btn-ghost" action={planWeekAction} args={[date]} showResult>Plan next 7 days</ActionButton>}
             {isToday && <RecoveryButton className="btn btn-sm btn-ghost" />}
           </div>
           {profile.availability.length === 0 && (

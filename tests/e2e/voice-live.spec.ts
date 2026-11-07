@@ -204,11 +204,13 @@ test("setting Navi up by voice ends in the same reviewed setup as typing", async
   const email = `voice-setup-${info.project.name}@navi.test`;
   const userId = await ensureAccount(email, { fresh: true });
   await signInWithPassword(page, email);
-  await expect(page).toHaveURL(/\/onboarding/);
+  await expect(page).toHaveURL(/\/welcome/);
+  // Straight to the "Talk it through" step of setup.
+  await admin.from("profiles").update({ onboarding_status: "in_progress", preferences: { onboarding_step: "talk" } }).eq("id", userId);
 
   const { seen, send } = await standInLiveApi(page, userId, "onboarding");
   await page.reload();
-  await page.getByRole("button", { name: "Talk", exact: true }).click();
+  await page.getByRole("button", { name: "Talk to Navi" }).click();
   await page.getByRole("region", { name: "Voice conversation" }).getByRole("button", { name: "Start talking" }).click();
   await expect.poll(() => seen.audioChunks, { timeout: 15_000 }).toBeGreaterThan(3);
 
@@ -236,14 +238,14 @@ test("setting Navi up by voice ends in the same reviewed setup as typing", async
   await expect.poll(() => seen.toolResponse, { timeout: 15_000 }).toMatchObject({ functionResponses: [{ id: "r1", response: { output: { ok: true } } }] });
 
   // The page switches to review on its own; nothing is active until approved.
-  await expect(page.getByRole("heading", { name: "Review your setup" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: "Here's what I'd set up" })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("Chess club", { exact: true })).toBeVisible();
   const { count } = await admin.from("routines").select("id", { count: "exact", head: true }).eq("user_id", userId);
   expect(count).toBe(0);
   // Leaving the conversation for the review hangs up the microphone.
   await expect.poll(() => seen.closed).toBe(true);
-  await page.getByRole("button", { name: /Activate \d+ items? and plan my week/ }).click();
-  await expect(page).toHaveURL(/\/$/, { timeout: 30_000 });
+  await page.getByRole("button", { name: /Turn on \d+ and plan my week/ }).click();
+  await expect(page.getByRole("heading", { name: "Can I check in with you?" })).toBeVisible({ timeout: 30_000 });
   const { data: routine } = await admin.from("routines").select("title,days,start_time,workspaces(name)").eq("user_id", userId).single();
   expect(routine).toEqual({ title: "Chess club", days: [2], start_time: "15:00:00", workspaces: { name: "School" } });
 });

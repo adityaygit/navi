@@ -11,10 +11,11 @@ test("routines are labelled fixed only when they are", async ({ page }, info) =>
   const dow = tomorrow.weekday % 7;
   await admin.from("routines").insert({ user_id: userId, title: "Evening reading", days: [dow], start_time: "19:00", duration_minutes: 30, is_fixed: false });
   await admin.from("routines").insert({ user_id: userId, title: "Swim practice", days: [dow], start_time: "16:00", duration_minutes: 60, is_fixed: true });
-  await page.goto(`/planner?start=${tomorrow.toISODate()}&view=day`);
-  const day = page.getByRole("region", { name: tomorrow.toFormat("cccc LLL d") });
-  await expect(day.locator("li", { hasText: "Evening reading" }).locator(".badge")).toHaveText("routine");
-  await expect(day.locator("li", { hasText: "Swim practice" }).locator(".badge")).toHaveText("fixed");
+  await page.goto(`/planner?date=${tomorrow.toISODate()}`);
+  const day = page.getByRole("list", { name: "Timeline" });
+  // The circle style shows it visually; the words are there for screen readers.
+  await expect(day.locator("li", { hasText: "Evening reading" })).toContainText("(routine)");
+  await expect(day.locator("li", { hasText: "Swim practice" })).toContainText("(fixed)");
 });
 
 test("accepting an inbox question saves it to memory", async ({ page }, info) => {

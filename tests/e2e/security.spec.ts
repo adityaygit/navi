@@ -18,16 +18,16 @@ async function removeUser(email: string) {
   if (u) await admin.auth.admin.deleteUser(u.id);
 }
 
-/** The newest sign-in link emailed to `email` by local Supabase (Mailpit). */
-async function latestLink(email: string, after: number): Promise<string> {
+/** The 6-digit sign-in code in the newest email to `email` from local Supabase (Mailpit). */
+async function latestCode(email: string, after: number): Promise<string> {
   for (let i = 0; i < 50; i++) {
     const res = await fetch(`${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`);
     const list = (await res.json()) as { messages: { ID: string; Created: string }[] };
     const fresh = list.messages.find((m) => Date.parse(m.Created) >= after - 1000);
     if (fresh) {
       const msg = (await (await fetch(`${MAILPIT}/api/v1/message/${fresh.ID}`)).json()) as { HTML: string; Text: string };
-      const link = (msg.HTML.match(/href="([^"]*\/auth\/v1\/verify[^"]*)"/) ?? msg.Text.match(/(http\S*\/auth\/v1\/verify\S*)/))?.[1];
-      if (link) return link.replace(/&amp;/g, "&");
+      const code = (msg.Text.match(/\b(\d{6})\b/) ?? msg.HTML.match(/\b(\d{6})\b/))?.[1];
+      if (code) return code;
     }
     await new Promise((r) => setTimeout(r, 200));
   }
@@ -48,14 +48,15 @@ test("an invited email can't be claimed from the sign-in page", async ({ page },
   await removeUser(email);
   await signInWithPassword(page, email);
   await expect(page.getByRole("main").getByRole("alert")).toContainText(/Wrong email or password/);
-  await page.getByRole("button", { name: "Use an email link instead" }).click();
-  await page.getByRole("button", { name: "Email me a sign-in link" }).click();
+  await page.getByRole("button", { name: "Use a code instead" }).click();
+  await page.getByPlaceholder("you@example.com").fill(email);
+  await page.getByRole("button", { name: "Send me a code" }).click();
   await expect(page.getByRole("main").getByRole("alert")).toContainText(/no Navi account for this email/i);
   expect(await findUser(email)).toBeNull();
   await expect(page).toHaveURL(/\/login/);
 });
 
-test("an account the owner created signs in by email link, then can add a password", async ({ page }, info) => {
+test("an account the owner created signs in with an email code, then can add a password", async ({ page }, info) => {
   const email = `invitee-${info.project.name}@navi.test`;
   await admin.from("allowed_emails").upsert({ email, note: "e2e security" });
   await removeUser(email);
@@ -65,11 +66,12 @@ test("an account the owner created signs in by email link, then can add a passwo
   await admin.from("profiles").update({ onboarding_status: "skipped", timezone: "UTC" }).eq("id", made.user!.id);
 
   await page.goto("/login");
-  await page.getByLabel("Email").fill(email);
+  await page.getByPlaceholder("you@example.com").fill(email);
   const sentAt = Date.now();
-  await page.getByRole("button", { name: "Email me a sign-in link" }).click();
-  await expect(page.getByRole("main").getByRole("status")).toContainText("Check your email");
-  await page.goto(await latestLink(email, sentAt));
+  await page.getByRole("button", { name: "Send me a code" }).click();
+  await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
+  // Pasting the whole code into the first box fills all six and signs in.
+  await page.getByLabel("Digit 1").fill(await latestCode(email, sentAt));
   await expect(page).toHaveURL(/\/$/);
 
   await page.goto("/settings");

@@ -68,3 +68,17 @@ const NO_DST_ZONES: Record<number, string> = {
 export function middayTimezone(): string {
   return NO_DST_ZONES[12 - new Date().getUTCHours()];
 }
+
+/**
+ * Opens quick capture: the floating button on phones; on desktop the Ctrl/⌘ K
+ * palette's "Capture something" (desktop has no floating button unless
+ * something waits to sync).
+ */
+export async function openCapture(page: Page, project: string) {
+  if (project === "iphone") {
+    await page.getByRole("button", { name: /\+ Capture/ }).click();
+    return;
+  }
+  await page.keyboard.press("Control+k");
+  await page.getByRole("option", { name: /Capture something/ }).click();
+}

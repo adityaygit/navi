@@ -24,7 +24,7 @@ export function QuickCapture({ userId }: { userId: string }) {
   // During setup and in chat the person is already talking to Navi, and the
   // floating button would cover the composer. Queued captures still show.
   const path = usePathname();
-  const hideFab = (path.startsWith("/onboarding") || path.startsWith("/chat") || path === "/") && queue.length === 0;
+  const hideFab = (path.startsWith("/onboarding") || path.startsWith("/chat")) && queue.length === 0;
 
   useEffect(() => {
     // Restore an unsent draft from this device's storage (an external system).

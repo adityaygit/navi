@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { admin, ensureAccount, freshSetUpAccount, signInWithPassword } from "./helpers";
+import { admin, ensureAccount, freshSetUpAccount, openCapture, signInWithPassword } from "./helpers";
 
 // The person's control over their own data: a full export, a shared device
 // where one person's unsent offline captures never reach someone else's
@@ -29,7 +29,7 @@ test("unsent offline captures stay with the person who made them on a shared dev
 
   // Capture while the server can't be reached, so it waits on the device.
   await context.setOffline(true);
-  await page.getByRole("button", { name: /\+ Capture/ }).click();
+  await openCapture(page, info.project.name);
   await page.getByLabel("What's on your mind?").fill("private: call the clinic about results");
   await page.getByRole("dialog").getByRole("button", { name: "Capture", exact: true }).click();
   await expect(page.getByText(/Waiting to sync \(1\)/)).toBeVisible();
@@ -47,7 +47,7 @@ test("unsent offline captures stay with the person who made them on a shared dev
   await page.goto("/");
   await page.waitForLoadState("networkidle");
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
-  await page.getByRole("button", { name: /\+ Capture/ }).click();
+  await openCapture(page, info.project.name);
   await expect(page.getByText(/Waiting to sync/)).toHaveCount(0);
   await page.getByRole("button", { name: "Close" }).click();
   await page.waitForTimeout(1000);
