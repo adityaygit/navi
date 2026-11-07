@@ -15,7 +15,7 @@ if (existsSync(file) && !process.argv.includes("--force")) {
   console.error(`${file} already exists; pass --force to replace it.`);
   process.exit(1);
 }
-const status = JSON.parse(execFileSync("npx", ["supabase", "status", "-o", "json"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }));
+const status = JSON.parse(execFileSync("npx", ["supabase", "status", "-o", "json"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], shell: process.platform === "win32" }));
 const vapid = webpush.generateVAPIDKeys();
 const values = {
   NEXT_PUBLIC_SUPABASE_URL: status.API_URL,

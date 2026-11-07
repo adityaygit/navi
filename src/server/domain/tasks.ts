@@ -44,6 +44,8 @@ export async function updateTask(ctx: Ctx, id: string, input: TaskUpdate) {
   const patch: Record<string, unknown> = compact(TaskUpdate.parse(input));
   if (patch.status === "done") patch.completed_at = new Date().toISOString();
   else if (patch.status) patch.completed_at = null;
+  // A new (or cleared) reminder time is a fresh reminder: it hasn't been sent yet.
+  if ("remind_at" in patch) patch.reminded_at = null;
   return updateEntity<Task>(ctx, "tasks", id, patch);
 }
 

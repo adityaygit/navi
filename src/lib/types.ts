@@ -80,6 +80,10 @@ export type Task = {
   actual_minutes: number;
   recurrence: { freq: "daily" | "weekly"; days?: number[] } | null;
   blocker: string | null;
+  /** When to send a reminder push for this task; null = none. */
+  remind_at?: string | null;
+  /** Set once that reminder was sent. */
+  reminded_at?: string | null;
   source: string;
   completed_at: string | null;
   created_at: string;

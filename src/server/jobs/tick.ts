@@ -74,6 +74,25 @@ export async function tickUser(db: SupabaseClient, profile: Profile, now = DateT
     }
   }
 
+  // Reminders the person set on a task ("More details" → Reminder). Sent once;
+  // quiet hours hold them (queueNotification), and a reminder more than a day
+  // late is dropped instead of arriving out of context.
+  const { data: reminders } = await db
+    .from("tasks")
+    .select("id,title,remind_at")
+    .eq("user_id", profile.id)
+    .in("status", ["todo", "in_progress", "blocked"])
+    .not("remind_at", "is", null)
+    .is("reminded_at", null)
+    .lte("remind_at", now.toISO()!);
+  for (const t of reminders ?? []) {
+    if (now.diff(DateTime.fromISO(t.remind_at), "hours").hours <= 24) {
+      await queueNotification(db, profile, { kind: "reminder", title: "Reminder", body: t.title, url: "/tasks", dedupeKey: `remind:${t.id}:${t.remind_at}` });
+      results.push("reminder");
+    }
+    await db.from("tasks").update({ reminded_at: now.toUTC().toISO() }).eq("id", t.id).eq("user_id", profile.id);
+  }
+
   const delivered = await dispatchDue(db, profile);
   if (delivered) results.push(`${delivered} pushed`);
   return results;

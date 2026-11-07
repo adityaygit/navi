@@ -24,6 +24,7 @@ export const TaskCreate = z.object({
   recurrence: z
     .object({ freq: z.enum(["daily", "weekly"]), days: weekdays.nullish() })
     .nullish(),
+  remind_at: isoDateTime.nullish().describe("When to send a reminder notification for this task (ISO date-time with offset). Respects quiet hours."),
 });
 export type TaskCreate = z.infer<typeof TaskCreate>;
 
