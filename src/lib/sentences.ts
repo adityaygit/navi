@@ -176,7 +176,10 @@ export function weekHeadline(days: { name: string; minutes: number; titles: stri
   const quiet = sorted[sorted.length - 1];
   if (full.minutes - quiet.minutes < 60) return [{ text: "About the same every day this week.", strong: true }];
   const line: Line = [{ text: `${full.name}'s the full one — ${hoursText(full.minutes)} planned.`, strong: true }];
-  if (quiet.titles.length === 0) line.push({ text: ` ${quiet.name} is open.` });
+  // Several empty days: count them instead of naming one of them at random.
+  const open = days.filter((d) => d.minutes === 0 && d.titles.length === 0);
+  if (open.length > 1) line.push({ text: ` ${countWord(open.length)} days have nothing planned.` });
+  else if (quiet.titles.length === 0) line.push({ text: ` ${quiet.name} is open.` });
   else if (quiet.titles.length <= 2) line.push({ text: ` ${quiet.name} has just ${joinAnd(quiet.titles.map(lowerFirstWord))}.` });
   return line;
 }
