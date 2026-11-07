@@ -3,12 +3,12 @@ import { headers } from "next/headers";
 import localFont from "next/font/local";
 import "./globals.css";
 
-// Instrument Sans, self-hosted (OFL), the same face as the landing page.
-const instrument = localFont({
-  src: "./fonts/InstrumentSans-latin.woff2",
-  weight: "400 700",
+// Figtree, self-hosted (OFL, see fonts/Figtree-OFL.txt): the approved Navi 1.5 face.
+const figtree = localFont({
+  src: "./fonts/Figtree-latin-wght.woff2",
+  weight: "300 900",
   display: "swap",
-  variable: "--font-instrument",
+  variable: "--font-figtree",
 });
 
 export const metadata: Metadata = {
@@ -27,7 +27,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#060608",
+  themeColor: "#000000",
   colorScheme: "dark",
 };
 
@@ -36,7 +36,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // stamp the proxy's CSP nonce onto its inline scripts (static pages can't).
   await headers();
   return (
-    <html lang="en" className={instrument.variable}>
+    <html lang="en" className={figtree.variable}>
       <body className="relative min-h-dvh antialiased">{children}</body>
     </html>
   );

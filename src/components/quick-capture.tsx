@@ -24,7 +24,7 @@ export function QuickCapture({ userId }: { userId: string }) {
   // During setup and in chat the person is already talking to Navi, and the
   // floating button would cover the composer. Queued captures still show.
   const path = usePathname();
-  const hideFab = (path.startsWith("/onboarding") || path.startsWith("/chat")) && queue.length === 0;
+  const hideFab = (path.startsWith("/onboarding") || path.startsWith("/chat") || path === "/") && queue.length === 0;
 
   useEffect(() => {
     // Restore an unsent draft from this device's storage (an external system).
@@ -108,7 +108,7 @@ export function QuickCapture({ userId }: { userId: string }) {
       {!hideFab && <button
         type="button"
         onClick={() => setOpen(true)}
-        className="btn btn-primary fab fixed right-4 z-30 h-12 rounded-full px-5 shadow-[0_12px_30px_-10px_rgba(0,0,0,0.8)] md:bottom-6 md:right-6"
+        className={`btn btn-primary fab fixed right-4 z-30 h-12 rounded-full px-5 shadow-[0_12px_30px_-10px_rgba(0,0,0,0.8)] md:bottom-6 md:left-6 md:right-auto ${queue.length ? "" : "md:hidden"}`}
         aria-haspopup="dialog"
       >
         + Capture{queue.length > 0 && <span className="ml-1 rounded-full bg-black/80 px-1.5 text-xs text-white">{queue.length}</span>}

@@ -6,40 +6,43 @@
    Dark only for now. */
 
 :root {
-  /* Canvas and text (from landing/src/styles.css). */
-  --bg: #060608;
-  --surface: rgba(255, 255, 255, 0.035);
-  --surface-2: rgba(255, 255, 255, 0.06);
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.16);
-  --text: #f2f2f2;
-  --muted: #a3a5aa;
-  --dim: #8b8e95;
+  /* Navi 1.5 (approved round 3/4): pure black, Figtree, the mint Navi stone,
+     colour only as meaning. */
+  --bg: #000000;
+  --surface: rgba(255, 255, 255, 0.05);
+  --surface-2: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --text: #f5f5f7;
+  --muted: #a0a0a8;
+  --dim: #8a8a93;
+  --faint: #5f5f67;
 
   /* Meaning colours: these never change. */
   --fixed: #f0f0f0;
-  --flex: #8fb8ff;
-  --focus: #5fd39a;
+  --flex: #9db8ff;
+  --focus: #a7ebc0;
   --recovery: #f2c46b;
   --clash: #ff8f8a;
+  --due: #f4b37a;
 
   /* Legacy names mapped onto the new system. */
-  --accent: #f2f2f2;
-  --accent-text: #060608;
+  --accent: #f5f5f7;
+  --accent-text: #000000;
   --accent-soft: rgba(255, 255, 255, 0.08);
   --danger: var(--clash);
   --danger-soft: rgba(255, 143, 138, 0.12);
   --warn: var(--recovery);
   --warn-soft: rgba(242, 196, 107, 0.12);
   --ok: var(--focus);
-  --ok-soft: rgba(95, 211, 154, 0.12);
+  --ok-soft: rgba(167, 235, 192, 0.12);
 
-  /* Navi's own colour; the app layout overrides these from the person's choice. */
-  --navi-light: #ffe7b0;
-  --navi-mid: #f5a83a;
-  --navi-dark: #c9661c;
-  --navi-ink: #2a1606;
-  --navi-text: #ffd58a;
+  /* Navi's own colour (the stone); the app layout overrides these from the person's choice. */
+  --navi-light: #cff6dd;
+  --navi-mid: #8bdcaf;
+  --navi-dark: #2f8566;
+  --navi-ink: #00140a;
+  --navi-text: #a7ebc0;
 
   color-scheme: dark;
 }
@@ -69,7 +72,9 @@
   --color-clash: var(--clash);
   --color-navi: var(--navi-mid);
   --color-navi-text: var(--navi-text);
-  --font-sans: var(--font-instrument), "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: var(--font-figtree), Figtree, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color-faint: var(--faint);
+  --color-due: var(--due);
   --radius-surface: 14px;
   --radius-control: 8px;
 }
@@ -83,30 +88,21 @@ body {
   color: var(--text);
   font-family: var(--font-sans);
   line-height: 1.45;
-  /* Very faint colour in the dark, plus fine grain, so it isn't flat black. */
-  background:
-    radial-gradient(60% 40% at 8% 25%, rgba(90, 120, 190, 0.08), transparent 70%),
-    radial-gradient(55% 35% at 95% 70%, rgba(110, 90, 200, 0.06), transparent 70%),
-    var(--bg);
-  background-attachment: fixed;
+  background: var(--bg);
 }
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.07;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+
+/* Thin, dark scrollbars (Windows draws wide light ones by default). */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
 }
 
 ::selection {
-  background: rgba(143, 184, 255, 0.35);
+  background: rgba(167, 235, 192, 0.3);
 }
 
 :focus-visible {
-  outline: 2px solid var(--flex);
+  outline: 2px solid var(--navi-text);
   outline-offset: 2px;
 }
 
@@ -155,10 +151,7 @@ body::before {
 
   /* Type */
   .gh {
-    background: linear-gradient(180deg, #f4f4f4 15%, #a4a4a4 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    color: var(--text);
   }
   .display {
     @apply font-semibold;
@@ -166,13 +159,10 @@ body::before {
     line-height: 1.02;
   }
   .h1 {
-    @apply text-[32px] font-semibold md:text-[40px];
-    letter-spacing: -0.035em;
-    line-height: 1.05;
-    background: linear-gradient(180deg, #f4f4f4 15%, #a4a4a4 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    @apply text-[30px] font-bold md:text-[34px];
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    color: var(--text);
   }
   .h2 {
     @apply text-xl font-semibold;
@@ -200,8 +190,8 @@ body::before {
   }
   .btn-primary {
     @apply border-transparent font-semibold;
-    background: #f2f2f2;
-    color: #060608;
+    background: #f5f5f7;
+    color: #000000;
   }
   .btn-primary:hover:not(:disabled) {
     background: #ffffff;
@@ -225,7 +215,7 @@ body::before {
     background: rgba(0, 0, 0, 0.3);
   }
   .input:focus {
-    border-color: rgba(143, 184, 255, 0.6);
+    border-color: rgba(167, 235, 192, 0.55);
   }
   textarea.input {
     @apply py-2.5;
@@ -530,4 +520,91 @@ html {
   html[data-kb="open"] .chat-shell {
     height: calc(var(--vvh, 100dvh) - var(--top-pad) - 10px);
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Navi 1.5 desktop shell: left nav, centre page, persistent Navi panel.
+   Phones keep the bottom dock (Nav) and the full /chat page.
+   ------------------------------------------------------------------------- */
+
+/* The Navi stone: Navi's presence. Coloured by the --navi-* variables. */
+.stone {
+  display: inline-block;
+  flex-shrink: 0;
+  width: var(--stone-size, 18px);
+  height: calc(var(--stone-size, 18px) * 0.91);
+  border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%;
+  background: radial-gradient(circle at 33% 27%, #ffffff 0%, var(--navi-light) 9%, var(--navi-mid) 34%, var(--navi-dark) 70%, color-mix(in srgb, var(--navi-dark) 40%, #000) 100%);
+}
+.stone-lit {
+  box-shadow: inset calc(var(--stone-size) * -0.09) calc(var(--stone-size) * -0.11) calc(var(--stone-size) * 0.2) rgba(0, 0, 0, 0.5),
+    inset calc(var(--stone-size) * 0.05) calc(var(--stone-size) * 0.06) calc(var(--stone-size) * 0.14) rgba(255, 255, 255, 0.25),
+    0 calc(var(--stone-size) * 0.3) calc(var(--stone-size) * 0.7) color-mix(in srgb, var(--navi-mid) 18%, transparent);
+}
+.stone-live {
+  animation: stone-breathe 2.4s ease-in-out infinite;
+}
+@keyframes stone-breathe {
+  50% { transform: scale(1.06); filter: brightness(1.12); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stone-live { animation: none; }
+}
+
+.shell {
+  display: flex;
+  min-height: 100dvh;
+}
+.shell-main {
+  flex: 1;
+  min-width: 0;
+}
+@media (min-width: 768px) {
+  .shell {
+    height: 100dvh;
+    overflow: hidden;
+  }
+  .shell-main {
+    height: 100dvh;
+    overflow-y: auto;
+  }
+}
+
+.side-link {
+  @apply flex h-9 items-center gap-3 rounded-[12px] px-3 text-[14px] text-muted transition-colors hover:bg-white/[0.04] hover:text-text;
+}
+.side-link[aria-current="page"] {
+  @apply bg-white/[0.08] font-medium text-text;
+}
+
+.chip {
+  @apply inline-flex h-9 items-center gap-2 rounded-full px-4 text-[14px] text-muted transition-colors hover:text-text;
+  background: rgba(255, 255, 255, 0.06);
+}
+.chip[aria-pressed="true"],
+.chip[aria-current="page"],
+.chip[aria-selected="true"] {
+  background: var(--text);
+  color: #000;
+  font-weight: 500;
+}
+
+.card-15 {
+  @apply rounded-[22px] border;
+  border-color: var(--border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.navi-line {
+  color: var(--faint);
+}
+.navi-line b,
+.navi-line strong {
+  color: var(--text);
+  font-weight: inherit;
+}
+
+.kbd {
+  @apply inline-flex h-5 min-w-5 items-center justify-center rounded-[6px] px-1.5 text-[11px] text-dim;
+  background: rgba(255, 255, 255, 0.08);
 }

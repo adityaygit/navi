@@ -10,6 +10,14 @@ import { ActionsContext } from "./action-card";
 import type { ActionView } from "@/lib/actions";
 import { Pebble } from "./pebble";
 import { createChatAction } from "@/app/(app)/actions";
+import { usePanelOptional } from "./shell/panel-context";
+
+/** A failed turn, with the server's reason code when it gave one (see /api/chat). */
+class TurnError extends Error {
+  constructor(message: string, readonly code?: string) {
+    super(message);
+  }
+}
 
 type AiStatus = { ready: boolean; mode: string; reason?: string };
 
@@ -48,6 +56,13 @@ export function Chat({
   ai,
   voice,
   placeholder,
+  variant = "page",
+  viewing,
+  onVoiceChange,
+  onDraftChange,
+  onReply,
+  endVoiceSignal = 0,
+  startVoiceSignal = 0,
 }: {
   kind: "chat" | "onboarding";
   /** The chat being continued; null starts a new chat on the first message. Unused for onboarding. */
@@ -60,7 +75,21 @@ export function Chat({
   ai: AiStatus;
   voice: { ready: boolean; reason?: string };
   placeholder?: string;
+  /** "panel": the persistent Navi panel (stays on the current page, compact composer). */
+  variant?: "page" | "panel";
+  /** What the person has open ("My day, Friday"), sent with each message. */
+  viewing?: string;
+  onVoiceChange?: (live: boolean) => void;
+  onDraftChange?: (hasDraft: boolean) => void;
+  /** Called when a reply from Navi has been added. */
+  onReply?: () => void;
+  /** Changing this number ends a voice session from outside (the dock's hang-up). */
+  endVoiceSignal?: number;
+  /** Changing this number starts voice from outside (the dock's microphone). */
+  startVoiceSignal?: number;
 }) {
+  const panel = usePanelOptional();
+  const isPanel = variant === "panel";
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [text, setText] = useState("");
@@ -94,7 +123,8 @@ export function Chat({
       if (pending) localStorage.setItem(`navi:chat-draft:chat:${id}`, pending);
     } catch {}
     setConversationId(id);
-    router.replace(`/chat?c=${id}`, { scroll: false });
+    // The panel stays on the page the person is looking at.
+    if (!isPanel) router.replace(`/chat?c=${id}`, { scroll: false });
   }
 
   async function openVoice() {
@@ -159,6 +189,27 @@ export function Chat({
     try { localStorage.setItem(draftKey, v); } catch {}
   }
 
+  // Tell the dock about a half-typed message and a live voice session.
+  useEffect(() => onDraftChange?.(text.trim().length > 0), [text, onDraftChange]);
+  useEffect(() => onVoiceChange?.(voiceOpen), [voiceOpen, onVoiceChange]);
+  const [seenEnd, setSeenEnd] = useState(endVoiceSignal);
+  if (seenEnd !== endVoiceSignal) {
+    setSeenEnd(endVoiceSignal);
+    setVoiceOpen(false);
+  }
+
+  useEffect(() => {
+    // A request from outside (the dock's microphone), not derived state.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (startVoiceSignal && !voiceOpen) void openVoice();
+    // Only a new signal starts voice.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startVoiceSignal]);
+
+  // The same message sent again (after a failure) reuses its id, so the server
+  // can tell a retry from a new message and never answers it twice.
+  const retry = useRef<{ text: string; id: string } | null>(null);
+
   async function send(content: string, modality: "text" | "voice" = "text", fromDraft = true) {
     const value = content.trim();
     if (!value || sending) return;
@@ -170,6 +221,8 @@ export function Chat({
       setError("You're offline, so Navi can't reply. Your message was saved as a capture and will sync to your inbox.");
       return;
     }
+    const clientMessageId = retry.current?.text === value ? retry.current.id : crypto.randomUUID();
+    retry.current = { text: value, id: clientMessageId };
     setSending(true);
     stick.current = true;
     const optimistic: Message = { id: `tmp-${++chunkId.current}`, conversation_id: "", role: "user", content: value, modality, tool_events: [], created_at: new Date().toISOString() };
@@ -182,23 +235,23 @@ export function Chat({
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json", accept: CHAT_STREAM_CONTENT_TYPE },
-        body: JSON.stringify({ kind, conversationId, text: value, modality, stream: true }),
+        body: JSON.stringify({ kind, conversationId, text: value, modality, stream: true, clientMessageId, ...(viewing ? { viewing } : {}) }),
       });
       if (!res.ok || !res.body) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `Error ${res.status}`);
+        throw new TurnError(body.error ?? `Error ${res.status}`, body.code);
       }
       if (!(res.headers.get("content-type") ?? "").includes(CHAT_STREAM_CONTENT_TYPE)) {
         turn.done = (await res.json()) as TurnDone; // a server that answered in one piece
       } else {
-        let failure: string | null = null;
+        let failure: TurnError | null = null;
         await readChatStream(res.body, (event) => {
           if (event.type === "user") {
             const userMessage = event.userMessage;
             turn.saved = userMessage;
             setMessages((m) => m.map((x) => (x.id === optimistic.id ? userMessage : x)));
           } else if (event.type === "done") turn.done = event;
-          else if (event.type === "error") failure = event.message;
+          else if (event.type === "error") failure = new TurnError(event.message, event.code);
           else {
             // A step that proposed or changed an action carries its newest card.
             if (event.type === "step_end" && event.action) {
@@ -208,22 +261,38 @@ export function Chat({
             setLive((items) => applyEvent(items ?? [], event, () => ++chunkId.current));
           }
         });
-        if (failure) throw new Error(failure);
+        if (failure) throw failure;
       }
       const result = turn.done;
       if (!result) throw new TypeError("stream ended early");
+      retry.current = null;
       // One update: the live reply is replaced by the saved one (announced once).
       setLive(null);
       if (result.actions) setActions((a) => ({ ...a, ...result.actions }));
       setMessages((m) => [...m.filter((x) => x.id !== optimistic.id && x.id !== result.userMessage.id), result.userMessage, result.assistantMessage]);
       const isNew = kind === "chat" && result.conversationId !== conversationId;
       if (result.mutated) announceChange();
+      onReply?.();
       if (isNew) adopt(result.conversationId);
       // Chats re-sort by recent activity, so refresh the list as well as any changed data.
       else if (result.mutated || kind === "chat") router.refresh();
     } catch (err) {
       setLive(null);
-      if (turn.saved) {
+      const code = err instanceof TurnError ? err.code : undefined;
+      if (code === "turn_in_progress") {
+        // This exact message reached Navi before and is still being answered.
+        retry.current = null;
+        setMessages((m) => m.filter((x) => x.id !== optimistic.id));
+        setError("Navi is still answering that message. Its reply will show here.");
+        router.refresh();
+      } else if (code === "turn_incomplete") {
+        // An earlier attempt died without a reply: send it again as a new message.
+        retry.current = null;
+        setMessages((m) => m.filter((x) => x.id !== optimistic.id));
+        if (fromDraft) setDraft(value);
+        setError("That message didn't get an answer. It's back in the box; send it again.");
+      } else if (turn.saved) {
+        retry.current = null;
         // The message reached Navi and is stored; the reply may still land. Don't offer to resend it.
         setError(err instanceof Error && !(err instanceof TypeError) ? err.message : "Lost the connection while Navi was replying. Your message was saved; the reply will show here once it's done.");
         router.refresh();
@@ -239,7 +308,29 @@ export function Chat({
     }
   }
 
-  const quick = kind === "chat" && (
+  // A page asked Navi something (Home's box, "Ask Navi to help", the palette).
+  const ask = isPanel ? panel?.pendingAsk : null;
+  const draftAsk = isPanel ? panel?.pendingDraft : null;
+  useEffect(() => {
+    if (!ask || sending) return;
+    panel?.consume(ask.id);
+    // A message handed over by a page (Home's box, the palette), sent once.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void send(ask.text, "text", false);
+    // send is recreated each render; the ask id is what matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ask?.id, sending]);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (!draftAsk) return;
+    panel?.consume(draftAsk.id);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDraft(draftAsk.text);
+    inputRef.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftAsk?.id]);
+
+  const quick = kind === "chat" && !isPanel && (
     <>
       {QUICK_PROMPTS.map((q) => (
         <button key={q} type="button" className="surf inline-flex h-9 shrink-0 items-center pointer-coarse:h-11 whitespace-nowrap rounded-full px-3.5 text-[14px] text-[#d8d9dc] transition-colors hover:text-text disabled:opacity-45" disabled={sending} onClick={() => void send(q, "text", false)}>
@@ -277,9 +368,9 @@ export function Chat({
       >
         {messages.length === 0 && !live && (
           <div className="m-auto flex max-w-sm flex-col items-center gap-3 py-8 text-center">
-            <Pebble size={56} mood="idle" float />
+            {!isPanel && <Pebble size={56} mood="idle" float />}
             <p className="muted text-[15px]">
-              {kind === "onboarding" ? "Say hi to start. You can type or talk." : "Ask Navi anything, dump what's on your mind, or say “plan my day”."}
+              {kind === "onboarding" ? "Say hi to start. You can type or talk." : isPanel ? "Ask about what's on this page, or tell Navi anything." : "Ask Navi anything, dump what's on your mind, or say “plan my day”."}
             </p>
           </div>
         )}
@@ -299,6 +390,41 @@ export function Chat({
           }}
         />
       )}
+      {isPanel ? (
+        <form
+          className="flex shrink-0 items-end gap-2 rounded-[26px] border border-white/[0.08] bg-white/[0.06] py-1.5 pl-[18px] pr-1.5 focus-within:border-white/20"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void send(text);
+          }}
+        >
+          <label htmlFor="panel-input" className="sr-only">Message Navi</label>
+          <textarea
+            id="panel-input"
+            ref={inputRef}
+            rows={1}
+            className="max-h-40 min-h-10 flex-1 resize-none bg-transparent py-2.5 text-[15px] leading-snug text-text outline-none [field-sizing:content] placeholder:text-dim focus-visible:outline-none"
+            placeholder={placeholder ?? "Talk to Navi…"}
+            value={text}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                void send(text);
+              }
+            }}
+          />
+          {text.trim() ? (
+            <button type="submit" aria-label="Send" disabled={sending} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-text text-black disabled:opacity-40">
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+            </button>
+          ) : (
+            <button type="button" onClick={() => void openVoice()} aria-pressed={voiceOpen} aria-label={voiceOpen ? "End voice" : "Talk to Navi"} title={voice.ready ? "Talk to Navi" : voice.reason} className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${voiceOpen ? "bg-[var(--navi-text)] text-black" : "bg-white/[0.08] text-text"}`}>
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" /></svg>
+            </button>
+          )}
+        </form>
+      ) : (<>
       {quick && !voiceOpen && !text && <div className="chat-quick -mx-1 flex shrink-0 gap-2 overflow-x-auto px-1 md:hidden">{quick}</div>}
       <form
         className={`lg composer flex shrink-0 gap-1 rounded-[22px] py-2 pl-4 pr-2 md:flex-col md:items-stretch md:py-3 md:pl-5 md:pr-3 ${text ? "flex-col" : "items-center"}`}
@@ -346,6 +472,7 @@ export function Chat({
           </div>
         </div>
       </form>
+      </>)}
     </div>
     </ActionsContext.Provider>
   );

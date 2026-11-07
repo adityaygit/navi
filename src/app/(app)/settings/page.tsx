@@ -174,7 +174,7 @@ export default async function SettingsPage() {
             <div className="flex flex-wrap gap-2 px-4 py-3.5 sm:px-5">
               <a className="btn btn-sm" href="/api/export">Export all my data (JSON)</a>
               <ActionButton className="btn btn-sm" action={restartOnboardingAction}>Redo setup conversation</ActionButton>
-              <Link className="btn btn-sm" href="/onboarding">Open setup</Link>
+              <Link className="btn btn-sm" href="/welcome">Open setup</Link>
             </div>
           </div>
         </section>

@@ -20,6 +20,9 @@ const Body = z.object({
   // (`replayed: true`) or, while there's none yet, a 409 with `code`
   // "turn_in_progress" | "turn_incomplete" and the message's `conversationId`.
   clientMessageId: z.string().uuid().nullish(),
+  // What the person has open in the app ("My day, Friday"), from the URL.
+  // Context only: Navi still reads the data itself with its tools.
+  viewing: z.string().max(120).nullish(),
 });
 
 export async function POST(request: NextRequest) {

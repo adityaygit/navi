@@ -19,17 +19,18 @@ export type NaviColor = {
 };
 
 export const NAVI_COLORS: NaviColor[] = [
+  // Mint first: the approved Navi 1.5 stone, and the fallback for unknown keys.
+  { key: "mint", name: "Mint", light: "#CFF6DD", mid: "#8BDCAF", dark: "#2F8566", ink: "#00140A", text: "#A7EBC0" },
   { key: "amber", name: "Amber", light: "#FFE7B0", mid: "#F5A83A", dark: "#C9661C", ink: "#2A1606", text: "#FFD58A" },
   { key: "rose", name: "Rose", light: "#FFD3E1", mid: "#F27BA0", dark: "#B9406A", ink: "#2E0A18", text: "#FFB8CE" },
   { key: "lilac", name: "Lilac", light: "#E6DCFF", mid: "#A98BFF", dark: "#6A4BCB", ink: "#1B1033", text: "#CDBDFF" },
   { key: "sky", name: "Sky", light: "#D9EEFF", mid: "#6FB7FF", dark: "#2F6FC4", ink: "#0A1A2E", text: "#AFD6FF" },
-  { key: "mint", name: "Mint", light: "#D6FBEF", mid: "#5FD3B0", dark: "#22906F", ink: "#062219", text: "#9FEBD3" },
   { key: "lime", name: "Lime", light: "#F0FFD0", mid: "#B5E05A", dark: "#6E9A22", ink: "#172404", text: "#D3F09A" },
   { key: "peach", name: "Peach", light: "#FFE2D6", mid: "#FF9E7A", dark: "#C4593A", ink: "#2B0F06", text: "#FFC4AE" },
   { key: "pearl", name: "Pearl", light: "#FFFFFF", mid: "#DDDAD3", dark: "#9A968E", ink: "#1A1A1C", text: "#EDEBE6" },
 ];
 
-export const DEFAULT_NAVI_COLOR: NaviColorKey = "amber";
+export const DEFAULT_NAVI_COLOR: NaviColorKey = "mint";
 
 export function naviColor(key: unknown): NaviColor {
   return NAVI_COLORS.find((c) => c.key === key) ?? NAVI_COLORS[0];

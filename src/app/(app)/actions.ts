@@ -335,3 +335,37 @@ export async function renameChatAction(id: string, title: string) {
 export async function deleteChatAction(id: string) {
   return act((ctx) => deleteConversation(ctx, z.string().uuid().parse(id)), "Chat deleted");
 }
+
+// ---- Navi 1.5 shell ----------------------------------------------------------
+
+/** ⌘K / Ctrl K: open tasks whose title matches. Read-only, so no refresh. */
+export async function searchTasksAction(query: string): Promise<ActionResult<{ id: string; title: string; due_at: string | null; workspace_id: string | null }[]>> {
+  try {
+    const ctx = await requireApiCtx();
+    const q = z.string().max(200).parse(query).trim();
+    if (!q) return { ok: true, data: [] };
+    // ilike wildcards in the person's text are matched literally.
+    const pattern = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    const { data, error } = await ctx.db
+      .from("tasks")
+      .select("id,title,due_at,workspace_id")
+      .in("status", ["todo", "in_progress", "blocked"])
+      .ilike("title", pattern)
+      .order("due_at", { ascending: true, nullsFirst: false })
+      .limit(6);
+    if (error) throw new Error(error.message);
+    return { ok: true, data: data ?? [] };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+const SuggestionKey = z.string().min(3).max(200).regex(/^[a-z_]+:[A-Za-z0-9:_-]+$/);
+/** "Not now" on a page suggestion: it never comes back the same way. */
+export async function dismissSuggestionAction(key: string) {
+  return act(async (ctx) => {
+    const k = SuggestionKey.parse(key);
+    const { error } = await ctx.db.from("dismissed_suggestions").upsert({ user_id: ctx.userId, key: k }, { onConflict: "user_id,key", ignoreDuplicates: true });
+    if (error) throw new Error(error.message);
+  });
+}

@@ -20,10 +20,10 @@ describe("Navi's colour preference", () => {
     for (const bad of ["", "red", "AMBER", "amber ", null, 1, { key: "rose" }, "__proto__"]) expect(() => withNaviColor({}, bad)).toThrow();
   });
 
-  it("reads the saved colour, falling back to amber", () => {
+  it("reads the saved colour, falling back to mint (the Navi 1.5 stone)", () => {
     expect(savedNaviColor({ navi_color: "mint" })).toBe("mint");
-    expect(savedNaviColor({ navi_color: "neon" })).toBe("amber");
-    expect(savedNaviColor({})).toBe("amber");
-    expect(savedNaviColor(null)).toBe("amber");
+    expect(savedNaviColor({ navi_color: "neon" })).toBe("mint");
+    expect(savedNaviColor({})).toBe("mint");
+    expect(savedNaviColor(null)).toBe("mint");
   });
 });

@@ -67,3 +67,6 @@ export const adoptBrowserTimezoneAction = safe(server.adoptBrowserTimezoneAction
 export const approveBudgetOverrideAction = safe(server.approveBudgetOverrideAction);
 export const markBriefingReadAction = safe(server.markBriefingReadAction);
 export const generateBriefingAction = safe(server.generateBriefingAction);
+export const searchTasksAction = safe(server.searchTasksAction);
+export const dismissSuggestionAction = safe(server.dismissSuggestionAction);
+export const createChatAction = safe(server.createChatAction);

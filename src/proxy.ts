@@ -43,6 +43,8 @@ export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", csp);
+  // The app layout reads this to gate unfinished setup (layouts don't get the path).
+  requestHeaders.set("x-pathname", request.nextUrl.pathname);
   const next = () => NextResponse.next({ request: { headers: requestHeaders } });
   let response = next();
 
