@@ -69,7 +69,8 @@ export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
   const wrapped = req.userText.match(/"""\n([\s\S]*)\n"""/);
   const text = (req.mode === "capture" && wrapped ? wrapped[1] : req.userText).trim();
   let reply = "";
-  // The newest action in this chat still waiting for the person's OK (what "no" or "make it…" refers to).
+  // The newest action in this chat still waiting for the person's OK. The simulator
+  // only knows a few fixed phrases for it; the real model reads intent freely.
   const pending =
     req.mode === "chat" && ctx.conversationId
       ? (await ctx.db.from("approvals").select("id").eq("conversation_id", ctx.conversationId).eq("status", "proposed").order("created_at", { ascending: false }).limit(1).maybeSingle()).data

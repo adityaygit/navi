@@ -643,7 +643,7 @@ export const TOOLS = [
   tool({
     name: "revise_action",
     description:
-      "Change an action that is still waiting for the user's OK, when they ask for something different before approving ('make it Friday instead', 'call it Draft essay', 'estimate 2 hours'). The same card updates in place; never propose a second action for the same thing. action_id comes from the overview or an earlier tool result. changes uses the same fields as the original tool (e.g. due_at, due_is_hard, title, priority, estimate_minutes, notes for tasks; the item's own fields for other changes; for an outside action give parameters plus exact_description, the full new description).",
+      "Change an action that is still waiting for the user's OK, whenever what they say means its details should be different before they approve (any field, several at once). The same card updates in place; never propose a second action for the same thing. action_id comes from the overview or an earlier tool result. changes uses the same fields as the original tool (e.g. due_at, due_is_hard, title, priority, estimate_minutes, notes for tasks; the item's own fields for other changes; for an outside action give parameters plus exact_description, the full new description).",
     schema: z.object({ action_id: z.string().uuid(), changes: z.record(z.string(), z.unknown()) }),
     run: async (ctx, { action_id, changes }) => {
       const a = await reviseApproval(ctx, action_id, changes);
@@ -652,7 +652,7 @@ export const TOOLS = [
   }),
   tool({
     name: "decline_action",
-    description: "Drop an action that is waiting for the user's OK when they say they don't want it ('no', 'never mind', 'don't cancel it'). Nothing runs. Approving only happens by the user's own tap on the card, never through you.",
+    description: "Drop an action that is waiting for the user's OK when they don't want it, or before replacing it with a different action. Nothing runs. Approving only happens by the user's own tap on the card, never through you.",
     schema: z.object({ action_id: z.string().uuid() }),
     run: async (ctx, { action_id }) => {
       const a = await decideApproval(ctx, action_id, "reject");
