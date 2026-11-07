@@ -13,6 +13,7 @@ Resume doc for the 1.5 desktop rebuild. Product brief: the "navi-1.5-desktop-han
 
 ## Owner decisions (this pass)
 
+- 2026-11-06: Owner on round 2: keep the layout (companion Home, collapsible sidebar, workspace + conversation panel), but it feels corporate/Linear. Wants a premium consumer Life OS: personal tasks, a planner built around a real day, Navi's personality in every workspace, less metadata/density, everyday life (school, hobbies, routines, friends, projects, work). Not childish, colourful or gamified. Opal as inspiration. Blacker blacks. Review before implementation.
 - 2026-11-06: Owner rejected design round 1 as generic ("slop"). Asked for Mobbin-grounded, elite-level references. Round 2 built from Opal (owner's "Navi – Look" board), Linear, Amie, Tana, Claude, Toggl.
 - Mobile is out of scope for this phase.
 - Approval system from `claude/trusting-rubin-pv5bgh`: integrate, don't rewrite.
@@ -26,13 +27,15 @@ Resume doc for the 1.5 desktop rebuild. Product brief: the "navi-1.5-desktop-han
 | Approval branch verified locally | tsc OK, eslint OK, vitest **27 files / 243 tests pass** (local DB, devsim) | PASS (unit+integration). Playwright not yet run. |
 | Read-only V1 code audit | Subagent report, summarized under Audit findings | DONE |
 | Design round 1 (structure prototype + 3 directions) | Artifact canvas | REJECTED by owner (generic) |
-| Design round 2 "Night Stone" (Home, Tasks+panel, Planner+docked panel, Focus, Home light) + clickable behavior prototype | Artifact https://claude.ai/artifact/52ooLVKUB77ZxGF1tGH267 | AWAITING OWNER |
+| Design round 2 "Night Stone" (Home, Tasks+panel, Planner+docked panel, Focus, Home light) + clickable behavior prototype | Artifact https://claude.ai/artifact/52ooLVKUB77ZxGF1tGH267 | Owner: layout good, but too corporate/Linear |
+| Design round 3 "Personal Life OS" (Home, Tasks+panel, My day+docked panel): pure black, Figtree, Navi sentence per page, time-of-day task groups, life Spaces, vertical day timeline with free-time suggestions | Same canvas, top row | AWAITING OWNER |
+| Backend reliability repairs merged (98e0a9a): focus one-open-session + atomic end + pause/resume; capture claim; honest accept-all; idempotent task create (client id); chat `clientMessageId` + voice `clientTurnId` idempotency (server); voice saveTurn res.ok; recovery profile TZ; error.tsx + global-error.tsx | Integrator re-ran after merge: tsc OK, eslint OK, vitest **29 files / 264 passed** | PASS (local) |
 
 ## In progress
 
 | Item | Owner | Files | Next |
 |---|---|---|---|
-| Backend reliability repairs (focus races + pause/resume, capture claim, accept-all honesty, task-create idempotency, chat/voice clientMessageId server side, voice saveTurn res.ok, recovery TZ, error boundaries) | Worktree agent | `src/server/**`, `src/app/api/**`, `(app)/actions.ts`, new migrations, tests | Review + merge its branch, rerun full suite |
+| Client wiring for repairs: send `clientMessageId` from chat, use `newSubmitId()` in task forms, pause/resume in Focus UI | Integrator | chat.tsx, task-form.tsx, focus.tsx | Do with the shell rebuild |
 | Desktop shell (left nav, persistent Navi panel in layout, Focus override) | Integrator (this session) | `(app)/layout.tsx`, `nav.tsx`, `chat*.tsx`, new shell components | Starts after D1 shell approval for visuals; structure can start now |
 
 ## Audit findings / bugs
@@ -66,17 +69,20 @@ Resume doc for the 1.5 desktop rebuild. Product brief: the "navi-1.5-desktop-han
 ## Data, migrations and environment
 
 - Hosted Supabase project `gxfkumxjeemceoygtuod`: 7 migrations applied (incl. inline_actions). No changes made this session.
-- New migrations: none committed yet (agent may add focus/capture/messages.client_id; local only).
+- New migrations (LOCAL ONLY, idempotent, non-destructive): `20261108000001_focus_reliability.sql` (paused_at/paused_seconds, closes duplicate open sessions without adding minutes, unique open-session index, focus_* SQL functions), `20261108000002_capture_claim.sql` ('processing' status + claimed_at), `20261108000003_message_client_id.sql` (messages.client_id + unique (user_id, client_id)). **Must be applied to hosted before deploying this code; needs owner approval.**
+- chat contract: POST /api/chat `clientMessageId` (uuid). Repeat with saved reply → 200 `replayed:true` (agent not re-run); repeat while running → 409 `turn_in_progress`; earlier attempt died → 409 `turn_incomplete` (resend with new id). Voice: `clientTurnId` on /api/voice/turn; exact repeat → `{ok:true, duplicate:true}`.
+- Known caveats: voice cost may be slightly under/over-counted on retries; captures stuck in `processing` only recovered by a later retry (no sweeper).
 - Env names present in Cloud: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ACCESS_TOKEN`, `NAVI_ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `VERCEL_TOKEN`, `TRIGGER_*`. A real Anthropic key is now available (V1 notes said it wasn't); real-model tests should still use a local DB.
 
 ## Tests
 
 - 2026-11-06, local, branch @ ef55294: `tsc` OK, `eslint` OK, `vitest run` 27 files / 243 passed.
+- 2026-11-06, local, after merging repairs (98e0a9a + lint ignore a40769e): `tsc` OK, `eslint` OK, `vitest run` 29 files / 264 passed.
 - Playwright: NOT RUN yet this session.
 
 ## Next three actions
 
-1. Merge the backend-repair worktree branch after review; full vitest + Playwright run.
+1. Get owner feedback on design round 3; then lock D1 (shell) and build the shell + persistent Navi panel to the approved look. Run Playwright.
 2. Build the persistent layout-level Navi panel + left nav + Focus override (functional, using approved visual tokens once owner picks).
 3. Owner decision on P0-PROD-1 (production approval mismatch).
 
