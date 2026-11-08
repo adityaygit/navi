@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
-import { DateTime, Interval } from "luxon";
+import { DateTime } from "luxon";
+import { fixedClash } from "@/server/planner/clash";
 import type { Ctx } from "@/server/context";
 import { getProfile } from "@/server/context";
 import { createProposals, proposalProblem } from "@/server/domain/proposals";
@@ -11,7 +12,7 @@ import { plannerV2 } from "@/lib/planner-flag";
 import { atLocalTime } from "@/lib/time";
 import { wakeBed } from "@/server/day";
 import { isWakeBedDefault, occurrencesOn, type DayModel } from "@/server/planner/day-model";
-import { protectionOf, scheduleDayV2 } from "@/server/planner/scheduler-v2";
+import { scheduleDayV2 } from "@/server/planner/scheduler-v2";
 import { loadDayModels, planDays } from "@/server/planner/plan-v2";
 import { routineRule } from "@/server/planner/agenda";
 import { addMemory, relevantMemories } from "@/server/domain/memory";
@@ -435,26 +436,6 @@ async function setDependencies(ctx: Ctx, taskId: string, dependsOn: string[]): P
     await createRow(ctx, "task_dependencies", { task_id: taskId, depends_on_task_id: d }, `Set to wait for “${(names ?? []).find((n) => n.id === d)?.title ?? "a task"}”`);
   }
   return ids.length ? `It now waits for ${(names ?? []).map((n) => `“${n.title}”`).join(", ")}.` : "It no longer waits for other tasks.";
-}
-
-/** What a moved block would overlap that Navi never moves (events, fixed routines, kept blocks), if anything. */
-async function fixedClash(ctx: Ctx, date: string, start: DateTime, end: DateTime, exceptBlockId: string): Promise<string | null> {
-  const zone = ctx.timezone;
-  const inputs = await loadAgendaInputs(ctx, zone, date, date);
-  const iv = Interval.fromDateTimes(start, end);
-  for (const e of inputs.events) for (const o of occurrencesOn(e, date, zone, inputs.overrides)) if (o.overlaps(iv)) return e.title;
-  const dow = DateTime.fromISO(date, { zone }).weekday % 7;
-  for (const r of inputs.routines) {
-    if (!r.start_time || !r.days.includes(dow) || protectionOf(r) !== "fixed") continue;
-    const s = atLocalTime(date, r.start_time, zone);
-    if (Interval.fromDateTimes(s, s.plus({ minutes: r.duration_minutes })).overlaps(iv)) return r.title;
-  }
-  for (const b of inputs.blocks) {
-    if (b.id === exceptBlockId || b.plan_date !== date || !["planned", "in_progress"].includes(b.status)) continue;
-    if (b.is_flexible && b.created_by === "navi" && !b.pinned) continue; // Navi's own blocks are re-fitted around it
-    if (Interval.fromDateTimes(DateTime.fromISO(b.starts_at), DateTime.fromISO(b.ends_at)).overlaps(iv)) return b.title;
-  }
-  return null;
 }
 
 /** Planner v2's extra facts about a planned day, for the model. */

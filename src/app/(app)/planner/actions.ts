@@ -5,6 +5,8 @@ import { DateTime } from "luxon";
 import { requireApiCtx } from "@/server/context";
 import { createEntity, getEntity } from "@/server/domain/entities";
 import type { PlanBlock, Task } from "@/lib/types";
+import { plannerV2 } from "@/lib/planner-flag";
+import { fixedClash } from "@/server/planner/clash";
 
 const Place = z.object({
   taskId: z.string().uuid(),
@@ -36,6 +38,12 @@ export async function placeTaskAction(input: { taskId: string; startsAt: string;
       .limit(1);
     if (error) throw new Error(error.message);
     if (clash?.length) throw new Error(`That time overlaps “${(clash[0] as Pick<PlanBlock, "title">).title}”.`);
+    // Planner v2 (B5): fixed things (events, with one-session changes, and fixed routines) are never overlapped either.
+    const { data: prof } = await ctx.db.from("profiles").select("preferences").eq("id", ctx.userId).single();
+    if (plannerV2(prof?.preferences)) {
+      const fixed = await fixedClash(ctx, planDate, start, end);
+      if (fixed) throw new Error(`That time overlaps “${fixed}”.`);
+    }
     await createEntity(
       ctx,
       "plan_blocks",

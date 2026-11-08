@@ -12,6 +12,7 @@ import { blockOutcomeAction, planDayAction } from "../actions";
 import { ReviewBlock } from "./review-block";
 import { statusWord } from "@/lib/follow-through";
 import { DayStrip } from "@/components/insights-day-strip";
+import { plannerV2 } from "@/lib/planner-flag";
 
 export const metadata = { title: "Daily review · Navi" };
 
@@ -164,7 +165,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           <p className="text-[15px] text-muted">
             {nextFixed.length ? `Fixed: ${nextFixed.map((e) => `${e.title} ${formatTime(e.start!, zone)}`).join("; ")}.` : "No fixed commitments."}{" "}
             {(dueNextRes.count ?? 0) > 0 ? `${dueNextRes.count} task${dueNextRes.count === 1 ? "" : "s"} due.` : ""}
-            {profile.availability.length === 0 && " Navi doesn't know when you're free yet, so set your availability in Settings first."}
+            {profile.availability.length === 0 && !plannerV2(profile.preferences) && " Navi doesn't know when you're free yet, so set your availability in Settings first."}
           </p>
           <div className="flex flex-wrap items-start gap-2">
             <ActionButton className="btn btn-primary" action={planDayAction} args={[next]} showResult>{next === today ? "Plan the rest of today" : "Plan tomorrow"}</ActionButton>

@@ -4,6 +4,7 @@ import type { PlanBlock } from "@/lib/types";
 import type { Fit } from "@/lib/day-layout";
 import { partOf, hoursText, type DayPart } from "@/lib/sentences";
 import { BlockOutcome, PutItThere, StartBlock } from "./day-actions";
+import { SkipSession } from "./plan-v2";
 
 export type Kind = "fixed" | "flex" | "routine";
 export type TimelineEntry = DayItem & { look: Kind; color: string; spaceName: string | null; block: PlanBlock | null };
@@ -33,7 +34,10 @@ export function DayTimeline({
   isToday,
   isPast,
   focusOpen,
+  v2,
 }: {
+  /** Planner v2: blocks in assumed time are drawn dashed, and an event's session can be skipped. */
+  v2?: { date: string } | null;
   entries: TimelineEntry[];
   /** Free stretches of 30+ minutes still ahead, with the task that fits each. */
   fits: Fit[];
@@ -124,10 +128,11 @@ export function DayTimeline({
           e.kind === "event"
             ? `Until ${full(e.endMs)}${e.spaceName ? ` · ${e.spaceName}` : ""}`
             : `${minutes} min${e.spaceName ? ` · ${e.spaceName}` : ""}${finished && e.block ? ` · ${e.block.status === "partial" ? "partly done" : e.block.status.replace("_", " ")}` : ""}`;
+        const assumed = !!v2 && e.block?.basis === "inferred" && open;
         const bubble =
           e.look === "fixed"
             ? { background: `color-mix(in srgb, ${e.color} 85%, transparent)`, color: "#000" }
-            : { border: `1.5px ${e.look === "routine" ? "dashed" : "solid"} ${e.color}`, color: e.color };
+            : { border: `1.5px ${e.look === "routine" || assumed ? "dashed" : "solid"} ${e.color}`, color: e.color };
         return (
           <li key={r.key} className={`flex items-center ${r.highlight ? "min-h-[70px]" : "min-h-14"} ${finished ? "opacity-45" : ""}`} aria-current={r.now ? "time" : undefined}>
             <span className="w-16 shrink-0 text-[13px] tabular-nums text-[#8E8E96]">{clock(e.startMs)}</span>
@@ -143,9 +148,12 @@ export function DayTimeline({
                 </span>
                 <span className="text-[13px] text-[#8E8E96]">
                   {sub}
+                  {assumed && " · in time Navi assumed is free"}
+                  {v2 && e.block?.pinned && open && " · pinned"}
                   <span className="sr-only">{e.look === "fixed" ? " (fixed)" : e.look === "routine" ? " (routine)" : " (flexible)"}</span>
                 </span>
               </div>
+              {v2 && e.kind === "event" && !isPast && e.recurring && <SkipSession eventId={e.id} date={v2.date} title={e.title} />}
               {e.block && (
                 <span className="ml-auto flex items-center gap-3">
                   {r.highlight && open && !focusOpen && e.block.task_id && <StartBlock blockId={e.block.id} taskId={e.block.task_id} minutes={Math.max(5, Math.min(480, minutes))} primary />}

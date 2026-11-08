@@ -4,11 +4,13 @@ import type { AvailabilityWindow, Profile } from "@/lib/types";
 import { updateProfileAction } from "@/app/(app)/client-actions";
 import { announceChange } from "@/lib/offline-queue";
 import { GROUP, Row, SectionHead, Switch } from "@/components/settings-ui";
+import { plannerV2 } from "@/lib/planner-flag";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const hhmm = (t: string | null) => (t ? t.slice(0, 5) : "");
 
 export function ScheduleSettings({ profile }: { profile: Profile }) {
+  const v2 = plannerV2(profile.preferences);
   const [name, setName] = useState(profile.display_name ?? "");
   const [timezone, setTimezone] = useState(profile.timezone);
   const [quietStart, setQuietStart] = useState(hhmm(profile.quiet_hours_start));
@@ -61,10 +63,14 @@ export function ScheduleSettings({ profile }: { profile: Profile }) {
       </div>
 
       <fieldset className="mt-3 flex min-w-0 flex-col gap-2">
-        <legend className="mb-2 px-1 text-[15px] font-semibold">When you&apos;re free for flexible work</legend>
+        <legend className="mb-2 px-1 text-[15px] font-semibold">{v2 ? "Usual free times (optional)" : "When you're free for flexible work"}</legend>
         <div className={GROUP}>
-          <p className="muted px-4 py-3 text-[13px] sm:px-5">Navi only schedules flexible work inside these windows, around your fixed commitments.</p>
-          {windows.length === 0 && <p className="px-4 py-3 text-sm text-recovery sm:px-5">No availability set, so Navi won&apos;t schedule flexible work.</p>}
+          <p className="muted px-4 py-3 text-[13px] sm:px-5">
+            {v2
+              ? "Navi works out your free time on its own and says what it assumes. Add times here only if you want them treated as confirmed."
+              : "Navi only schedules flexible work inside these windows, around your fixed commitments."}
+          </p>
+          {windows.length === 0 && !v2 && <p className="px-4 py-3 text-sm text-recovery sm:px-5">No availability set, so Navi won&apos;t schedule flexible work.</p>}
           {windows.map((w, i) => (
             <div key={i} className="flex flex-col gap-3 px-4 py-3.5 sm:px-5 md:flex-row md:items-center md:justify-between">
               <div className="grid grid-cols-7 gap-1 md:flex" role="group" aria-label={`Days for window ${i + 1}`}>

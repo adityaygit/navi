@@ -1,5 +1,8 @@
 import type { CSSProperties } from "react";
 import { AutonomySettings } from "./autonomy-settings";
+import { PlannerSettings } from "./planner-settings";
+import { planningPrefs } from "@/lib/planner-flag";
+import { isAdmin } from "@/server/waitlist";
 import { autonomyFrom } from "@/lib/actions";
 import Link from "next/link";
 import { requireCtx, getProfile } from "@/server/context";
@@ -90,6 +93,8 @@ export default async function SettingsPage() {
         <NaviColorPicker saved={color} />
 
         <AutonomySettings saved={autonomyFrom(profile.preferences)} />
+        {/* The new planner is a per-account preview (owner first, D9): shown to admins, in development, or once it's on. */}
+        {(planningPrefs(profile.preferences).v2 || isAdmin(email) || process.env.NODE_ENV !== "production") && <PlannerSettings saved={planningPrefs(profile.preferences)} />}
 
         <section id="notifications" className="flex scroll-mt-24 flex-col gap-3" aria-labelledby="notif-h">
           <SectionHead id="notif-h" title="Notifications" desc="Briefings, reviews and deadline reminders go to devices you turn on, never during your quiet hours." />

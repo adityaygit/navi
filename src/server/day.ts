@@ -1,7 +1,7 @@
 import "server-only";
 import { DateTime } from "luxon";
 import type { Ctx } from "./context";
-import type { CalendarEvent, PlanBlock, Profile, Routine, Task } from "@/lib/types";
+import type { CalendarEvent, OccurrenceOverride, PlanBlock, Profile, Routine, Task } from "@/lib/types";
 import { buildDayAgenda, type AgendaEntry } from "./planner/agenda";
 import { atLocalTime } from "@/lib/time";
 import type { Span } from "@/lib/sentences";
@@ -42,13 +42,15 @@ export function awakeSpan(profile: Pick<Profile, "preferences">, date: string, z
 
 export async function loadSources(ctx: Ctx, from: string, to: string) {
   const zone = ctx.timezone;
-  const [events, routines, blocks, spaces] = await Promise.all([
+  const [events, routines, blocks, spaces, overrides] = await Promise.all([
     ctx.db.from("events").select("*").neq("status", "cancelled"),
     ctx.db.from("routines").select("*").eq("active", true),
     ctx.db.from("plan_blocks").select("*").gte("plan_date", from).lte("plan_date", to).order("starts_at"),
     ctx.db.from("workspaces").select("id,name,color"),
+    // One-session changes (planner v2); empty for everyone else.
+    ctx.db.from("event_occurrence_overrides").select("*").gte("occurrence_date", DateTime.fromISO(from).minus({ days: 7 }).toISODate()!).lte("occurrence_date", to),
   ]);
-  for (const r of [events, routines, blocks, spaces]) if (r.error) throw new Error(r.error.message);
+  for (const r of [events, routines, blocks, spaces, overrides]) if (r.error) throw new Error(r.error.message);
   const blockRows = (blocks.data ?? []) as PlanBlock[];
   const taskIds = [...new Set(blockRows.map((b) => b.task_id).filter(Boolean))] as string[];
   const taskSpace = new Map<string, string | null>();
@@ -61,13 +63,14 @@ export async function loadSources(ctx: Ctx, from: string, to: string) {
     events: (events.data ?? []) as CalendarEvent[],
     routines: (routines.data ?? []) as Routine[],
     blocks: blockRows,
+    overrides: (overrides.data ?? []) as OccurrenceOverride[],
     taskSpace,
     spaces: new Map(((spaces.data ?? []) as { id: string; name: string; color: string | null }[]).map((s) => [s.id, s])) as Spaces,
   };
 }
 
 export function dayFrom(src: Awaited<ReturnType<typeof loadSources>>, date: string): DayData {
-  const agenda = buildDayAgenda({ date, zone: src.zone, events: src.events, routines: src.routines, blocks: src.blocks, tasks: [] });
+  const agenda = buildDayAgenda({ date, zone: src.zone, events: src.events, routines: src.routines, blocks: src.blocks, tasks: [], overrides: src.overrides });
   const eventSpace = new Map(src.events.map((e) => [e.id, e.workspace_id]));
   const routineSpace = new Map(src.routines.map((r) => [r.id, r.workspace_id]));
   const blockById = new Map(src.blocks.map((b) => [b.id, b]));

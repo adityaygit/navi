@@ -13,6 +13,9 @@ import { CalendarGrid, type CalendarDay } from "@/components/day/calendar";
 import { PlaceIt } from "@/components/day/day-actions";
 import { planDayAction, planWeekAction } from "../actions";
 import { AddCommitment } from "./add-commitment";
+import { plannerV2 } from "@/lib/planner-flag";
+import { myDayV2 } from "@/server/planner/my-day-v2";
+import { Assumptions, ProposedPlan } from "@/components/day/plan-v2";
 
 export const metadata = { title: "My day · Navi" };
 
@@ -209,7 +212,10 @@ export default async function MyDayPage({ searchParams }: { searchParams: Promis
   const windowStart = awake?.start ?? DateTime.fromISO(`${date}T07:00`, { zone }).toMillis();
   const windowEnd = awake?.end ?? DateTime.fromISO(`${date}T23:00`, { zone }).toMillis();
   const from = isToday ? Math.max(windowStart, Math.ceil(nowMs / (5 * 60000)) * 5 * 60000) : windowStart;
-  const gaps = isPast ? [] : freeGaps(entries.map((e) => ({ start: e.startMs, end: e.endMs })), from, windowEnd);
+  const v2 = plannerV2(profile.preferences) ? await myDayV2(ctx, date, src.blocks, isToday ? Math.ceil(nowMs / (5 * 60000)) * 5 * 60000 : 0) : null;
+  const busySpans = entries.map((e) => ({ start: e.startMs, end: e.endMs }));
+  // Planner v2 (B4): the same free time the planner uses (confirmed or assumed, never unknown), not a 7 AM–11 PM guess.
+  const gaps = isPast ? [] : v2 ? v2.capacity.flatMap((c) => freeGaps(busySpans, Math.max(c.start, from), c.end)) : freeGaps(busySpans, from, windowEnd);
   const unscheduled = openTasks.filter((t) => !scheduled.has(t.id));
   const candidates: FitCandidate[] = unscheduled.map((t) => ({ id: t.id, title: t.title, estimate: t.estimate_minutes, dueMs: t.due_at ? Date.parse(t.due_at) : null }));
   const fits = findFits(gaps, candidates);
@@ -268,7 +274,18 @@ export default async function MyDayPage({ searchParams }: { searchParams: Promis
       <div className="mt-[18px] flex flex-col gap-7 lg:flex-row">
         <section aria-label="Timeline" className="min-w-0 flex-1">
           <h2 className="sr-only">Timeline</h2>
-          <DayTimeline entries={entries} fits={fits} zone={zone} nowMs={nowMs} isToday={isToday} isPast={isPast} focusOpen={!!focusRes.data} />
+          {v2 && !isPast && (v2.proposals.length > 0 || v2.assumptions.length > 0 || v2.unknown.length > 0) && (
+            <div className="mb-4 flex flex-col gap-2.5">
+              {v2.proposals.map((p) => <ProposedPlan key={p.id} {...p} />)}
+              <Assumptions date={date} items={v2.assumptions} />
+              {v2.unknown.length > 0 && (
+                <p className="px-1 text-[13px] text-dim">
+                  Navi doesn&apos;t know if you&apos;re free {v2.unknown.map((u) => u.text).join(", ")}, so it won&apos;t plan there. Tell Navi if you are.
+                </p>
+              )}
+            </div>
+          )}
+          <DayTimeline entries={entries} fits={fits} zone={zone} nowMs={nowMs} isToday={isToday} isPast={isPast} focusOpen={!!focusRes.data} v2={v2 ? { date } : null} />
           {day.untimed.length > 0 && (
             <p className="mt-3 text-[13px] text-dim">Any time: {day.untimed.map((e) => e.title).join(", ")} (routines with no set time)</p>
           )}
@@ -305,7 +322,7 @@ export default async function MyDayPage({ searchParams }: { searchParams: Promis
             {!isPast && <ActionButton className="btn btn-sm btn-ghost" action={planWeekAction} args={[date]} showResult>Plan next 7 days</ActionButton>}
             {isToday && <RecoveryButton className="btn btn-sm btn-ghost" />}
           </div>
-          {profile.availability.length === 0 && (
+          {profile.availability.length === 0 && !v2 && (
             <p className="text-[13px] text-dim">
               Navi won&apos;t invent free time. Set when you&apos;re available in <Link className="underline" href="/settings">Settings</Link> so it can plan flexible work.
             </p>
