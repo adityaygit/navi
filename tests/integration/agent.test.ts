@@ -158,10 +158,11 @@ describe("Claude tool loop", () => {
     const text = (seg: number) => events.filter((e): e is Extract<AgentEvent, { type: "text" }> => e.type === "text" && e.segment === seg).map((e) => e.delta).join("");
     expect(text(0)).toBe("Let me check your plan first.");
     expect(text(1)).toBe(r.text);
-    // A step is never shown done before its tool result: the end carries the tool's own summary.
+    // A step is never shown done before its tool result: the end carries its plain line (never the model's summary).
     const end = events.find((e) => e.type === "step_end" && e.name === "propose_items");
-    expect(end).toMatchObject({ ok: true, readOnly: false, label: "Added to review inbox", summary: r.toolEvents[0].summary });
-    expect(events.find((e) => e.type === "step_end" && e.name === "get_overview")).toMatchObject({ readOnly: true, summary: "" });
+    expect(end).toMatchObject({ ok: true, readOnly: false, label: "Added to review inbox", display: r.toolEvents[0].display });
+    expect(end).not.toHaveProperty("summary");
+    expect(events.find((e) => e.type === "step_end" && e.name === "get_overview")).not.toHaveProperty("display");
   });
 
   it("closes a started step as not run when the turn stops before running it", async () => {
@@ -172,7 +173,7 @@ describe("Claude tool loop", () => {
     expect(r.toolEvents).toEqual([]);
     expect(events.filter((e) => e.type !== "text")).toEqual([
       expect.objectContaining({ type: "step_start", id: "toolu_cut" }),
-      expect.objectContaining({ type: "step_end", id: "toolu_cut", ok: false, summary: "Didn't run" }),
+      expect.objectContaining({ type: "step_end", id: "toolu_cut", ok: false }),
     ]);
   });
 
@@ -221,7 +222,7 @@ describe("Claude tool loop", () => {
       .mockRejectedValueOnce(new RealAnthropic.InternalServerError(500, { type: "error", error: { type: "api_error", message: "boom" } }, "boom", new Headers()));
     const r = await runAgent(request("planner", "I need to pack for the trip"));
     expect(create).toHaveBeenCalledTimes(2); // no re-run on the backup model
-    expect(r).toMatchObject({ error: "provider", mutated: true, text: expect.stringMatching(/got partway.*Added 1 item to the review inbox/) });
+    expect(r).toMatchObject({ error: "provider", mutated: true, text: expect.stringMatching(/got partway.*Put 1 thing in your inbox to review/) });
     const { count } = await db.from("proposals").select("id", { count: "exact", head: true }).eq("source_excerpt", "pack for the trip");
     expect(count).toBe(1);
 

@@ -162,6 +162,19 @@ export function planView(rs: PlanLike[], zone: string, opts: { now?: DateTime; c
     ];
     if (options.length === 1) options.push("Tell me what can wait, or move a due date, and I'll re-plan.");
     left = { line, options };
+  } else {
+    // Planner v2 keeps some time open on purpose: say how much waits for another day.
+    const held = (one ? rs[0] : rs[rs.length - 1]).unscheduled.filter((u) => u.why === HELD);
+    if (held.length) {
+      const names = held.map((u) => q(u.title, 30));
+      left = {
+        line: `${things(held.length)} left for another day so ${when} isn't packed`,
+        options: [
+          `${names.length > 3 ? `Includes ${names.slice(0, 3).join(", ")} and ${names.length - 3} more` : names.join(", ")}. ${held.length === 1 ? "It stays" : "They stay"} on your list; nothing was dropped.`,
+          "Tell me if you want a fuller day, or what matters most.",
+        ],
+      };
+    }
   }
   return { display, detail, plan: true, ...(left ? { leftover: left } : {}), ...(opts.unchanged ? { unchanged: true } : {}) };
 }

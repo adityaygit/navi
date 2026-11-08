@@ -152,7 +152,7 @@ export function legacyDisplay(e: { name: string; ok: boolean; summary: string })
     const left = s.match(/still on your task list: (.*?);/);
     return left ? `Reworked the rest of today. ${things(countTitles(left[1]))} didn't fit` : "Reworked the rest of today";
   }
-  if (["plan_day", "plan_week", "plan"].includes(e.name)) {
+  if (["plan_day", "plan_week", "plan"].includes(e.name) || /placed \d+ blocks?|no flexible blocks placed/.test(s)) {
     const placed = s.match(/placed (\d+) blocks?/);
     const head = placed ? `Planned ${things(Number(placed[1]))}` : "Updated your plan";
     const fit = s.match(/Didn't fit[^:]*: (.*?)\. (?:It|They) stay/);
@@ -178,6 +178,12 @@ export function firstPlainSentence(text: string): string {
       return d.isValid ? d.toFormat("ccc") : "";
     });
   s = collapseLists(shortenQuoted(s));
+  // Planner words, outside quoted titles, in words people use.
+  s = s.replace(/(“[^”]*”)|\b(blocks?|availability|interrupted|re-?planned|quiet hours)\b/gi, (m, quoted: string | undefined, word: string | undefined) => {
+    if (quoted || !word) return m;
+    const w = word.toLowerCase();
+    return w === "block" ? "thing" : w === "blocks" ? "things" : w === "availability" ? "free time" : w === "interrupted" ? "set aside" : w === "quiet hours" ? "do-not-disturb time" : "planned again";
+  });
   const first = s.match(/^.*?[.!?](?=\s|$)/)?.[0] ?? s;
   const line = first.replace(/\.$/, "").trim();
   return line.length > 120 ? `${line.slice(0, 117).replace(/\s+\S*$/, "")}…` : line;

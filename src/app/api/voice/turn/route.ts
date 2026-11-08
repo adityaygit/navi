@@ -18,9 +18,16 @@ const Body = z.object({
         name: z.string().max(64),
         ok: z.boolean(),
         summary: z.string().max(500),
+        // What the person sees for the step (plain words; see src/lib/plain-text.ts).
+        display: z.string().max(300).optional(),
+        detail: z.array(z.string().max(300)).max(40).optional(),
+        plan: z.boolean().optional(),
+        leftover: z.object({ line: z.string().max(300), options: z.array(z.string().max(400)).max(4) }).optional(),
+        irreversible: z.boolean().optional(),
+        unchanged: z.boolean().optional(),
         // Ids are only links: cards and Undo read the person's own rows under RLS.
         action_id: z.string().uuid().optional(),
-        undo: z.array(z.string().uuid()).max(20).optional(),
+        undo: z.array(z.string().uuid()).max(100).optional(),
       }),
     )
     .max(20)

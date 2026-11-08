@@ -62,7 +62,7 @@ describe("Scenario 8: changing the schedule by talking", () => {
     const apw = await createTask(user, { title: "AP World essay", estimate_minutes: 60 });
     const read = await createTask(user, { title: "Reading log", estimate_minutes: 60, priority: 1 });
     const r = await say("These are my non-negotiables: Chemistry lab and AP World essay. Plan everything else around them.");
-    expect(r.assistantMessage.content).toMatch(/must-complete/);
+    expect(r.assistantMessage.content).toMatch(/must-dos?/);
     const { data: tasks } = await me.db.from("tasks").select("id,commitment").in("id", [chem.id, apw.id, read.id]);
     expect(Object.fromEntries((tasks ?? []).map((t) => [t.id, t.commitment]))).toEqual({ [chem.id]: "must", [apw.id]: "must", [read.id]: "normal" });
     const blocks = await blocksOn(today());

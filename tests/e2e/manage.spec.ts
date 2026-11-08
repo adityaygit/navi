@@ -38,7 +38,7 @@ test("focus, recovery, memory, approvals and settings", async ({ page }, info) =
   await dialog.getByLabel("Things took longer than planned").check();
   await dialog.getByLabel("Details (optional)").fill("lab ran long");
   await dialog.getByRole("button", { name: "Re-plan my day" }).click();
-  await expect(dialog.getByRole("status")).toContainText(/re-planned/i);
+  await expect(dialog.getByRole("status")).toContainText(/Reworked the rest of today/i);
   await dialog.getByRole("button", { name: "Close" }).click();
   const { data: errand } = await admin.from("tasks").select("status").eq("id", doomed!.id).single();
   expect(errand!.status).toBe("todo");

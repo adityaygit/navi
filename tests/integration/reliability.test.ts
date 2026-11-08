@@ -243,7 +243,7 @@ describe("chat turn idempotency", () => {
     expect(await tasksTitled("water the ferns")).toHaveLength(1);
     const { count: convs } = await me.db.from("conversations").select("id", { count: "exact", head: true }).eq("kind", "chat");
     expect(convs).toBe(1);
-    const { data: msgs } = await me.db.from("messages").select("role").eq("conversation_id", first.conversationId);
+    const { data: msgs } = await me.db.from("messages").select("role").eq("conversation_id", first.conversationId).order("created_at");
     expect(msgs!.map((m) => m.role)).toEqual(["user", "assistant"]);
   });
 

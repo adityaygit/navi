@@ -22,7 +22,7 @@ describe("scheduleDay", () => {
   it("does not invent availability when none is declared", () => {
     const out = scheduleDay({ date: "2026-11-02", zone, now: morning, availability: [], events: [], routines: [], tasks: [task({})], keptBlocks: [] });
     expect(out.blocks).toHaveLength(0);
-    expect(out.warnings[0]).toMatch(/No availability/);
+    expect(out.warnings[0]).toMatch(/doesn't know when you're free/);
     expect(out.unscheduled).toHaveLength(1);
   });
 
@@ -162,6 +162,20 @@ describe("learnedEstimateRatio", () => {
     const t = task({ id: "late", title: "Form", estimate_minutes: 120, due_at: "2026-11-02T16:30:00-05:00" });
     const out = scheduleDay({ date: "2026-11-02", zone, now: morning, availability: weekdays, events: [], routines: [], tasks: [t], keptBlocks: [], maxBlockMinutes: 60 });
     expect(out.afterDeadline).toEqual([{ task_id: "late", title: "Form", due_at: DateTime.fromISO("2026-11-02T16:30:00-05:00").toISO() }]);
-    expect(out.warnings.filter((w) => /after its deadline/.test(w))).toHaveLength(1);
+    expect(out.warnings.filter((w) => /only fits after it's due/.test(w))).toHaveLength(1);
+  });
+
+  it("respects 'keep it off until <day>' (not_before): nothing before then, not reported as didn't fit", () => {
+    const later = task({ id: "spanish", title: "Module 3 (Spanish)", priority: 1, not_before: "2026-11-04T00:00:00-05:00" });
+    const afternoon = task({ id: "lab", title: "Lab", priority: 1, not_before: "2026-11-02T18:00:00-05:00" });
+    const out = scheduleDay({ date: "2026-11-02", zone, now: morning, availability: weekdays, events: [], routines: [], tasks: [later, afternoon, task({ id: "x" })], keptBlocks: [] });
+    expect(out.blocks.some((b) => b.task_id === "spanish")).toBe(false);
+    expect(out.unscheduled.some((u) => u.task_id === "spanish")).toBe(false);
+    const lab = out.blocks.find((b) => b.task_id === "lab")!;
+    expect(DateTime.fromISO(lab.starts_at).setZone(zone).toFormat("HH:mm")).toBe("18:00");
+    // The time before 6 PM is still used by other work.
+    expect(DateTime.fromISO(out.blocks.find((b) => b.task_id === "x")!.starts_at).setZone(zone).toFormat("HH:mm")).toBe("16:00");
+    const wed = scheduleDay({ date: "2026-11-04", zone, now: morning, availability: weekdays, events: [], routines: [], tasks: [later], keptBlocks: [] });
+    expect(wed.blocks.some((b) => b.task_id === "spanish")).toBe(true);
   });
 });

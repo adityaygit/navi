@@ -44,6 +44,6 @@ export async function fixedSpans(ctx: Ctx, date: string): Promise<FixedSpan[]> {
  */
 export async function fixedClash(ctx: Ctx, date: string, start: DateTime, end: DateTime, exceptBlockId?: string): Promise<string | null> {
   const iv = Interval.fromDateTimes(start, end);
-  const hit = (await fixedSpans(ctx, date)).find((f) => f.blockId !== exceptBlockId && Interval.fromDateTimes(f.start, f.end).overlaps(iv));
+  const hit = (await fixedSpans(ctx, date)).find((f) => (!exceptBlockId || f.blockId !== exceptBlockId) && Interval.fromDateTimes(f.start, f.end).overlaps(iv));
   return hit?.title ?? null;
 }

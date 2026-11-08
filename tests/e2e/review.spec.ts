@@ -39,10 +39,10 @@ test("daily review: mark yesterday, see the review, plan ahead", async ({ page }
   await expect(page.getByText("Every block is marked.")).toBeVisible();
 
   const review = page.getByRole("region", { name: "2. How the day went" });
-  await expect(review.getByText("1 done and 0 partly done out of 1 counted blocks (partial = half credit) = 100%.", { exact: false })).toBeVisible();
+  await expect(review.getByText("1 done and 0 partly done out of 1 planned (partial = half credit) = 100%.", { exact: false })).toBeVisible();
   await expect(review.getByText(/didn't get done because work took longer than estimated/)).toBeVisible();
   const { data: stored } = await admin.from("briefings").select("body").eq("user_id", userId).eq("kind", "evening").eq("local_date", ymd).single();
-  expect(stored!.body).toMatch(/1 done and 0 partly done out of 1 counted blocks/);
+  expect(stored!.body).toMatch(/1 done and 0 partly done out of 1 planned/);
 
   // Plan the next day (here: the rest of today) and see what the planner did.
   const plan = page.getByRole("region", { name: "3. Plan the rest of today" });

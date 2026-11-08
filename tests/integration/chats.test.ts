@@ -88,7 +88,7 @@ describe("multiple chats", () => {
     const steps = events.filter((e) => e.type === "step_start" || e.type === "step_end");
     expect(steps).toEqual([
       expect.objectContaining({ type: "step_start", name: "propose_items", label: "Adding to your review inbox" }),
-      expect.objectContaining({ type: "step_end", name: "propose_items", ok: true, summary: live.assistantMessage.tool_events[0].summary }),
+      expect.objectContaining({ type: "step_end", name: "propose_items", ok: true, display: live.assistantMessage.tool_events[0].display }),
     ]);
     // Text arrives in pieces, after the steps, and adds up to the saved reply.
     const pieces = events.filter((e): e is Extract<ChatStreamEvent, { type: "text" }> => e.type === "text");
@@ -104,7 +104,7 @@ describe("multiple chats", () => {
   it("shows read-only steps live but doesn't save them as actions taken", async () => {
     const events: ChatStreamEvent[] = [];
     const r = await handleTurn(ctx, { kind: "chat", text: "what's in my inbox?", modality: "text" }, (e) => events.push(e));
-    expect(events.filter((e) => e.type === "step_end")).toEqual([expect.objectContaining({ name: "get_inbox", readOnly: true, summary: "" })]);
+    expect(events.filter((e) => e.type === "step_end")).toEqual([expect.objectContaining({ name: "get_inbox", readOnly: true })]);
     expect(r.assistantMessage.tool_events).toEqual([]);
   });
 

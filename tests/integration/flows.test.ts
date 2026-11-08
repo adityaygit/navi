@@ -318,7 +318,8 @@ describe("plan recovery", () => {
     const r = await recoverPlan(ctx, { description: "Family emergency", category: "interruption", availableFrom: DateTime.now().plus({ hours: 1 }).toISO() });
     const { count: openAfter } = await db.from("tasks").select("id", { count: "exact", head: true }).in("status", ["todo", "in_progress"]);
     expect(openAfter).toBe(openBefore);
-    expect(r.summary).toMatch(/re-planned/);
+    expect(r.summary).toMatch(/planned again from/);
+    expect(r.message).toMatch(/^Reworked the rest of today\./);
     const { data: dis } = await db.from("plan_disruptions").select("*");
     expect(dis!.some((d) => d.description === "Family emergency")).toBe(true);
   });
@@ -474,11 +475,11 @@ describe("accountability", () => {
     const r = await dayReview(db, userId, zone, date);
     // Counted: done, partial, skipped-without-reason, unmarked = 4. (1 + 0.5) / 4.
     expect(r.completionRate).toBeCloseTo(0.375);
-    expect(r.explanation).toMatch(/1 done and 1 partly done out of 4 counted blocks .* = 38%/);
-    expect(r.explanation).toMatch(/3 blocks excluded/);
+    expect(r.explanation).toMatch(/1 done and 1 partly done out of 4 planned .* = 38%/);
+    expect(r.explanation).toMatch(/3 planned things not counted/);
     expect(r.explanation).toMatch(/1 wasn't marked; mark it/);
-    expect(r.findings.join(" ")).toMatch(/skipped 1 block without an outside reason/);
-    expect(r.findings.join(" ")).toMatch(/blocked on missing information/);
+    expect(r.findings.join(" ")).toMatch(/skipped 1 planned thing without an outside reason/);
+    expect(r.findings.join(" ")).toMatch(/stuck on missing information/);
   });
 });
 

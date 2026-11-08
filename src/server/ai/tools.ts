@@ -970,7 +970,10 @@ export const TOOLS = [
       const movingIds = new Set(blocks.map((b) => b.id));
       const busy = (await fixedSpans(ctx, date)).filter((f) => !f.blockId || !movingIds.has(f.blockId));
       const spans = blocks.map((b) => ({ id: b.id, start: DateTime.fromISO(b.starts_at).setZone(zone), end: DateTime.fromISO(b.ends_at).setZone(zone) }));
-      const { moves, stuck } = shiftTimes(spans, busy, { startAt, minutes: i.minutes ?? null, earliest: now, dayEnd: DateTime.fromISO(date, { zone }).endOf("day") });
+      // "Start now": the next thing moves up to now and the rest come along by the same amount.
+      const firstStart = DateTime.min(...spans.map((s) => s.start))!;
+      const pullIn = i.start_at === "now" && startAt && firstStart > startAt ? -Math.round(firstStart.diff(startAt, "minutes").minutes) : null;
+      const { moves, stuck } = shiftTimes(spans, busy, { startAt: pullIn ? null : startAt, minutes: pullIn ?? i.minutes ?? null, earliest: now, dayEnd: DateTime.fromISO(date, { zone }).endOf("day") });
       const v2 = await plannerV2For(ctx);
       const changes: PlanChange[] = [];
       let waiting = false;

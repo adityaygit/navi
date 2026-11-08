@@ -49,7 +49,7 @@ describe("availability model today", () => {
     expect(out.blocks).toHaveLength(0);
     expect(out.freeMinutes).toBe(0);
     expect(out.unscheduled.map((u) => u.task_id)).toEqual(["chem"]);
-    expect(out.warnings[0]).toMatch(/No availability is set/);
+    expect(out.warnings[0]).toMatch(/doesn't know when you're free yet/);
   });
 
   // Fixed for planner v2 accounts; see planner-v2 'D5: ... untimed protected exercise is reserved before tasks'.
@@ -64,7 +64,7 @@ describe("availability model today", () => {
   it("v1 (flag off), ROOT CAUSE fixed in planner v2: a weekday with no window gets only fixed items, with a warning", () => {
     const out = plan({ availability: [{ days: [6], start: "10:00", end: "12:00" }], tasks: [task({ id: "a" })] });
     expect(out.blocks).toHaveLength(0);
-    expect(out.warnings).toContain("You have no availability on this day, so only fixed commitments are shown.");
+    expect(out.warnings).toContain("You have no free time set for this day, so only your fixed plans are shown.");
   });
 
   // Fixed for planner v2 accounts; see planner-v2 'B1 fixed: a free window crossing midnight counts on both days'.
@@ -159,7 +159,7 @@ describe("priority, deadlines and must-complete work today", () => {
     const left = (id: string) => out.unscheduled.find((u) => u.task_id === id)?.remaining_minutes ?? 0;
     for (const t of tasks) expect(placed(t.id) + left(t.id), t.id).toBe(t.estimate_minutes);
     expect(out.unscheduled.length).toBeGreaterThan(0);
-    expect(out.warnings.some((w) => /is due by today but/.test(w))).toBe(true);
+    expect(out.warnings.some((w) => /is due today but/.test(w))).toBe(true);
   });
 
   it("an overdue task is placed first but gets no 'after its deadline' warning", () => {

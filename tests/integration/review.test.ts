@@ -83,7 +83,7 @@ describe("took longer than estimated", () => {
     expect(r.overran).toBe(1);
     expect(r.avoided).toBe(0);
     expect(r.completionRate).toBe(1);
-    expect(r.explanation).toMatch(/1 block excluded \(rest, interruptions, missing info, took longer than estimated\)/);
+    expect(r.explanation).toMatch(/1 planned thing not counted \(rest, interruptions, missing info, took longer than estimated\)/);
     expect(r.findings.join(" ")).toMatch(/took longer than estimated/);
   });
 });
@@ -115,8 +115,8 @@ describe("“my plan broke”", () => {
     expect(await statusOf(soon.id)).toEqual({ status: "skipped", outcome_reason: "Took longer than estimated: lab ran long" });
     const { data: morning } = await db.from("plan_blocks").select("status").eq("plan_date", n.toISODate()).eq("title", "Morning reading").eq("starts_at", earlier.starts_at);
     expect(morning).toEqual([{ status: "planned" }]);
-    expect(r.summary).toMatch(/2 blocks marked as taking longer than estimated/);
-    expect(r.summary).toMatch(/1 earlier block isn't marked yet/);
+    expect(r.summary).toMatch(/2 planned things marked as taking longer than estimated/);
+    expect(r.summary).toMatch(/1 earlier planned thing isn't marked yet/);
 
     // Nothing is placed before the person is free again.
     const { data: todays } = await db.from("plan_blocks").select("starts_at,status").eq("plan_date", n.toISODate()).eq("status", "planned").neq("starts_at", earlier.starts_at);
@@ -188,7 +188,7 @@ describe("stored reviews follow the record", () => {
     expect(saved!.body).toMatch(/Open the evening review/);
     await setBlockOutcome(ctx(), b.id, "done");
     const { data } = await db.from("briefings").select("body").eq("id", saved!.id).single();
-    expect(data!.body).toMatch(/1 done and 0 partly done out of 1 counted blocks/);
+    expect(data!.body).toMatch(/1 done and 0 partly done out of 1 planned/);
     expect(data!.body).not.toMatch(/wasn't marked/);
   });
 

@@ -58,7 +58,7 @@ describe("weekInsights", () => {
     w = await weekInsights(db, userId, zone, today().toISODate()!);
     expect(w.enoughData).toBe(true);
     expect(w.avgCompletion).toBeCloseTo((1 + 1 + 0.75) / 3);
-    expect(w.findings.join(" ")).toMatch(/Average completion of counted blocks: 92% across 3 days/);
+    expect(w.findings.join(" ")).toMatch(/Average completion of planned work: 92% across 3 days/);
   });
 
   it("flags work skipped 3 times without an outside reason, not work blocked or overrun", async () => {
@@ -122,7 +122,7 @@ describe("weekInsights", () => {
     expect(w.nextWeek.overloaded).toBe(false);
     const text = w.findings.join(" ");
     expect(text).toMatch(/Your plan broke 3 times this week \(2 interruption, 1 missing information\)/);
-    expect(text).toMatch(/Planned 3 h of work blocks; blocks marked done cover 60 min \(\+60 min partly done\); 40 min measured in focus sessions/);
+    expect(text).toMatch(/Planned 3 h of work; work marked done covers 60 min \(\+60 min partly done\); 40 min measured in focus sessions/);
     expect(text).toMatch(/No tasks finished this week for “Garden” \(1 open\)/);
     expect(text).toMatch(/Next 7 days: 2 deadlines \(1 hard\); work due needs about 2 h \(1 without an estimate, 30 min assumed\) and you have about 14 h free/);
 
@@ -146,7 +146,7 @@ describe("weekInsights", () => {
     for (const d of [1, 2, 3]) for (const h of [9, 10]) await block("Work", day(d), h, "done");
     const w = await weekInsights(db, userId, zone, today().toISODate()!);
     expect(w.interruptionsByPart).toEqual([{ part: "afternoon", count: 3 }]);
-    expect(w.findings.join(" ")).toMatch(/Interruptions cluster in the afternoon \(noon–5 PM\): 3 interrupted blocks in 3 weeks/);
+    expect(w.findings.join(" ")).toMatch(/Interruptions cluster in the afternoon \(noon–5 PM\): 3 interruptions in 3 weeks/);
   });
 });
 
