@@ -67,18 +67,18 @@ export async function dayReview(db: SupabaseClient, userId: string, zone: string
     blocks.length === 0
       ? "Nothing was planned, so there's no completion rating today."
       : completionRate === null
-        ? `All ${blocks.length} planned blocks were rest, interruptions, blocked on missing information or ran over their estimate, so they aren't counted against you.`
-        : `${counts.done} done and ${counts.partial} partly done out of ${counted} counted blocks (partial = half credit) = ${Math.round(completionRate * 100)}%.` +
-          (excluded ? ` ${plural(excluded, "block")} excluded (rest, interruptions, missing info, took longer than estimated).` : "") +
+        ? `All ${blocks.length} planned things were rest, interruptions, blocked on missing information or ran over their estimate, so they aren't counted against you.`
+        : `${counts.done} done and ${counts.partial} partly done out of ${counted} planned (partial = half credit) = ${Math.round(completionRate * 100)}%.` +
+          (excluded ? ` ${plural(excluded, "planned thing")} not counted (rest, interruptions, missing info, took longer than estimated).` : "") +
           (counts.unmarked ? ` ${counts.unmarked} ${counts.unmarked === 1 ? "wasn't marked; mark it" : "weren't marked; mark them"} to make this accurate.` : "");
 
   const findings: string[] = [];
-  if (counts.avoided > 0) findings.push(`You skipped ${plural(counts.avoided, "block")} without an outside reason. Was the plan unrealistic, or is something about that work hard to start?`);
+  if (counts.avoided > 0) findings.push(`You skipped ${plural(counts.avoided, "planned thing")} without an outside reason. Was the plan unrealistic, or is something about that work hard to start?`);
   const overdue = (openRes.data ?? []).filter((t) => t.due_at && t.due_at < DateTime.now().toISO()!);
   if (overdue.length) findings.push(`${overdue.length} task${overdue.length === 1 ? " is" : "s are"} past due: ${overdue.slice(0, 3).map((t) => `“${t.title}”`).join(", ")}${overdue.some((t) => t.due_is_hard) ? " (including a hard deadline)" : ""}.`);
   if (counts.interrupted >= 2) findings.push(`${counts.interrupted} interruptions today. If that's a pattern, Navi can leave more buffer.`);
-  if (counts.missing_info > 0) findings.push(`${counts.missing_info} block${counts.missing_info === 1 ? " was" : "s were"} blocked on missing information. Who can you ask, and when?`);
-  if (counts.estimate > 0) findings.push(`${counts.estimate} block${counts.estimate === 1 ? "" : "s"} didn't get done because work took longer than estimated. That's a planning problem, not a failure: give that work more time next time.`);
+  if (counts.missing_info > 0) findings.push(`${counts.missing_info} planned thing${counts.missing_info === 1 ? " was" : "s were"} stuck on missing information. Who can you ask, and when?`);
+  if (counts.estimate > 0) findings.push(`${counts.estimate} planned thing${counts.estimate === 1 ? "" : "s"} didn't get done because work took longer than estimated. That's a planning problem, not a failure: give that work more time next time.`);
   const disruptionCount = Object.values(disruptions).reduce((s, n) => s + n, 0);
   if (disruptionCount) findings.push(`Your plan broke ${disruptionCount === 1 ? "once" : `${disruptionCount} times`} today (${describeDisruptions(disruptions)}).`);
 
@@ -287,24 +287,24 @@ export async function weekInsights(db: SupabaseClient, userId: string, zone: str
   const nextWeek = { from: nextFrom.toISODate()!, to: nextTo.toISODate()!, deadlines, loadMinutes, unestimated, freeMinutes, overloaded: loadMinutes > freeMinutes };
 
   const findings: string[] = [];
-  if (!enoughData) findings.push("Not enough recorded days yet for trends. Keep marking blocks done/skipped and Navi will show patterns once there's real evidence.");
+  if (!enoughData) findings.push("Not enough recorded days yet for trends. Keep marking planned work done or skipped and Navi will show patterns once there's real evidence.");
   else {
-    if (avgCompletion !== null) findings.push(`Average completion of counted blocks: ${Math.round(avgCompletion * 100)}% across ${rated.length} days.`);
+    if (avgCompletion !== null) findings.push(`Average completion of planned work: ${Math.round(avgCompletion * 100)}% across ${rated.length} days.`);
     const best = [...rated].sort((a, b) => b.completionRate! - a.completionRate!)[0];
     const worst = [...rated].sort((a, b) => a.completionRate! - b.completionRate!)[0];
     if (best && worst && best.date !== worst.date) findings.push(`Strongest day: ${DateTime.fromISO(best.date).toFormat("cccc")} (${Math.round(best.completionRate! * 100)}%). Weakest: ${DateTime.fromISO(worst.date).toFormat("cccc")} (${Math.round(worst.completionRate! * 100)}%).`);
     for (const ip of interruptionsByPart.filter((x) => x.count >= INTERRUPTIONS_AT_TIME).slice(0, 1)) {
-      findings.push(`Interruptions cluster in the ${ip.part} (${PART_OF_DAY_HOURS[ip.part]}): ${ip.count} interrupted blocks in 3 weeks. Plan lighter or more buffer then.`);
+      findings.push(`Interruptions cluster in the ${ip.part} (${PART_OF_DAY_HOURS[ip.part]}): ${ip.count} interruptions in 3 weeks. Plan lighter or more buffer then.`);
     }
   }
   for (const r of repeatedlyAvoided.slice(0, 3)) findings.push(`“${r.title}” has been skipped ${r.times} times without an outside reason. Break it into a smaller first step, change when it's scheduled, or decide to drop it.`);
   if (medianRatio !== null && medianRatio > 1.25) findings.push(`Tasks take about ${medianRatio.toFixed(1)}× your estimates (${ratios.length} tasks). Navi pads future plans to match.`);
   if (medianRatio !== null && medianRatio < 0.8) findings.push(`You finish tasks faster than estimated (about ${medianRatio.toFixed(1)}×, ${ratios.length} tasks).`);
   if (lateCompletions > 0) findings.push(`${lateCompletions} task${lateCompletions === 1 ? " was" : "s were"} finished after the deadline this week.`);
-  if (overran >= 3) findings.push(`${overran} blocks this week didn't get done because the work took longer than estimated. The plan was unrealistic: give that work bigger estimates or plan fewer blocks a day.`);
+  if (overran >= 3) findings.push(`${overran} planned things this week didn't get done because the work took longer than estimated. The plan was unrealistic: give that work bigger estimates or plan less each day.`);
   const disruptionCount = Object.values(disruptions).reduce((s, n) => s + n, 0);
   if (disruptionCount) findings.push(`Your plan broke ${disruptionCount === 1 ? "once" : `${disruptionCount} times`} this week (${describeDisruptions(disruptions)}).`);
-  if (minutes.planned) findings.push(`Planned ${hours(minutes.planned)} of work blocks; blocks marked done cover ${hours(minutes.done)}${minutes.partial ? ` (+${hours(minutes.partial)} partly done)` : ""}; ${hours(minutes.focus)} measured in focus sessions.`);
+  if (minutes.planned) findings.push(`Planned ${hours(minutes.planned)} of work; work marked done covers ${hours(minutes.done)}${minutes.partial ? ` (+${hours(minutes.partial)} partly done)` : ""}; ${hours(minutes.focus)} measured in focus sessions.`);
   const stalled = progress.filter((p) => p.completed === 0 && p.open > 0);
   if (stalled.length) findings.push(`No tasks finished this week for ${stalled.slice(0, 3).map((p) => `“${p.name}”`).join(", ")} (${stalled.slice(0, 3).map((p) => `${p.open} open`).join(", ")}).`);
   if (deadlines.length || loadMinutes) {

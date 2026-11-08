@@ -1,12 +1,14 @@
 import type { Message } from "./types";
 import type { ActionView } from "./actions";
+import type { StepView } from "./tool-events";
 
 // The live chat protocol. POST /api/chat with `stream: true` answers with
 // newline-delimited JSON (application/x-ndjson), one event per line, in order:
 //
 //   user        the saved user message, and the chat it went to
 //   step_start  a tool step began                     (0..n, each later ends)
-//   step_end    that step finished, ok or not, with the tool's own summary;
+//   step_end    that step finished, ok or not, with its plain line for people
+//               (display/detail/plan/leftover; never the model's summary);
 //               `action` when it became a card waiting for the person's OK,
 //               `undo` when it changed something on its own that can be undone
 //   text        a piece of reply text as it is written (segment = model pass;
@@ -21,7 +23,7 @@ import type { ActionView } from "./actions";
 
 export type AgentEvent =
   | { type: "step_start"; id: string; name: string; label: string; readOnly: boolean }
-  | { type: "step_end"; id: string; name: string; ok: boolean; label: string; summary: string; readOnly: boolean; action?: ActionView; undo?: string[] }
+  | ({ type: "step_end"; id: string; name: string; ok: boolean; label: string; readOnly: boolean; action?: ActionView; undo?: string[] } & StepView)
   | { type: "text"; delta: string; segment: number }
   | { type: "reset" };
 

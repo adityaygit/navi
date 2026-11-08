@@ -10,6 +10,17 @@ import { OUTCOMES, withNote } from "@/lib/outcomes";
 import { refreshStoredReview } from "@/server/jobs/briefings";
 import { plannerV2 } from "@/lib/planner-flag";
 import { planDays, type PlanRun, type PlanTrigger } from "./plan-v2";
+import type { PlanChange } from "@/lib/plan-summary";
+import { things } from "@/lib/plain-text";
+
+/** What a recovery did, in one plain message for the person (the summary is for Navi). */
+function recoveryMessage(r: { moved: unknown[]; notPlaced: unknown[]; earlier: number }): string {
+  const parts = ["Reworked the rest of today."];
+  if (r.moved.length) parts.push(`${things(r.moved.length)} moved to tomorrow.`);
+  if (r.notPlaced.length) parts.push(`${things(r.notPlaced.length)} didn't fit; ${r.notPlaced.length === 1 ? "it stays" : "they stay"} on your list.`);
+  if (r.earlier) parts.push("Say how the earlier things went in the evening review.");
+  return parts.join(" ");
+}
 
 // Persists the deterministic schedule. Navi may freely rearrange flexible
 // blocks it created; it never touches fixed blocks, user-created blocks, or
@@ -272,13 +283,13 @@ export async function recoverPlan(
   const t = (iso: string) => DateTime.fromISO(iso).setZone(zone).toFormat("h:mm a");
   const parts = [
     affected.length
-      ? `${affected.length} block${affected.length === 1 ? "" : "s"} marked ${label} (${affected.map((b) => `“${b.title}”`).join(", ")}).`
-      : "No planned blocks fell in that time.",
-    `${plan.blocks.length} block${plan.blocks.length === 1 ? "" : "s"} re-planned from ${from.toFormat("h:mm a")} today.`,
+      ? `${affected.length} planned thing${affected.length === 1 ? "" : "s"} marked ${label} (${affected.map((b) => `“${b.title}”`).join(", ")}).`
+      : "Nothing planned fell in that time.",
+    `${plan.blocks.length} thing${plan.blocks.length === 1 ? "" : "s"} planned again from ${from.toFormat("h:mm a")} today.`,
   ];
   if (moved.length) parts.push(`Moved to tomorrow: ${moved.map((m) => `“${m.title}” ${t(m.starts_at)}`).join(", ")}${next?.moved ? ` (${next.moved} of tomorrow's blocks shifted to make room)` : ""}.`);
   if (notPlaced.length) parts.push(`Not scheduled yet, still on your task list: ${notPlaced.map((u) => `“${u.title}” (${u.remaining_minutes} min)`).join(", ")}; there's no free time for it tomorrow either.`);
-  if (untouchedEarlier.length) parts.push(`${untouchedEarlier.length} earlier block${untouchedEarlier.length === 1 ? " isn't" : "s aren't"} marked yet; say how ${untouchedEarlier.length === 1 ? "it" : "they"} went in the evening review.`);
+  if (untouchedEarlier.length) parts.push(`${untouchedEarlier.length} earlier planned thing${untouchedEarlier.length === 1 ? " isn't" : "s aren't"} marked yet; say how ${untouchedEarlier.length === 1 ? "it" : "they"} went in the evening review.`);
   const summary = parts.join(" ");
 
   await ctx.db.from("plan_disruptions").insert({
@@ -290,7 +301,12 @@ export async function recoverPlan(
   });
   await logActivity(ctx, { action: "plan_recovered", summary: `Plan broke (${input.category}): ${summary}`.slice(0, 1000) });
   await refreshStoredReview(ctx.db, ctx.userId, today);
-  return { summary, affected: affected.length, plan, tomorrow: next, movedToTomorrow: moved, notPlaced };
+  const changes: PlanChange[] = [
+    ...affected.map((b): PlanChange => ({ kind: "mark", title: b.title, status: outcome.status })),
+    ...plan.blocks.map((b): PlanChange => ({ kind: "add", title: b.title, at: b.starts_at })),
+    ...moved.map((m): PlanChange => ({ kind: "add", title: m.title, at: m.starts_at })),
+  ];
+  return { summary, message: recoveryMessage({ moved, notPlaced, earlier: untouchedEarlier.length }), affected: affected.length, plan, tomorrow: next, movedToTomorrow: moved, notPlaced, changes };
 }
 
 /**
@@ -328,12 +344,12 @@ async function recoverPlanV2(
   const label = { rest: "as rest", interrupted: "interrupted", skipped: input.category === "estimate" ? "as taking longer than estimated" : "as blocked on missing info" }[outcome.status as "rest" | "interrupted" | "skipped"];
   const t = (iso: string) => DateTime.fromISO(iso).setZone(zone).toFormat("h:mm a");
   const parts = [
-    affected.length ? `${affected.length} block${affected.length === 1 ? "" : "s"} marked ${label} (${affected.map((b) => `“${b.title}”`).join(", ")}).` : "No planned blocks fell in that time.",
-    `${plan.blocks.length} block${plan.blocks.length === 1 ? "" : "s"} re-planned from ${from.toFormat("h:mm a")} today.`,
+    affected.length ? `${affected.length} planned thing${affected.length === 1 ? "" : "s"} marked ${label} (${affected.map((b) => `“${b.title}”`).join(", ")}).` : "Nothing planned fell in that time.",
+    `${plan.blocks.length} thing${plan.blocks.length === 1 ? "" : "s"} planned again from ${from.toFormat("h:mm a")} today.`,
   ];
   if (moved.length) parts.push(`Moved to tomorrow: ${moved.map((m) => `“${m.title}” ${t(m.starts_at)}`).join(", ")}.`);
   if (notPlaced.length) parts.push(`Not scheduled yet, still on your task list: ${notPlaced.map((u) => `“${u.title}” (${u.remaining_minutes} min)`).join(", ")}; there's no free time for it tomorrow either.`);
-  if (untouchedEarlier.length) parts.push(`${untouchedEarlier.length} earlier block${untouchedEarlier.length === 1 ? " isn't" : "s aren't"} marked yet; say how ${untouchedEarlier.length === 1 ? "it" : "they"} went in the evening review.`);
+  if (untouchedEarlier.length) parts.push(`${untouchedEarlier.length} earlier planned thing${untouchedEarlier.length === 1 ? " isn't" : "s aren't"} marked yet; say how ${untouchedEarlier.length === 1 ? "it" : "they"} went in the evening review.`);
   const opts = (plan as PlanResult & { tradeoffs?: string[] }).tradeoffs;
   if (opts?.length) parts.push(`Options: ${opts.map((x, i) => `${i + 1}) ${x}`).join(" ")}`);
   if (run.status === "applied") parts.push("You can undo this.");
@@ -341,5 +357,5 @@ async function recoverPlanV2(
   await ctx.db.from("plan_disruptions").insert({ user_id: ctx.userId, occurred_at: windowStart.toISO(), description: input.description, category: input.category, replan_summary: summary });
   await logActivity(ctx, { action: "plan_recovered", summary: `Plan broke (${input.category}): ${summary}`.slice(0, 1000) });
   await refreshStoredReview(ctx.db, ctx.userId, today);
-  return { summary, affected: affected.length, plan, tomorrow: next as PlanResult | null, movedToTomorrow: moved, notPlaced };
+  return { summary, message: recoveryMessage({ moved, notPlaced, earlier: untouchedEarlier.length }), affected: affected.length, plan, tomorrow: next as PlanResult | null, movedToTomorrow: moved, notPlaced, changes: run.changes };
 }

@@ -3,6 +3,7 @@ import { DateTime } from "luxon";
 import type { Ctx } from "@/server/context";
 import { logActivity, sameValue } from "./activity";
 import { requestApproval } from "./approvals";
+import { fieldWords } from "@/lib/plain-text";
 
 // Generic create/update/delete for the user's structured items, with an
 // activity-log entry for every change so it can be reviewed and undone.
@@ -179,7 +180,8 @@ export async function updateEntity<T = Record<string, unknown>>(
     action: "update",
     entityType: table,
     entityId: id,
-    summary: opts.summary ?? `Updated ${LABEL[table]} “${nameOf(data)}” (${changedKeys.join(", ")})`,
+    // Readable in Activity: what changed in words, never column names.
+    summary: opts.summary ?? (table === "plan_blocks" && typeof patch.starts_at === "string" ? `Moved “${nameOf(data)}” to ${DateTime.fromISO(patch.starts_at, { setZone: true }).setZone(ctx.timezone).toFormat("ccc h:mm a")}` : `Changed the ${fieldWords(changedKeys)} of “${nameOf(data)}”`),
     before: prior,
     after: patch,
     reversible: true,

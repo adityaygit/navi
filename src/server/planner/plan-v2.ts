@@ -9,7 +9,7 @@ import { nowIn } from "@/lib/time";
 import { wakeBed } from "@/server/day";
 import { logActivity } from "@/server/domain/activity";
 import { requestApproval } from "@/server/domain/approvals";
-import { summarizeDayPlan, summarizeWeekPlan } from "@/lib/plan-summary";
+import { summarizeDayPlan, summarizeWeekPlan, type PlanChange } from "@/lib/plan-summary";
 import { learnedEstimateRatio } from "./scheduler";
 import { buildDayModel, isWakeBedDefault, typicalHoursFor, type DayModel } from "./day-model";
 import { scheduleDayV2, type SchedulerV2Output } from "./scheduler-v2";
@@ -47,6 +47,8 @@ export type PlanRun = {
   actionId: string | null;
   summary: string;
   undo: string[];
+  /** What the run changes, for the chat card's disclosure. */
+  changes: PlanChange[];
 };
 
 type Op =
@@ -158,6 +160,17 @@ function opLines(ops: Op[], zone: string): { label: string; value: string; from?
     return [];
   });
   return lines.length > 8 ? [...lines.slice(0, 7), { label: "And", value: `${lines.length - 7} more changes` }] : lines;
+}
+
+/** A change set's ops as plain changes (moves, additions, removals, marks). */
+function changesOf(ops: Op[]): PlanChange[] {
+  return ops.flatMap((o): PlanChange[] => {
+    if (o.op === "insert") return [{ kind: "add", title: o.block.title, at: o.block.starts_at }];
+    if (o.op === "update" && o.moved) return [{ kind: "move", title: o.title, at: String(o.after.starts_at), from: String(o.before.starts_at) }];
+    if (o.op === "delete") return [{ kind: "remove", title: String(o.before.title) }];
+    if (o.op === "status") return [{ kind: "mark", title: o.title, status: o.after.status }];
+    return [];
+  });
 }
 
 function stripCode(message: string): string {
@@ -290,7 +303,7 @@ export async function planDays(ctx: Ctx, dates: string[], opts: PlanOptions): Pr
     const rs = results.map((r) => ({ ...r, proposed }));
     return rs.length === 1 ? summarizeDayPlan(rs[0], zone) : summarizeWeekPlan(rs, zone);
   };
-  if (!ops.length) return { results, changesetId: null, status: "unchanged", actionId: null, summary: summaryOf(false), undo: [] };
+  if (!ops.length) return { results, changesetId: null, status: "unchanged", actionId: null, summary: summaryOf(false), undo: [], changes: [] };
 
   // Older proposals for these days are replaced by this one.
   await ctx.db.from("plan_changesets").update({ status: "superseded" }).eq("user_id", ctx.userId).eq("status", "proposed").overlaps("dates", runDates);
@@ -319,7 +332,7 @@ export async function planDays(ctx: Ctx, dates: string[], opts: PlanOptions): Pr
     });
     await ctx.db.from("plan_changesets").update({ approval_id: approval.id }).eq("id", cs.id);
     for (const r of results) r.proposed = true;
-    return { results, changesetId: cs.id, status: "proposed", actionId: approval.id, summary, undo: [] };
+    return { results, changesetId: cs.id, status: "proposed", actionId: approval.id, summary, undo: [], changes: changesOf(ops) };
   }
 
   const undo: string[] = [];
@@ -331,5 +344,5 @@ export async function planDays(ctx: Ctx, dates: string[], opts: PlanOptions): Pr
     if (err instanceof StalePlanError && !opts.retried) return planDays(ctx, dates, { ...opts, retried: true });
     throw err;
   }
-  return { results, changesetId: cs.id, status: "applied", actionId: null, summary, undo };
+  return { results, changesetId: cs.id, status: "applied", actionId: null, summary, undo, changes: changesOf(ops) };
 }

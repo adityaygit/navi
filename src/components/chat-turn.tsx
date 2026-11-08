@@ -1,7 +1,10 @@
 "use client";
+import { useId, useState } from "react";
 import Link from "next/link";
 import type { Message, ToolEvent } from "@/lib/types";
 import { readStepsLine, stepDone } from "@/lib/tool-labels";
+import { isPlanStep, legacyDetail, legacyDisplay } from "@/lib/plain-text";
+import type { StepView } from "@/lib/tool-events";
 import { Pebble, type PebbleMood } from "./pebble";
 import { Stone } from "./shell/stone";
 import type { ActionView } from "@/lib/actions";
@@ -9,13 +12,16 @@ import { ActionCard, UndoButton, useActions } from "./action-card";
 
 // How one turn of the conversation looks: the person's words in a light
 // bubble; Navi's reply under the small Navi stone with its steps as hairline rows
-// (each change it made on its own can be undone right there) and anything that
-// needs the person's OK as an inline action card. A live turn is
-// drawn from stream events (see src/lib/chat-stream.ts) and is swapped for the
-// saved message when the turn finishes.
+// and anything that needs the person's OK as an inline action card. Each row
+// is one plain line (the step's `display`, never the model's summary). All the
+// plan changes of one reply share ONE row ("Updated your plan") with one Undo
+// for all of them; the individual moves sit behind a disclosure arrow, and
+// work that didn't fit is one line with its options behind another. A live
+// turn is drawn from stream events (see src/lib/chat-stream.ts) and is
+// swapped for the saved message when the turn finishes.
 
 /** A live step. Undo appears once the reply is saved (live rows are hidden from screen readers, so they hold no controls). */
-export type LiveStep = { kind: "step"; id: string; name: string; label: string; readOnly: boolean; status: "running" | "ok" | "failed"; doneLabel?: string; summary?: string; action?: ActionView };
+export type LiveStep = { kind: "step"; id: string; name: string; label: string; readOnly: boolean; status: "running" | "ok" | "failed"; doneLabel?: string; action?: ActionView } & StepView;
 export type LiveText = { kind: "text"; segment: number; chunks: { id: number; text: string }[] };
 export type LiveItem = LiveStep | LiveText;
 
@@ -60,22 +66,109 @@ function Check({ ok }: { ok: boolean }) {
   );
 }
 
-/** A finished step: ✓ or ✕, what kind of action it was, the tool's own summary, and Undo when it changed something on its own. */
-function StepRow({ ok, label, summary, animate = false, undo }: { ok: boolean; label: string; summary: string; animate?: boolean; undo?: string[] }) {
+/** A small "show more" arrow: a real button that says whether its list is open. */
+function Disclosure({ label, children, interactive = true }: { label: string; children: React.ReactNode; interactive?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  if (!interactive) return null;
+  return (
+    <div className="flex flex-col gap-1">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen((o) => !o)}
+        className="muted -ml-1 inline-flex w-fit items-center gap-1 rounded px-1 py-0.5 text-[13px] hover:text-[#e6e7ea]"
+      >
+        <svg aria-hidden="true" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${open ? "rotate-90" : ""}`}>
+          <path d="m9 6 6 6-6 6" />
+        </svg>
+        {label}
+      </button>
+      <div id={id} hidden={!open}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function DetailList({ lines }: { lines: string[] }) {
+  return (
+    <ul className="muted flex flex-col gap-0.5 pl-4 text-[14px] leading-snug">
+      {lines.map((l, i) => (
+        <li key={i} className="[overflow-wrap:anywhere]">{l}</li>
+      ))}
+    </ul>
+  );
+}
+
+/** "13 things didn't fit tonight", its options behind an arrow, and a link to My day. */
+function Leftover({ leftover, interactive }: { leftover: NonNullable<StepView["leftover"]>; interactive: boolean }) {
+  return (
+    <div className="flex flex-col gap-1 pt-1">
+      <span className="text-[14px] text-recovery">{leftover.line}</span>
+      {interactive && (
+        <div className="flex flex-wrap items-start gap-x-4">
+          <Disclosure label="Options">
+            <DetailList lines={leftover.options} />
+          </Disclosure>
+          <Link href="/planner" className="muted py-0.5 text-[13px] underline underline-offset-2">See My day</Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A finished step: ✓ or ✕, what kind of action it was, one plain line, and Undo when it changed something on its own. */
+function StepRow({ ok, label, display, detail, leftover, animate = false, undo, interactive = true }: { ok: boolean; label: string; display: string; detail?: string[]; leftover?: StepView["leftover"]; animate?: boolean; undo?: string[]; interactive?: boolean }) {
   const { undone, markUndone } = useActions();
-  // Most summaries already say what happened ("Added task “Essay”"); then the label would just repeat it.
-  const firstWord = (t: string) => t.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
-  const showLabel = !summary || !ok || firstWord(summary) !== firstWord(label);
+  // Most lines already say what happened ("Added “Essay”"); then the label would just repeat it.
+  const showLabel = !display || !ok;
   return (
     <li className={`flex items-start gap-3 py-3 ${animate ? "step-in" : ""}`}>
       <Check ok={ok} />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         {showLabel && <span className={`text-[13px] ${ok ? "dim" : "text-clash"}`}>{label}</span>}
-        {summary && <span className="text-[15px] font-medium leading-snug [overflow-wrap:anywhere]">{summary}</span>}
+        {display && <span className="text-[15px] font-medium leading-snug [overflow-wrap:anywhere]">{display}</span>}
+        {detail && detail.length > 0 && (
+          <Disclosure label={detail.length === 1 ? "Details" : `${detail.length} changes`} interactive={interactive}>
+            <DetailList lines={detail} />
+          </Disclosure>
+        )}
+        {leftover && <Leftover leftover={leftover} interactive={interactive} />}
       </div>
-      {ok && undo && undo.length > 0 && <UndoButton ids={undo} done={undo.every((id) => undone.has(id))} onDone={() => markUndone(undo)} label="Undo" />}
+      {interactive && ok && undo && undo.length > 0 && <UndoButton ids={undo} done={undo.every((id) => undone.has(id))} onDone={() => markUndone(undo)} label="Undo" />}
     </li>
   );
+}
+
+type Step = Pick<ToolEvent, "name" | "ok" | "summary" | "undo"> & StepView;
+
+/** A saved step's plain line; older messages only have the summary, which is cleaned. */
+export function displayOf(e: Step): string {
+  return e.display ?? legacyDisplay({ name: e.name, ok: e.ok, summary: e.summary ?? "" });
+}
+
+/**
+ * All the plan changes of one reply as one card: its line ("Updated your
+ * plan" when there were several), every move behind one arrow, what didn't fit,
+ * and one Undo that puts back everything this reply changed in the plan. Undo
+ * is offered only when all of it can be undone.
+ */
+export function planCard(steps: Step[]): { display: string; detail: string[]; leftover?: StepView["leftover"]; undo?: string[] } {
+  const changed = steps.filter((s) => !s.unchanged);
+  const lines = changed.length ? changed : steps;
+  const display = lines.length === 1 ? displayOf(lines[0]) : "Updated your plan";
+  const detail = lines.flatMap((s) => (s.detail?.length ? s.detail : s.display === undefined ? legacyDetail({ summary: s.summary ?? "" }) : lines.length > 1 && s.display ? [s.display] : []));
+  const leftover = [...steps].reverse().find((s) => s.leftover)?.leftover;
+  const ids = changed.flatMap((s) => s.undo ?? []);
+  const canUndo = ids.length > 0 && changed.every((s) => (s.undo?.length ?? 0) > 0 && !s.irreversible);
+  return { display, detail, ...(leftover ? { leftover } : {}), ...(canUndo ? { undo: ids } : {}) };
+}
+
+function PlanRow({ steps, animate = false, interactive = true }: { steps: Step[]; animate?: boolean; interactive?: boolean }) {
+  const card = planCard(steps);
+  return <StepRow ok label="Updated your plan" display={card.display} detail={card.detail} leftover={card.leftover} undo={card.undo} animate={animate} interactive={interactive} />;
 }
 
 function QuietRow({ text, running }: { text: string; running: boolean }) {
@@ -108,14 +201,21 @@ export function NaviMessage({ message }: { message: Message }) {
   const rows = events.filter((e) => !(e.action_id && actions[e.action_id]));
   // Older messages from before cards were linked: the request is still in Activity.
   const unlinked = rows.some((e) => !e.action_id && /approv/i.test(e.summary));
+  // One card for every plan change in this reply, where the first one was.
+  const planSteps = rows.filter((e) => e.ok && isPlanStep(e));
+  const firstPlan = rows.findIndex((e) => planSteps.includes(e));
   return (
     <div className="flex max-w-[720px] flex-col gap-3">
       <NaviHeader mood="idle" voice={message.modality === "voice"} />
       {rows.length > 0 && (
         <StepsBox>
-          {rows.map((e, i) => (
-            <StepRow key={i} ok={e.ok} label={stepDone(e.name, e.ok)} summary={e.summary} undo={e.undo} />
-          ))}
+          {rows.map((e, i) =>
+            planSteps.includes(e) ? (
+              i === firstPlan ? <PlanRow key={i} steps={planSteps} /> : null
+            ) : (
+              <StepRow key={i} ok={e.ok} label={stepDone(e.name, e.ok)} display={displayOf(e)} detail={e.detail} leftover={e.leftover} undo={e.undo} />
+            ),
+          )}
         </StepsBox>
       )}
       {message.content && <p className="whitespace-pre-wrap text-[16px] leading-[1.5] text-[#e6e7ea] md:text-[17px]">{withBold(message.content)}</p>}
@@ -178,11 +278,18 @@ export function LiveNavi({ items }: { items: LiveItem[] }) {
         cards.push(<ActionCard key={`c${s.id}`} view={actions[s.action.id] ?? s.action} />);
         continue;
       }
+      if (s.status === "ok" && s.plan) {
+        // Finished plan changes in a row share one line, as in the saved reply.
+        const group: LiveStep[] = [s];
+        while (j < run.length && run[j].status === "ok" && run[j].plan && !run[j].action) group.push(run[j++]);
+        rows.push(<PlanRow key={s.id} animate interactive={false} steps={group.map((g) => ({ ...g, summary: "", ok: true }))} />);
+        continue;
+      }
       rows.push(
         s.status === "running" ? (
           <RunningRow key={s.id} label={s.label} />
         ) : (
-          <StepRow key={s.id} animate ok={s.status === "ok"} label={s.doneLabel ?? s.label} summary={s.summary ?? ""} />
+          <StepRow key={s.id} animate interactive={false} ok={s.status === "ok"} label={s.doneLabel ?? s.label} display={s.display ?? ""} detail={s.detail} leftover={s.leftover} />
         ),
       );
     }

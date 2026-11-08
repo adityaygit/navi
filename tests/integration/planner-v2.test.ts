@@ -97,7 +97,7 @@ describe("planner v2: saving plans as change sets", () => {
     const blk = (await blocksOn(day()))[0];
     await updateEntity(user, "plan_blocks", blk.id, { title: "Flashcards (with Sam)" });
     await me.db.from("plan_blocks").update({ status: "done" }).eq("id", blk.id);
-    await expect(revertActivities(user, r2.undo!)).rejects.toThrow(/changed since/);
+    await expect(revertActivities(user, r2.undo!)).rejects.toThrow(/changed (again )?since/);
   });
 
   it("B2: a pinned block stays where it is through re-plans", async () => {

@@ -274,7 +274,26 @@ export type Message = {
  * approvals row it is waiting on (shown as an inline card); `undo` lists the
  * activity-log entries that undo what it changed on its own.
  */
-export type ToolEvent = { name: string; ok: boolean; summary: string; action_id?: string; undo?: string[] };
+export type ToolEvent = {
+  name: string;
+  ok: boolean;
+  /** Exact, for the model's history (field names and times allowed). Never shown to people. */
+  summary: string;
+  /** One short plain line for the person (src/lib/plain-text.ts). Older messages don't have it. */
+  display?: string;
+  /** Plain lines behind the step's disclosure arrow (e.g. "Heimler video → 2:05 PM"). */
+  detail?: string[];
+  /** The step changed the plan: a reply's plan steps show as one card with one Undo. */
+  plan?: boolean;
+  /** Work that didn't fit: one line, plus a few options behind a disclosure. */
+  leftover?: { line: string; options: string[] };
+  /** It changed things that can't be undone (old planner re-plans). */
+  irreversible?: boolean;
+  /** It ran but nothing changed. */
+  unchanged?: boolean;
+  action_id?: string;
+  undo?: string[];
+};
 
 export type Approval = {
   id: string;

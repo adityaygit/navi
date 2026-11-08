@@ -12,6 +12,8 @@ import { READ_ONLY_TOOLS } from "@/lib/tool-names";
 import type { AgentEvent } from "@/lib/chat-stream";
 import { emitter, stepEndEvent, stepStartEvent, toolEventOf } from "./live";
 import { actionViews } from "@/server/domain/approvals";
+import { legacyDisplay } from "@/lib/plain-text";
+import { stepDone } from "@/lib/tool-labels";
 
 export type AgentMode = "chat" | "onboarding" | "capture";
 
@@ -184,7 +186,7 @@ async function runAnthropic(req: AgentRequest, model: string, allowServerFallbac
 
       if (response.stop_reason === "refusal") {
         finalText = mutated
-          ? `I can't continue with that one. Already done before I stopped: ${toolEvents.map((e) => e.summary).join("; ")}.`
+          ? `I can't continue with that one. Already done before I stopped: ${toolEvents.map((e) => e.display || legacyDisplay(e) || stepDone(e.name, e.ok)).join("; ")}.`
           : "I can't help with that one. Nothing was changed.";
         break;
       }
@@ -206,7 +208,7 @@ async function runAnthropic(req: AgentRequest, model: string, allowServerFallbac
         const result = await runTool({ ...req.ctx, actor: "navi", userMessage: req.userText }, use.name, use.input);
         open.delete(use.id);
         const action = result.actionId && req.onEvent ? (await actionViews(req.ctx, [result.actionId]))[result.actionId] : undefined;
-        emit(stepEndEvent(use.id, use.name, result.ok, result.summary, { action, undo: result.actionId ? undefined : result.undo }));
+        emit(stepEndEvent(use.id, use.name, result.ok, result, { action, undo: result.actionId ? undefined : result.undo }));
         if (result.mutated) mutated = true;
         if (!READ_ONLY_TOOLS.includes(use.name)) toolEvents.push(toolEventOf(use.name, result));
         results.push({
@@ -224,7 +226,7 @@ async function runAnthropic(req: AgentRequest, model: string, allowServerFallbac
     // it on a backup model): say exactly what was done before it stopped.
     if (!toolEvents.length) throw err;
     console.error("AI provider error mid-turn:", err instanceof Error ? err.message : err);
-    const done = toolEvents.map((e) => `${e.ok ? "" : "(failed) "}${e.summary}`).join("; ");
+    const done = toolEvents.map((e) => `${e.ok ? "" : "(didn't work) "}${e.display || legacyDisplay(e) || stepDone(e.name, e.ok)}`).join("; ");
     return {
       text: `I got partway before stopping. Done so far: ${done}. Then: ${providerMessage(err)} Check those before asking again.`,
       toolEvents,
@@ -236,7 +238,7 @@ async function runAnthropic(req: AgentRequest, model: string, allowServerFallbac
     };
   } finally {
     // A step the model began but that never ran (stopped, refused, failed) must not look done.
-    for (const [id, name] of open) emit(stepEndEvent(id, name, false, "Didn't run"));
+    for (const [id, name] of open) emit(stepEndEvent(id, name, false));
     open.clear();
   }
   return { text: finalText || "Done.", toolEvents, mutated, model, simulated: false, costUsd };

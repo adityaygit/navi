@@ -352,7 +352,7 @@ export function scheduleDayV2(input: SchedulerV2Input): SchedulerV2Output {
       const start = use.start!;
       const end = start.plus({ minutes: len });
       if (item.dueBy && start >= item.dueBy && item.dueBy > input.now && item.task_id && !afterDeadline.some((a) => a.task_id === item.task_id)) {
-        warnings.push(`“${item.title}” can only be scheduled after its deadline.`);
+        warnings.push(`“${item.title}” only fits after it's due.`);
         afterDeadline.push({ task_id: item.task_id, title: item.title, due_at: item.dueBy.toISO()! });
       }
       const part = len < item.total ? `; this block: ${len} of ${item.total}m` : "";
@@ -379,7 +379,7 @@ export function scheduleDayV2(input: SchedulerV2Input): SchedulerV2Output {
         why: why ?? (placedAny ? "Only part of it fits today" : wholeNow() ? `No free ${left}-minute slot left today` : "No free time left today"),
       });
       if (item.dueBy && item.dueBy.setZone(zone).toISODate()! <= date) {
-        warnings.push(`“${item.title}” is due by today but ${left} min of work doesn't fit. Consider the options below.`);
+        warnings.push(`“${item.title}” is due today but ${left} min of it doesn't fit.`);
       }
     } else if (left > 0 && item.routine_id) {
       unplacedRoutines.push({ routine_id: item.routine_id, title: item.title, why: why ?? "No free time left for it today" });

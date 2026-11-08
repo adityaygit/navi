@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { DateTime } from "luxon";
-import { fixedClash } from "@/server/planner/clash";
+import { fixedClash, fixedSpans } from "@/server/planner/clash";
 import type { Ctx } from "@/server/context";
 import { getProfile } from "@/server/context";
 import { createProposals, proposalProblem } from "@/server/domain/proposals";
@@ -29,18 +29,25 @@ import { buildDayAgenda, describeDayAgenda, type AgendaEntry } from "@/server/pl
 import { proposalTitle } from "@/server/domain/proposals";
 import { fixWeekdayNumbering, guardInventedTimes } from "./time-guard";
 import { dayReview, weekInsights, type DayReview } from "@/server/domain/insights";
-import { summarizeDayPlan, summarizeWeekPlan } from "@/lib/plan-summary";
+import { changeLine, planView, summarizeDayPlan, summarizeWeekPlan, type PlanChange } from "@/lib/plan-summary";
+import { clockFor, dayWord, fieldWords, legacyDisplay, partOfDay, PLAN_TOOLS, q, shortTitle, things } from "@/lib/plain-text";
+import { resolveClock, resolveDay, shiftTimes } from "@/lib/time-words";
+import type { StepView } from "@/lib/tool-events";
 
 // The tools Navi can use. The same registry backs text chat, real-time voice
 // and onboarding, and every tool calls the same domain functions the
 // dashboard uses, with the user's own database permissions.
 
 /**
+ * `summary`: exact, for the model (it's all later turns see of the action).
+ * `display` (+ `detail`, `leftover`): what the person sees, in plain words
+ * (src/lib/plain-text.ts); never the summary. `plan`: it changed the plan, so
+ * the chat groups it with the reply's other plan changes under one Undo.
  * `actionId`: the step proposed (or changed) an action that waits for the
  * person's OK; the chat shows it as a card. `undo`: activity entries that undo
  * what the step changed on its own.
  */
-export type ToolResult = { ok: boolean; summary: string; data?: unknown; mutated?: boolean; actionId?: string; undo?: string[] };
+export type ToolResult = { ok: boolean; summary: string; data?: unknown; mutated?: boolean; actionId?: string; undo?: string[] } & StepView;
 
 /** What a tool says when its change became a card instead of running. */
 const WAITING = "It's shown to the user as a card with Approve and Decline; nothing has changed yet. Don't ask them to confirm in text.";
@@ -448,6 +455,19 @@ function v2Data(r: object) {
   };
 }
 
+/**
+ * What a planning result looks like in the chat. A proposal is its card;
+ * an old-planner run can't be undone, so its card offers no Undo.
+ */
+function runView(rs: Parameters<typeof planView>[0], zone: string, run: { status: string; changes: PlanChange[] } | undefined, opts: { recovered?: boolean; changes?: PlanChange[] } = {}): StepView {
+  if (run?.status === "proposed") return { plan: true };
+  const view = planView(rs, zone, { changes: opts.changes ?? run?.changes, recovered: opts.recovered, unchanged: run?.status === "unchanged" });
+  return { ...view, ...(run ? {} : { irreversible: true }) };
+}
+
+/** A date the person named as a word Navi says ("Monday", "tomorrow"). */
+const dayName = (date: string, zone: string) => dayWord(date, zone, DateTime.now(), false).replace("tonight", "today");
+
 export const TOOLS = [
   tool({
     name: "get_overview",
@@ -548,7 +568,7 @@ export const TOOLS = [
         captureId: ctx.captureId ?? null,
         batch: batch === "onboarding" ? "onboarding" : null,
       });
-      return { ok: true, mutated: true, summary: `Added ${created.length} item${created.length === 1 ? "" : "s"} to the review inbox` };
+      return { ok: true, mutated: true, summary: `Added ${created.length} item${created.length === 1 ? "" : "s"} to the review inbox`, display: batch === "onboarding" ? `Picked up ${things(created.length)}` : `Put ${things(created.length)} in your inbox to review` };
     },
   }),
   tool({
@@ -570,7 +590,7 @@ export const TOOLS = [
       }
       const t = await createTask(ctx, task);
       await logActivity(ctx, { action: "explicit_command", entityType: "tasks", entityId: t.id, summary: `Added at your request: “${user_command.slice(0, 120)}”` });
-      return { ok: true, mutated: true, summary: `Created task “${t.title}”: ${taskDateSummary(t, ctx.timezone, user_command)}`, data: { id: t.id, due_at: t.due_at, due_is_hard: t.due_is_hard } };
+      return { ok: true, mutated: true, summary: `Created task “${t.title}”: ${taskDateSummary(t, ctx.timezone, user_command)}`, display: `Added ${q(t.title)}${t.due_at ? `, due ${dayWord(DateTime.fromISO(t.due_at).setZone(ctx.timezone).toISODate()!, ctx.timezone, DateTime.now(), false).replace("tonight", "today")}` : ""}`, data: { id: t.id, due_at: t.due_at, due_is_hard: t.due_is_hard } };
     },
   }),
   tool({
@@ -585,11 +605,17 @@ export const TOOLS = [
     run: async (ctx, { id, depends_on, ...patch }) => {
       let deps = "";
       if (depends_on) deps = await setDependencies(ctx, id, depends_on);
-      if (!Object.keys(compact(patch)).length) return { ok: true, mutated: true, summary: deps || "Nothing to change" };
+      if (!Object.keys(compact(patch)).length) return { ok: true, mutated: true, summary: deps || "Nothing to change", display: deps ? "Changed what it waits for" : "" };
       const r = await updateTask(ctx, id, patch);
       if (r.kind === "approval_requested") return { ok: true, mutated: true, summary: `${deps ? `${deps} ` : ""}That change needs the user's OK because ${r.reason}. ${WAITING}` };
       const dates = "due_at" in patch || "due_is_hard" in patch ? `: ${await taskScheduleSummary(ctx, r.row)}` : "";
-      return { ok: true, mutated: true, summary: `Updated task “${r.row.title}”${dates}${deps ? `. ${deps}` : ""}` };
+      const changed = Object.keys(compact(patch));
+      const display = r.row.due_at && "due_at" in patch
+        ? `${q(r.row.title)} is now due ${DateTime.fromISO(r.row.due_at).setZone(ctx.timezone).toFormat("cccc")}`
+        : changed.length === 1 && changed[0] === "commitment" && patch.commitment === "must"
+          ? `Made ${q(r.row.title)} a must-do`
+          : `Updated ${q(r.row.title)}`;
+      return { ok: true, mutated: true, summary: `Updated task “${r.row.title}”${dates}${deps ? `. ${deps}` : ""}`, display };
     },
   }),
   tool({
@@ -603,7 +629,7 @@ export const TOOLS = [
       if (ctx.actor === "navi" && !userSaidItsDone(ctx.userMessage, user_statement)) {
         const { data: task } = await ctx.db.from("tasks").select("title,status").eq("id", id).maybeSingle();
         if (!task) return { ok: false, summary: "That task doesn't exist (or isn't yours)" };
-        if (task.status === "done") return { ok: true, summary: `“${task.title}” is already done` };
+        if (task.status === "done") return { ok: true, summary: `“${task.title}” is already done`, display: `${q(String(task.title))} was already done` };
         await requestApproval(ctx, {
           actionType: "internal.complete.tasks",
           summary: `Mark “${String(task.title).slice(0, 80)}” done`,
@@ -617,7 +643,7 @@ export const TOOLS = [
       }
       const r = await completeTask({ ...ctx, actor: "user" }, id, actual_minutes);
       await logActivity(ctx, { action: "explicit_command", entityType: "tasks", entityId: id, summary: `Marked done because you said: “${user_statement.slice(0, 120)}”` });
-      return { ok: true, mutated: true, summary: r.kind === "updated" ? `Marked “${r.row.title}” done` : "Sent for approval" };
+      return { ok: true, mutated: true, summary: r.kind === "updated" ? `Marked “${r.row.title}” done` : "Sent for approval", display: r.kind === "updated" ? `Marked ${q(r.row.title)} done` : "" };
     },
   }),
   tool({
@@ -637,8 +663,14 @@ export const TOOLS = [
       if (r.kind === "approval_requested") return { ok: true, mutated: true, summary: `That change needs the user's OK because ${r.reason}. ${WAITING}` };
       // Say exactly what changed: the summary is all later turns see of this action.
       const row = r.row as Record<string, unknown>;
+      const name = String(row.title ?? row.name ?? "");
       const changes = Object.entries(clean).map(([k, v]) => `${k} → ${String(typeof v === "object" ? JSON.stringify(v) : v).slice(0, 40)}`).join(", ");
-      return { ok: true, mutated: true, summary: `Updated ${table.replace(/s$/, "").replace("_", " ")} “${String(row.title ?? row.name ?? "")}”: ${changes}` };
+      const summary = `Updated ${table.replace(/s$/, "").replace("_", " ")} “${name}”: ${changes}`;
+      if (table === "plan_blocks" && typeof clean.starts_at === "string") {
+        // A moved piece of the plan: grouped with the reply's other plan changes.
+        return { ok: true, mutated: true, summary, display: `Moved ${q(name)}`, detail: [changeLine({ kind: "move", title: name, at: String(row.starts_at) }, ctx.timezone, nowIn(ctx.timezone).toISODate()!)], plan: true };
+      }
+      return { ok: true, mutated: true, summary, display: `Changed ${q(name)}'s ${fieldWords(Object.keys(clean))}`, plan: table === "plan_blocks" };
     },
   }),
   tool({
@@ -651,6 +683,7 @@ export const TOOLS = [
         ok: true,
         mutated: true,
         summary: r.run?.summary ?? summarizeDayPlan(r, ctx.timezone),
+        ...runView([r], ctx.timezone, r.run),
         data: { blocks: r.blocks.map((b) => ({ title: b.title, start: b.starts_at, end: b.ends_at, why: b.reason })), moved: r.moved, unscheduled: r.unscheduled, only_after_deadline: r.afterDeadline, warnings: r.warnings, freeMinutes: r.freeMinutes, ...v2Data(r) },
       };
     },
@@ -665,6 +698,7 @@ export const TOOLS = [
         ok: true,
         mutated: true,
         summary: days[0]?.run?.summary ?? summarizeWeekPlan(days, ctx.timezone),
+        ...runView(days, ctx.timezone, days[0]?.run),
         data: days.map((d) => ({ date: d.date, blocks: d.blocks.length, moved: d.moved, unscheduled: d.unscheduled.map((u) => u.title), only_after_deadline: d.afterDeadline.map((a) => a.title), warnings: d.warnings })),
       };
     },
@@ -675,12 +709,14 @@ export const TOOLS = [
     schema: z.object({
       description: z.string().min(3).max(500),
       category: z.enum(["interruption", "rest", "missing_info", "estimate", "external", "other"]),
-      available_from: z.string().nullish().describe("ISO time the user is free again, if known"),
-      since: z.string().nullish().describe("ISO time the disruption started, if earlier than now (only blocks from then until available_from are marked)"),
+      available_from: z.string().nullish().describe("When the user is free again: a local time HH:MM as they said it (e.g. '14:05'), or 'now'. Navi's code reads it against the real clock; don't compute it."),
+      since: z.string().nullish().describe("When the disruption started, if earlier than now: local HH:MM (only planned work from then until available_from is marked)"),
     }),
     run: async (ctx, input) => {
       const r = await recoverPlan(ctx, { description: input.description, category: input.category, availableFrom: input.available_from, since: input.since });
-      return { ok: true, mutated: true, summary: r.summary, data: { moved_to_tomorrow: r.movedToTomorrow, not_scheduled: r.notPlaced, warnings: r.plan.warnings } };
+      const view = runView([r.plan], ctx.timezone, r.plan.run, { recovered: true, changes: r.changes });
+      const left = r.notPlaced.length ? { line: `${things(r.notPlaced.length)} didn't fit today or tomorrow`, options: [`${r.notPlaced.length > 3 ? `Includes ${r.notPlaced.slice(0, 3).map((u) => q(u.title, 30)).join(", ")} and ${r.notPlaced.length - 3} more` : r.notPlaced.map((u) => q(u.title, 30)).join(", ")}. They stay on your list; nothing was dropped.`, "Tell me what can wait, or move a due date, and I'll re-plan."] } : undefined;
+      return { ok: true, mutated: true, summary: r.summary, ...view, leftover: left, data: { moved_to_tomorrow: r.movedToTomorrow, not_scheduled: r.notPlaced, warnings: r.plan.warnings } };
     },
   }),
   // ---- Planner v2 (constraint-first) tools: offered only when it's on (toolsFor). ----
@@ -696,7 +732,7 @@ export const TOOLS = [
       capacity_minutes: z.number().int().min(0).max(1440).nullish().describe("At most this much work on the first day, as the user said"),
       free: z.array(z.object({ start: HHMM, end: HHMM })).max(6).nullish().describe("Local times the user said they're free on the first day"),
       busy: z.array(z.object({ start: HHMM, end: HHMM, title: z.string().max(120).nullish() })).max(6).nullish().describe("Local times the user said they're busy on the first day (one-off, e.g. 'karate tonight 6–7:30')"),
-      start_from: HHMM.nullish().describe("Plan the first day from this local time (e.g. 'I'm free from 15:00')"),
+      start_from: z.union([HHMM, z.literal("now")]).nullish().describe("Plan the first day from this local time (e.g. 'I'm free from 15:00'), or 'now' ('start now'). Navi's code reads 'now' from the real clock; never compute the current time yourself."),
     }),
     run: async (ctx, input) => {
       const zone = ctx.timezone;
@@ -707,7 +743,9 @@ export const TOOLS = [
       for (const b of input.busy ?? []) facts.push(await addException(ctx, { date: first, kind: "busy", start_time: b.start, end_time: b.end, note: b.title ?? "Busy" }));
       const today = nowIn(zone).toISODate()!;
       let from: DateTime | undefined;
-      if (input.start_from) {
+      if (input.start_from === "now") {
+        if (first === today) from = resolveClock("now", first, zone, nowIn(zone))!;
+      } else if (input.start_from) {
         if (first === today) from = DateTime.max(atLocalTime(first, input.start_from, zone), nowIn(zone));
         else facts.push(await addException(ctx, { date: first, kind: "busy", start_time: "00:00", end_time: input.start_from, note: `not free before ${input.start_from}` }));
       }
@@ -715,7 +753,8 @@ export const TOOLS = [
       const run = await planDays(ctx, days, { trigger: "chat", mode: input.mode ?? undefined, from, focusTaskIds: input.focus_task_ids ?? undefined });
       const lead = facts.length ? `Saved for ${DateTime.fromISO(first, { zone }).toFormat("cccc")} only: ${facts.join("; ")}. ` : "";
       const summary = run.status === "unchanged" ? `${lead}The plan already fits: nothing to change. ${run.summary}` : `${lead}${run.summary}${run.status === "applied" ? " (The user can undo this.)" : run.status === "proposed" ? ` ${WAITING}` : ""}`;
-      return { ok: true, mutated: true, summary, data: run.results.map((r) => ({ date: r.date, blocks: r.blocks.map((b) => ({ title: b.title, start: b.starts_at, end: b.ends_at, assumed: b.basis === "inferred" })), ...v2Data(r) })) };
+      const view = runView(run.results, zone, run);
+      return { ok: true, mutated: true, summary, ...view, ...(facts.length && view.detail ? { detail: [...facts.map((f) => `Just ${dayName(first, zone)}: ${f}`), ...view.detail] } : {}), data: run.results.map((r) => ({ date: r.date, blocks: r.blocks.map((b) => ({ title: b.title, start: b.starts_at, end: b.ends_at, assumed: b.basis === "inferred" })), ...v2Data(r) })) };
     },
   }),
   tool({
@@ -734,7 +773,12 @@ export const TOOLS = [
       if (i.kind !== "capacity" && (!i.start || !i.end)) return { ok: false, summary: "Busy or free needs start and end (HH:MM)." };
       const date = resolveDate(i.date, ctx.timezone);
       const said = await addException(ctx, { date, kind: i.kind, start_time: i.start ?? null, end_time: i.end ?? null, minutes: i.minutes ?? null, note: i.note ?? null });
-      return { ok: true, mutated: true, summary: `Saved for ${DateTime.fromISO(date, { zone: ctx.timezone }).toFormat("cccc LLL d")} only: ${said}. Call plan to re-plan around it.` };
+      const zone = ctx.timezone;
+      const display =
+        i.kind === "capacity"
+          ? `Noted: at most ${i.minutes! >= 60 ? `${Math.round((i.minutes! / 60) * 10) / 10} hours` : `${i.minutes} min`} of work ${dayName(date, zone)}`
+          : `Noted: you're ${i.kind} ${partOfDay(atLocalTime(date, i.start!, zone), nowIn(zone))}`;
+      return { ok: true, mutated: true, summary: `Saved for ${DateTime.fromISO(date, { zone }).toFormat("cccc LLL d")} only: ${said}. Call plan to re-plan around it.`, display, detail: [`Just ${dayName(date, zone)}: ${said}`] };
     },
   }),
   tool({
@@ -771,23 +815,26 @@ export const TOOLS = [
       } else {
         await createRow(ctx, "event_occurrence_overrides", values, what);
       }
-      return { ok: true, mutated: true, summary: `${what} (the weekly event is unchanged). Call plan for that day to use the time.` };
+      const day = dayName(date, zone);
+      const display = i.action === "cancel" ? `Skipped ${q(ev.title)} just ${day}` : `Moved ${q(ev.title)} just ${day}`;
+      return { ok: true, mutated: true, summary: `${what} (the weekly event is unchanged). Call plan for that day to use the time.`, display, detail: [i.action === "cancel" ? `${shortTitle(ev.title)}: off just ${day} (the usual one stays)` : `${shortTitle(ev.title)} → ${clockFor(values.starts_at!, zone)} just ${day}`] };
     },
   }),
   tool({
     name: "move_block",
     description:
       "Move planned work blocks to new times and pin them there (re-plans then leave them alone), e.g. 'move my studying earlier', 'put Chemistry at 4'. Get block ids from get_plan. The rest of that day is re-fitted around them automatically. Never moves fixed things; a fixed block becomes a card.",
-    schema: z.object({ moves: z.array(z.object({ block_id: z.string().uuid(), start: z.string().describe("New start, ISO date-time with the user's offset") })).min(1).max(6) }),
+    schema: z.object({ moves: z.array(z.object({ block_id: z.string().uuid(), start: z.string().describe("New start: local HH:MM on the block's day (as the user said it), 'now', or an ISO date-time with the user's offset. 'now' is read from the real clock by Navi's code.") })).min(1).max(6) }),
     run: async (ctx, { moves }) => {
       const zone = ctx.timezone;
       const done: string[] = [];
       const problems: string[] = [];
       const dates = new Set<string>();
+      const changes: PlanChange[] = [];
       let waiting = false;
       for (const m of moves) {
         const b = await getEntity<PlanBlock>(ctx, "plan_blocks", m.block_id);
-        const start = DateTime.fromISO(m.start, { setZone: true }).setZone(zone);
+        const start = resolveClock(m.start, b.plan_date, zone, nowIn(zone)) ?? DateTime.fromISO(m.start, { setZone: true }).setZone(zone);
         if (!start.isValid) {
           problems.push(`“${b.title}”: not a valid time`);
           continue;
@@ -803,17 +850,22 @@ export const TOOLS = [
         if (r.kind === "approval_requested") waiting = true;
         else {
           done.push(`“${b.title}” → ${start.toFormat("ccc h:mm a")}`);
+          changes.push({ kind: "move", title: b.title, at: start.toISO()!, from: b.starts_at });
           dates.add(date);
           if (b.plan_date !== date) dates.add(b.plan_date);
         }
       }
       let refit = "";
+      let refitView: StepView = {};
       if (dates.size) {
         const run = await planDays(ctx, [...dates], { trigger: "chat" });
         refit = run.status === "unchanged" ? " Nothing else needed to move." : ` Re-fitted the rest: ${run.summary}`;
+        if (run.status === "applied") refitView = runView(run.results, zone, run);
       }
       const parts = [done.length ? `Moved and pinned ${done.join(", ")}.${refit}` : "", problems.length ? `Not moved: ${problems.join("; ")}.` : "", waiting ? `A fixed block needs the user's OK. ${WAITING}` : ""].filter(Boolean);
-      return { ok: done.length > 0 || waiting, mutated: done.length > 0 || waiting, summary: parts.join(" ") };
+      const display = changes.length === 1 ? `Moved ${q(changes[0].title)}` : changes.length ? `Moved ${things(changes.length)}` : "";
+      const detail = [...changes.map((c) => changeLine(c, zone, nowIn(zone).toISODate()!)), ...(refitView.detail ?? []).filter((l) => !changes.some((c) => l.startsWith(shortTitle(c.title))))];
+      return { ok: done.length > 0 || waiting, mutated: done.length > 0 || waiting, summary: parts.join(" "), display, detail, plan: true, ...(refitView.leftover ? { leftover: refitView.leftover } : {}), ...(problems.length && !done.length ? { display: "Couldn't move it there" } : {}) };
     },
   }),
   tool({
@@ -824,7 +876,7 @@ export const TOOLS = [
       const { data } = await ctx.db.from("activity_log").select("id,summary").eq("action", "plan_applied").is("reverted_at", null).order("created_at", { ascending: false }).limit(1).maybeSingle();
       if (!data) return { ok: false, summary: "There's no recent plan change to undo." };
       await revertActivities(ctx, [data.id]);
-      return { ok: true, mutated: true, summary: `Undid the last plan change (${String(data.summary).slice(0, 160)}).` };
+      return { ok: true, mutated: true, summary: `Undid the last plan change (${String(data.summary).slice(0, 160)}).`, display: "Put your plan back the way it was" };
     },
   }),
   tool({
@@ -840,7 +892,115 @@ export const TOOLS = [
     run: async (ctx, i) => {
       const what = `${i.free ? "Usually free" : "Usually busy"} ${i.days.map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d]).join("/")} ${i.start}–${i.end}${i.note ? ` (${i.note})` : ""}`;
       await createRow(ctx, "availability_rules", { days: i.days, start_time: i.start, end_time: i.end, kind: i.free ? "free" : "busy", basis: "confirmed", source: "chat", note: i.note ?? null }, what);
-      return { ok: true, mutated: true, summary: `Saved: ${what}.` };
+      return { ok: true, mutated: true, summary: `Saved: ${what}.`, display: `Saved when you're usually ${i.free ? "free" : "busy"}`, detail: [what] };
+    },
+  }),
+  tool({
+    name: "keep_off_until",
+    description:
+      "Keep tasks off the plan until a day, when the user says so ('keep the Module 3 items off until Monday', 'don't plan the essay before Friday'). Navi won't plan them before then, every later re-plan respects it, and the days they were already on are re-fitted now. until: a weekday name ('monday' = the next Monday, never today), 'tomorrow', or YYYY-MM-DD; Navi's code works out the date. until null lets them be planned again. The tasks stay on the list; nothing is dropped.",
+    schema: z.object({
+      task_ids: z.array(z.string().uuid()).min(1).max(30),
+      until: z.string().max(20).nullable().describe("'monday' … 'sunday', 'tomorrow', YYYY-MM-DD, or null to allow planning again"),
+    }),
+    run: async (ctx, { task_ids, until }) => {
+      const zone = ctx.timezone;
+      const now = nowIn(zone);
+      const date = until === null ? null : resolveDay(until, zone, now);
+      if (until !== null && !date) return { ok: false, summary: `Not a day Navi understands: “${until}”. Use a weekday name, 'tomorrow' or YYYY-MM-DD.` };
+      const notBefore = date ? DateTime.fromISO(date, { zone }).startOf("day").toISO()! : null;
+      const kept: string[] = [];
+      let waiting = 0;
+      for (const id of [...new Set(task_ids)]) {
+        const r = await updateTask(ctx, id, { not_before: notBefore });
+        if (r.kind === "approval_requested") waiting++;
+        else kept.push(r.row.title);
+      }
+      // The days they're already planned on before then are re-fitted now.
+      const today = now.toISODate()!;
+      const { data: planned } = await ctx.db.from("plan_blocks").select("plan_date").in("task_id", task_ids).eq("status", "planned").eq("is_flexible", true).gte("plan_date", today);
+      const dates = [...new Set(((planned ?? []) as { plan_date: string }[]).map((b) => b.plan_date).filter((d) => !date || d < date))].sort();
+      let refit = "";
+      let view: StepView = {};
+      if (kept.length && dates.length) {
+        if (await plannerV2For(ctx)) {
+          const run = await planDays(ctx, dates, { trigger: "chat" });
+          refit = ` Re-fitted ${dates.join(", ")}: ${run.summary}`;
+          if (run.status === "applied") view = runView(run.results, zone, run);
+        } else {
+          const rs = [];
+          for (const d of dates) rs.push(await generateDayPlan(ctx, d, { trigger: "chat" }));
+          refit = ` Re-planned ${dates.join(", ")}: ${rs.map((r) => summarizeDayPlan(r, zone)).join(" ")}`;
+          view = { irreversible: true, detail: planView(rs, zone).detail };
+        }
+      }
+      const when = date ? dayName(date, zone) : null;
+      const summary = `${kept.length ? `${date ? `Kept off the plan until ${DateTime.fromISO(date, { zone }).toFormat("cccc LLL d")} (not_before set)` : "Allowed to be planned again (not_before cleared)"}: ${kept.map((t) => `“${t}”`).join(", ")}.` : ""}${waiting ? ` ${waiting} change${waiting === 1 ? "" : "s"} need the user's OK. ${WAITING}` : ""}${refit}`.trim();
+      return {
+        ok: kept.length > 0 || waiting > 0,
+        mutated: kept.length > 0 || waiting > 0,
+        summary,
+        display: kept.length ? (when ? `Kept ${kept.length === 1 ? q(kept[0]) : things(kept.length)} off your plan until ${when}` : `${kept.length === 1 ? q(kept[0]) : things(kept.length)} can be planned again`) : "",
+        detail: [...(kept.length > 1 ? kept.map((t) => shortTitle(t)) : []), ...(view.detail ?? [])],
+        plan: true,
+        ...(view.irreversible ? { irreversible: true } : {}),
+      };
+    },
+  }),
+  tool({
+    name: "shift_blocks",
+    description:
+      "Move the rest of a day's planned work later or earlier, computed by Navi's code from the real clock (never work out the current time or new times yourself). 'Leave me free until 2:05' / 'nothing before 2:05' → start_at '14:05'; 'start now' → start_at 'now'; 'push everything 30 min' → minutes 30 ('15 min earlier' → -15). Work planned from `from` (default now) on moves; order is kept, fixed things are stepped over, and anything that would run past midnight stays put. One card, one Undo.",
+    schema: z.object({
+      date: z.string().regex(/^(\d{4}-\d{2}-\d{2}|today|tomorrow)$/).nullish().describe("Default today"),
+      start_at: z.union([HHMM, z.literal("now")]).nullish().describe("Nothing starts before this local time (or 'now'); later work moves only as needed"),
+      minutes: z.number().int().min(-480).max(480).nullish().describe("Move everything by this many minutes (negative = earlier)"),
+      from: z.union([HHMM, z.literal("now")]).nullish().describe("Only work planned from this local time on moves (default now)"),
+    }),
+    run: async (ctx, i) => {
+      const zone = ctx.timezone;
+      const now = nowIn(zone);
+      const date = resolveDate(i.date, zone);
+      if ((i.start_at == null) === (i.minutes == null)) return { ok: false, summary: "Give exactly one of start_at or minutes." };
+      const from = resolveClock(i.from ?? "now", date, zone, now)!;
+      const startAt = i.start_at ? resolveClock(i.start_at, date, zone, now) : null;
+      const { data } = await ctx.db.from("plan_blocks").select("*").eq("plan_date", date).eq("status", "planned").eq("is_flexible", true).gte("starts_at", (from < now ? now : from).minus({ minutes: 1 }).toUTC().toISO()!);
+      const blocks = ((data ?? []) as PlanBlock[]).filter((b) => DateTime.fromISO(b.starts_at) >= from.minus({ minutes: 1 }));
+      if (!blocks.length) return { ok: true, summary: `Nothing planned on ${date} from ${from.toFormat("h:mm a")} on, so nothing moved.`, display: "Nothing planned then, so nothing moved", plan: true, unchanged: true };
+      const movingIds = new Set(blocks.map((b) => b.id));
+      const busy = (await fixedSpans(ctx, date)).filter((f) => !f.blockId || !movingIds.has(f.blockId));
+      const spans = blocks.map((b) => ({ id: b.id, start: DateTime.fromISO(b.starts_at).setZone(zone), end: DateTime.fromISO(b.ends_at).setZone(zone) }));
+      const { moves, stuck } = shiftTimes(spans, busy, { startAt, minutes: i.minutes ?? null, earliest: now, dayEnd: DateTime.fromISO(date, { zone }).endOf("day") });
+      const v2 = await plannerV2For(ctx);
+      const changes: PlanChange[] = [];
+      let waiting = false;
+      for (const m of moves) {
+        const b = blocks.find((x) => x.id === m.id)!;
+        const r = await updateEntity(ctx, "plan_blocks", b.id, { starts_at: m.start.toISO(), ends_at: m.end.toISO(), ...(v2 ? { pinned: true } : {}) }, { summary: `Moved “${b.title}” to ${m.start.toFormat("ccc h:mm a")}` });
+        if (r.kind === "approval_requested") waiting = true;
+        else changes.push({ kind: "move", title: b.title, at: m.start.toISO()!, from: b.starts_at });
+      }
+      const stuckTitles = stuck.map((id) => blocks.find((b) => b.id === id)!.title);
+      const summary = [
+        changes.length ? `Moved ${changes.map((c) => `“${c.title}” → ${DateTime.fromISO(c.at!).setZone(zone).toFormat("h:mm a")}`).join(", ")}${v2 ? " (pinned)" : ""}.` : "Nothing needed to move.",
+        stuckTitles.length ? `Left where they were (would run past midnight): ${stuckTitles.map((t) => `“${t}”`).join(", ")}.` : "",
+        waiting ? `Some moves need the user's OK. ${WAITING}` : "",
+      ].filter(Boolean).join(" ");
+      const display = !changes.length
+        ? "Nothing needed to move"
+        : startAt
+          ? i.start_at === "now" ? `Moved ${things(changes.length)} to start now` : "Cleared your time until then"
+          : `Moved ${things(changes.length)} ${Math.abs(i.minutes!)} min ${i.minutes! > 0 ? "later" : "earlier"}`;
+      return {
+        ok: true,
+        mutated: changes.length > 0 || waiting,
+        summary,
+        display,
+        detail: changes.map((c) => changeLine(c, zone, date)),
+        plan: true,
+        ...(changes.length ? {} : { unchanged: true }),
+        ...(stuckTitles.length ? { leftover: { line: `${things(stuckTitles.length)} wouldn't fit ${dayName(date, zone)}`, options: [`${stuckTitles.slice(0, 3).map((t) => q(t, 30)).join(", ")}${stuckTitles.length > 3 ? ` and ${stuckTitles.length - 3} more` : ""} stayed where ${stuckTitles.length === 1 ? "it was" : "they were"}.`, "Tell me what can wait and I'll make room."] } } : {}),
+      };
     },
   }),
   tool({
@@ -855,7 +1015,7 @@ export const TOOLS = [
     }),
     run: async (ctx, input) => {
       const m = await addMemory(ctx, { ...input, confidence: input.origin === "inferred" ? Math.min(input.confidence, 0.8) : input.confidence });
-      return { ok: true, mutated: true, summary: `Remembered: ${m.content.slice(0, 80)}` };
+      return { ok: true, mutated: true, summary: `Remembered: ${m.content.slice(0, 80)}`, display: `Remembered: ${m.content.length > 70 ? `${m.content.slice(0, 67).replace(/\s+\S*$/, "")}…` : m.content}` };
     },
   }),
   tool({
@@ -888,7 +1048,7 @@ export const TOOLS = [
       if (error) return { ok: false, summary: error.message };
       // Planner v2 (B6): a settings change, availability included, can be undone.
       await logActivity(ctx, v2 ? { action: "settings_updated", entityType: "profiles", entityId: ctx.userId, summary: `Updated settings: ${Object.keys(patch).join(", ")}`, before: prior, after: patch, reversible: true } : { action: "settings_updated", summary: `Updated settings: ${Object.keys(patch).join(", ")}` });
-      return { ok: true, mutated: true, summary: `Updated ${Object.keys(patch).join(", ")}${v2 && "availability" in patch ? " (usual free times; the user can undo this)" : ""}` };
+      return { ok: true, mutated: true, summary: `Updated ${Object.keys(patch).join(", ")}${v2 && "availability" in patch ? " (usual free times; the user can undo this)" : ""}`, display: `Updated your ${fieldWords(Object.keys(patch))}` };
     },
   }),
   tool({
@@ -921,7 +1081,7 @@ export const TOOLS = [
     run: async (ctx, { table, id }) => {
       const r = await deleteEntity(ctx, table as EntityTable, id);
       if (r.kind === "approval_requested") return { ok: true, mutated: true, summary: `Deleting needs the user's OK. ${WAITING}` };
-      return { ok: true, mutated: true, summary: `Deleted the ${table.replace(/s$/, "")}` };
+      return { ok: true, mutated: true, summary: `Deleted the ${table.replace(/s$/, "")}`, display: "Deleted it" };
     },
   }),
   tool({
@@ -931,7 +1091,7 @@ export const TOOLS = [
     schema: z.object({ action_id: z.string().uuid(), changes: z.record(z.string(), z.unknown()) }),
     run: async (ctx, { action_id, changes }) => {
       const a = await reviseApproval(ctx, action_id, changes);
-      return { ok: true, mutated: true, summary: `Changed the waiting action: ${a.summary}. The card now shows the new details and still needs the user's tap.` };
+      return { ok: true, mutated: true, summary: `Changed the waiting action: ${a.summary}. The card now shows the new details and still needs the user's tap.`, display: "Updated the card" };
     },
   }),
   tool({
@@ -940,7 +1100,7 @@ export const TOOLS = [
     schema: z.object({ action_id: z.string().uuid() }),
     run: async (ctx, { action_id }) => {
       const a = await decideApproval(ctx, action_id, "reject");
-      if (a.status === "declined") return { ok: true, mutated: true, summary: `Dropped: ${a.summary}. Nothing was done.` };
+      if (a.status === "declined") return { ok: true, mutated: true, summary: `Dropped: ${a.summary}. Nothing was done.`, display: "Dropped it; nothing changed" };
       return { ok: false, summary: `That action is already ${a.status}, so it couldn't be dropped.` };
     },
   }),
@@ -951,7 +1111,7 @@ export const TOOLS = [
     run: async (ctx, { summary }) => {
       await ctx.db.from("profiles").update({ onboarding_status: "reviewing" }).eq("id", ctx.userId);
       await logActivity(ctx, { action: "onboarding_ready", summary: `Proposed initial setup: ${summary.slice(0, 200)}` });
-      return { ok: true, mutated: true, summary: "Setup is ready for the user to review" };
+      return { ok: true, mutated: true, summary: "Setup is ready for the user to review", display: "Your setup is ready to review" };
     },
   }),
 ] as const;
@@ -1004,9 +1164,12 @@ export async function runTool(ctx: Ctx, name: string, rawInput: unknown): Promis
   try {
     const result = await t.run(stepCtx, parsed.data);
     const actionId = actions.at(-1);
-    return { ...result, ...(actionId ? { actionId } : {}), ...(undo.length ? { undo } : {}) };
+    // People see `display`; a tool that didn't set one gets a cleaned line from its summary.
+    const display = result.display ?? (result.ok ? legacyDisplay({ name, ok: result.ok, summary: result.summary }) : "");
+    const plan = result.plan ?? PLAN_TOOLS.includes(name);
+    return { ...result, display, ...(plan ? { plan } : {}), ...(actionId ? { actionId } : {}), ...(undo.length ? { undo } : {}) };
   } catch (err) {
-    return { ok: false, summary: err instanceof Error ? err.message : String(err) };
+    return { ok: false, summary: err instanceof Error ? err.message : String(err), display: "" };
   }
 }
 

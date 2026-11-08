@@ -29,7 +29,7 @@ export function RecoveryButton({ className = "btn" }: { className?: string }) {
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-sm md:items-center" onClick={() => setOpen(false)}>
           <div role="dialog" aria-modal="true" aria-labelledby="recover-title" className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-[20px] border border-border-strong bg-[#111215] p-5 shadow-[0_-20px_60px_-20px_rgba(0,0,0,0.8)] md:rounded-[20px] safe-bottom" onClick={(e) => e.stopPropagation()}>
             <h2 id="recover-title" className="h2">What happened?</h2>
-            <p className="muted mt-1 text-sm">Only blocks in that time are marked. Unfinished work stays on your list: Navi re-plans the rest of today, and moves what no longer fits to tomorrow.</p>
+            <p className="muted mt-1 text-sm">Only what was planned for that time is marked. Unfinished work stays on your list: Navi re-plans the rest of today, and moves what no longer fits to tomorrow.</p>
             <form
               className="mt-3 flex flex-col gap-3"
               onSubmit={(e) => {
@@ -39,7 +39,7 @@ export function RecoveryButton({ className = "btn" }: { className?: string }) {
                   // as today in the person's profile timezone, not this browser's zone.
                   const r = await recoverPlanAction({ description: description || CATEGORIES.find((c) => c[0] === category)![1], category, availableFrom: freeAt || null, since: since || null });
                   if (r.ok) {
-                    setResult((r.data as { summary: string }).summary);
+                    setResult((r.data as { message: string }).message);
                     announceChange();
                   } else setResult(r.error);
                 });

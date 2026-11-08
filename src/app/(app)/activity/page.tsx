@@ -8,6 +8,7 @@ import { revertActivityAction } from "../actions";
 import { actionView, revertedAmong } from "@/server/domain/approvals";
 import { isOpen } from "@/lib/actions";
 import { ActionList } from "@/components/action-list";
+import { plainActivity } from "@/lib/plain-text";
 
 export const metadata = { title: "Activity · Navi" };
 
@@ -109,11 +110,11 @@ export default async function ActivityPage() {
                     <li key={e.id} className="flex items-start gap-3 px-4 py-3 text-sm sm:px-5">
                       <span className={`badge mt-px w-[4.5rem] shrink-0 justify-center ${cls}`}>{who}</span>
                       <div className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
-                        <span className={`break-words ${e.reverted_at ? "muted line-through" : ""}`}>{e.summary}</span>
+                        <span className={`break-words ${e.reverted_at ? "muted line-through" : ""}`}>{plainActivity(e.summary, ctx.timezone)}</span>
                         <span className="dim num shrink-0 text-[13px]">{time(e.created_at)}{e.reverted_at ? " · undone" : ""}</span>
                       </div>
                       {e.reversible && !e.reverted_at && (
-                        <ActionButton className="btn btn-ghost btn-sm -my-1.5 shrink-0" confirm={`Undo: ${e.summary}?`} action={revertActivityAction} args={[e.id]}>Undo</ActionButton>
+                        <ActionButton className="btn btn-ghost btn-sm -my-1.5 shrink-0" confirm={`Undo: ${plainActivity(e.summary, ctx.timezone)}?`} action={revertActivityAction} args={[e.id]}>Undo</ActionButton>
                       )}
                     </li>
                   );

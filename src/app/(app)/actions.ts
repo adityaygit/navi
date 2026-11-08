@@ -18,7 +18,7 @@ import { actionView, decideApproval, revertedAmong } from "@/server/domain/appro
 import { revertActivities, revertActivity } from "@/server/domain/activity";
 import type { ActionView } from "@/lib/actions";
 import { generateDayPlan, generateWeekPlan, recoverPlan, setBlockOutcome } from "@/server/planner/plan";
-import { summarizeDayPlan, summarizeWeekPlan } from "@/lib/plan-summary";
+import { planMessage, planView } from "@/lib/plan-summary";
 import {
   EventCreate,
   GoalCreate,
@@ -193,12 +193,12 @@ export async function restartOnboardingAction() {
 
 // ---- planner ---------------------------------------------------------------
 const PlanDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish();
-// Planning results are summarized for the person (placed / moved / didn't fit / warnings).
+// Planning results are told in one plain sentence (how much was planned, how much didn't fit); My day shows the rest.
 export async function planDayAction(date?: string | null) {
-  return act((ctx) => generateDayPlan(ctx, PlanDate.parse(date) ?? undefined), (r, ctx) => summarizeDayPlan(r, ctx.timezone));
+  return act((ctx) => generateDayPlan(ctx, PlanDate.parse(date) ?? undefined), (r, ctx) => planMessage(planView([r], ctx.timezone, { changes: r.run?.changes, unchanged: r.run?.status === "unchanged" })));
 }
 export async function planWeekAction(start?: string | null) {
-  return act((ctx) => generateWeekPlan(ctx, PlanDate.parse(start)), (rs, ctx) => summarizeWeekPlan(rs, ctx.timezone));
+  return act((ctx) => generateWeekPlan(ctx, PlanDate.parse(start)), (rs, ctx) => planMessage(planView(rs, ctx.timezone, { unchanged: rs[0]?.run?.status === "unchanged" })));
 }
 const BlockOutcome = z.object({
   status: z.enum(["done", "partial", "skipped", "missed", "rest", "interrupted", "planned"]),
@@ -257,7 +257,7 @@ export async function decideApprovalAction(id: string, decision: "approve" | "re
 /** Undo everything one of Navi's steps (or an approved action) changed. */
 export async function undoChangesAction(activityIds: string[]) {
   return act(async (ctx) => {
-    const ids = z.array(z.string().uuid()).min(1).max(20).parse(activityIds);
+    const ids = z.array(z.string().uuid()).min(1).max(100).parse(activityIds);
     return revertActivities(ctx, ids);
   }, (r) => r.message);
 }

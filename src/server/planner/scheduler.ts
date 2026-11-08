@@ -144,9 +144,9 @@ export function scheduleDay(input: SchedulerInput): SchedulerOutput {
   // 2. Available time: declared windows for this weekday, not in the past.
   const windows = input.availability.filter((w) => w.days.includes(dow));
   if (input.availability.length === 0) {
-    warnings.push("No availability is set, so Navi didn't schedule flexible work. Tell Navi when you're usually free, or set it in Settings.");
+    warnings.push("Navi doesn't know when you're free yet, so it didn't plan any work. Tell Navi when you're usually free, or set it in Settings.");
   } else if (windows.length === 0) {
-    warnings.push("You have no availability on this day, so only fixed commitments are shown.");
+    warnings.push("You have no free time set for this day, so only your fixed plans are shown.");
   }
   const earliest = input.now > dayStart ? input.now.setZone(zone) : dayStart;
   let free: Interval[] = windows
@@ -168,7 +168,7 @@ export function scheduleDay(input: SchedulerInput): SchedulerOutput {
   // 3. Work queue: flexible routines for today, then tasks by score.
   // `total` is the whole (adjusted) amount of work, `minutes` what's still left
   // to place, so each block's reason can say which part of the work it is.
-  type Item = { title: string; task_id: string | null; routine_id: string | null; minutes: number; total: number; reason: string; score: number; dueBy?: DateTime };
+  type Item = { title: string; task_id: string | null; routine_id: string | null; minutes: number; total: number; reason: string; score: number; dueBy?: DateTime; notBefore?: DateTime };
   const queue: Item[] = [];
   for (const r of input.routines) {
     if (!r.active || !r.days.includes(dow) || r.start_time || keptRoutineIds.has(r.id)) continue;
@@ -186,6 +186,9 @@ export function scheduleDay(input: SchedulerInput): SchedulerOutput {
     const adjusted = Math.round(estimate * ratio);
     const remaining = Math.max(0, adjusted - t.actual_minutes - (keptTaskMinutes[t.id] ?? 0) - (input.alreadyScheduledMinutes?.[t.id] ?? 0));
     if (remaining <= 0) continue;
+    // "Keep it off until Monday": not planned before that time (a later day isn't "didn't fit").
+    const notBefore = t.not_before ? DateTime.fromISO(t.not_before).setZone(zone) : undefined;
+    if (notBefore && notBefore >= dayEnd) continue;
     const reasons: string[] = [];
     if (t.due_at) {
       const due = DateTime.fromISO(t.due_at).setZone(zone);
@@ -203,6 +206,7 @@ export function scheduleDay(input: SchedulerInput): SchedulerOutput {
       reason: reasons.join(", "),
       score: taskScore(t, input.now),
       dueBy: t.due_at ? DateTime.fromISO(t.due_at) : undefined,
+      notBefore: notBefore && notBefore > dayStart ? notBefore : undefined,
     });
   }
   queue.sort((a, b) => b.score - a.score || (a.dueBy?.toMillis() ?? Infinity) - (b.dueBy?.toMillis() ?? Infinity));
@@ -222,16 +226,20 @@ export function scheduleDay(input: SchedulerInput): SchedulerOutput {
     while (left > 0) {
       const whole = wholeNow();
       const need = whole ? left : minChunk;
-      const slotIdx = free.findIndex((f) => f.length("minutes") >= need);
+      // Work that mustn't start before a time only uses free time from then on.
+      const usable = (f: Interval) => (item.notBefore && f.start! < item.notBefore ? (item.notBefore < f.end! ? Interval.fromDateTimes(item.notBefore, f.end!) : null) : f);
+      const slotIdx = free.findIndex((f) => (usable(f)?.length("minutes") ?? 0) >= need);
       if (slotIdx === -1) break;
-      const slot = free[slotIdx];
+      const whole0 = free[slotIdx];
+      const slot = usable(whole0)!;
+      const before = slot.start! > whole0.start! ? [Interval.fromDateTimes(whole0.start!, slot.start!)] : [];
       let len = whole ? left : Math.min(left, maxBlock, Math.floor(slot.length("minutes")));
       const rest = left - len;
       if (rest > 0 && rest < minChunk) len = left - minChunk; // left ≥ 2·minChunk here, so both parts stay ≥ minChunk
       const start = slot.start!;
       const end = start.plus({ minutes: len });
       if (item.dueBy && start >= item.dueBy && item.dueBy > input.now && item.task_id && !afterDeadline.some((a) => a.task_id === item.task_id)) {
-        warnings.push(`“${item.title}” can only be scheduled after its deadline.`);
+        warnings.push(`“${item.title}” only fits after it's due.`);
         afterDeadline.push({ task_id: item.task_id, title: item.title, due_at: item.dueBy.toISO()! });
       }
       const part = len < item.total ? `; this block: ${len} of ${item.total}m` : "";
@@ -247,7 +255,7 @@ export function scheduleDay(input: SchedulerInput): SchedulerOutput {
       placedAny = true;
       left -= len;
       const after = end.plus({ minutes: buffer });
-      free.splice(slotIdx, 1, ...(after < slot.end! ? [Interval.fromDateTimes(after, slot.end!)] : []));
+      free.splice(slotIdx, 1, ...before, ...(after < slot.end! ? [Interval.fromDateTimes(after, slot.end!)] : []));
     }
     if (left > 0 && item.task_id) {
       unscheduled.push({
@@ -258,7 +266,7 @@ export function scheduleDay(input: SchedulerInput): SchedulerOutput {
         why: placedAny ? "Only part of it fits today" : wholeNow() ? `No free ${left}-minute slot left today` : "No free time left today",
       });
       if (item.dueBy && item.dueBy.setZone(zone).toISODate()! <= date) {
-        warnings.push(`“${item.title}” is due by today but ${left} min of work doesn't fit. Consider the recovery options.`);
+        warnings.push(`“${item.title}” is due today but ${left} min of it doesn't fit.`);
       }
     }
   }

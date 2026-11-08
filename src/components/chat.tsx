@@ -34,7 +34,7 @@ function applyEvent(items: LiveItem[], event: ChatStreamEvent, nextChunk: () => 
       if (items.some((i) => i.kind === "step" && i.id === event.id)) return items;
       return [...items, { kind: "step", id: event.id, name: event.name, label: event.label, readOnly: event.readOnly, status: "running" }];
     case "step_end":
-      return items.map((i) => (i.kind === "step" && i.id === event.id ? { ...i, status: event.ok ? "ok" : "failed", doneLabel: event.label, summary: event.summary, action: event.action } : i));
+      return items.map((i) => (i.kind === "step" && i.id === event.id ? { ...i, status: event.ok ? "ok" : "failed", doneLabel: event.label, display: event.display, detail: event.detail, plan: event.plan, leftover: event.leftover, action: event.action } : i));
     case "text": {
       const last = items[items.length - 1];
       const chunk = { id: nextChunk(), text: event.delta };

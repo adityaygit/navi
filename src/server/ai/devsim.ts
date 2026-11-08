@@ -9,6 +9,7 @@ import { parseDue, areaFor, detectAreas, extractAvailability, extractGoals, extr
 import type { AgentRequest, AgentResult } from "./agent";
 import { emitter, stepEndEvent, stepStartEvent, toolEventOf } from "./live";
 import { actionViews } from "@/server/domain/approvals";
+import { partOfDay, q, things } from "@/lib/plain-text";
 
 // Development simulator: a deterministic stand-in for the model so the full
 // product loop (onboarding, capture, inbox, planning) can be exercised and
@@ -67,10 +68,27 @@ function clock(h: string, m: string | undefined, ap: string | undefined): string
   return `${String(hr).padStart(2, "0")}:${m ?? "00"}`;
 }
 
-const clean = (s: string) => s.replace(/\s*\(The user can undo this\.\)/, "").trim();
+/**
+ * What a real reply adds after a plan change: nothing the card already shows,
+ * at most the one assumption to check (as a part of the day, not a clock
+ * time) and a pointer to the options when something didn't fit.
+ */
+function afterPlan(r: ToolResult): string {
+  if (!r.ok) return r.display || "That didn't work.";
+  if (r.actionId) return "It's on the card below; nothing changes until you approve it.";
+  const days = (Array.isArray(r.data) ? r.data : []) as { blocks?: { start: string; assumed?: boolean }[] }[];
+  const assumed = days.flatMap((d) => d.blocks ?? []).find((b) => b.assumed);
+  const parts: string[] = [];
+  if (assumed) parts.push(`I assumed you're free ${partOfDay(DateTime.fromISO(assumed.start, { setZone: true }))}; is that right?`);
+  if (r.leftover) parts.push("Not everything fit; the options are under the card.");
+  return parts.join(" ");
+}
 
 export async function planningIntent(text: string, ctx: Ctx, call: Call, step: Call): Promise<string | null> {
-  if (/^\s*undo( that| it| the plan)?\b/i.test(text)) return (await call("undo_plan", {})).summary;
+  if (/^\s*undo( that| it| the plan)?\b/i.test(text)) {
+    const r = await call("undo_plan", {});
+    return r.ok ? "Done, your plan is back the way it was." : r.summary;
+  }
 
   const nonNeg = text.match(/non-?negotiables?\b[\s:,-]*(?:are\s*)?(.*?)(?:\.\s*plan\b|\.\s*$|$)/i);
   if (nonNeg) {
@@ -82,7 +100,7 @@ export async function planningIntent(text: string, ctx: Ctx, call: Call, step: C
       marked.push(t.title);
     }
     const r = await call("plan", {});
-    return `Got it. ${marked.length ? `I marked ${marked.map((m) => `“${m}”`).join(", ")} as must-complete and` : "I"} built the rest of your day around them. ${clean(r.summary)}`;
+    return `Got it. ${marked.length ? `${marked.map((m) => q(m)).join(", ")} ${marked.length === 1 ? "is a must-do" : "are must-dos"}, and I` : "I"} planned the rest of your day around ${marked.length === 1 ? "it" : "them"}. ${afterPlan(r)}`.trim();
   }
 
   const haveBut = text.match(/i have (.+?) (tonight|today|this (?:afternoon|evening|morning))\b(.*?)\b(?:need|have) to (?:finish|do|study for|work on|get) (.+?)[.!]?$/i);
@@ -94,7 +112,7 @@ export async function planningIntent(text: string, ctx: Ctx, call: Call, step: C
     if (!ev && !busy.length) return `What time is ${what.trim()} ${haveBut[2].toLowerCase()}? I'll plan ${goal.trim()} around it.`;
     const focus = await tasksLike(ctx, goal);
     const r = await call("plan", { focus_task_ids: focus.map((t) => t.id), ...(busy.length ? { busy } : {}) });
-    return `${ev ? `“${ev.title}” stays where it is.` : `Noted ${what.trim()} ${busy[0].start}–${busy[0].end} for today only.`} ${focus.length ? `I put ${focus.map((t) => `“${t.title}”`).join(", ")} first.` : ""} ${clean(r.summary)}`.replace(/\s+/g, " ");
+    return `${ev ? `${q(ev.title)} stays where it is.` : `Noted ${what.trim()} for today only.`} ${focus.length ? `I put ${focus.map((t) => q(t.title)).join(", ")} first.` : ""} ${afterPlan(r)}`.replace(/\s+/g, " ").trim();
   }
 
   const cancelled = text.match(/(?:my\s+)?(.+?)\s+(?:is|got|was|has been)\s+cancel+ed\b/i) ?? text.match(/\bno\s+(.+?)\s+(?:today|tonight)\b/i);
@@ -104,7 +122,7 @@ export async function planningIntent(text: string, ctx: Ctx, call: Call, step: C
       const s = await call("skip_occurrence", { event_id: ev.id, date: "today", action: "cancel" });
       if (!s.ok) return s.summary;
       const r = await call("plan", {});
-      return `${s.summary.split(" (")[0]}; the weekly one stays. ${clean(r.summary)}`;
+      return `Cancelled just today's ${q(ev.title)}; the weekly one stays. ${afterPlan(r)}`.trim();
     }
   }
 
@@ -112,7 +130,7 @@ export async function planningIntent(text: string, ctx: Ctx, call: Call, step: C
   if (opened) {
     const span = { morning: ["08:00", "12:00"], afternoon: ["12:00", "17:00"], evening: ["17:00", "21:00"] }[opened[1].toLowerCase() as "morning" | "afternoon" | "evening"];
     const r = await call("plan", { free: [{ start: span[0], end: span[1] }] });
-    return `Nice. I treated your ${opened[1].toLowerCase()} as free and moved work earlier. ${clean(r.summary)}`;
+    return `Nice. I treated your ${opened[1].toLowerCase()} as free and moved work earlier. ${afterPlan(r)}`.trim();
   }
 
   const only = text.match(/\bonly have (\d+|one|two|three|four|five|six|a couple of|an?)\s*(hours?|hrs?|minutes?|mins?)\b/i);
@@ -121,8 +139,9 @@ export async function planningIntent(text: string, ctx: Ctx, call: Call, step: C
     const minutes = /^h/i.test(only[2]) ? n * 60 : n;
     const r = await call("plan", { capacity_minutes: minutes });
     const data = (r.data as { blocks: { title: string; start: string; end: string }[] }[] | undefined)?.[0];
-    const first = data?.blocks.map((b) => `“${b.title}”`).join(", ");
-    return `With ${minutes >= 60 ? `${minutes / 60} hour${minutes === 60 ? "" : "s"}` : `${minutes} minutes`}, prioritise ${first || "nothing new: what's planned already fills it"}. ${clean(r.summary)}`;
+    const titles = data?.blocks.map((b) => q(b.title)) ?? [];
+    const first = titles.length > 3 ? `${titles.slice(0, 2).join(", ")} and ${things(titles.length - 2)} more` : titles.join(", ");
+    return `With ${minutes >= 60 ? `${minutes / 60} hour${minutes === 60 ? "" : "s"}` : `${minutes} minutes`}, prioritise ${first || "nothing new: what's planned already fills it"}. ${afterPlan(r)}`.trim();
   }
 
   const behind = text.match(/\bbehind on ([^.,!]+)/i);
@@ -130,15 +149,46 @@ export async function planningIntent(text: string, ctx: Ctx, call: Call, step: C
     const focus = await tasksLike(ctx, behind[1]);
     if (!focus.length) return `I couldn't find a task for “${behind[1].trim()}”. Which task is it?`;
     const r = await call("plan", { focus_task_ids: focus.map((t) => t.id) });
-    return `Let's catch up on ${focus.map((t) => `“${t.title}”`).join(", ")}: it goes first for the rest of today. ${clean(r.summary)}`;
+    return `Let's catch up on ${focus.map((t) => q(t.title)).join(", ")}: it goes first for the rest of today. ${afterPlan(r)}`.trim();
   }
 
   if (/\b(build|plan|make|set up)\b.*\b(schedule|plan|day)\b.*\btomorrow\b|\btomorrow'?s (schedule|plan)\b/i.test(text)) {
     await step("get_plan", { date: "tomorrow" });
     const r = await call("plan", { date: "tomorrow" });
-    return clean(r.summary);
+    return `Tomorrow is planned; it's on My day. ${afterPlan(r)}`.trim();
   }
-  if (/\b(plan|organi[sz]e|schedule)\b.*\b(my day|today)\b/i.test(text)) return clean((await call("plan", {})).summary);
+  if (/\b(plan|organi[sz]e|schedule)\b.*\b(my day|today)\b/i.test(text)) {
+    const r = await call("plan", {});
+    return `Done; your day is on My day. ${afterPlan(r)}`.trim();
+  }
+  return null;
+}
+
+/** "Now"-relative plan changes and "keep it off until Monday", for both planners. Times are worked out by the tools. */
+async function relativeIntent(text: string, ctx: Ctx, call: Call): Promise<string | null> {
+  const keep = text.match(/\b(?:keep|leave)\s+(.+?)\s+off(?:\s+(?:my|the)\s+plan)?\s+(?:until|till|before)\s+(\w+)/i) ?? text.match(/\bdon'?t plan\s+(.+?)\s+(?:until|till|before)\s+(\w+)/i);
+  if (keep) {
+    const found = await tasksLike(ctx, keep[1]);
+    if (!found.length) return `I couldn't find tasks matching “${keep[1].trim()}”. Which ones?`;
+    const r = await call("keep_off_until", { task_ids: found.map((t) => t.id), until: keep[2].toLowerCase() });
+    if (!r.ok) return r.summary;
+    const day = keep[2].charAt(0).toUpperCase() + keep[2].slice(1).toLowerCase();
+    return `Okay, ${found.length === 1 ? `${q(found[0].title)} stays` : `those ${found.length} stay`} off your plan until ${day}.`;
+  }
+  const until = text.match(/\b(?:leave|keep|clear|give)\b.*?\b(?:till|until)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+  if (until) {
+    const r = await call("shift_blocks", { start_at: clock(until[1], until[2], until[3]) });
+    return r.ok ? (r.unchanged ? "You're already free until then." : "Done, you're free until then.") : r.summary;
+  }
+  const push = text.match(/\bpush\s+(?:everything|it all|my plan|the rest(?: of my day)?)(?:\s+back)?\s+(?:by\s+)?(\d{1,3})\s*(?:min|mins|minutes)\b/i);
+  if (push) {
+    const r = await call("shift_blocks", { minutes: Number(push[1]) });
+    return r.ok ? `Done, everything moved ${push[1]} minutes later.` : r.summary;
+  }
+  if (/\b(?:let'?s |i want to |i'?ll )?start (?:right )?now\b/i.test(text)) {
+    const r = await call("shift_blocks", { start_at: "now" });
+    return r.ok ? (r.unchanged ? "You're all set; nothing needed to move." : "Done, your next thing starts now.") : r.summary;
+  }
   return null;
 }
 
@@ -157,7 +207,7 @@ export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
     if (live) await pause(350 + Math.random() * 250);
     const r = await runTool(ctx, name, input);
     const action = r.actionId && req.onEvent ? (await actionViews(req.ctx, [r.actionId]))[r.actionId] : undefined;
-    emit(stepEndEvent(id, name, r.ok, r.summary, { action, undo: r.actionId ? undefined : r.undo }));
+    emit(stepEndEvent(id, name, r.ok, r, { action, undo: r.actionId ? undefined : r.undo }));
     return r;
   };
   const call = async (name: string, input: unknown) => {
@@ -184,7 +234,8 @@ export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
   const dropTask = req.mode === "chat" ? text.match(/^(?:please\s+)?(cancel|delete|remove)\s+(?:the\s+|my\s+)?(?:task\s+)?["“]?(.+?)["”]?[.!]?$/i) : null;
 
   // Planner v2: the six planning phrases from the brief, deterministically.
-  const v2Reply = req.mode === "chat" && (await plannerV2For(ctx)) ? await planningIntent(text, { ...ctx, plannerV2: true }, call, step) : null;
+  const relative = req.mode === "chat" ? await relativeIntent(text, ctx, call) : null;
+  const v2Reply = relative ?? (req.mode === "chat" && (await plannerV2For(ctx)) ? await planningIntent(text, { ...ctx, plannerV2: true }, call, step) : null);
 
   if (v2Reply !== null) {
     reply = v2Reply;
@@ -225,17 +276,15 @@ export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
     reply = String(r.data ?? r.summary).replace(/\s*\[[0-9a-f-]{36}\]/g, "");
   } else if (req.mode === "chat" && /\b(plan|organi[sz]e)\b.*\b(week)\b/i.test(text)) {
     const r = await call("plan_week", {});
-    reply = r.summary;
+    reply = `Planned your week; it's on My day. ${r.leftover ? "Not everything fit; the options are under the card." : ""}`.trim();
   } else if (req.mode === "chat" && /\b(plan|organi[sz]e|schedule)\b.*\b(day|today)\b/i.test(text)) {
     const r = await call("plan_day", {});
-    const data = (await step("get_overview", {})).data as string;
-    // The overview carries item IDs for the model; people don't need them.
-    const planLine = (data.split("\n").find((l) => l.startsWith("Today's plan")) ?? "").replace(/\s*\[[0-9a-f-]{36}\]/g, "");
-    reply = `${r.summary.replace(/\.$/, "")}. ${planLine}`;
+    // The card shows what was planned; the reply doesn't recite the schedule.
+    reply = `Done; your day is on My day. ${r.leftover ? "Not everything fit; the options are under the card." : ""}`.trim();
   } else if (req.mode === "chat" && /\b(plan (broke|fell apart)|got interrupted|ran out of time|i'?m behind|sick|unexpected)\b/i.test(text)) {
     const category = /sick|tired|rest/i.test(text) ? "rest" : /estimate|took longer/i.test(text) ? "estimate" : "interruption";
     const r = await call("recover_plan", { description: text.slice(0, 400), category });
-    reply = `That happens. ${r.summary} Nothing unfinished was dropped.`;
+    reply = `That happens. I reworked the rest of today, and nothing unfinished was dropped.${r.leftover ? " Not everything fit; the options are under the card." : ""}`;
   } else if (pending && /^(no|nope|nah|don'?t|never ?mind|forget it|decline)\b/i.test(text)) {
     const r = await call("decline_action", { action_id: pending.id });
     reply = r.ok ? "Okay, I won't do that. Nothing was changed." : r.summary;
@@ -262,14 +311,14 @@ export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
       estimate_minutes: est ? (est[2].toLowerCase().startsWith("h") ? Number(est[1]) * 60 : Number(est[1])) : null,
       user_command: text.slice(0, 300),
     });
-    reply = !r.ok ? r.summary : r.actionId ? "Here it is. Approve it and I'll add it, or tell me what to change." : `${r.summary.split(":")[0]}.`;
+    reply = !r.ok ? r.summary : r.actionId ? "Here it is. Approve it and I'll add it, or tell me what to change." : `${r.display}.`;
   } else if (dropTask) {
     const { data: task } = await ctx.db.from("tasks").select("id,title").ilike("title", `%${dropTask[2].replace(/[%_\\]/g, "\\$&")}%`).neq("status", "cancelled").limit(1).maybeSingle();
     if (!task) {
       reply = `I couldn't find a task called “${dropTask[2]}”.`;
     } else {
       const r = /cancel/i.test(dropTask[1]) ? await call("update_task", { id: task.id, status: "cancelled" }) : await call("delete_item", { table: "tasks", id: task.id });
-      reply = r.ok ? (r.actionId ? `That needs your OK first, so it's on the card below.` : r.summary) : r.summary;
+      reply = r.ok ? (r.actionId ? `That needs your OK first, so it's on the card below.` : `${r.display || "Done"}.`) : r.summary;
     }
   } else if (req.mode === "chat" && /^remember (that )?/i.test(text)) {
     const content = text.replace(/^remember (that )?/i, "");

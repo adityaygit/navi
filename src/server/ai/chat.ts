@@ -8,6 +8,7 @@ import { CHAT_SYSTEM, CHAT_SYSTEM_V2, ONBOARDING_SYSTEM } from "./prompts";
 import { plannerV2 } from "@/lib/planner-flag";
 import { runTool } from "./tools";
 import { nowIn } from "@/lib/time";
+import { nowLine } from "@/lib/time-words";
 import { UserFacingError } from "@/server/http";
 import type { AgentEvent, ChatStreamEvent } from "@/lib/chat-stream";
 import type { ActionView } from "@/lib/actions";
@@ -211,13 +212,17 @@ export async function upsertMessage(
 
 const PLANNER_CUES = /\b(plan|schedule|week|prioriti|reorgani|broke|behind|overwhelm|review|goal|deadline|realistic|strategy)\b/i;
 
-/** Context block appended after the cached system prompt. */
+/**
+ * Context block appended after the cached system prompt. It opens with the
+ * authoritative current time (the model has no clock of its own).
+ */
 export async function buildContext(ctx: Ctx, query: string, mode: AgentMode | "voice"): Promise<string> {
   const [overview, memories] = await Promise.all([runTool(ctx, "get_overview", {}), relevantMemories(ctx, query)]);
   const mem = memories.length
     ? memories.map((m) => `- (${m.kind}, ${m.origin}${m.origin === "inferred" ? `, confidence ${m.confidence}` : ""}) ${m.content}`).join("\n")
     : "(none yet)";
   return [
+    `${nowLine(ctx.timezone)}${mode === "voice" ? " (when this voice session started)" : ""} This is the real current time; use it.`,
     `Mode: ${mode}.`,
     `Current state (a snapshot taken at the start of this ${mode === "voice" ? "voice session" : "turn"}; call the read tools for other dates or anything that may have changed since):`,
     String(overview.data ?? ""),
@@ -372,7 +377,7 @@ export async function handleTurn(
       mode,
       role: mode === "onboarding" || PLANNER_CUES.test(input.text) ? "planner" : "fast",
       system: mode === "onboarding" ? ONBOARDING_SYSTEM : turnCtx.plannerV2 ? CHAT_SYSTEM_V2 : CHAT_SYSTEM,
-      context: `${context}\nUser's local time: ${nowIn(profile.timezone).toFormat("cccc yyyy-LL-dd HH:mm ZZ")}${viewingLine(input.viewing)}`,
+      context: `${context}\nUser's local time (same clock as the top): ${nowIn(profile.timezone).toFormat("cccc yyyy-LL-dd HH:mm ZZ")}${viewingLine(input.viewing)}`,
       history,
       userText: input.text,
       purpose: mode === "onboarding" ? "onboarding" : "chat",

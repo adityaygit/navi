@@ -6,10 +6,15 @@ import { eventOccurrence } from "@/server/planner/scheduler";
 import { occurrencesOn } from "@/server/planner/day-model";
 import { plannerV2 } from "@/lib/planner-flag";
 import { dayReview, weekInsights } from "@/server/domain/insights";
-import { formatTime } from "@/lib/time";
 import { deadlineRisks } from "@/server/planner/deadlines";
 import { learnFromWeek } from "@/server/domain/patterns";
 import type { PlanLike } from "@/lib/plan-summary";
+import { q, shortTitle, things } from "@/lib/plain-text";
+
+/** At most three names, then a count: briefings never list twenty things. */
+function list(items: string[], max = 3): string {
+  return items.length > max ? `${items.slice(0, max).join("; ")} and ${items.length - max} more` : items.join("; ");
+}
 
 // Briefings are generated deterministically from real data (no AI call), so
 // they are cheap, reliable, and never invent progress. Each is stored once per
@@ -65,13 +70,15 @@ export async function buildBriefing(db: SupabaseClient, profile: Profile, kind: 
     const due = (dueRes.data ?? []) as Task[];
     const overdue = due.filter((t) => t.due_at! < now.toISO()!);
     const dueToday = due.filter((t) => !overdue.includes(t));
-    lines.push(items.length ? `Fixed today: ${items.map((i) => `${i.title} at ${i.start.toFormat("h:mm a")}`).join("; ")}.` : "No fixed commitments today.");
-    if (conflicts.length) lines.push(`⚠ Schedule conflict: ${conflicts.join("; ")}.`);
-    lines.push(blocks.length ? `Planned work: ${blocks.map((b) => `${formatTime(b.starts_at, zone)} ${b.title}`).join("; ")}.` : profile.availability.length || plannerV2(profile.preferences) ? "No flexible work planned yet. Open Today to plan it." : "No flexible work planned: Navi doesn't know your availability yet.");
+    // Plain and short: the times are on My day, so the plan isn't recited here.
+    lines.push(items.length ? `Fixed today: ${list(items.map((i) => `${shortTitle(i.title)} (${i.start.toFormat(i.start.minute ? "h:mm a" : "h a")})`))}.` : "Nothing fixed today.");
+    if (conflicts.length) lines.push(`⚠ Two things overlap: ${conflicts.join("; ")}.`);
+    const work = blocks.filter((b) => b.status === "planned" || b.status === "in_progress");
+    lines.push(work.length ? `${things(work.length)} planned, starting with ${q(work[0].title)}. See My day for times.` : profile.availability.length || plannerV2(profile.preferences) ? "Nothing planned yet. Open My day to plan it." : "Nothing planned yet: tell Navi when you're usually free.");
     const assumed = (extras.plan as { assumptions?: string[] } | null | undefined)?.assumptions ?? [];
     if (assumed.length) lines.push(`${assumed.join(" ")} Tell Navi if that's wrong.`);
-    if (dueToday.length) lines.push(`Due today: ${dueToday.map((t) => `${t.title}${t.due_is_hard ? " (hard)" : ""}`).join("; ")}.`);
-    if (overdue.length) lines.push(`Overdue: ${overdue.map((t) => t.title).join("; ")}. Decide today: do it, reschedule it, or drop it.`);
+    if (dueToday.length) lines.push(`Due today: ${list(dueToday.map((t) => `${shortTitle(t.title)}${t.due_is_hard ? " (hard deadline)" : ""}`))}.`);
+    if (overdue.length) lines.push(`Overdue: ${list(overdue.map((t) => shortTitle(t.title)))}. Decide today: do it, move it, or drop it.`);
     const hardSoon = (hardRes.data ?? []) as Pick<Task, "id" | "title" | "due_at">[];
     const when = (iso: string) => DateTime.fromISO(iso).setZone(zone).toFormat("ccc h:mm a");
     if (hardSoon.length) lines.push(`Hard deadlines in the next 3 days: ${hardSoon.map((t) => `${t.title} (${when(t.due_at!)})`).join("; ")}.`);
@@ -81,10 +88,10 @@ export async function buildBriefing(db: SupabaseClient, profile: Profile, kind: 
     const riskIds = new Set(risks.map((r) => r.task_id));
     const didntFit = (extras.plan?.unscheduled ?? []).filter((u) => !riskIds.has(u.task_id));
     const afterDeadline = (extras.plan?.afterDeadline ?? []).filter((a) => !riskIds.has(a.task_id));
-    if (didntFit.length) lines.push(`Didn't fit in today's plan: ${didntFit.map((u) => `${u.title} (${u.remaining_minutes} min)`).join("; ")}. It stays on your list.`);
-    if (afterDeadline.length) lines.push(`Can only be scheduled after its deadline: ${afterDeadline.map((a) => `${a.title} (due ${when(a.due_at)})`).join("; ")}.`);
+    if (didntFit.length) lines.push(`Didn't fit in today's plan: ${list(didntFit.map((u) => `${shortTitle(u.title)} (${u.remaining_minutes} min)`))}. ${didntFit.length === 1 ? "It stays" : "They stay"} on your list.`);
+    if (afterDeadline.length) lines.push(`Only fits after it's due: ${list(afterDeadline.map((a) => `${shortTitle(a.title)} (due ${when(a.due_at)})`))}.`);
     if ((inboxRes.count ?? 0) > 0) lines.push(`${inboxRes.count} item${inboxRes.count === 1 ? "" : "s"} waiting in your inbox.`);
-    if ((apprRes.count ?? 0) > 0) lines.push(`${apprRes.count} approval${apprRes.count === 1 ? "" : "s"} waiting for you.`);
+    if ((apprRes.count ?? 0) > 0) lines.push(`${apprRes.count} change${apprRes.count === 1 ? "" : "s"} waiting for your OK.`);
     Object.assign(data, {
       fixed: items.length,
       planned: blocks.length,
