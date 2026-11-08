@@ -197,3 +197,8 @@ See `docs/navi-1.5/RESUME_CLOUD.md` for the full resume brief: state, open owner
 - Verified live: a normal browser at www.meetnavi.app gets the landing page; the desktop app (NaviDesktop user agent) is redirected to /login, which serves the 1.5 sign-in. The installers already built (Actions run 42384617232) open the new version; no rebuild needed.
 - Still open: sign-in by email code needs custom SMTP (owner setting up Resend). Once Resend SMTP is saved in Supabase: set OTP length 6, expiry 600 s, subject + template with `{{ .Token }}` (payload in session scratchpad `auth-patch.json`; link kept for old sessions). Until then: password sign-in (set one in Settings while signed in on the web).
 - Sign-in email DONE: owner connected Resend SMTP (sender noreply@mail.meetnavi.app) and rotated the Resend key in Vercel + Supabase. Hosted auth now: 6-digit code, 10-minute expiry, "Your Navi sign-in code" template (link kept for old sessions). Production redeployed for the new key. Test code request to the owner returned 200.
+
+## Session 3, part 4 — chat layout + small fixes (2026-11-08)
+- Composer fields seamless (`.bare-field`; no ring/box/pill highlight), scrollbars hidden globally (owner).
+- Chat layout (owner-approved canvas): Home is the chat in the centre (`/?c=<id>`), New chat + 10 recent chats in the sidebar (rename/delete, `/chats` for all), same conversation in the side panel on other pages with "Back to chat" and a "Navi opened <Page>" pill; `/chat` redirects. Branch claude/chat-layout merged; tsc/lint/vitest 289 green; Playwright desktop 30/30 on the branch.
+- Planner v2 (constraint-first) in progress on claude/planning-audit; owner approved all defaults D1–D10. Local only until reviewed; hosted migration needs owner OK.
