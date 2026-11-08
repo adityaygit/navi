@@ -84,6 +84,10 @@ export type Task = {
   remind_at?: string | null;
   /** Set once that reminder was sent. */
   reminded_at?: string | null;
+  /** must = must-complete (planned first); optional = only if there's room. Default normal. */
+  commitment?: TaskCommitment;
+  /** Don't plan work on it before this time. */
+  not_before?: string | null;
   source: string;
   completed_at: string | null;
   created_at: string;
@@ -100,6 +104,54 @@ export type Routine = {
   duration_minutes: number;
   is_fixed: boolean;
   active: boolean;
+  /** fixed = never moves; protected = kept, may shift within its window; flexible = fits where there's room. Null = from is_fixed. */
+  protection?: RoutineProtection | null;
+  kind?: RoutineKind | null;
+  /** The span a protected routine may move within (local times). */
+  window_start?: string | null;
+  window_end?: string | null;
+};
+
+export type TaskCommitment = "must" | "normal" | "optional";
+export type RoutineProtection = "fixed" | "protected" | "flexible";
+export type RoutineKind = "sleep" | "meal" | "exercise" | "recovery" | "other";
+export type Basis = "confirmed" | "inferred";
+
+/** Usual free/busy time beyond Settings' free-time list (availability_rules). */
+export type AvailabilityRule = {
+  id: string;
+  days: number[];
+  start_time: string;
+  end_time: string;
+  kind: "free" | "busy";
+  basis: Basis;
+  source: "settings" | "chat" | "onboarding" | "learned";
+  valid_from: string | null;
+  valid_until: string | null;
+  note: string | null;
+};
+
+/** A one-day fact (day_exceptions): busy or free for a stretch, or at most N minutes of work. */
+export type DayException = {
+  id: string;
+  date: string;
+  kind: "busy" | "free" | "capacity";
+  start_time: string | null;
+  end_time: string | null;
+  minutes: number | null;
+  note: string | null;
+  source: "chat" | "ui";
+};
+
+/** One session of a weekly event cancelled or moved (event_occurrence_overrides). */
+export type OccurrenceOverride = {
+  id: string;
+  event_id: string;
+  occurrence_date: string;
+  status: "cancelled" | "moved";
+  starts_at: string | null;
+  ends_at: string | null;
+  note?: string | null;
 };
 
 export type CalendarEvent = {
@@ -139,6 +191,12 @@ export type PlanBlock = {
   outcome_reason: string | null;
   created_by: "navi" | "user";
   reason: string | null;
+  /** Re-plans leave a pinned block where it is. */
+  pinned?: boolean;
+  /** Planned in time the person confirmed, or time Navi assumed was free. Null = old planner. */
+  basis?: Basis | null;
+  assumption?: string | null;
+  changeset_id?: string | null;
 };
 
 export type ProposalKind =
