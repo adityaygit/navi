@@ -91,10 +91,13 @@ body {
   background: var(--bg);
 }
 
-/* Thin, dark scrollbars (Windows draws wide light ones by default). */
+/* No visible scrollbars anywhere (owner's call): everything still scrolls with
+   the wheel, trackpad, keyboard and touch. */
 * {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
 }
 
 ::selection {
