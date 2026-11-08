@@ -202,3 +202,10 @@ See `docs/navi-1.5/RESUME_CLOUD.md` for the full resume brief: state, open owner
 - Composer fields seamless (`.bare-field`; no ring/box/pill highlight), scrollbars hidden globally (owner).
 - Chat layout (owner-approved canvas): Home is the chat in the centre (`/?c=<id>`), New chat + 10 recent chats in the sidebar (rename/delete, `/chats` for all), same conversation in the side panel on other pages with "Back to chat" and a "Navi opened <Page>" pill; `/chat` redirects. Branch claude/chat-layout merged; tsc/lint/vitest 289 green; Playwright desktop 30/30 on the branch.
 - Planner v2 (constraint-first) in progress on claude/planning-audit; owner approved all defaults D1–D10. Local only until reviewed; hosted migration needs owner OK.
+
+## Session 3, part 5 — planner v2 built (2026-11-08, branch claude/planning-audit, local only)
+- Constraint-first planner, stages M1–M7, behind `profiles.preferences.planner_v2` (default off; flag-off behaviour unchanged). Details: `docs/navi-1.5/PLANNING_AUDIT.md` Part 6.
+- Migration (LOCAL only, hosted needs owner OK): `supabase/migrations/20261110000001_constraint_planning.sql`.
+- Turn on for one account: `scripts/local-only.sh node scripts/planner-flag.mjs on person@example.com`.
+- Verified locally (devsim AI): tsc OK, eslint OK, vitest 40 files / 375 tests pass (unit 185, integration 190); Playwright desktop 14/17 on the relevant specs incl. new `planner-v2.spec.ts`. The 3 failures come from the chat layout work, not planner v2: a11y.spec and chats.spec ("Navi opened Activity" pill) fail the same way on `claude/bold-cori-laltf6` itself; actions.spec fails only on its axe check, the same `target-size` rule on the same sidebar collapse button.
+- Built with `next build --webpack` in the worktree (Turbopack refuses the symlinked node_modules).

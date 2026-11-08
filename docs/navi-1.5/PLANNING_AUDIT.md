@@ -1,6 +1,6 @@
 # Navi planning: audit and proposed plan (constraint-first, adaptive availability)
 
-**Status:** proposal for owner review. Nothing in Navi's scheduling behaviour has been changed.
+**Status:** owner approved all defaults D1–D10 (2026-11-08); **built** behind the per-account flag `profiles.preferences.planner_v2` (off by default). See Part 6 for the build status. The original proposal text below is unchanged.
 **Date:** 2026-11-08 · **Branch:** `claude/planning-audit` (from `claude/bold-cori-laltf6` = `main` @ `6d888d9`)
 **Added in this pass:** this document and two test files that record how the planner behaves today (listed in section 11). No app code changed.
 
@@ -437,3 +437,27 @@ A **proposal** is a `plan_changesets` row with `status='proposed'`. The calendar
 - Playwright not run (no UI change)
 
 No production deploy, no hosted database access, no app code changes.
+
+---
+
+## Part 6: Build status (2026-11-08, branch `claude/planning-audit`, local only)
+
+Owner approved D1–D10 as recommended. Everything is behind `profiles.preferences.planner_v2` (default off). With the flag off, the old planner runs unchanged; the characterization tests now pin that flag-off behaviour on purpose, and each ROOT CAUSE test names the v2 test that fixes it.
+
+| Stage | Commit | What |
+|---|---|---|
+| M1 | `32364c8` | Day model (confirmed / assumed / unknown / busy time, wake–bed, typical school/work hours, history), constraint-first scheduler v2, horizon shortfalls and ≤3 tradeoffs (pure, unit-tested; parity with v1 on confirmed-only input) |
+| M2 | `66cba5f` | Migration `supabase/migrations/20261110000001_constraint_planning.sql` (additive; applied to the LOCAL stack only) |
+| M3 | `6cc3c64` | Plans saved as change sets (block ids kept, stale checks, advisory lock), one Undo per run, proposals as "Apply plan" cards in ask mode (D4/D8) |
+| M4 | `7b1334f` | Chat tools (`plan`, `set_day_exception`, `skip_occurrence`, `move_block`, `undo_plan`, `set_usual_time`, dependencies, must-complete), v2 prompt, simulator intents |
+| M5 | `5bfca2c` | My day (free time from the day model, ≤2 assumptions with Yes/No, unknown time named, proposals, "Skip this one"), shared clash check, Settings "How Navi plans (preview)" |
+| M6 | `55b2075` | Focus overrun ("how much more?") re-fits the rest of today; measured work not double-counted; Insights free time |
+| M7 | `6a4e7eb` | `scripts/planner-flag.mjs`, scenario 10 migration tests, ROOT CAUSE tests re-labelled, v2 Playwright spec |
+
+**Bugs:** B1 (overnight windows), B2 (pins), B3 (routine rule text = planner), B4 (My day free time), B5 (placing over fixed things), B6 (undoable usual times), B7 (stable ids), B8 (ask mode), B9 (unplaced routines reported), B11 (tick without saved free times) fixed for v2 accounts, each with a test. Measured focus time counted twice was found and fixed during M6.
+
+**Deviation from 3.2:** usual free times stay in `profiles.availability` (Settings already edits it, and v1 reads it); `availability_rules` exists for future use but nothing is backfilled into it.
+
+**Turning it on for one account:** `scripts/local-only.sh node scripts/planner-flag.mjs on person@example.com` (also `off`, `status`); or Settings → "How Navi plans (preview)" (shown to admins, in development, or once on); or SQL `update profiles set preferences = coalesce(preferences,'{}'::jsonb) || '{"planner_v2": true}' where id = '<user id>';`. The hosted project needs the migration first (owner approval).
+
+**Known limits:** turning the flag off returns to v1, whose `replace_day_plan` ignores pins (pinned Navi blocks can be re-planned). One-day exceptions created through chat in ask mode are saved at once (only plans become proposals). Real-model (Claude/Gemini) behaviour with the new tools is not verified; only the devsim simulator was used.
