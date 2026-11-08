@@ -6,6 +6,7 @@ import { atLocalTime } from "@/lib/time";
 import { briefingUrl, saveBriefing, type BriefingKind } from "./briefings";
 import { dispatchDue, queueNotification } from "./notify";
 import { generateDayPlan } from "@/server/planner/plan";
+import { plannerV2 } from "@/lib/planner-flag";
 
 // The scheduler tick. Run every 5–15 minutes server-side (Trigger.dev
 // schedule or any cron hitting /api/cron/tick). It is idempotent: briefings
@@ -42,7 +43,8 @@ export async function tickUser(db: SupabaseClient, profile: Profile, now = DateT
       // and say in the briefing what didn't fit or only fits after its deadline.
       const { count } = await db.from("plan_blocks").select("id", { count: "exact", head: true }).eq("user_id", profile.id).eq("plan_date", date);
       const { count: briefed } = await db.from("briefings").select("id", { count: "exact", head: true }).eq("user_id", profile.id).eq("kind", "morning").eq("local_date", date);
-      if (!count && !briefed && profile.availability.length) plan = await generateDayPlan(ctx, date);
+      // Planner v2 doesn't need saved free times (B11): it works from what it knows.
+      if (!count && !briefed && (profile.availability.length || plannerV2(profile.preferences))) plan = await generateDayPlan(ctx, date, { trigger: "tick" });
     }
     const b = await saveBriefing(db, profile, kind, date, { plan, now });
     if (b) {

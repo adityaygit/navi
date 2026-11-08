@@ -13,6 +13,14 @@ const REVERTIBLE_TABLES = new Set([
   "memories",
   "notes",
   "milestones",
+  // Planner v2: one-day facts, usual times, session changes, dependencies,
+  // settings (B6: a free-time change can be undone), and whole planning runs.
+  "day_exceptions",
+  "availability_rules",
+  "event_occurrence_overrides",
+  "task_dependencies",
+  "profiles",
+  "plan_changesets",
 ]);
 
 export type ActivityInput = {
@@ -108,7 +116,11 @@ export async function revertActivity(ctx: Ctx, activityId: string): Promise<stri
   if (!claimed) throw new Error("Already undone");
 
   try {
-    if (entry.before === null) {
+    if (table === "plan_changesets") {
+      // A whole planning run: undone in one locked step, or not at all.
+      const { revertChangeset } = await import("@/server/planner/plan-v2");
+      await revertChangeset(ctx, entry.entity_id);
+    } else if (entry.before === null) {
       const { error: delErr } = await ctx.db.from(table).delete().eq("id", entry.entity_id);
       if (delErr) throw new Error(delErr.message);
     } else {

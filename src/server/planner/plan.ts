@@ -8,6 +8,8 @@ import { logActivity } from "@/server/domain/activity";
 import { nowIn } from "@/lib/time";
 import { OUTCOMES, withNote } from "@/lib/outcomes";
 import { refreshStoredReview } from "@/server/jobs/briefings";
+import { plannerV2 } from "@/lib/planner-flag";
+import { planDays, type PlanRun, type PlanTrigger } from "./plan-v2";
 
 // Persists the deterministic schedule. Navi may freely rearrange flexible
 // blocks it created; it never touches fixed blocks, user-created blocks, or
@@ -30,17 +32,34 @@ async function loadInputs(ctx: Ctx) {
   };
 }
 
-export type PlanResult = SchedulerOutput & { date: string; moved: number; estimateSamples: number; estimateRatio: number };
+export type PlanResult = SchedulerOutput & {
+  date: string;
+  moved: number;
+  estimateSamples: number;
+  estimateRatio: number;
+  /** Planner v2 only: the whole run this day was part of (change set, applied or proposed). */
+  run?: Omit<PlanRun, "results">;
+};
+
+type V2Opts = { trigger?: PlanTrigger; mode?: "apply" | "propose"; focusTaskIds?: string[] };
+
+function withRun(run: PlanRun): PlanResult[] {
+  const { results, ...rest } = run;
+  return results.map((r) => ({ ...r, run: rest }));
+}
 
 /** (Re)generate the flexible plan for one local date. */
 export async function generateDayPlan(
   ctx: Ctx,
   date?: string,
-  opts: { from?: DateTime; reasonPrefix?: string; /** Tasks moved here from another day: their blocks say so. */ carried?: { taskIds: string[]; from: string } } = {},
+  opts: { from?: DateTime; reasonPrefix?: string; /** Tasks moved here from another day: their blocks say so. */ carried?: { taskIds: string[]; from: string } } & V2Opts = {},
 ): Promise<PlanResult> {
   const profile = await getProfile(ctx);
   const zone = profile.timezone;
   const day = date ?? nowIn(zone).toISODate()!;
+  if (plannerV2(profile.preferences)) {
+    return withRun(await planDays(ctx, [day], { trigger: opts.trigger ?? "button", mode: opts.mode, from: opts.from, reasonPrefix: opts.reasonPrefix, focusTaskIds: opts.focusTaskIds }))[0];
+  }
   const { tasks, events, routines, estimate } = await loadInputs(ctx);
 
   const { data: existing } = await ctx.db.from("plan_blocks").select("*").eq("user_id", ctx.userId).eq("plan_date", day);
@@ -122,9 +141,14 @@ export async function generateDayPlan(
   return { ...out, date: day, moved, estimateSamples: estimate.samples, estimateRatio: estimate.ratio };
 }
 
-export async function generateWeekPlan(ctx: Ctx, startDate?: string | null) {
+export async function generateWeekPlan(ctx: Ctx, startDate?: string | null, opts: V2Opts = {}) {
   const profile = await getProfile(ctx);
   const start = startDate ?? nowIn(profile.timezone).toISODate()!;
+  if (plannerV2(profile.preferences)) {
+    // One change set for the whole week: one Undo, one card when proposed.
+    const days = Array.from({ length: 7 }, (_, i) => DateTime.fromISO(start, { zone: profile.timezone }).plus({ days: i }).toISODate()!);
+    return withRun(await planDays(ctx, days, { trigger: opts.trigger ?? "button", mode: opts.mode, focusTaskIds: opts.focusTaskIds }));
+  }
   const results: PlanResult[] = [];
   for (let i = 0; i < 7; i++) {
     const day = DateTime.fromISO(start, { zone: profile.timezone }).plus({ days: i }).toISODate()!;
@@ -227,6 +251,7 @@ export async function recoverPlan(
   );
   const untouchedEarlier = open.filter((b) => !affected.includes(b) && DateTime.fromISO(b.ends_at) <= windowStart);
   const outcome = recoveryOutcome(input.category, input.description);
+  if (plannerV2(profile.preferences)) return recoverPlanV2(ctx, { input, zone, now, today, from, windowStart, affected, untouchedEarlier, outcome });
   for (const b of affected) {
     await ctx.db.from("plan_blocks").update({ status: outcome.status, outcome_reason: outcome.reason }).eq("user_id", ctx.userId).eq("id", b.id);
   }
@@ -266,4 +291,55 @@ export async function recoverPlan(
   await logActivity(ctx, { action: "plan_recovered", summary: `Plan broke (${input.category}): ${summary}`.slice(0, 1000) });
   await refreshStoredReview(ctx.db, ctx.userId, today);
   return { summary, affected: affected.length, plan, tomorrow: next, movedToTomorrow: moved, notPlaced };
+}
+
+/**
+ * Planner v2 recovery: the same steps as recoverPlan, saved as ONE change set
+ * (blocks marked + today re-planned from when they're free + what no longer
+ * fits carried to tomorrow), so the whole recovery can be undone.
+ */
+async function recoverPlanV2(
+  ctx: Ctx,
+  s: {
+    input: { description: string; category: RecoveryCategory };
+    zone: string;
+    now: DateTime;
+    today: string;
+    from: DateTime;
+    windowStart: DateTime;
+    affected: PlanBlock[];
+    untouchedEarlier: PlanBlock[];
+    outcome: { status: PlanBlock["status"]; reason: string };
+  },
+) {
+  const { input, zone, now, today, from, windowStart, affected, untouchedEarlier, outcome } = s;
+  const tomorrow = now.plus({ days: 1 }).toISODate()!;
+  const run = await planDays(ctx, [today, tomorrow], {
+    trigger: "recovery",
+    from,
+    reasonPrefix: "Replanned",
+    carryFromFirstDay: true,
+    markBlocks: affected.map((b) => ({ id: b.id, status: outcome.status, outcome_reason: outcome.reason })),
+  });
+  const [plan, next] = withRun(run);
+  const carriedIds = plan.unscheduled.map((u) => u.task_id);
+  const moved = next.blocks.filter((b) => b.task_id && carriedIds.includes(b.task_id)).map((b) => ({ title: b.title, starts_at: b.starts_at }));
+  const notPlaced = next.unscheduled.filter((u) => carriedIds.includes(u.task_id));
+  const label = { rest: "as rest", interrupted: "interrupted", skipped: input.category === "estimate" ? "as taking longer than estimated" : "as blocked on missing info" }[outcome.status as "rest" | "interrupted" | "skipped"];
+  const t = (iso: string) => DateTime.fromISO(iso).setZone(zone).toFormat("h:mm a");
+  const parts = [
+    affected.length ? `${affected.length} block${affected.length === 1 ? "" : "s"} marked ${label} (${affected.map((b) => `“${b.title}”`).join(", ")}).` : "No planned blocks fell in that time.",
+    `${plan.blocks.length} block${plan.blocks.length === 1 ? "" : "s"} re-planned from ${from.toFormat("h:mm a")} today.`,
+  ];
+  if (moved.length) parts.push(`Moved to tomorrow: ${moved.map((m) => `“${m.title}” ${t(m.starts_at)}`).join(", ")}.`);
+  if (notPlaced.length) parts.push(`Not scheduled yet, still on your task list: ${notPlaced.map((u) => `“${u.title}” (${u.remaining_minutes} min)`).join(", ")}; there's no free time for it tomorrow either.`);
+  if (untouchedEarlier.length) parts.push(`${untouchedEarlier.length} earlier block${untouchedEarlier.length === 1 ? " isn't" : "s aren't"} marked yet; say how ${untouchedEarlier.length === 1 ? "it" : "they"} went in the evening review.`);
+  const opts = (plan as PlanResult & { tradeoffs?: string[] }).tradeoffs;
+  if (opts?.length) parts.push(`Options: ${opts.map((x, i) => `${i + 1}) ${x}`).join(" ")}`);
+  if (run.status === "applied") parts.push("You can undo this.");
+  const summary = parts.join(" ");
+  await ctx.db.from("plan_disruptions").insert({ user_id: ctx.userId, occurred_at: windowStart.toISO(), description: input.description, category: input.category, replan_summary: summary });
+  await logActivity(ctx, { action: "plan_recovered", summary: `Plan broke (${input.category}): ${summary}`.slice(0, 1000) });
+  await refreshStoredReview(ctx.db, ctx.userId, today);
+  return { summary, affected: affected.length, plan, tomorrow: next as PlanResult | null, movedToTomorrow: moved, notPlaced };
 }

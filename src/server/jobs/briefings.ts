@@ -1,8 +1,10 @@
 import "server-only";
 import { DateTime } from "luxon";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { CalendarEvent, PlanBlock, Profile, Routine, Task } from "@/lib/types";
+import type { CalendarEvent, OccurrenceOverride, PlanBlock, Profile, Routine, Task } from "@/lib/types";
 import { eventOccurrence } from "@/server/planner/scheduler";
+import { occurrencesOn } from "@/server/planner/day-model";
+import { plannerV2 } from "@/lib/planner-flag";
 import { dayReview, weekInsights } from "@/server/domain/insights";
 import { formatTime } from "@/lib/time";
 import { deadlineRisks } from "@/server/planner/deadlines";
@@ -16,13 +18,16 @@ import type { PlanLike } from "@/lib/plan-summary";
 export type BriefingKind = "morning" | "evening" | "weekly";
 
 async function fixedOn(db: SupabaseClient, userId: string, date: string, zone: string) {
-  const [ev, ro] = await Promise.all([
+  const [ev, ro, ov] = await Promise.all([
     db.from("events").select("*").eq("user_id", userId).neq("status", "cancelled"),
     db.from("routines").select("*").eq("user_id", userId).eq("active", true),
+    db.from("event_occurrence_overrides").select("*").eq("user_id", userId),
   ]);
   const dow = DateTime.fromISO(date, { zone }).weekday % 7;
+  // One-session changes (planner v2) apply: a cancelled session isn't listed, a moved one is at its new time.
+  const overrides = (ov.data ?? []) as OccurrenceOverride[];
   const items = [
-    ...((ev.data ?? []) as CalendarEvent[]).map((e) => ({ e, iv: eventOccurrence(e, date, zone) })).filter((x) => x.iv).map((x) => ({ title: x.e.title, start: x.iv!.start!, end: x.iv!.end! })),
+    ...((ev.data ?? []) as CalendarEvent[]).flatMap((e) => (overrides.length ? occurrencesOn(e, date, zone, overrides) : [eventOccurrence(e, date, zone)].filter((x): x is NonNullable<typeof x> => !!x)).map((iv) => ({ title: e.title, start: iv.start!, end: iv.end! }))),
     ...((ro.data ?? []) as Routine[]).filter((r) => r.start_time && r.days.includes(dow)).map((r) => {
       const s = DateTime.fromISO(`${date}T${r.start_time!.slice(0, 5)}`, { zone });
       return { title: r.title, start: s, end: s.plus({ minutes: r.duration_minutes }) };
@@ -62,7 +67,9 @@ export async function buildBriefing(db: SupabaseClient, profile: Profile, kind: 
     const dueToday = due.filter((t) => !overdue.includes(t));
     lines.push(items.length ? `Fixed today: ${items.map((i) => `${i.title} at ${i.start.toFormat("h:mm a")}`).join("; ")}.` : "No fixed commitments today.");
     if (conflicts.length) lines.push(`⚠ Schedule conflict: ${conflicts.join("; ")}.`);
-    lines.push(blocks.length ? `Planned work: ${blocks.map((b) => `${formatTime(b.starts_at, zone)} ${b.title}`).join("; ")}.` : profile.availability.length ? "No flexible work planned yet. Open Today to plan it." : "No flexible work planned: Navi doesn't know your availability yet.");
+    lines.push(blocks.length ? `Planned work: ${blocks.map((b) => `${formatTime(b.starts_at, zone)} ${b.title}`).join("; ")}.` : profile.availability.length || plannerV2(profile.preferences) ? "No flexible work planned yet. Open Today to plan it." : "No flexible work planned: Navi doesn't know your availability yet.");
+    const assumed = (extras.plan as { assumptions?: string[] } | null | undefined)?.assumptions ?? [];
+    if (assumed.length) lines.push(`${assumed.join(" ")} Tell Navi if that's wrong.`);
     if (dueToday.length) lines.push(`Due today: ${dueToday.map((t) => `${t.title}${t.due_is_hard ? " (hard)" : ""}`).join("; ")}.`);
     if (overdue.length) lines.push(`Overdue: ${overdue.map((t) => t.title).join("; ")}. Decide today: do it, reschedule it, or drop it.`);
     const hardSoon = (hardRes.data ?? []) as Pick<Task, "id" | "title" | "due_at">[];

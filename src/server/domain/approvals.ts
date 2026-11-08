@@ -172,6 +172,10 @@ export async function decideApproval(
     if (pastExpiry(row)) return expire(ctx, admin, row, "It waited too long without an answer.");
     const declined = await move(admin, row, "proposed", { status: "declined", decided_at: now });
     if (!declined) return reload();
+    const det = row.details as Record<string, unknown>;
+    if (det?.op === "apply_plan" && typeof det.changeset_id === "string") {
+      await ctx.db.from("plan_changesets").update({ status: "expired" }).eq("id", det.changeset_id).eq("status", "proposed");
+    }
     await logActivity(ctx, { action: "approval_rejected", entityType: "approvals", entityId: row.id, summary: `Declined: ${row.summary}` });
     return declined;
   }
@@ -256,6 +260,18 @@ async function executeApproved(ctx: Ctx, approval: Approval): Promise<{ summary:
     const name = (row: Record<string, unknown> | null) => String(row?.title ?? row?.name ?? d.subject ?? label).slice(0, 80);
 
     switch (d.op) {
+      case "apply_plan": {
+        // A plan Navi proposed (planner v2): applied exactly as shown, or not
+        // at all if the plan changed since (then the card expires).
+        const { applyChangeset, StalePlanError } = await import("@/server/planner/plan-v2");
+        try {
+          await applyChangeset(ctx, String(d.changeset_id), `Applied after you approved: ${approval.summary}`);
+        } catch (err) {
+          if (err instanceof StalePlanError) throw new StaleActionError(`${err.message}, so nothing was changed. Ask Navi for a fresh plan.`);
+          throw err;
+        }
+        return { summary: `Applied: ${approval.summary}` };
+      }
       case "create": {
         if (table !== "tasks") throw new Error(`Can't create ${table} this way`);
         const values = TaskCreate.parse(d.values);
@@ -478,6 +494,9 @@ export function actionView(a: Approval, zone: string, reverted: Set<string> = ne
   } else if (d.op === "settings") {
     verb = "Change settings";
     fields = fieldsOf(d.patch as Record<string, unknown>, zone);
+  } else if (d.op === "apply_plan") {
+    verb = "Apply plan";
+    fields = Array.isArray(d.lines) ? (d.lines as ActionField[]).slice(0, 8) : [];
   }
   const result = (a.result ?? {}) as { summary?: unknown; undo?: unknown };
   const undo = Array.isArray(result.undo) ? result.undo.map(String) : [];

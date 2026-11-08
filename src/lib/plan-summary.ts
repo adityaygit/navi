@@ -12,7 +12,31 @@ export type PlanLike = {
   unscheduled: { task_id: string; title: string; remaining_minutes: number; why?: string }[];
   afterDeadline: { task_id: string; title: string; due_at: string }[];
   warnings: string[];
+  // Planner v2 only (absent from the old planner, whose text is unchanged):
+  proposed?: boolean;
+  assumptions?: string[];
+  conflicts?: string[];
+  tradeoffs?: string[];
+  clarification?: string | null;
+  unplacedRoutines?: { title: string; why: string }[];
+  blockedTasks?: { title: string }[];
+  waiting?: { title: string; why: string }[];
 };
+
+const HELD = "Kept free so the day isn't packed";
+
+/** Planner v2's extra lines: conflicts, assumptions, what's waiting, options and the one question. */
+function v2Lines(r: PlanLike): string[] {
+  const out: string[] = [];
+  if (r.conflicts?.length) out.push(...r.conflicts);
+  if (r.assumptions?.length) out.push(`${r.assumptions.join(" ")} Tell me if that's wrong.`);
+  if (r.unplacedRoutines?.length) out.push(`Couldn't fit: ${r.unplacedRoutines.map((u) => `“${u.title}” (${u.why.charAt(0).toLowerCase()}${u.why.slice(1)})`).join(", ")}.`);
+  if (r.blockedTasks?.length) out.push(`Blocked, so not planned: ${list(r.blockedTasks.map((b) => `“${b.title}”`))}.`);
+  if (r.waiting?.length) out.push(`Waiting: ${list(r.waiting.map((w) => `“${w.title}” (${w.why})`))}.`);
+  if (r.tradeoffs?.length) out.push(`Options: ${r.tradeoffs.map((t, i) => `${i + 1}) ${t}`).join(" ")}`);
+  if (r.clarification) out.push(r.clarification);
+  return out;
+}
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const list = (items: string[], max = 4) =>
@@ -30,10 +54,14 @@ export function summarizeDayPlan(r: PlanLike, zone: string): string {
   const parts: string[] = [];
   const day = DateTime.fromISO(r.date, { zone }).toFormat("ccc LLL d");
   parts.push(r.blocks.length ? `${day}: placed ${plural(r.blocks.length, "block")}${r.moved ? ` (${r.moved} moved)` : ""}.` : `${day}: no flexible blocks placed.`);
-  if (r.unscheduled.length) parts.push(`Didn't fit: ${leftover(r.unscheduled)}. ${r.unscheduled.length === 1 ? "It stays" : "They stay"} on your task list.`);
+  const held = r.unscheduled.filter((u) => u.why === HELD);
+  const notFit = r.unscheduled.filter((u) => u.why !== HELD && !r.waiting?.some((w) => w.title === u.title));
+  if (notFit.length) parts.push(`Didn't fit: ${leftover(notFit)}. ${notFit.length === 1 ? "It stays" : "They stay"} on your task list.`);
+  if (held.length) parts.push(`Left for another day so today isn't packed: ${leftover(held)}.`);
   if (r.afterDeadline.length) parts.push(`Only fits after its deadline: ${r.afterDeadline.map((a) => `“${a.title}” (due ${dueText(a.due_at, zone)})`).join(", ")}.`);
-  parts.push(...[...new Set(r.warnings.filter((w) => !covered(w)))]);
-  return parts.join(" ");
+  parts.push(...[...new Set(r.warnings.filter((w) => !covered(w) && w !== r.clarification))]);
+  parts.push(...v2Lines(r));
+  return `${r.proposed ? "Proposed, nothing changed yet. " : ""}${parts.join(" ")}`;
 }
 
 export function summarizeWeekPlan(rs: PlanLike[], zone: string): string {
@@ -51,7 +79,15 @@ export function summarizeWeekPlan(rs: PlanLike[], zone: string): string {
   if (late.size) parts.push(`Only fits after its deadline: ${[...late.values()].map((a) => `“${a.title}” (due ${dueText(a.due_at, zone)})`).join(", ")}.`);
   const noTime = rs.filter((r) => r.warnings.some((w) => /no availability on this day/i.test(w))).map((r) => DateTime.fromISO(r.date, { zone }).toFormat("ccc"));
   if (noTime.length) parts.push(`No availability on ${noTime.join(", ")}.`);
-  const other = new Set(rs.flatMap((r) => r.warnings).filter((w) => !covered(w) && !/no availability on this day/i.test(w)));
+  const clarifications = new Set(rs.map((r) => r.clarification).filter(Boolean));
+  const other = new Set(rs.flatMap((r) => r.warnings).filter((w) => !covered(w) && !/no availability on this day/i.test(w) && !clarifications.has(w)));
   parts.push(...other);
-  return parts.join(" ");
+  const assumedDays = rs.filter((r) => r.assumptions?.length).length;
+  if (assumedDays) parts.push(`On ${plural(assumedDays, "day")} I planned in time I assumed is free (shown on My day); tell me if any of it isn't.`);
+  parts.push(...new Set(rs.flatMap((r) => r.conflicts ?? [])));
+  const firstShort = rs.find((r) => r.tradeoffs?.length);
+  if (firstShort) parts.push(`${DateTime.fromISO(firstShort.date, { zone }).toFormat("cccc")}: options: ${firstShort.tradeoffs!.map((t, i) => `${i + 1}) ${t}`).join(" ")}`);
+  const ask = rs.find((r) => r.clarification)?.clarification;
+  if (ask) parts.push(ask);
+  return `${rs.some((r) => r.proposed) ? "Proposed, nothing changed yet. " : ""}${parts.join(" ")}`;
 }

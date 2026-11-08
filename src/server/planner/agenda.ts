@@ -1,6 +1,7 @@
 import { DateTime } from "luxon";
-import type { CalendarEvent, PlanBlock, Routine, Task } from "@/lib/types";
+import type { CalendarEvent, OccurrenceOverride, PlanBlock, Routine, Task } from "@/lib/types";
 import { eventOccurrence } from "./scheduler";
+import { occurrencesOn } from "./day-model";
 import { atLocalTime, formatTime, weekdayOf } from "@/lib/time";
 
 // What a local day holds: fixed events (weekly ones expanded to that date),
@@ -20,6 +21,8 @@ export type AgendaEntry = {
   label: "fixed" | "external" | "routine" | "flexible";
   status?: PlanBlock["status"];
   recurring?: boolean;
+  /** Routines only: how the v2 planner treats it. */
+  routine?: Pick<Routine, "protection" | "kind" | "window_start" | "window_end" | "is_fixed" | "start_time">;
 };
 
 export type DayAgenda = {
@@ -39,14 +42,17 @@ export function buildDayAgenda(input: {
   routines: Routine[];
   blocks: PlanBlock[];
   tasks: Task[];
+  /** One-session changes to weekly events (planner v2); none for the old planner. */
+  overrides?: OccurrenceOverride[];
 }): DayAgenda {
   const { date, zone } = input;
   const dow = weekdayOf(date, zone);
   const entries: AgendaEntry[] = [];
   for (const e of input.events) {
-    const iv = eventOccurrence(e, date, zone);
-    if (!iv) continue;
-    entries.push({ kind: "event", id: e.id, title: e.title, start: iv.start!.toISO()!, end: iv.end!.toISO()!, fixed: true, label: e.external_ref ? "external" : "fixed", recurring: Boolean(e.recurrence) });
+    const ivs = input.overrides?.length ? occurrencesOn(e, date, zone, input.overrides) : [eventOccurrence(e, date, zone)].filter((x): x is NonNullable<typeof x> => !!x);
+    for (const iv of ivs) {
+      entries.push({ kind: "event", id: e.id, title: e.title, start: iv.start!.toISO()!, end: iv.end!.toISO()!, fixed: true, label: e.external_ref ? "external" : "fixed", recurring: Boolean(e.recurrence) });
+    }
   }
   const blocks = input.blocks.filter((b) => b.plan_date === date);
   // A routine that already has a block that day is shown as that block.
@@ -54,7 +60,7 @@ export function buildDayAgenda(input: {
   for (const r of input.routines) {
     if (!r.active || !r.days.includes(dow) || routinesWithBlocks.has(r.id)) continue;
     const s = r.start_time ? atLocalTime(date, r.start_time, zone) : null;
-    entries.push({ kind: "routine", id: r.id, title: r.title, start: s?.toISO() ?? null, end: s?.plus({ minutes: r.duration_minutes }).toISO() ?? null, fixed: r.is_fixed, label: routineLabel(r), recurring: true });
+    entries.push({ kind: "routine", id: r.id, title: r.title, start: s?.toISO() ?? null, end: s?.plus({ minutes: r.duration_minutes }).toISO() ?? null, fixed: r.is_fixed, label: routineLabel(r), recurring: true, routine: { protection: r.protection ?? null, kind: r.kind ?? null, window_start: r.window_start ?? null, window_end: r.window_end ?? null, is_fixed: r.is_fixed, start_time: r.start_time } });
   }
   for (const b of blocks) {
     entries.push({ kind: "block", id: b.id, title: b.title, start: b.starts_at, end: b.ends_at, fixed: !b.is_flexible, label: b.is_flexible ? "flexible" : "fixed", status: b.status });
@@ -70,13 +76,30 @@ export function buildDayAgenda(input: {
 }
 
 /** One readable paragraph per day for the AI (ids in brackets are for tool calls only). */
-export function describeDayAgenda(a: DayAgenda, zone: string, today: string): string {
+/**
+ * How the v2 planner treats a routine, in words for the AI (B3: the text says
+ * exactly what the planner does, nothing more).
+ */
+export function routineRule(r: NonNullable<AgendaEntry["routine"]>): string {
+  const p = r.protection ?? (r.is_fixed ? "fixed" : r.start_time ? "protected" : "flexible");
+  if (p === "fixed") return "fixed routine, never moved";
+  if (p === "flexible") return r.start_time ? "flexible routine, preferred time, can move" : "flexible routine, fits where there's room";
+  if (r.window_start && r.window_end) return `protected routine, may shift between ${r.window_start.slice(0, 5)} and ${r.window_end.slice(0, 5)}`;
+  if (!r.start_time) return "protected routine, kept every day it's on, any time";
+  if (r.kind === "meal") return "protected meal, may shift up to 30 min";
+  if (r.kind === "exercise" || r.kind === "recovery") return "protected routine, may move within the day, never dropped without asking";
+  if (r.kind === "sleep") return "sleep, never moved";
+  return "protected routine, stays at its time";
+}
+
+export function describeDayAgenda(a: DayAgenda, zone: string, today: string, opts: { v2?: boolean } = {}): string {
   const dt = DateTime.fromISO(a.date, { zone });
   const rel = a.date === today ? "today" : a.date === DateTime.fromISO(today, { zone }).plus({ days: 1 }).toISODate() ? "tomorrow" : null;
   const head = `${dt.toFormat("cccc, LLL d yyyy")} (${a.date}${rel ? `, ${rel}` : ""})`;
   const time = (e: AgendaEntry) => (e.start ? `${formatTime(e.start, zone)}–${formatTime(e.end!, zone)}` : "any time");
   const what = (e: AgendaEntry) => {
     if (e.kind === "event") return `${e.label === "external" ? "external event" : "fixed event"}${e.recurring ? ", weekly" : ""}`;
+    if (e.kind === "routine" && opts.v2 && e.routine) return routineRule(e.routine);
     if (e.kind === "routine") return e.fixed ? "routine, fixed time" : e.start ? "routine, preferred time (can move)" : "routine, no set time";
     return `${e.fixed ? "fixed" : "flexible"} plan block, ${e.status}`;
   };
