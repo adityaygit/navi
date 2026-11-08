@@ -255,6 +255,7 @@ export function Chat({
     retry.current = { text: value, id: clientMessageId };
     setSending(true);
     stick.current = true;
+    let adoptedEarly = false;
     const optimistic: Message = { id: `tmp-${++chunkId.current}`, conversation_id: "", role: "user", content: value, modality, tool_events: [], created_at: new Date().toISOString() };
     setMessages((m) => [...m, optimistic]);
     setLive([]);
@@ -280,6 +281,11 @@ export function Chat({
             const userMessage = event.userMessage;
             turn.saved = userMessage;
             setMessages((m) => m.map((x) => (x.id === optimistic.id ? userMessage : x)));
+            // A new chat gets its address as soon as it exists, so a reload mid-reply keeps it.
+            if (kind === "chat" && !conversationId && userMessage.conversation_id && !adoptedEarly) {
+              adoptedEarly = true;
+              adopt(userMessage.conversation_id);
+            }
           } else if (event.type === "done") turn.done = event;
           else if (event.type === "error") failure = new TurnError(event.message, event.code);
           else {
@@ -300,7 +306,7 @@ export function Chat({
       setLive(null);
       if (result.actions) setActions((a) => ({ ...a, ...result.actions }));
       setMessages((m) => [...m.filter((x) => x.id !== optimistic.id && x.id !== result.userMessage.id), result.userMessage, result.assistantMessage]);
-      const isNew = kind === "chat" && result.conversationId !== conversationId;
+      const isNew = kind === "chat" && result.conversationId !== conversationId && !adoptedEarly;
       if (result.mutated) announceChange();
       onReply?.();
       if (isNew) adopt(result.conversationId);
