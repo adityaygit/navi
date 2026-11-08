@@ -10,6 +10,9 @@ import type { AvailabilityWindow, CalendarEvent, Routine, Task } from "@/lib/typ
 // visible. Tests marked "ROOT CAUSE" pin behaviour the audit proposes to
 // change; when that work lands, update them on purpose (don't just delete).
 // Everything else is behaviour the plan keeps (regression guard).
+// Update (planner v2 built): the new planner is behind a per-account flag,
+// off by default, and this v1 scheduler is unchanged. These tests now pin
+// the flag-off behaviour; each ROOT CAUSE names the v2 test that fixes it.
 
 const zone = "America/New_York";
 const MON = "2026-11-02"; // a Monday (EST, after DST ended Nov 1)
@@ -40,7 +43,8 @@ const hm = (iso: string) => DateTime.fromISO(iso).setZone(zone).toFormat("HH:mm"
 const mins = (b: { starts_at: string; ends_at: string }) => DateTime.fromISO(b.ends_at).diff(DateTime.fromISO(b.starts_at), "minutes").minutes;
 
 describe("availability model today", () => {
-  it("ROOT CAUSE: with no availability windows, nothing flexible is planned even on an empty day", () => {
+  // Fixed for planner v2 accounts; see planner-v2 'Scenario 1: plans a no-setup day in assumed time'.
+  it("v1 (flag off), ROOT CAUSE fixed in planner v2: with no availability windows, nothing flexible is planned even on an empty day", () => {
     const out = plan({ availability: [], tasks: [task({ id: "chem", title: "Chemistry", priority: 1, due_at: `${MON}T23:59:00-05:00`, due_is_hard: true })] });
     expect(out.blocks).toHaveLength(0);
     expect(out.freeMinutes).toBe(0);
@@ -48,27 +52,31 @@ describe("availability model today", () => {
     expect(out.warnings[0]).toMatch(/No availability is set/);
   });
 
-  it("ROOT CAUSE: flexible routines (meals, exercise with no set time) are not placed without availability either", () => {
+  // Fixed for planner v2 accounts; see planner-v2 'D5: ... untimed protected exercise is reserved before tasks'.
+  it("v1 (flag off), ROOT CAUSE fixed in planner v2: flexible routines (meals, exercise with no set time) are not placed without availability either", () => {
     const out = plan({ availability: [], routines: [routine({ id: "walk", title: "Walk" })] });
     expect(out.blocks).toHaveLength(0);
     // A routine that doesn't fit isn't reported anywhere: `unscheduled` lists tasks only.
     expect(out.unscheduled).toHaveLength(0);
   });
 
-  it("ROOT CAUSE: a weekday with no window gets only fixed items, with a warning", () => {
+  // Fixed for planner v2 accounts; see planner-v2 day model 'Scenario 1' and 'Settings' free times are confirmed'.
+  it("v1 (flag off), ROOT CAUSE fixed in planner v2: a weekday with no window gets only fixed items, with a warning", () => {
     const out = plan({ availability: [{ days: [6], start: "10:00", end: "12:00" }], tasks: [task({ id: "a" })] });
     expect(out.blocks).toHaveLength(0);
     expect(out.warnings).toContain("You have no availability on this day, so only fixed commitments are shown.");
   });
 
-  it("ROOT CAUSE: a window that crosses midnight (22:00–01:00) is silently ignored, with no warning", () => {
+  // Fixed for planner v2 accounts; see planner-v2 'B1 fixed: a free window crossing midnight counts on both days'.
+  it("v1 (flag off), ROOT CAUSE fixed in planner v2: a window that crosses midnight (22:00–01:00) is silently ignored, with no warning", () => {
     const out = plan({ availability: [{ days: [1], start: "22:00", end: "01:00" }], tasks: [task({ id: "a" })] });
     expect(out.blocks).toHaveLength(0);
     expect(out.freeMinutes).toBe(0);
     expect(out.warnings).toEqual([]);
   });
 
-  it("ROOT CAUSE: availability is the only protection for sleep: a 00:00–23:59 window books work at midnight", () => {
+  // Fixed for planner v2 accounts; see planner-v2 'D5: sleep is never planned into'.
+  it("v1 (flag off), ROOT CAUSE fixed in planner v2: availability is the only protection for sleep: a 00:00–23:59 window books work at midnight", () => {
     const out = plan({ now: theNightBefore, availability: [{ days: [1], start: "00:00", end: "23:59" }], tasks: [task({ id: "a" })] });
     expect(hm(out.blocks[0].starts_at)).toBe("00:00");
   });
@@ -81,7 +89,8 @@ describe("availability model today", () => {
 });
 
 describe("how commitments are represented today", () => {
-  it("ROOT CAUSE: a timed routine NOT marked fixed is still treated as immovable by the scheduler, while the AI is told it 'can move'", () => {
+  // Fixed for planner v2 accounts; see planner-v2 'D5: a meal moves at most 30 minutes ... (B3: same in text and planner)'.
+  it("v1 (flag off), ROOT CAUSE fixed in planner v2: a timed routine NOT marked fixed is still treated as immovable by the scheduler, while the AI is told it 'can move'", () => {
     const dinner = routine({ id: "dinner", title: "Dinner", days: [1], start_time: "18:00", duration_minutes: 60, is_fixed: false });
     const out = plan({ routines: [dinner], tasks: [task({ id: "a", estimate_minutes: 60 })] });
     expect(out.fixed).toEqual([expect.objectContaining({ title: "Dinner", kind: "routine" })]);
@@ -104,7 +113,8 @@ describe("how commitments are represented today", () => {
     expect(hm(out.blocks[0].starts_at)).toBe("16:00");
   });
 
-  it("ROOT CAUSE: a weekly event has no single-date exception: cancelling it cancels every week", () => {
+  // Fixed for planner v2 accounts; see planner-v2 'Scenario 4 (pure part)' and planner-v2-chat 'Scenario 4'.
+  it("v1 (flag off), ROOT CAUSE fixed in planner v2: a weekly event has no single-date exception: cancelling it cancels every week", () => {
     const karate = event({ title: "Karate", starts_at: "2026-10-05T17:00:00-04:00", ends_at: "2026-10-05T18:30:00-04:00", recurrence: { freq: "weekly", days: [1] } });
     expect(eventOccurrence(karate, MON, zone)).not.toBeNull();
     const cancelled = { ...karate, status: "cancelled" as const };
@@ -126,7 +136,8 @@ describe("how commitments are represented today", () => {
 });
 
 describe("priority, deadlines and must-complete work today", () => {
-  it("ROOT CAUSE: there is no 'must-complete' flag; urgency is one additive score of priority + due date + hard flag", () => {
+  // Fixed for planner v2 accounts; see planner-v2 'Scenario 3: competing must-complete deadlines'.
+  it("v1 (flag off), ROOT CAUSE fixed in planner v2: there is no 'must-complete' flag; urgency is one additive score of priority + due date + hard flag", () => {
     const now = morning;
     // P1 with no deadline (40) < P4 due in 10h (10 + 35) < P3 with a hard deadline in 30h (20 + 20 + 10).
     const important = task({ id: "important", priority: 1 });

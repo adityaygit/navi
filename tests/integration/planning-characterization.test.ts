@@ -10,6 +10,8 @@ import type { Ctx } from "@/server/context";
 // the constraint-first planning work (docs/navi-1.5/PLANNING_AUDIT.md).
 // "ROOT CAUSE" tests pin behaviour the audit proposes to change; update them
 // deliberately when that lands. The rest is behaviour to keep.
+// Update (planner v2 built): this account has the flag off, so these pin the
+// old behaviour, which is unchanged; each ROOT CAUSE names its v2 fix.
 
 const zone = "America/New_York";
 let me: Awaited<ReturnType<typeof userClient>>;
@@ -36,7 +38,8 @@ async function blocksOn(d: string) {
 }
 
 describe("saving and replacing a plan", () => {
-  it("ROOT CAUSE: Navi's plan_day runs at once and leaves nothing to undo", async () => {
+  // Fixed for planner v2 accounts; see planner-v2 'Scenario 1 ... the run can be undone' and 'Scenario 9'.
+  it("v1 (flag off), ROOT CAUSE fixed in planner v2: Navi's plan_day runs at once and leaves nothing to undo", async () => {
     await createTask(user, { title: "Chemistry review", estimate_minutes: 60 });
     const r = await runTool(navi, "plan_day", { date: day() });
     expect(r.ok).toBe(true);
@@ -47,7 +50,8 @@ describe("saving and replacing a plan", () => {
     expect(log).toEqual([{ action: "plan_generated", reversible: false }]);
   });
 
-  it("ROOT CAUSE: re-planning deletes Navi's planned blocks and writes new rows; user-made and marked blocks are kept as they are", async () => {
+  // Fixed for planner v2 accounts; see planner-v2 're-planning keeps block ids when nothing changed (B7)'.
+  it("v1 (flag off), ROOT CAUSE fixed in planner v2: re-planning deletes Navi's planned blocks and writes new rows; user-made and marked blocks are kept as they are", async () => {
     await createTask(user, { title: "Essay", estimate_minutes: 60 });
     await generateDayPlan(user, day());
     const first = await blocksOn(day());
@@ -64,7 +68,8 @@ describe("saving and replacing a plan", () => {
     expect(second.map((b) => b.id)).toContain(mine.data!.id);
   });
 
-  it("ROOT CAUSE: in 'ask me first' mode, planning still runs without a card", async () => {
+  // Fixed for planner v2 accounts; see planner-v2 'D8/B8: in ask me first mode a plan is a proposal card'.
+  it("v1 (flag off), ROOT CAUSE fixed in planner v2: in 'ask me first' mode, planning still runs without a card", async () => {
     await admin().from("profiles").update({ preferences: { autonomy: "ask" } }).eq("id", me.userId);
     await createTask(user, { title: "Flashcards", estimate_minutes: 30 });
     const r = await runTool(navi, "plan_day", { date: day() });
@@ -98,7 +103,8 @@ describe("approval boundaries for schedule changes", () => {
     expect(b.actionId).toBeDefined();
   });
 
-  it("ROOT CAUSE: cancelling tonight's karate means cancelling the weekly event itself, which waits for a tap", async () => {
+  // Fixed for planner v2 accounts; see planner-v2-chat 'Scenario 4: cancels only tonight's session'.
+  it("v1 (flag off), ROOT CAUSE fixed in planner v2: cancelling tonight's karate means cancelling the weekly event itself, which waits for a tap", async () => {
     const start = DateTime.now().setZone(zone).startOf("day").set({ hour: 18 });
     const { data: ev } = await me.db
       .from("events")
@@ -111,7 +117,8 @@ describe("approval boundaries for schedule changes", () => {
     expect(approval!.details).toMatchObject({ op: "update", table: "events", patch: { status: "cancelled" } });
   });
 
-  it("ROOT CAUSE: changing availability through update_settings runs at once and can't be undone", async () => {
+  // Fixed for planner v2 accounts; see planner-v2-chat 'B6: changing usual free times can be undone'.
+  it("v1 (flag off), ROOT CAUSE fixed in planner v2: changing availability through update_settings runs at once and can't be undone", async () => {
     const r = await runTool(navi, "update_settings", { availability: [{ days: [1, 2, 3, 4, 5], start: "16:00", end: "21:00" }] });
     expect(r.ok).toBe(true);
     expect(r.actionId).toBeUndefined();
