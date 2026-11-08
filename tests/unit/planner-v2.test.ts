@@ -297,6 +297,15 @@ describe("v2 scheduler", () => {
     expect(out.blocks[0].reason).toMatch(/took longer than its estimate; 30m more assumed/);
   });
 
+  it("doesn't count measured work twice (focus minutes and the partly-done block they happened in)", () => {
+    const m = model({ wakeBed: null, usualFree: [{ days: [1], start: "16:00", end: "20:00" }] });
+    const partial = [{ starts_at: `${MON}T09:00:00-05:00`, ends_at: `${MON}T10:00:00-05:00`, task_id: "chem", routine_id: null, status: "partial" as const, title: "Chem" }];
+    const measured = plan(m, { tasks: [task({ id: "chem", estimate_minutes: 100, actual_minutes: 60 })], keptBlocks: partial });
+    expect(measured.blocks.reduce((s, b) => s + mins(b), 0)).toBe(40);
+    const unmeasured = plan(m, { tasks: [task({ id: "chem", estimate_minutes: 100, actual_minutes: 0 })], keptBlocks: partial });
+    expect(unmeasured.blocks.reduce((s, b) => s + mins(b), 0)).toBe(40);
+  });
+
   it("never schedules into unknown time", () => {
     const m = model({ typicalHours: [{ start: "08:00", end: "15:00", label: "school hours" }], wakeBed: { wake: "07:00", bed: "16:00" } });
     const out = plan(m, { now: at(MON, "08:00"), tasks: [task({ id: "a", estimate_minutes: 60, commitment: "must" })] });

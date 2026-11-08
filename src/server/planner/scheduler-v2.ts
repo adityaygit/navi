@@ -152,9 +152,13 @@ export function scheduleDayV2(input: SchedulerV2Input): SchedulerV2Output {
   const keptRoutineIds = new Set(input.keptBlocks.map((b) => b.routine_id).filter(Boolean));
   const keptTaskMinutes: Record<string, number> = {};
   const keptTaskEnds: Record<string, DateTime> = {};
+  // Time already worked is in actual_minutes when it was measured (focus); a
+  // done/partly-done block then isn't counted again (same rule as deadlines.ts).
+  const measured = new Set(input.tasks.filter((t) => t.actual_minutes > 0).map((t) => t.id));
   for (const b of input.keptBlocks) {
     const iv = Interval.fromDateTimes(DateTime.fromISO(b.starts_at).setZone(zone), DateTime.fromISO(b.ends_at).setZone(zone));
     if (iv.isValid) busy.push(iv);
+    if (b.task_id && (b.status === "done" || b.status === "partial") && measured.has(b.task_id)) continue;
     if (b.task_id && !UNWORKED_STATUSES.includes(b.status)) {
       keptTaskMinutes[b.task_id] = (keptTaskMinutes[b.task_id] ?? 0) + iv.length("minutes");
       if (!keptTaskEnds[b.task_id] || iv.end! > keptTaskEnds[b.task_id]) keptTaskEnds[b.task_id] = iv.end!;

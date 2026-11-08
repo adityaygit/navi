@@ -30,7 +30,10 @@ export function FocusView({
   dayStartMs,
   dayEndMs,
   zone,
+  askMore = false,
 }: {
+  /** Planner v2: "Made progress" asks how much more it needs, so the rest of today is re-fitted. */
+  askMore?: boolean;
   session: Session;
   title: string;
   space: string | null;
@@ -75,10 +78,11 @@ export function FocusView({
       if (row) setSession({ ...session, paused_at: row.paused_at, paused_seconds: row.paused_seconds ?? session.paused_seconds });
       router.refresh();
     });
-  const end = (outcome: Outcome, reason?: "rest" | "missing_info" | "estimate") =>
+  const [progressing, setProgressing] = useState(false);
+  const end = (outcome: Outcome, reason?: "rest" | "missing_info" | "estimate", moreMinutes?: number) =>
     start(async () => {
       setError(null);
-      const r = await endFocusAction(session.id, outcome, null, reason ?? null);
+      const r = await endFocusAction(session.id, outcome, null, reason ?? null, moreMinutes ?? null);
       if (!r.ok) return setError(r.error);
       announceChange();
       router.replace(`/focus?ended=${session.id}`);
@@ -117,10 +121,21 @@ export function FocusView({
           <span className="text-[15px] text-muted">How did it go?</span>
           <div className="flex flex-wrap justify-center gap-2">
             <button type="button" disabled={pending} onClick={() => end("completed")} className={`${pill} bg-text text-black`}>Finished it</button>
-            <button type="button" disabled={pending} onClick={() => end("progress")} className={`${pill} bg-white/[0.08]`}>Made progress</button>
+            <button type="button" disabled={pending} onClick={() => (askMore ? setProgressing(true) : end("progress"))} className={`${pill} bg-white/[0.08]`} aria-expanded={askMore ? progressing : undefined}>Made progress</button>
             <button type="button" disabled={pending} onClick={() => end("interrupted")} className={`${pill} bg-white/[0.08]`}>Got interrupted</button>
             {!stopping && <button type="button" disabled={pending} onClick={() => setStopping(true)} className={`${pill} bg-transparent text-dim`}>Stop</button>}
           </div>
+          {progressing && (
+            <div className="mt-2 flex flex-col items-center gap-2">
+              <span className="text-[14px] text-dim">How much more does it need? Navi re-fits the rest of today.</span>
+              <div className="flex flex-wrap justify-center gap-2">
+                {[15, 30, 60].map((m) => (
+                  <button key={m} type="button" disabled={pending} onClick={() => end("progress", undefined, m)} className="chip">{m} min more</button>
+                ))}
+                <button type="button" disabled={pending} onClick={() => end("progress")} className="chip">Not sure</button>
+              </div>
+            </div>
+          )}
           {stopping && (
             // Stopping counts as skipped unless there's an outside reason; only the person can give one.
             <div className="mt-2 flex flex-col items-center gap-2">

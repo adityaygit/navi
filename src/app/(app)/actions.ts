@@ -97,10 +97,11 @@ const FocusEnd = z.object({
   note: z.string().max(300).nullish(),
   reason: z.enum(["rest", "missing_info", "estimate"]).nullish(),
 });
-export async function endFocusAction(id: string, outcome: "completed" | "progress" | "interrupted" | "abandoned", note?: string | null, reason?: "rest" | "missing_info" | "estimate" | null) {
+export async function endFocusAction(id: string, outcome: "completed" | "progress" | "interrupted" | "abandoned", note?: string | null, reason?: "rest" | "missing_info" | "estimate" | null, moreMinutes?: number | null) {
   return act((ctx) => {
     const v = FocusEnd.parse({ outcome, note, reason });
-    return endFocus(ctx, id, v.outcome, v.note, v.reason);
+    const more = moreMinutes == null ? null : z.number().int().min(5).max(480).parse(moreMinutes);
+    return endFocus(ctx, id, v.outcome, v.note, v.reason, more);
   });
 }
 const SessionId = z.string().uuid();

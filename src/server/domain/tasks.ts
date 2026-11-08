@@ -102,6 +102,26 @@ export async function completeTask(ctx: Ctx, id: string, actualMinutes?: number 
 const RUNNING_ELSEWHERE = "A focus session is already running. End it first.";
 
 /**
+ * Scenario 5 (planner v2 only): the work took longer than estimated. If the
+ * person said how much more it needs, the estimate becomes time spent + that
+ * (undoable); then the rest of today is re-fitted around it as one undoable
+ * change set. The task stays open: nothing is marked done.
+ */
+async function refitAfterOverrun(ctx: Ctx, s: FocusSession, outcome: string, moreMinutes: number | null) {
+  if (!s.task_id || outcome === "completed") return;
+  const { data: prof } = await ctx.db.from("profiles").select("preferences").eq("id", ctx.userId).single();
+  const { plannerV2 } = await import("@/lib/planner-flag");
+  if (!plannerV2(prof?.preferences)) return;
+  const task = await getEntity<Task>(ctx, "tasks", s.task_id);
+  if (["done", "cancelled"].includes(task.status)) return;
+  if (moreMinutes) await updateTask({ ...ctx, actor: "user" }, task.id, { estimate_minutes: Math.min(1440, task.actual_minutes + moreMinutes) });
+  if (!moreMinutes && outcome !== "progress" && outcome !== "interrupted") return;
+  const { planDays } = await import("@/server/planner/plan-v2");
+  const today = DateTime.now().setZone(ctx.timezone).toISODate()!;
+  await planDays(ctx, [today], { trigger: "overrun", reasonPrefix: "Re-fitted after focus" });
+}
+
+/**
  * Start focus. The database allows one open session per person, so a double
  * tap (or two devices) can't start two: the repeated request gets the session
  * the first one started. Asking to focus on something else while a session is
@@ -176,6 +196,8 @@ export async function endFocus(
   outcome: "completed" | "progress" | "interrupted" | "abandoned",
   note?: string | null,
   reason?: StopReason | null,
+  /** Planner v2: the person says it needs this much more (it took longer than estimated). */
+  moreMinutes?: number | null,
 ): Promise<FocusSession> {
   const s = await focusRpc(ctx, "focus_end", { p_session: sessionId, p_outcome: outcome, p_note: note ?? null }, "end focus");
   if (!s) return readSession(ctx, sessionId); // already ended (or not the person's: then "not found")
@@ -188,5 +210,11 @@ export async function endFocus(
     if (b) await refreshStoredReview(ctx.db, ctx.userId, b.plan_date);
   }
   await logActivity(ctx, { action: "focus_ended", summary: `Focus session ended after ${s.actual_minutes} min (${outcome}${block?.reason ? `: ${block.reason}` : ""})` });
+  try {
+    await refitAfterOverrun(ctx, s, outcome, moreMinutes ?? null);
+  } catch (err) {
+    // Re-planning must never undo ending the session; the person can plan again.
+    console.error("re-plan after focus failed:", err instanceof Error ? err.message : err);
+  }
   return s;
 }

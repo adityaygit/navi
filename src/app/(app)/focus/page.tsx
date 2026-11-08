@@ -3,6 +3,7 @@ import { requireCtx, getProfile } from "@/server/context";
 import { dayFrom, loadSources } from "@/server/day";
 import type { FocusSession } from "@/lib/focus";
 import { FocusView, FocusPicker, type PickTask } from "@/components/focus/focus-view";
+import { plannerV2 } from "@/lib/planner-flag";
 
 export const metadata = { title: "Focus · Navi" };
 
@@ -38,6 +39,7 @@ export default async function FocusPage({ searchParams }: { searchParams: Promis
         dayStartMs={now.startOf("day").toMillis()}
         dayEndMs={now.endOf("day").toMillis()}
         zone={zone}
+        askMore={plannerV2(profile.preferences) && !!session.tasks}
       />
     );
   }

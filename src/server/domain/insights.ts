@@ -1,7 +1,8 @@
 import "server-only";
 import { DateTime } from "luxon";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { CalendarEvent, PlanBlock, Routine, Task } from "@/lib/types";
+import type { CalendarEvent, OccurrenceOverride, PlanBlock, Routine, Task } from "@/lib/types";
+import { plannerV2 } from "@/lib/planner-flag";
 import { blockCategory, describeDisruptions } from "@/lib/outcomes";
 import { scheduleDay } from "@/server/planner/scheduler";
 
@@ -185,7 +186,7 @@ export async function weekInsights(db: SupabaseClient, userId: string, zone: str
     db.from("tasks").select("id,title,due_at,due_is_hard,estimate_minutes,actual_minutes,project_id,goal_id,status").eq("user_id", userId).in("status", ["todo", "in_progress", "blocked"]),
     db.from("projects").select("id,name,status").eq("user_id", userId),
     db.from("goals").select("id,title,status").eq("user_id", userId),
-    db.from("profiles").select("availability").eq("id", userId).maybeSingle(),
+    db.from("profiles").select("availability,preferences").eq("id", userId).maybeSingle(),
     db.from("events").select("*").eq("user_id", userId).neq("status", "cancelled"),
     db.from("routines").select("*").eq("user_id", userId).eq("active", true),
     db.from("plan_blocks").select("starts_at,ends_at,task_id,routine_id,status,title,plan_date").eq("user_id", userId).eq("is_flexible", false).gte("plan_date", nextFrom.toISODate()!).lte("plan_date", nextTo.toISODate()!),
@@ -255,7 +256,22 @@ export async function weekInsights(db: SupabaseClient, userId: string, zone: str
   const availability = (profRes.data?.availability ?? []) as Parameters<typeof scheduleDay>[0]["availability"];
   const nextFixed = (nextFixedRes.data ?? []) as (Pick<PlanBlock, "starts_at" | "ends_at" | "task_id" | "routine_id" | "status" | "title"> & { plan_date: string })[];
   let freeMinutes = 0;
-  for (let i = 0; i < 7; i++) {
+  const v2 = plannerV2((profRes.data as { preferences?: unknown } | null)?.preferences);
+  if (v2) {
+    // Planner v2: free time from the day model (confirmed + assumed), not only saved windows.
+    const { loadDayModels } = await import("@/server/planner/plan-v2");
+    const { scheduleDayV2 } = await import("@/server/planner/scheduler-v2");
+    const dates = Array.from({ length: 7 }, (_, i) => nextFrom.plus({ days: i }).toISODate()!);
+    const models = await loadDayModels({ db, userId, actor: "system", timezone: zone }, dates);
+    const { data: ov } = await db.from("event_occurrence_overrides").select("*").eq("user_id", userId);
+    for (const d of dates) {
+      freeMinutes += scheduleDayV2({
+        date: d, zone, now, model: models.get(d)!, events: (evRes.data ?? []) as CalendarEvent[], overrides: (ov ?? []) as OccurrenceOverride[],
+        routines: (roRes.data ?? []) as Routine[], tasks: [], keptBlocks: nextFixed.filter((b) => b.plan_date === d), loadCap: 1,
+      }).freeMinutes;
+    }
+  }
+  for (let i = 0; i < 7 && !v2; i++) {
     const d = nextFrom.plus({ days: i }).toISODate()!;
     freeMinutes += scheduleDay({
       date: d,
