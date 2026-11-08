@@ -25,6 +25,8 @@ export const TaskCreate = z.object({
     .object({ freq: z.enum(["daily", "weekly"]), days: weekdays.nullish() })
     .nullish(),
   remind_at: isoDateTime.nullish().describe("When to send a reminder notification for this task (ISO date-time with offset). Respects quiet hours."),
+  commitment: z.enum(["must", "normal", "optional"]).nullish().describe("must = must-complete / non-negotiable (planned first); optional = only if there's room; default normal"),
+  not_before: isoDateTime.nullish().describe("Don't plan work on it before this time (ISO date-time with offset)"),
 });
 export type TaskCreate = z.infer<typeof TaskCreate>;
 
@@ -71,6 +73,10 @@ export const RoutineCreate = z.object({
   is_fixed: z.boolean().nullish().describe("True when the time cannot move (e.g. practice at 4pm)"),
   workspace_id: uuid.nullish(),
   goal_id: uuid.nullish(),
+  protection: z.enum(["fixed", "protected", "flexible"]).nullish().describe("fixed = never moves; protected = always kept, may shift within its window (meals ±30 min, exercise within the day); flexible = fits where there's room"),
+  kind: z.enum(["sleep", "meal", "exercise", "recovery", "other"]).nullish(),
+  window_start: hhmm.nullish().describe("Earliest local time a protected routine may move to"),
+  window_end: hhmm.nullish().describe("Latest local time a protected routine may end"),
 });
 
 export const EventCreate = z.object({
@@ -137,6 +143,7 @@ export const ENTITY_PATCHES = {
       status: planBlockStatus,
       outcome_reason: z.string().max(500).nullish(),
       reason: z.string().max(500).nullish(),
+      pinned: z.boolean().describe("Re-plans leave a pinned block where it is"),
     })
     .partial()
     .strict(),

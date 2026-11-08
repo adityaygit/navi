@@ -30,6 +30,8 @@ export type Ctx = {
    * becomes an inline card first. Unset is treated as "auto".
    */
   autonomy?: "auto" | "ask";
+  /** The constraint-first planner (profiles.preferences.planner_v2) is on for this person. Unset = look it up. */
+  plannerV2?: boolean;
   /** Told about each activity-log entry written (so a tool call can offer Undo). */
   onActivity?: (entry: { id: string; reversible: boolean }) => void;
   /** Told about each action a step proposed (so its reply can show the card). */

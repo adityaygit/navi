@@ -94,6 +94,13 @@ function needsApproval(table: EntityTable, before: Record<string, unknown>, patc
   if (table === "tasks") {
     if (before.due_is_hard && changes(before, patch, ["due_at", "due_is_hard"])) return "changes a hard deadline";
     if (patch.status === "cancelled" && before.status !== "cancelled") return "cancels a task";
+    if (before.commitment === "must" && "commitment" in patch && patch.commitment !== "must") return "lowers a must-complete task";
+  }
+  if (table === "routines") {
+    const level = { fixed: 3, protected: 2, flexible: 1 } as Record<string, number>;
+    if (before.protection && patch.protection && (level[String(patch.protection)] ?? 0) < (level[String(before.protection)] ?? 0)) return "lowers a routine's protection";
+    if (before.kind === "sleep" && changes(before, patch, ["start_time", "days", "duration_minutes", "active", "protection", "kind"])) return "changes your sleep";
+    if (before.protection === "fixed" && !before.is_fixed && changes(before, patch, ["start_time", "days", "duration_minutes", "active"])) return "changes a fixed routine";
   }
   if (table === "events") {
     if (before.external_ref) return "modifies an event owned by a connected external calendar";

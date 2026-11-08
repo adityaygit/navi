@@ -4,7 +4,8 @@ import { getProfile } from "@/server/context";
 import type { Message, ToolEvent } from "@/lib/types";
 import { relevantMemories } from "@/server/domain/memory";
 import { runAgent, type AgentMode } from "./agent";
-import { CHAT_SYSTEM, ONBOARDING_SYSTEM } from "./prompts";
+import { CHAT_SYSTEM, CHAT_SYSTEM_V2, ONBOARDING_SYSTEM } from "./prompts";
+import { plannerV2 } from "@/lib/planner-flag";
 import { runTool } from "./tools";
 import { nowIn } from "@/lib/time";
 import { UserFacingError } from "@/server/http";
@@ -363,14 +364,14 @@ export async function handleTurn(
   let result: Awaited<ReturnType<typeof runAgent>>;
   try {
     const profile = await getProfile(ctx);
-    const turnCtx: Ctx = { ...ctx, conversationId, autonomy: autonomyFrom(profile.preferences) };
+    const turnCtx: Ctx = { ...ctx, conversationId, autonomy: autonomyFrom(profile.preferences), plannerV2: plannerV2(profile.preferences) };
     const mode: AgentMode = input.kind === "onboarding" ? "onboarding" : "chat";
     const context = await buildContext(turnCtx, input.text, mode);
     result = await runAgent({
       ctx: turnCtx,
       mode,
       role: mode === "onboarding" || PLANNER_CUES.test(input.text) ? "planner" : "fast",
-      system: mode === "onboarding" ? ONBOARDING_SYSTEM : CHAT_SYSTEM,
+      system: mode === "onboarding" ? ONBOARDING_SYSTEM : turnCtx.plannerV2 ? CHAT_SYSTEM_V2 : CHAT_SYSTEM,
       context: `${context}\nUser's local time: ${nowIn(profile.timezone).toFormat("cccc yyyy-LL-dd HH:mm ZZ")}${viewingLine(input.viewing)}`,
       history,
       userText: input.text,

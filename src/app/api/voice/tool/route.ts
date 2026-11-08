@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { requireApiCtx } from "@/server/context";
 import { apiError } from "@/server/http";
-import { runTool, toolsFor } from "@/server/ai/tools";
+import { plannerV2For, runTool, toolsFor } from "@/server/ai/tools";
 
 const Body = z.object({
   conversationId: z.string().uuid(),
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const { data: conv } = await ctx.db.from("conversations").select("id,kind").eq("id", body.conversationId).maybeSingle();
     if (!conv) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
     // Only the tools this voice session was offered can run.
-    if (!toolsFor(conv.kind === "onboarding" ? "onboarding" : "voice").some((t) => t.name === body.name)) {
+    if (!toolsFor(conv.kind === "onboarding" ? "onboarding" : "voice", { plannerV2: await plannerV2For(ctx) }).some((t) => t.name === body.name)) {
       return NextResponse.json({ ok: false, summary: `“${body.name}” isn't available in this conversation.` }, { status: 400 });
     }
     if (body.name === "mark_onboarding_ready") {

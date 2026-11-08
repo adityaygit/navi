@@ -3,7 +3,8 @@ import { DateTime } from "luxon";
 import type { ToolEvent } from "@/lib/types";
 import { getProfile } from "@/server/context";
 import { recordUsage } from "./budget";
-import { runTool } from "./tools";
+import { plannerV2For, runTool, type ToolResult } from "./tools";
+import type { Ctx } from "@/server/context";
 import { parseDue, areaFor, detectAreas, extractAvailability, extractGoals, extractItems, extractName, extractProjects, extractRoutines, extractWeeklyCommitments } from "./heuristics";
 import type { AgentRequest, AgentResult } from "./agent";
 import { emitter, stepEndEvent, stepStartEvent, toolEventOf } from "./live";
@@ -35,6 +36,110 @@ export function wordGroups(text: string): string[] {
     i += n;
   }
   return groups;
+}
+
+// ---- planner v2 phrases ---------------------------------------------------------
+
+type Call = (name: string, input: unknown) => Promise<ToolResult>;
+const STOP = new Set(["the", "and", "for", "my", "a", "an", "to", "of", "on", "in", "it", "with", "this", "that", "test", "homework", "work"]);
+const NUMBERS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, "a couple of": 2, "a": 1 };
+
+/** Open tasks whose titles share a meaningful word with the phrase. */
+async function tasksLike(ctx: Ctx, phrase: string): Promise<{ id: string; title: string }[]> {
+  const words = phrase.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !STOP.has(w));
+  if (!words.length) return [];
+  const { data } = await ctx.db.from("tasks").select("id,title").in("status", ["todo", "in_progress", "blocked"]);
+  return ((data ?? []) as { id: string; title: string }[]).filter((t) => words.some((w) => t.title.toLowerCase().includes(w)));
+}
+
+async function eventLike(ctx: Ctx, phrase: string): Promise<{ id: string; title: string } | null> {
+  const words = phrase.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !STOP.has(w));
+  if (!words.length) return null;
+  const { data } = await ctx.db.from("events").select("id,title").neq("status", "cancelled");
+  return ((data ?? []) as { id: string; title: string }[]).find((e) => words.some((w) => e.title.toLowerCase().includes(w))) ?? null;
+}
+
+/** "6", "6pm", "6:30", "18:00" → "HH:MM" (afternoon/evening hours without am/pm are read as pm). */
+function clock(h: string, m: string | undefined, ap: string | undefined): string {
+  let hr = Number(h);
+  if (ap?.toLowerCase() === "pm" && hr < 12) hr += 12;
+  if (!ap && hr >= 1 && hr <= 8) hr += 12;
+  return `${String(hr).padStart(2, "0")}:${m ?? "00"}`;
+}
+
+const clean = (s: string) => s.replace(/\s*\(The user can undo this\.\)/, "").trim();
+
+export async function planningIntent(text: string, ctx: Ctx, call: Call, step: Call): Promise<string | null> {
+  if (/^\s*undo( that| it| the plan)?\b/i.test(text)) return (await call("undo_plan", {})).summary;
+
+  const nonNeg = text.match(/non-?negotiables?\b[\s:,-]*(?:are\s*)?(.*?)(?:\.\s*plan\b|\.\s*$|$)/i);
+  if (nonNeg) {
+    const names = nonNeg[1].split(/,|\band\b|;/).map((s) => s.trim()).filter(Boolean);
+    const marked: string[] = [];
+    for (const n of names) for (const t of await tasksLike(ctx, n)) {
+      if (marked.includes(t.title)) continue;
+      await call("update_task", { id: t.id, commitment: "must" });
+      marked.push(t.title);
+    }
+    const r = await call("plan", {});
+    return `Got it. ${marked.length ? `I marked ${marked.map((m) => `“${m}”`).join(", ")} as must-complete and` : "I"} built the rest of your day around them. ${clean(r.summary)}`;
+  }
+
+  const haveBut = text.match(/i have (.+?) (tonight|today|this (?:afternoon|evening|morning))\b(.*?)\b(?:need|have) to (?:finish|do|study for|work on|get) (.+?)[.!]?$/i);
+  if (haveBut) {
+    const [, what, , middle, goal] = haveBut;
+    const time = (what + middle).match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:-|–|to|until)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+    const ev = await eventLike(ctx, what);
+    const busy = time ? [{ start: clock(time[1], time[2], time[3]), end: clock(time[4], time[5], time[6] ?? time[3]), title: what.trim() }] : [];
+    if (!ev && !busy.length) return `What time is ${what.trim()} ${haveBut[2].toLowerCase()}? I'll plan ${goal.trim()} around it.`;
+    const focus = await tasksLike(ctx, goal);
+    const r = await call("plan", { focus_task_ids: focus.map((t) => t.id), ...(busy.length ? { busy } : {}) });
+    return `${ev ? `“${ev.title}” stays where it is.` : `Noted ${what.trim()} ${busy[0].start}–${busy[0].end} for today only.`} ${focus.length ? `I put ${focus.map((t) => `“${t.title}”`).join(", ")} first.` : ""} ${clean(r.summary)}`.replace(/\s+/g, " ");
+  }
+
+  const cancelled = text.match(/(?:my\s+)?(.+?)\s+(?:is|got|was|has been)\s+cancel+ed\b/i) ?? text.match(/\bno\s+(.+?)\s+(?:today|tonight)\b/i);
+  if (cancelled) {
+    const ev = await eventLike(ctx, cancelled[1]);
+    if (ev) {
+      const s = await call("skip_occurrence", { event_id: ev.id, date: "today", action: "cancel" });
+      if (!s.ok) return s.summary;
+      const r = await call("plan", {});
+      return `${s.summary.split(" (")[0]}; the weekly one stays. ${clean(r.summary)}`;
+    }
+  }
+
+  const opened = text.match(/\b(morning|afternoon|evening)\s+(?:just\s+)?(?:opened up|freed up|is free|cleared)\b/i);
+  if (opened) {
+    const span = { morning: ["08:00", "12:00"], afternoon: ["12:00", "17:00"], evening: ["17:00", "21:00"] }[opened[1].toLowerCase() as "morning" | "afternoon" | "evening"];
+    const r = await call("plan", { free: [{ start: span[0], end: span[1] }] });
+    return `Nice. I treated your ${opened[1].toLowerCase()} as free and moved work earlier. ${clean(r.summary)}`;
+  }
+
+  const only = text.match(/\bonly have (\d+|one|two|three|four|five|six|a couple of|an?)\s*(hours?|hrs?|minutes?|mins?)\b/i);
+  if (only) {
+    const n = /^\d+$/.test(only[1]) ? Number(only[1]) : NUMBERS[only[1].toLowerCase()] ?? 1;
+    const minutes = /^h/i.test(only[2]) ? n * 60 : n;
+    const r = await call("plan", { capacity_minutes: minutes });
+    const data = (r.data as { blocks: { title: string; start: string; end: string }[] }[] | undefined)?.[0];
+    const first = data?.blocks.map((b) => `“${b.title}”`).join(", ");
+    return `With ${minutes >= 60 ? `${minutes / 60} hour${minutes === 60 ? "" : "s"}` : `${minutes} minutes`}, prioritise ${first || "nothing new: what's planned already fills it"}. ${clean(r.summary)}`;
+  }
+
+  const behind = text.match(/\bbehind on ([^.,!]+)/i);
+  if (behind) {
+    const focus = await tasksLike(ctx, behind[1]);
+    if (!focus.length) return `I couldn't find a task for “${behind[1].trim()}”. Which task is it?`;
+    const r = await call("plan", { focus_task_ids: focus.map((t) => t.id) });
+    return `Let's catch up on ${focus.map((t) => `“${t.title}”`).join(", ")}: it goes first for the rest of today. ${clean(r.summary)}`;
+  }
+
+  if (/\b(build|plan|make|set up)\b.*\b(schedule|plan|day)\b.*\btomorrow\b|\btomorrow'?s (schedule|plan)\b/i.test(text)) {
+    await step("get_plan", { date: "tomorrow" });
+    const r = await call("plan", { date: "tomorrow" });
+    return clean(r.summary);
+  }
+  if (/\b(plan|organi[sz]e|schedule)\b.*\b(my day|today)\b/i.test(text)) return clean((await call("plan", {})).summary);
+  return null;
 }
 
 export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
@@ -78,7 +183,12 @@ export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
   const addTask = req.mode === "chat" ? text.match(/^(?:please\s+)?(?:add|create)\s+(?:a\s+)?task\s+(?:to\s+)?(.+?)[.!]?$/i) : null;
   const dropTask = req.mode === "chat" ? text.match(/^(?:please\s+)?(cancel|delete|remove)\s+(?:the\s+|my\s+)?(?:task\s+)?["“]?(.+?)["”]?[.!]?$/i) : null;
 
-  if (req.mode === "onboarding") {
+  // Planner v2: the six planning phrases from the brief, deterministically.
+  const v2Reply = req.mode === "chat" && (await plannerV2For(ctx)) ? await planningIntent(text, { ...ctx, plannerV2: true }, call, step) : null;
+
+  if (v2Reply !== null) {
+    reply = v2Reply;
+  } else if (req.mode === "onboarding") {
     const userTurns = req.history.filter((m) => m.role === "user").map((m) => m.content);
     const greeting = /^(start|hi|hello|hey)\b[\s!.]*$/i;
     // Answers so far, not counting greetings; the current message is the next answer.

@@ -95,7 +95,7 @@ function providerMessage(err: unknown) {
 
 async function runAnthropic(req: AgentRequest, model: string, allowServerFallback: boolean): Promise<AgentResult> {
   const client = new Anthropic({ apiKey: serverEnv.anthropicApiKey()!, maxRetries: 2 });
-  const tools = toolsFor(req.mode).map((t) => ({
+  const tools = toolsFor(req.mode, { plannerV2: req.ctx.plannerV2 }).map((t) => ({
     name: t.name,
     description: t.description,
     input_schema: jsonSchemaFor(t) as Anthropic.Beta.BetaTool["input_schema"],

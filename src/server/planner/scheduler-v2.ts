@@ -61,6 +61,8 @@ export type SchedulerV2Output = Omit<SchedulerOutput, "blocks" | "fixed"> & {
   /** Free minutes left open because of the load cap (D7). */
   heldBackMinutes: number;
   capacity: { confirmed: number; inferred: number; unknown: number };
+  /** Free minutes after fixed plans, before any work is placed, by how sure Navi is. */
+  freeByBasis: { confirmed: number; inferred: number };
   mustTaskIds: string[];
 };
 
@@ -227,6 +229,10 @@ export function scheduleDayV2(input: SchedulerV2Input): SchedulerV2Output {
     });
   free = subtractFree(free, busy.map((b) => pad(b)));
   const freeMinutes = Math.round(free.reduce((s, f) => s + f.iv.length("minutes"), 0));
+  const freeByBasis = {
+    confirmed: Math.round(free.filter((f) => f.basis === "confirmed").reduce((s, f) => s + f.iv.length("minutes"), 0)),
+    inferred: Math.round(free.filter((f) => f.basis === "inferred").reduce((s, f) => s + f.iv.length("minutes"), 0)),
+  };
 
   // 4. Work queue.
   const parentsWithOpenChildren = new Set(input.tasks.filter((t) => t.parent_task_id && (t.status === "todo" || t.status === "in_progress")).map((t) => t.parent_task_id));
@@ -409,6 +415,7 @@ export function scheduleDayV2(input: SchedulerV2Input): SchedulerV2Output {
     assumptions,
     heldBackMinutes,
     capacity: model.minutes,
+    freeByBasis,
     mustTaskIds,
   };
 }

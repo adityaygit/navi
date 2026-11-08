@@ -1,11 +1,19 @@
 import "server-only";
 import { z } from "zod";
-import { DateTime } from "luxon";
+import { DateTime, Interval } from "luxon";
 import type { Ctx } from "@/server/context";
 import { getProfile } from "@/server/context";
 import { createProposals, proposalProblem } from "@/server/domain/proposals";
 import { createTask, completeTask, updateTask } from "@/server/domain/tasks";
-import { deleteEntity, updateEntity, type EntityTable } from "@/server/domain/entities";
+import { deleteEntity, getEntity, updateEntity, type EntityTable } from "@/server/domain/entities";
+import { logActivity, revertActivities } from "@/server/domain/activity";
+import { plannerV2 } from "@/lib/planner-flag";
+import { atLocalTime } from "@/lib/time";
+import { wakeBed } from "@/server/day";
+import { isWakeBedDefault, occurrencesOn, type DayModel } from "@/server/planner/day-model";
+import { protectionOf, scheduleDayV2 } from "@/server/planner/scheduler-v2";
+import { loadDayModels, planDays } from "@/server/planner/plan-v2";
+import { routineRule } from "@/server/planner/agenda";
 import { addMemory, relevantMemories } from "@/server/domain/memory";
 import { decideApproval, requestApproval, reviseApproval } from "@/server/domain/approvals";
 import { autonomyFrom } from "@/lib/actions";
@@ -13,10 +21,9 @@ import { READ_ONLY_TOOLS } from "@/lib/tool-names";
 import { generateDayPlan, generateWeekPlan, recoverPlan } from "@/server/planner/plan";
 import { ProfileUpdate, TaskCreate, TaskUpdate, compact } from "@/server/domain/schemas";
 import { ENTITY_PATCHES } from "@/server/domain/schemas";
-import { logActivity } from "@/server/domain/activity";
 import { formatDue, formatTime, nowIn } from "@/lib/time";
 import { integrations } from "@/server/integrations";
-import type { CalendarEvent, PlanBlock, Proposal, Routine, Task } from "@/lib/types";
+import type { CalendarEvent, OccurrenceOverride, PlanBlock, Proposal, Routine, Task } from "@/lib/types";
 import { buildDayAgenda, describeDayAgenda, type AgendaEntry } from "@/server/planner/agenda";
 import { proposalTitle } from "@/server/domain/proposals";
 import { fixWeekdayNumbering, guardInventedTimes } from "./time-guard";
@@ -103,19 +110,54 @@ function parseEntityPatch(table: (typeof ENTITY_TABLES)[number], patch: Record<s
 async function loadAgendaInputs(ctx: Ctx, zone: string, first: string, last: string) {
   const from = DateTime.fromISO(first, { zone }).startOf("day").toUTC().toISO()!;
   const to = DateTime.fromISO(last, { zone }).endOf("day").toUTC().toISO()!;
-  const [events, routines, blocks, tasks] = await Promise.all([
+  const [events, routines, blocks, tasks, overrides] = await Promise.all([
     // Weekly events are stored once with their first occurrence, so they're expanded per date.
     ctx.db.from("events").select("*").neq("status", "cancelled").limit(500),
     ctx.db.from("routines").select("*").eq("active", true),
     ctx.db.from("plan_blocks").select("*").gte("plan_date", first).lte("plan_date", last).order("starts_at"),
     ctx.db.from("tasks").select("*").in("status", ["todo", "in_progress", "blocked"]).gte("due_at", from).lte("due_at", to).order("due_at"),
+    // One-session changes (planner v2); empty for everyone else.
+    ctx.db.from("event_occurrence_overrides").select("*").gte("occurrence_date", DateTime.fromISO(first).minus({ days: 7 }).toISODate()!).lte("occurrence_date", last),
   ]);
   return {
     events: (events.data ?? []) as CalendarEvent[],
     routines: (routines.data ?? []) as Routine[],
     blocks: (blocks.data ?? []) as PlanBlock[],
     tasks: (tasks.data ?? []) as Task[],
+    overrides: (overrides.data ?? []) as OccurrenceOverride[],
   };
+}
+
+/** Is the constraint-first planner on for this person? */
+export async function plannerV2For(ctx: Ctx): Promise<boolean> {
+  if (ctx.plannerV2 !== undefined) return ctx.plannerV2;
+  const { data } = await ctx.db.from("profiles").select("preferences").eq("id", ctx.userId).maybeSingle();
+  return plannerV2(data?.preferences);
+}
+
+const hours = (n: number) => (n >= 60 ? `${Math.floor(n / 60)}h${n % 60 ? ` ${n % 60}m` : ""}` : `${n}m`);
+
+/** Planner v2: what Navi knows about a day's free time, for the model (it never computes this itself). */
+function capacityLine(m: DayModel, free: { confirmed: number; inferred: number }, zone: string): string {
+  const t = (iso: string) => formatTime(iso, zone);
+  const parts = [`about ${hours(free.confirmed + free.inferred)} free after fixed plans (${hours(free.confirmed)} confirmed by the user, ${hours(free.inferred)} assumed by Navi)`];
+  if (m.unknown.length) parts.push(`unknown, never planned without asking: ${m.unknown.map((u) => `${t(u.starts_at)}–${t(u.ends_at)} (${u.label})`).join(", ")}`);
+  if (m.busy.length) parts.push(`busy: ${m.busy.map((b) => `${b.title} ${t(b.starts_at)}–${t(b.ends_at)}${b.kind === "exception" ? " (just this day)" : " (usual)"}`).join(", ")}`);
+  if (m.capacityLimitMinutes != null) parts.push(`the user said at most ${m.capacityLimitMinutes} min of work this day`);
+  if (m.clarification) parts.push(`Navi knows nothing about this day yet; if planning it matters, ask: “${m.clarification}”`);
+  return `  Free time: ${parts.join("; ")}.`;
+}
+
+async function capacityLines(ctx: Ctx, zone: string, dates: string[], inputs: Awaited<ReturnType<typeof loadAgendaInputs>>): Promise<Map<string, string>> {
+  const models = await loadDayModels(ctx, dates);
+  const out = new Map<string, string>();
+  for (const d of dates) {
+    const m = models.get(d)!;
+    const kept = inputs.blocks.filter((b) => b.plan_date === d && (!b.is_flexible || b.created_by === "user" || b.pinned || b.status !== "planned"));
+    const r = scheduleDayV2({ date: d, zone, now: DateTime.now().setZone(zone), model: m, events: inputs.events, overrides: inputs.overrides, routines: inputs.routines, tasks: [], keptBlocks: kept, loadCap: 1 });
+    out.set(d, capacityLine(m, r.freeByBasis, zone));
+  }
+  return out;
 }
 
 function dates(zone: string, first: string, days: number): string[] {
@@ -138,8 +180,10 @@ async function planText(ctx: Ctx, date: string | null | undefined, days: number)
   if (!DateTime.fromISO(first, { zone }).isValid) throw new Error(`Not a valid date: ${first}`);
   const list = dates(zone, first, days);
   const inputs = await loadAgendaInputs(ctx, zone, list[0], list[list.length - 1]);
-  const body = list.map((d) => describeDayAgenda(buildDayAgenda({ date: d, zone, ...inputs }), zone, today)).join("\n");
-  const noAvailability = profile.availability.length === 0 ? " No availability is set, so Navi hasn't scheduled flexible work." : "";
+  const v2 = plannerV2(profile.preferences);
+  const caps = v2 ? await capacityLines(ctx, zone, list, inputs) : null;
+  const body = list.map((d) => describeDayAgenda(buildDayAgenda({ date: d, zone, ...inputs }), zone, today, { v2 }) + (caps ? `\n${caps.get(d)}` : "")).join("\n");
+  const noAvailability = !v2 && profile.availability.length === 0 ? " No availability is set, so Navi hasn't scheduled flexible work." : "";
   return `Times are in ${zone}. Today is ${DateTime.fromISO(today, { zone }).toFormat("cccc, LLL d yyyy")}.${noAvailability}\n${body}`;
 }
 
@@ -231,13 +275,13 @@ async function overview(ctx: Ctx): Promise<string> {
   const today = now.toISODate()!;
   const week = dates(zone, today, 7);
   const [tasks, inbox, projects, goals, approvals, workspaces, routines, agendaInputs] = await Promise.all([
-    ctx.db.from("tasks").select("id,title,status,priority,due_at,due_is_hard,estimate_minutes,project_id,blocker").in("status", ["todo", "in_progress", "blocked"]).order("due_at", { ascending: true, nullsFirst: false }).limit(40),
+    ctx.db.from("tasks").select("id,title,status,priority,due_at,due_is_hard,estimate_minutes,project_id,blocker,commitment").in("status", ["todo", "in_progress", "blocked"]).order("due_at", { ascending: true, nullsFirst: false }).limit(40),
     ctx.db.from("proposals").select("kind,payload,source_excerpt", { count: "exact" }).eq("status", "pending").order("created_at", { ascending: false }).limit(8),
     ctx.db.from("projects").select("id,name,status,due_date").eq("status", "active"),
     ctx.db.from("goals").select("id,title,status,target_date").eq("status", "active"),
     ctx.db.from("approvals").select("id,summary,revision").eq("status", "proposed").gt("expires_at", new Date().toISOString()).order("created_at"),
     ctx.db.from("workspaces").select("id,name").eq("status", "active"),
-    ctx.db.from("routines").select("id,title,days,start_time,duration_minutes,is_fixed").eq("active", true),
+    ctx.db.from("routines").select("*").eq("active", true),
     loadAgendaInputs(ctx, zone, today, week[1]),
   ]);
   const agenda = (d: string) => buildDayAgenda({ date: d, zone, ...agendaInputs });
@@ -251,16 +295,24 @@ async function overview(ctx: Ctx): Promise<string> {
   const lines: string[] = [];
   const later = now.plus({ days: 7 });
   const offsets = `UTC offset ${now.toFormat("ZZ")}${later.offset !== now.offset ? `, ${later.toFormat("ZZ")} from ${week.find((d) => DateTime.fromISO(d, { zone }).endOf("day").offset !== now.offset) ?? later.toISODate()}` : ""}`;
-  lines.push(`Now: ${now.toFormat("cccc, LLL d yyyy, h:mm a")} (${zone}, ${offsets}). Availability: ${JSON.stringify(profile.availability)}. Quiet hours: ${profile.quiet_hours_start ?? "not set"}–${profile.quiet_hours_end ?? "not set"}. Name: ${profile.display_name ?? "not set"}.`);
+  const v2 = plannerV2(profile.preferences);
+  const wb = wakeBed(profile);
+  const usual = v2
+    ? `Usual times: ${wb ? `up ${wb.wake}, bed ${wb.bed}` : "wake-up/bedtime unknown"}; free times they set: ${isWakeBedDefault(profile.availability, wb) ? "none (only the setup default)" : JSON.stringify(profile.availability)}. Navi's planner works out free time itself (confirmed / assumed / unknown, see Free time lines); never ask the user to set availability.`
+    : `Availability: ${JSON.stringify(profile.availability)}.`;
+  lines.push(`Now: ${now.toFormat("cccc, LLL d yyyy, h:mm a")} (${zone}, ${offsets}). ${usual} Quiet hours: ${profile.quiet_hours_start ?? "not set"}–${profile.quiet_hours_end ?? "not set"}. Name: ${profile.display_name ?? "not set"}.`);
   lines.push(`Workspaces: ${(workspaces.data ?? []).map((w) => `${w.name} [${w.id}]`).join("; ") || "none"}`);
   lines.push(`Active goals: ${(goals.data ?? []).map((g) => `${g.title}${g.target_date ? ` (by ${g.target_date})` : ""} [${g.id}]`).join("; ") || "none"}`);
   lines.push(`Active projects: ${(projects.data ?? []).map((p) => `${p.name}${p.due_date ? ` (due ${p.due_date})` : ""} [${p.id}]`).join("; ") || "none"}`);
-  lines.push(`Routines: ${(routines.data ?? []).map((r) => `${r.title} days=${r.days.join(",")} ${r.start_time ? `${r.start_time}${r.is_fixed ? " fixed" : " preferred, can move"}` : "no set time"} ${r.duration_minutes}m [${r.id}]`).join("; ") || "none"}`);
+  const routineText = (r: Routine) =>
+    v2 ? `${r.title} days=${r.days.join(",")} ${r.start_time ? r.start_time : "no set time"} ${r.duration_minutes}m (${routineRule(r)}) [${r.id}]` : `${r.title} days=${r.days.join(",")} ${r.start_time ? `${r.start_time}${r.is_fixed ? " fixed" : " preferred, can move"}` : "no set time"} ${r.duration_minutes}m [${r.id}]`;
+  lines.push(`Routines: ${((routines.data ?? []) as Routine[]).map(routineText).join("; ") || "none"}`);
   lines.push(`Fixed events, next 7 days: ${weekEvents.slice(0, 30).join("; ") || "none"}`);
-  lines.push(`Today's plan: ${dayLine(today)}`);
-  lines.push(`Tomorrow's plan (${week[1]}): ${dayLine(week[1])}. For any other date, call get_plan.`);
+  const caps = v2 ? await capacityLines(ctx, zone, [today, week[1]], agendaInputs) : null;
+  lines.push(`Today's plan: ${dayLine(today)}${caps ? `\n${caps.get(today)}` : ""}`);
+  lines.push(`Tomorrow's plan (${week[1]}): ${dayLine(week[1])}. For any other date, call get_plan.${caps ? `\n${caps.get(week[1])}` : ""}`);
   lines.push(
-    `Open tasks: ${((tasks.data ?? []) as Task[]).map((t) => `${t.title} (P${t.priority}, ${t.status}${t.due_at ? `, due ${formatDue(t.due_at, zone)}${t.due_is_hard ? " HARD" : ""}` : ", no due date"}${t.estimate_minutes ? `, ~${t.estimate_minutes}m` : ""}${t.blocker ? `, blocked: ${t.blocker}` : ""}) [${t.id}]`).join("; ") || "none"}`,
+    `Open tasks: ${((tasks.data ?? []) as Task[]).map((t) => `${t.title} (${v2 && t.commitment === "must" ? "MUST-COMPLETE, " : v2 && t.commitment === "optional" ? "optional, " : ""}P${t.priority}, ${t.status}${t.due_at ? `, due ${formatDue(t.due_at, zone)}${t.due_is_hard ? " HARD" : ""}` : ", no due date"}${t.estimate_minutes ? `, ~${t.estimate_minutes}m` : ""}${t.blocker ? `, blocked: ${t.blocker}` : ""}) [${t.id}]`).join("; ") || "none"}`,
   );
   const pending = (inbox.data ?? []) as Pick<Proposal, "kind" | "payload" | "source_excerpt">[];
   lines.push(
@@ -332,6 +384,87 @@ async function inboxText(ctx: Ctx): Promise<string> {
   lines.push("Recent activity (newest first):");
   for (const a of activity.data ?? []) lines.push(`  - ${when(a.created_at)} by ${a.actor}: ${a.summary}`);
   return lines.join("\n");
+}
+
+// ---- planner v2 helpers -------------------------------------------------------
+
+const HHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM, 24-hour local time");
+
+function resolveDate(date: string | null | undefined, zone: string): string {
+  const today = nowIn(zone).toISODate()!;
+  if (!date || date === "today") return today;
+  if (date === "tomorrow") return DateTime.fromISO(today, { zone }).plus({ days: 1 }).toISODate()!;
+  if (!DateTime.fromISO(date, { zone }).isValid) throw new Error(`Not a valid date: ${date}`);
+  return date;
+}
+
+/** Insert one of the person's planning facts and log it so it can be undone. */
+async function createRow(ctx: Ctx, table: "day_exceptions" | "availability_rules" | "event_occurrence_overrides" | "task_dependencies", values: Record<string, unknown>, summary: string) {
+  const { data, error } = await ctx.db.from(table).insert({ ...values, user_id: ctx.userId }).select().single();
+  if (error) throw new Error(`Could not save that: ${error.message}`);
+  await logActivity(ctx, { action: "create", entityType: table, entityId: data.id, summary, before: null, after: data, reversible: true });
+  return data as Record<string, unknown>;
+}
+
+/** A one-day fact (day_exceptions), in words for the reply. */
+async function addException(ctx: Ctx, x: { date: string; kind: "busy" | "free" | "capacity"; start_time?: string | null; end_time?: string | null; minutes?: number | null; note?: string | null }): Promise<string> {
+  const words = x.kind === "capacity" ? `at most ${x.minutes} min of work` : `${x.kind === "busy" ? (x.note && x.note !== "Busy" ? x.note : "busy") : "free"} ${x.start_time}–${x.end_time}`;
+  await createRow(ctx, "day_exceptions", { date: x.date, kind: x.kind, start_time: x.start_time ?? null, end_time: x.end_time ?? null, minutes: x.minutes ?? null, note: x.note ?? null, source: "chat" }, `For ${x.date} only: ${words}`);
+  return words;
+}
+
+/** Replace a task's prerequisites (refusing a loop). */
+async function setDependencies(ctx: Ctx, taskId: string, dependsOn: string[]): Promise<string> {
+  const ids = [...new Set(dependsOn)].filter((d) => d !== taskId);
+  const { data: all } = await ctx.db.from("task_dependencies").select("task_id,depends_on_task_id");
+  const edges = (all ?? []) as { task_id: string; depends_on_task_id: string }[];
+  const reaches = (from: string, target: string, seen = new Set<string>()): boolean =>
+    from === target || edges.filter((e) => e.task_id === from && !seen.has(e.depends_on_task_id)).some((e) => (seen.add(e.depends_on_task_id), reaches(e.depends_on_task_id, target, seen)));
+  if (ids.some((d) => reaches(d, taskId))) return "Didn't set that order: it would make tasks wait for each other in a loop.";
+  const { data: names } = ids.length ? await ctx.db.from("tasks").select("id,title").in("id", ids) : { data: [] };
+  if ((names ?? []).length !== ids.length) return "Didn't set the order: one of those tasks wasn't found.";
+  const current = edges.filter((e) => e.task_id === taskId);
+  for (const e of current.filter((c) => !ids.includes(c.depends_on_task_id))) {
+    const { data: row } = await ctx.db.from("task_dependencies").select("id").eq("task_id", taskId).eq("depends_on_task_id", e.depends_on_task_id).maybeSingle();
+    if (row) {
+      await ctx.db.from("task_dependencies").delete().eq("id", row.id);
+      await logActivity(ctx, { action: "delete", entityType: "task_dependencies", entityId: row.id, summary: "Removed a task order" });
+    }
+  }
+  for (const d of ids.filter((x) => !current.some((c) => c.depends_on_task_id === x))) {
+    await createRow(ctx, "task_dependencies", { task_id: taskId, depends_on_task_id: d }, `Set to wait for “${(names ?? []).find((n) => n.id === d)?.title ?? "a task"}”`);
+  }
+  return ids.length ? `It now waits for ${(names ?? []).map((n) => `“${n.title}”`).join(", ")}.` : "It no longer waits for other tasks.";
+}
+
+/** What a moved block would overlap that Navi never moves (events, fixed routines, kept blocks), if anything. */
+async function fixedClash(ctx: Ctx, date: string, start: DateTime, end: DateTime, exceptBlockId: string): Promise<string | null> {
+  const zone = ctx.timezone;
+  const inputs = await loadAgendaInputs(ctx, zone, date, date);
+  const iv = Interval.fromDateTimes(start, end);
+  for (const e of inputs.events) for (const o of occurrencesOn(e, date, zone, inputs.overrides)) if (o.overlaps(iv)) return e.title;
+  const dow = DateTime.fromISO(date, { zone }).weekday % 7;
+  for (const r of inputs.routines) {
+    if (!r.start_time || !r.days.includes(dow) || protectionOf(r) !== "fixed") continue;
+    const s = atLocalTime(date, r.start_time, zone);
+    if (Interval.fromDateTimes(s, s.plus({ minutes: r.duration_minutes })).overlaps(iv)) return r.title;
+  }
+  for (const b of inputs.blocks) {
+    if (b.id === exceptBlockId || b.plan_date !== date || !["planned", "in_progress"].includes(b.status)) continue;
+    if (b.is_flexible && b.created_by === "navi" && !b.pinned) continue; // Navi's own blocks are re-fitted around it
+    if (Interval.fromDateTimes(DateTime.fromISO(b.starts_at), DateTime.fromISO(b.ends_at)).overlaps(iv)) return b.title;
+  }
+  return null;
+}
+
+/** Planner v2's extra facts about a planned day, for the model. */
+function v2Data(r: object) {
+  const x = r as Partial<{ assumptions: string[]; tradeoffs: string[]; clarification: string | null; conflicts: string[]; unplacedRoutines: unknown[]; blockedTasks: unknown[]; waiting: unknown[]; heldBackMinutes: number }>;
+  if (!x.assumptions) return {};
+  return {
+    assumptions: x.assumptions, options: x.tradeoffs, ask_this: x.clarification, conflicts: x.conflicts,
+    routines_not_fitted: x.unplacedRoutines, blocked_not_planned: x.blockedTasks, waiting: x.waiting, minutes_kept_free: x.heldBackMinutes,
+  };
 }
 
 export const TOOLS = [
@@ -461,16 +594,21 @@ export const TOOLS = [
   }),
   tool({
     name: "update_task",
-    description: "Change an existing task (title, notes, priority, estimate, due date, status other than done, blocker, links). Just call it: hard-deadline changes and cancelling automatically become a card the user approves with one tap.",
+    description:
+      "Change an existing task (title, notes, priority, estimate, due date, status other than done, blocker, links, commitment, not_before, depends_on). commitment 'must' = the user called it non-negotiable / must-complete (planned first); only lower it if they say so (that becomes a card). depends_on = ids of tasks that must be done first (replaces the list). Just call it: hard-deadline changes and cancelling automatically become a card the user approves with one tap.",
     schema: TaskUpdate.omit({ status: true }).extend({
       id: z.string().uuid(),
       status: z.enum(["todo", "in_progress", "blocked", "cancelled"]).nullish(),
+      depends_on: z.array(z.string().uuid()).max(5).nullish().describe("Task ids this task waits for (replaces the current list; [] clears it)"),
     }),
-    run: async (ctx, { id, ...patch }) => {
+    run: async (ctx, { id, depends_on, ...patch }) => {
+      let deps = "";
+      if (depends_on) deps = await setDependencies(ctx, id, depends_on);
+      if (!Object.keys(compact(patch)).length) return { ok: true, mutated: true, summary: deps || "Nothing to change" };
       const r = await updateTask(ctx, id, patch);
-      if (r.kind === "approval_requested") return { ok: true, mutated: true, summary: `That change needs the user's OK because ${r.reason}. ${WAITING}` };
+      if (r.kind === "approval_requested") return { ok: true, mutated: true, summary: `${deps ? `${deps} ` : ""}That change needs the user's OK because ${r.reason}. ${WAITING}` };
       const dates = "due_at" in patch || "due_is_hard" in patch ? `: ${await taskScheduleSummary(ctx, r.row)}` : "";
-      return { ok: true, mutated: true, summary: `Updated task “${r.row.title}”${dates}` };
+      return { ok: true, mutated: true, summary: `Updated task “${r.row.title}”${dates}${deps ? `. ${deps}` : ""}` };
     },
   }),
   tool({
@@ -512,6 +650,8 @@ export const TOOLS = [
       const checked = parseEntityPatch(table, patch);
       if (!checked.ok) return { ok: false, summary: checked.summary };
       const clean = checked.patch;
+      // A routine's protection and the old planner's is_fixed say the same thing.
+      if (table === "routines" && typeof clean.protection === "string") clean.is_fixed = clean.protection === "fixed";
       const r = await updateEntity(ctx, table as EntityTable, id, clean);
       if (r.kind === "approval_requested") return { ok: true, mutated: true, summary: `That change needs the user's OK because ${r.reason}. ${WAITING}` };
       // Say exactly what changed: the summary is all later turns see of this action.
@@ -525,12 +665,12 @@ export const TOOLS = [
     description: "Re-plan flexible work for a date (default today) around fixed commitments and the user's availability. Deterministic; returns what was placed and what didn't fit.",
     schema: z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish() }),
     run: async (ctx, { date }) => {
-      const r = await generateDayPlan(ctx, date ?? undefined);
+      const r = await generateDayPlan(ctx, date ?? undefined, { trigger: "chat" });
       return {
         ok: true,
         mutated: true,
-        summary: summarizeDayPlan(r, ctx.timezone),
-        data: { blocks: r.blocks.map((b) => ({ title: b.title, start: b.starts_at, end: b.ends_at, why: b.reason })), moved: r.moved, unscheduled: r.unscheduled, only_after_deadline: r.afterDeadline, warnings: r.warnings, freeMinutes: r.freeMinutes },
+        summary: r.run?.summary ?? summarizeDayPlan(r, ctx.timezone),
+        data: { blocks: r.blocks.map((b) => ({ title: b.title, start: b.starts_at, end: b.ends_at, why: b.reason })), moved: r.moved, unscheduled: r.unscheduled, only_after_deadline: r.afterDeadline, warnings: r.warnings, freeMinutes: r.freeMinutes, ...v2Data(r) },
       };
     },
   }),
@@ -539,11 +679,11 @@ export const TOOLS = [
     description: "Re-plan the next 7 days of flexible work.",
     schema: z.object({}),
     run: async (ctx) => {
-      const days = await generateWeekPlan(ctx);
+      const days = await generateWeekPlan(ctx, null, { trigger: "chat" });
       return {
         ok: true,
         mutated: true,
-        summary: summarizeWeekPlan(days, ctx.timezone),
+        summary: days[0]?.run?.summary ?? summarizeWeekPlan(days, ctx.timezone),
         data: days.map((d) => ({ date: d.date, blocks: d.blocks.length, moved: d.moved, unscheduled: d.unscheduled.map((u) => u.title), only_after_deadline: d.afterDeadline.map((a) => a.title), warnings: d.warnings })),
       };
     },
@@ -560,6 +700,166 @@ export const TOOLS = [
     run: async (ctx, input) => {
       const r = await recoverPlan(ctx, { description: input.description, category: input.category, availableFrom: input.available_from, since: input.since });
       return { ok: true, mutated: true, summary: r.summary, data: { moved_to_tomorrow: r.movedToTomorrow, not_scheduled: r.notPlaced, warnings: r.plan.warnings } };
+    },
+  }),
+  // ---- Planner v2 (constraint-first) tools: offered only when it's on (toolsFor). ----
+  tool({
+    name: "plan",
+    description:
+      "Plan or re-plan flexible work for a day (or up to 7 days) with Navi's deterministic planner. It works out free time itself from everything Navi knows (events, routines, sleep, school/work hours, one-day facts) and labels what it assumes, so never compute free time or ask the user to set availability. Use for 'plan my day', 'build tomorrow from what you know', 'rework the rest of my day', 'I only have two hours today', 'I'm free from 3', 'I'm behind on X'. Facts the user just stated about this day go in capacity_minutes / free / busy / start_from (saved for that day only, undoable, never their usual settings). focus_task_ids = tasks they want prioritised now. mode 'propose' shows the plan as one card to approve instead of applying it (use when they ask what you'd suggest). The result says what was placed, moved and assumed, what didn't fit, up to 3 options and at most one question: say the assumptions and ask only that question.",
+    schema: z.object({
+      date: z.string().regex(/^(\d{4}-\d{2}-\d{2}|today|tomorrow)$/, "YYYY-MM-DD, 'today' or 'tomorrow'").nullish().describe("First day (default today)"),
+      days: z.number().int().min(1).max(7).nullish().describe("How many days (default 1)"),
+      mode: z.enum(["apply", "propose"]).nullish(),
+      focus_task_ids: z.array(z.string().uuid()).max(10).nullish(),
+      capacity_minutes: z.number().int().min(0).max(1440).nullish().describe("At most this much work on the first day, as the user said"),
+      free: z.array(z.object({ start: HHMM, end: HHMM })).max(6).nullish().describe("Local times the user said they're free on the first day"),
+      busy: z.array(z.object({ start: HHMM, end: HHMM, title: z.string().max(120).nullish() })).max(6).nullish().describe("Local times the user said they're busy on the first day (one-off, e.g. 'karate tonight 6–7:30')"),
+      start_from: HHMM.nullish().describe("Plan the first day from this local time (e.g. 'I'm free from 15:00')"),
+    }),
+    run: async (ctx, input) => {
+      const zone = ctx.timezone;
+      const first = resolveDate(input.date, zone);
+      const facts: string[] = [];
+      if (input.capacity_minutes != null) facts.push(await addException(ctx, { date: first, kind: "capacity", minutes: input.capacity_minutes, note: `at most ${input.capacity_minutes} min of work` }));
+      for (const f of input.free ?? []) facts.push(await addException(ctx, { date: first, kind: "free", start_time: f.start, end_time: f.end, note: "free" }));
+      for (const b of input.busy ?? []) facts.push(await addException(ctx, { date: first, kind: "busy", start_time: b.start, end_time: b.end, note: b.title ?? "Busy" }));
+      const today = nowIn(zone).toISODate()!;
+      let from: DateTime | undefined;
+      if (input.start_from) {
+        if (first === today) from = DateTime.max(atLocalTime(first, input.start_from, zone), nowIn(zone));
+        else facts.push(await addException(ctx, { date: first, kind: "busy", start_time: "00:00", end_time: input.start_from, note: `not free before ${input.start_from}` }));
+      }
+      const days = Array.from({ length: input.days ?? 1 }, (_, i) => DateTime.fromISO(first, { zone }).plus({ days: i }).toISODate()!);
+      const run = await planDays(ctx, days, { trigger: "chat", mode: input.mode ?? undefined, from, focusTaskIds: input.focus_task_ids ?? undefined });
+      const lead = facts.length ? `Saved for ${DateTime.fromISO(first, { zone }).toFormat("cccc")} only: ${facts.join("; ")}. ` : "";
+      const summary = run.status === "unchanged" ? `${lead}The plan already fits: nothing to change. ${run.summary}` : `${lead}${run.summary}${run.status === "applied" ? " (The user can undo this.)" : run.status === "proposed" ? ` ${WAITING}` : ""}`;
+      return { ok: true, mutated: true, summary, data: run.results.map((r) => ({ date: r.date, blocks: r.blocks.map((b) => ({ title: b.title, start: b.starts_at, end: b.ends_at, assumed: b.basis === "inferred" })), ...v2Data(r) })) };
+    },
+  }),
+  tool({
+    name: "set_day_exception",
+    description: "Save a one-day fact without planning: busy or free for a stretch, or at most N minutes of work that day. Only that date changes; usual settings never do. Undoable. Usually use plan with busy/free/capacity_minutes instead, which saves the fact and re-plans in one step.",
+    schema: z.object({
+      date: z.string().regex(/^(\d{4}-\d{2}-\d{2}|today|tomorrow)$/).nullish(),
+      kind: z.enum(["busy", "free", "capacity"]),
+      start: HHMM.nullish(),
+      end: HHMM.nullish(),
+      minutes: z.number().int().min(0).max(1440).nullish(),
+      note: z.string().max(200).nullish(),
+    }),
+    run: async (ctx, i) => {
+      if (i.kind === "capacity" && i.minutes == null) return { ok: false, summary: "A capacity fact needs minutes." };
+      if (i.kind !== "capacity" && (!i.start || !i.end)) return { ok: false, summary: "Busy or free needs start and end (HH:MM)." };
+      const date = resolveDate(i.date, ctx.timezone);
+      const said = await addException(ctx, { date, kind: i.kind, start_time: i.start ?? null, end_time: i.end ?? null, minutes: i.minutes ?? null, note: i.note ?? null });
+      return { ok: true, mutated: true, summary: `Saved for ${DateTime.fromISO(date, { zone: ctx.timezone }).toFormat("cccc LLL d")} only: ${said}. Call plan to re-plan around it.` };
+    },
+  }),
+  tool({
+    name: "skip_occurrence",
+    description:
+      "Cancel or move ONE session of the user's own recurring (or one-off) event, e.g. 'karate is cancelled tonight', 'practice moved to 6 today'. The series is unchanged. Runs right away with Undo when the user said it. For the whole series use update_item (a card). Then call plan to use the freed time.",
+    schema: z.object({
+      event_id: z.string().uuid(),
+      date: z.string().regex(/^(\d{4}-\d{2}-\d{2}|today|tomorrow)$/).nullish(),
+      action: z.enum(["cancel", "move"]),
+      start: HHMM.nullish().describe("New local start time when moving"),
+      end: HHMM.nullish().describe("New local end time when moving"),
+      note: z.string().max(200).nullish(),
+    }),
+    run: async (ctx, i) => {
+      const zone = ctx.timezone;
+      const date = resolveDate(i.date, zone);
+      const ev = await getEntity<CalendarEvent>(ctx, "events", i.event_id);
+      if (ev.external_ref) return { ok: false, summary: "That event belongs to a connected calendar; it has to be changed there (or with request_external_action)." };
+      if (!occurrencesOn(ev, date, zone, []).length) return { ok: false, summary: `“${ev.title}” isn't on ${DateTime.fromISO(date, { zone }).toFormat("cccc LLL d")}.` };
+      if (i.action === "move" && (!i.start || !i.end)) return { ok: false, summary: "Moving a session needs start and end (HH:MM)." };
+      const values = {
+        event_id: ev.id, occurrence_date: date, status: i.action === "cancel" ? "cancelled" : "moved",
+        starts_at: i.action === "move" ? atLocalTime(date, i.start!, zone).toISO() : null,
+        ends_at: i.action === "move" ? atLocalTime(date, i.end!, zone).toISO() : null,
+        note: i.note ?? null,
+      };
+      const what = i.action === "cancel" ? `Cancelled just ${DateTime.fromISO(date, { zone }).toFormat("cccc's")} “${ev.title}”` : `Moved just ${DateTime.fromISO(date, { zone }).toFormat("cccc's")} “${ev.title}” to ${i.start}–${i.end}`;
+      const { data: existing } = await ctx.db.from("event_occurrence_overrides").select("*").eq("event_id", ev.id).eq("occurrence_date", date).maybeSingle();
+      if (existing) {
+        const { error } = await ctx.db.from("event_occurrence_overrides").update(values).eq("id", existing.id);
+        if (error) return { ok: false, summary: error.message };
+        await logActivity(ctx, { action: "update", entityType: "event_occurrence_overrides", entityId: existing.id, summary: what, before: { status: existing.status, starts_at: existing.starts_at, ends_at: existing.ends_at, note: existing.note }, after: { status: values.status, starts_at: values.starts_at, ends_at: values.ends_at, note: values.note }, reversible: true });
+      } else {
+        await createRow(ctx, "event_occurrence_overrides", values, what);
+      }
+      return { ok: true, mutated: true, summary: `${what} (the weekly event is unchanged). Call plan for that day to use the time.` };
+    },
+  }),
+  tool({
+    name: "move_block",
+    description:
+      "Move planned work blocks to new times and pin them there (re-plans then leave them alone), e.g. 'move my studying earlier', 'put Chemistry at 4'. Get block ids from get_plan. The rest of that day is re-fitted around them automatically. Never moves fixed things; a fixed block becomes a card.",
+    schema: z.object({ moves: z.array(z.object({ block_id: z.string().uuid(), start: z.string().describe("New start, ISO date-time with the user's offset") })).min(1).max(6) }),
+    run: async (ctx, { moves }) => {
+      const zone = ctx.timezone;
+      const done: string[] = [];
+      const problems: string[] = [];
+      const dates = new Set<string>();
+      let waiting = false;
+      for (const m of moves) {
+        const b = await getEntity<PlanBlock>(ctx, "plan_blocks", m.block_id);
+        const start = DateTime.fromISO(m.start, { setZone: true }).setZone(zone);
+        if (!start.isValid) {
+          problems.push(`“${b.title}”: not a valid time`);
+          continue;
+        }
+        const end = start.plus({ milliseconds: Date.parse(b.ends_at) - Date.parse(b.starts_at) });
+        const date = start.toISODate()!;
+        const clash = await fixedClash(ctx, date, start, end, b.id);
+        if (clash) {
+          problems.push(`“${b.title}” would overlap “${clash}”, which Navi doesn't move`);
+          continue;
+        }
+        const r = await updateEntity(ctx, "plan_blocks", b.id, { starts_at: start.toISO(), ends_at: end.toISO(), plan_date: date, pinned: true }, { summary: `Moved “${b.title}” to ${start.toFormat("ccc h:mm a")}` });
+        if (r.kind === "approval_requested") waiting = true;
+        else {
+          done.push(`“${b.title}” → ${start.toFormat("ccc h:mm a")}`);
+          dates.add(date);
+          if (b.plan_date !== date) dates.add(b.plan_date);
+        }
+      }
+      let refit = "";
+      if (dates.size) {
+        const run = await planDays(ctx, [...dates], { trigger: "chat" });
+        refit = run.status === "unchanged" ? " Nothing else needed to move." : ` Re-fitted the rest: ${run.summary}`;
+      }
+      const parts = [done.length ? `Moved and pinned ${done.join(", ")}.${refit}` : "", problems.length ? `Not moved: ${problems.join("; ")}.` : "", waiting ? `A fixed block needs the user's OK. ${WAITING}` : ""].filter(Boolean);
+      return { ok: done.length > 0 || waiting, mutated: done.length > 0 || waiting, summary: parts.join(" ") };
+    },
+  }),
+  tool({
+    name: "undo_plan",
+    description: "Undo the most recent planning change (a re-plan, recovery or applied plan) when the user says 'undo that' about the plan. All of it goes back at once, or nothing if they edited it since.",
+    schema: z.object({}),
+    run: async (ctx) => {
+      const { data } = await ctx.db.from("activity_log").select("id,summary").eq("action", "plan_applied").is("reverted_at", null).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (!data) return { ok: false, summary: "There's no recent plan change to undo." };
+      await revertActivities(ctx, [data.id]);
+      return { ok: true, mutated: true, summary: `Undid the last plan change (${String(data.summary).slice(0, 160)}).` };
+    },
+  }),
+  tool({
+    name: "set_usual_time",
+    description: "Save a USUAL weekly time the user says they're free or busy (e.g. 'I'm always free after 4 on weekdays', 'I work Saturdays 9–1'). Confirmed from then on; undoable. Never use it for one day (use plan or set_day_exception).",
+    schema: z.object({
+      days: z.array(z.number().int().min(0).max(6)).min(1).max(7).describe("0 = Sunday ... 6 = Saturday"),
+      start: HHMM,
+      end: HHMM,
+      free: z.boolean().describe("true = free then; false = busy then"),
+      note: z.string().max(200).nullish(),
+    }),
+    run: async (ctx, i) => {
+      const what = `${i.free ? "Usually free" : "Usually busy"} ${i.days.map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d]).join("/")} ${i.start}–${i.end}${i.note ? ` (${i.note})` : ""}`;
+      await createRow(ctx, "availability_rules", { days: i.days, start_time: i.start, end_time: i.end, kind: i.free ? "free" : "busy", basis: "confirmed", source: "chat", note: i.note ?? null }, what);
+      return { ok: true, mutated: true, summary: `Saved: ${what}.` };
     },
   }),
   tool({
@@ -601,10 +901,13 @@ export const TOOLS = [
         });
         return { ok: true, mutated: true, summary: `Not changed yet: the settings change is waiting for the user's Approve tap. ${WAITING}` };
       }
+      const v2 = await plannerV2For(ctx);
+      const { data: prior } = v2 ? await ctx.db.from("profiles").select(Object.keys(patch).join(",")).eq("id", ctx.userId).single() : { data: null };
       const { error } = await ctx.db.from("profiles").update(patch).eq("id", ctx.userId);
       if (error) return { ok: false, summary: error.message };
-      await logActivity(ctx, { action: "settings_updated", summary: `Updated settings: ${Object.keys(patch).join(", ")}` });
-      return { ok: true, mutated: true, summary: `Updated ${Object.keys(patch).join(", ")}` };
+      // Planner v2 (B6): a settings change, availability included, can be undone.
+      await logActivity(ctx, v2 ? { action: "settings_updated", entityType: "profiles", entityId: ctx.userId, summary: `Updated settings: ${Object.keys(patch).join(", ")}`, before: prior, after: patch, reversible: true } : { action: "settings_updated", summary: `Updated settings: ${Object.keys(patch).join(", ")}` });
+      return { ok: true, mutated: true, summary: `Updated ${Object.keys(patch).join(", ")}${v2 && "availability" in patch ? " (usual free times; the user can undo this)" : ""}` };
     },
   }),
   tool({
@@ -697,13 +1000,17 @@ export async function runTool(ctx: Ctx, name: string, rawInput: unknown): Promis
   const undo: string[] = [];
   const actions: string[] = [];
   let autonomy = ctx.autonomy;
-  if (ctx.actor === "navi" && !autonomy && !READ_ONLY_TOOLS.includes(name)) {
+  let v2 = ctx.plannerV2;
+  if ((ctx.actor === "navi" && !autonomy && !READ_ONLY_TOOLS.includes(name)) || (v2 === undefined && PLANNER_V2_TOOLS.includes(name))) {
     const { data } = await ctx.db.from("profiles").select("preferences").eq("id", ctx.userId).maybeSingle();
-    autonomy = autonomyFrom(data?.preferences);
+    if (ctx.actor === "navi" && !autonomy) autonomy = autonomyFrom(data?.preferences);
+    v2 = plannerV2(data?.preferences);
   }
+  if (PLANNER_V2_TOOLS.includes(name) && !v2) return { ok: false, summary: `${name} isn't available: the new planner isn't on for this account.` };
   const stepCtx: Ctx = {
     ...ctx,
     autonomy,
+    plannerV2: v2,
     onActivity: (e) => {
       if (e.reversible) undo.push(e.id);
       ctx.onActivity?.(e);
@@ -722,8 +1029,11 @@ export async function runTool(ctx: Ctx, name: string, rawInput: unknown): Promis
   }
 }
 
-export function toolsFor(mode: "chat" | "onboarding" | "capture" | "voice"): NaviTool[] {
-  const all = TOOLS as readonly NaviTool[];
+/** Tools that only exist with the constraint-first planner (planner v2). */
+export const PLANNER_V2_TOOLS: readonly string[] = ["plan", "set_day_exception", "skip_occurrence", "move_block", "undo_plan", "set_usual_time"];
+
+export function toolsFor(mode: "chat" | "onboarding" | "capture" | "voice", opts: { plannerV2?: boolean } = {}): NaviTool[] {
+  const all = (TOOLS as readonly NaviTool[]).filter((t) => opts.plannerV2 || !PLANNER_V2_TOOLS.includes(t.name));
   if (mode === "capture") return all.filter((t) => ["get_overview", "get_plan", "propose_items"].includes(t.name));
   if (mode === "onboarding") return all.filter((t) => ["get_overview", "propose_items", "remember", "mark_onboarding_ready", "update_settings"].includes(t.name));
   return all.filter((t) => t.name !== "mark_onboarding_ready");

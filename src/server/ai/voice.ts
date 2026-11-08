@@ -3,8 +3,8 @@ import { Behavior, GoogleGenAI, Modality, type FunctionDeclaration, type LiveCon
 import type { Ctx } from "@/server/context";
 import { serverEnv } from "@/lib/env";
 import { buildContext, listMessages, resolveConversation } from "./chat";
-import { CHAT_SYSTEM, ONBOARDING_SYSTEM } from "./prompts";
-import { jsonSchemaFor, toolsFor } from "./tools";
+import { CHAT_SYSTEM, CHAT_SYSTEM_V2, ONBOARDING_SYSTEM } from "./prompts";
+import { jsonSchemaFor, plannerV2For, toolsFor } from "./tools";
 import { modelFor } from "./config";
 import { VOICE_TOKEN_MINUTES } from "./budget";
 
@@ -24,8 +24,8 @@ You are speaking aloud in a real-time voice conversation. Keep replies short and
 The state below is a snapshot from when this voice session started and goes stale as you talk. For anything about the schedule, tasks, the inbox or captures, call get_plan, get_inbox or search_items first and answer from the result. For "how did I do", call get_review and say its numbers; never work statistics out yourself. For "tomorrow" or a weekday, call get_plan with date "tomorrow" or that date rather than working it out from the snapshot.
 When an action waits for approval, say it's on screen for them to tap Approve, and that they can tell you what to change; never say it's done.`;
 
-export function voiceFunctionDeclarations(kind: "chat" | "onboarding"): FunctionDeclaration[] {
-  return toolsFor(kind === "onboarding" ? "onboarding" : "voice").map((t) => ({
+export function voiceFunctionDeclarations(kind: "chat" | "onboarding", opts: { plannerV2?: boolean } = {}): FunctionDeclaration[] {
+  return toolsFor(kind === "onboarding" ? "onboarding" : "voice", opts).map((t) => ({
     name: t.name,
     description: t.description,
     parametersJsonSchema: jsonSchemaFor(t),
@@ -42,15 +42,16 @@ export async function buildVoiceSession(ctx: Ctx, kind: "chat" | "onboarding", c
     .map((m) => `${m.role === "user" ? "User" : "Navi"}${m.modality === "voice" ? " (voice)" : ""}: ${m.content.slice(0, 600)}`)
     .join("\n");
   const context = await buildContext({ ...ctx, conversationId }, recent.at(-1)?.content ?? "", "voice");
+  const v2 = await plannerV2For(ctx);
   const system =
-    (kind === "onboarding" ? ONBOARDING_SYSTEM : CHAT_SYSTEM) +
+    (kind === "onboarding" ? ONBOARDING_SYSTEM : v2 ? CHAT_SYSTEM_V2 : CHAT_SYSTEM) +
     VOICE_STYLE +
     `\n\n${context}\n\nRecent conversation (text and voice share this history):\n${history || "(none yet)"}`;
 
   const config: LiveConnectConfig = {
     responseModalities: [Modality.AUDIO],
     systemInstruction: system,
-    tools: [{ functionDeclarations: voiceFunctionDeclarations(kind) }],
+    tools: [{ functionDeclarations: voiceFunctionDeclarations(kind, { plannerV2: v2 }) }],
     inputAudioTranscription: {},
     outputAudioTranscription: {},
     sessionResumption: {},
