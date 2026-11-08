@@ -112,6 +112,7 @@ test("a link in Navi's reply opens the page with a way back to the chat", async 
   await freshSetUpAccount(page, "chats-link@navi.test");
   await page.goto("/");
   await say(page, "Hello there");
+  await expect(page).toHaveURL(/\/\?c=[0-9a-f-]{36}$/);
   const chatUrl = page.url();
   // Stand in for a link in a reply (e.g. "See approvals in Activity"): any link inside the conversation.
   await page.getByRole("log", { name: "Conversation" }).evaluate((log) => {

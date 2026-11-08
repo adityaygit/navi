@@ -146,7 +146,6 @@ export function Chat({
       if (pending) localStorage.setItem(`navi:chat-draft:chat:${id}`, pending);
     } catch {}
     setConversationId(id);
-    setSeenConv(id);
     // The shell points the URL (on Home) and the sidebar list at it.
     onConversationChange?.(id);
   }
