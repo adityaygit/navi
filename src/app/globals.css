@@ -106,6 +106,26 @@ body {
   outline-offset: 2px;
 }
 
+/* Fields that live inside a pill/composer: nothing lights up on focus (owner's
+   call: typing should feel like plain text; the caret shows where you are). Unlayered on purpose: the global
+   :focus-visible rule above is unlayered and would beat Tailwind's layered
+   outline-none utility. */
+.bare-field,
+.bare-field:focus,
+.bare-field:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+  appearance: none;
+}
+.bare-field:-webkit-autofill {
+  -webkit-text-fill-color: var(--navi-text);
+  transition: background-color 9999s ease-out;
+  box-shadow: 0 0 0 1000px transparent inset;
+}
+
 .tabular,
 .num {
   font-variant-numeric: tabular-nums;
@@ -357,12 +377,9 @@ html {
     height: calc(100dvh - 7rem);
   }
 }
-/* The composer shows focus by brightening its edge, not with a ring. */
+/* Composers stay calm while typing: no ring, no edge change; the caret shows where you are. */
 .composer :focus-visible {
   outline: none;
-}
-.composer:focus-within {
-  border-color: rgba(255, 255, 255, 0.3);
 }
 
 /* Disclosure toggles get a full-size tap area on touch screens. */

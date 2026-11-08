@@ -19,7 +19,7 @@ export function HomeComposer() {
   };
   return (
     <form
-      className="sticky bottom-7 z-10 mx-auto mt-auto flex h-[58px] w-full max-w-[660px] items-center gap-2.5 rounded-[29px] border border-white/[0.09] bg-[rgba(28,28,31,0.92)] pl-[22px] pr-2 shadow-[0_20px_50px_rgba(0,0,0,0.6)]"
+      className="sticky bottom-7 z-10 mx-auto mt-auto flex h-[58px] w-full max-w-[660px] items-center gap-2.5 rounded-[29px] border border-white/[0.09] bg-[rgba(28,28,31,0.92)] pl-5 pr-2 shadow-[0_20px_50px_rgba(0,0,0,0.6)]"
       onSubmit={(e) => {
         e.preventDefault();
         send();
@@ -31,7 +31,7 @@ export function HomeComposer() {
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="Tell Navi anything — a plan, a worry, a to-do"
-        className="h-full flex-1 bg-transparent text-[15px] text-text outline-none placeholder:text-[#8E8E96] focus-visible:outline-none"
+        className="bare-field h-full min-w-0 flex-1 p-0 text-[15px] text-text placeholder:text-[#8E8E96]"
         autoComplete="off"
       />
       {text.trim() ? (

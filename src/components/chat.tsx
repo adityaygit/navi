@@ -396,7 +396,7 @@ export function Chat({
       )}
       {isPanel ? (
         <form
-          className="flex shrink-0 items-end gap-2 rounded-[26px] border border-white/[0.08] bg-white/[0.06] py-1.5 pl-[18px] pr-1.5 focus-within:border-white/20"
+          className="flex shrink-0 items-end gap-2 rounded-[26px] border border-white/[0.08] bg-white/[0.06] py-1.5 pl-[18px] pr-1.5"
           onSubmit={(e) => {
             e.preventDefault();
             void send(text);
@@ -407,7 +407,7 @@ export function Chat({
             id="panel-input"
             ref={inputRef}
             rows={1}
-            className="max-h-40 min-h-10 flex-1 resize-none bg-transparent py-2.5 text-[15px] leading-snug text-text outline-none [field-sizing:content] placeholder:text-dim focus-visible:outline-none"
+            className="max-h-40 min-h-10 bare-field flex-1 resize-none px-0 py-2.5 text-[15px] leading-snug text-text [field-sizing:content] placeholder:text-dim"
             placeholder={placeholder ?? "Talk to Navi…"}
             value={text}
             onChange={(e) => setDraft(e.target.value)}
@@ -441,7 +441,7 @@ export function Chat({
         <textarea
           id={`chat-input-${kind}`}
           rows={1}
-          className={`max-h-32 min-h-11 w-full min-w-0 resize-none ${text ? "" : "flex-1 md:flex-none"} bg-transparent py-2 md:max-h-40 text-[17px] leading-snug text-text outline-none [field-sizing:content] placeholder:text-dim focus-visible:outline-none`}
+          className={`max-h-32 min-h-11 w-full min-w-0 bare-field resize-none ${text ? "" : "flex-1 md:flex-none"} px-0 py-2 md:max-h-40 text-[17px] leading-snug text-text [field-sizing:content] placeholder:text-dim`}
           placeholder={placeholder ?? "Tell Navi anything…"}
           value={text}
           onChange={(e) => setDraft(e.target.value)}
