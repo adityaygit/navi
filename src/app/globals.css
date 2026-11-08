@@ -366,20 +366,6 @@ html {
 .fab {
   bottom: calc(var(--dock-bottom) + var(--dock-h) + 12px);
 }
-/* Chat fills the screen between the top padding and the dock; no page scroll. */
-.chat-shell {
-  height: calc(100dvh - var(--top-pad) - var(--dock-bottom) - var(--dock-h) - 14px);
-}
-@media (max-width: 767.98px) {
-  .app-main:has(.chat-shell) {
-    padding-bottom: 0;
-  }
-}
-@media (min-width: 768px) {
-  .chat-shell {
-    height: calc(100dvh - 7rem);
-  }
-}
 /* Composers stay calm while typing: no ring, no edge change; the caret shows where you are. */
 .composer :focus-visible {
   outline: none;
@@ -533,18 +519,14 @@ html {
 @media (max-width: 767.98px) {
   html[data-kb="open"] .dock,
   html[data-kb="open"] .edge-bottom,
-  html[data-kb="open"] .fab,
-  html[data-kb="open"] .chat-quick {
+  html[data-kb="open"] .fab {
     display: none;
-  }
-  html[data-kb="open"] .chat-shell {
-    height: calc(var(--vvh, 100dvh) - var(--top-pad) - 10px);
   }
 }
 
 /* ---------------------------------------------------------------------------
    Navi 1.5 desktop shell: left nav, centre page, persistent Navi panel.
-   Phones keep the bottom dock (Nav) and the full /chat page.
+   On Home the chat is the page (centre); elsewhere it is the panel.
    ------------------------------------------------------------------------- */
 
 /* The Navi stone: Navi's presence. Coloured by the --navi-* variables. */

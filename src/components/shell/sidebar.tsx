@@ -6,6 +6,8 @@ import { Stone } from "./stone";
 import { NAV_COOKIE, setShellCookie } from "./panel-context";
 import { shortcutLabel } from "@/lib/viewing";
 import { SignOutButton } from "../sign-out";
+import { useChatSession } from "./chat-session";
+import { SidebarChats } from "./sidebar-chats";
 import { spaceColor } from "@/lib/space-color";
 
 export { spaceColor };
@@ -36,7 +38,6 @@ const MORE = [
   { href: "/memory", label: "Memory" },
   { href: "/notes", label: "Notes" },
   { href: "/activity", label: "Activity" },
-  { href: "/chat", label: "All chats" },
   { href: "/settings", label: "Settings" },
 ];
 
@@ -55,6 +56,7 @@ export function Sidebar({
 }) {
   const path = usePathname();
   const search = useSearchParams();
+  const session = useChatSession();
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const [kbd, setKbd] = useState("Ctrl K");
   useEffect(() => {
@@ -97,6 +99,16 @@ export function Sidebar({
         )}
       </div>
 
+      <Link
+        href="/"
+        onClick={() => session.requestFocus("center")}
+        className={`mb-2 flex h-9 items-center gap-3 rounded-[12px] border border-white/[0.08] text-[14px] font-medium text-text transition-colors hover:bg-white/[0.06] ${collapsed ? "justify-center px-0" : "px-3"}`}
+        title={collapsed ? "New chat" : undefined}
+      >
+        <svg {...icon}><path d="M12 5v14M5 12h14" /></svg>
+        {collapsed ? <span className="sr-only">New chat</span> : <span>New chat</span>}
+      </Link>
+
       {PRIMARY.map((i) => {
         const n = i.href === "/inbox" ? counts.inbox : 0;
         return (
@@ -135,6 +147,8 @@ export function Sidebar({
           </ul>
         </>
       )}
+
+      {!collapsed && <SidebarChats />}
 
       <span className="flex-1" />
       <details className="group relative">

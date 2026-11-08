@@ -21,10 +21,10 @@ export function QuickCapture({ userId }: { userId: string }) {
   const recRef = useRef<SpeechRec | null>(null);
   const [listening, setListening] = useState(false);
   const [usedVoice, setUsedVoice] = useState(false);
-  // During setup and in chat the person is already talking to Navi, and the
+  // During setup the person is already talking to Navi, and the
   // floating button would cover the composer. Queued captures still show.
   const path = usePathname();
-  const hideFab = (path.startsWith("/onboarding") || path.startsWith("/chat")) && queue.length === 0;
+  const hideFab = path.startsWith("/onboarding") && queue.length === 0;
 
   useEffect(() => {
     // Restore an unsent draft from this device's storage (an external system).

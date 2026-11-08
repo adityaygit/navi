@@ -14,7 +14,7 @@ config({ path: ".env.local", quiet: true });
 assertLocalSupabase();
 const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
 
-const PAGES = ["/", "/chat", "/inbox", "/planner", "/tasks", "/projects", "/insights", "/review", "/memory", "/notes", "/activity", "/settings", "/more", "/focus", "/planner?view=calendar"];
+const PAGES = ["/", "/chats", "/inbox", "/planner", "/tasks", "/projects", "/insights", "/review", "/memory", "/notes", "/activity", "/settings", "/more", "/focus", "/planner?view=calendar"];
 
 /** Elements sticking out past the right edge of the screen (sideways scrolling). */
 async function overflow(page: Page, label: string) {

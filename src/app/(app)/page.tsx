@@ -4,7 +4,7 @@ import { requireCtx, getProfile } from "@/server/context";
 import type { Briefing, Task } from "@/lib/types";
 import { Stone } from "@/components/shell/stone";
 import { spaceColor } from "@/lib/space-color";
-import { HomeComposer, Insight, StartFocusButton, type InsightView } from "@/components/home/home-parts";
+import { Insight, StartFocusButton, type InsightView } from "@/components/home/home-parts";
 import { awakeSpan, dayFrom, loadSources, zoneHelpers, wakeBed } from "@/server/day";
 import { greeting, homeSummary, lastWorkedText, partOf, type DayPart, type Line } from "@/lib/sentences";
 import { formatTime } from "@/lib/time";
@@ -27,6 +27,8 @@ function Sentence({ line }: { line: Line }) {
  * Home: companion-first and work-centred. A greeting and one line about today
  * (from real counts), the day at a glance, where to pick up, and at most one
  * suggestion. Every sentence follows the sources contract (src/lib/sentences.ts).
+ * This is the header of the chat in the centre of Home (the app layout puts it
+ * at the top of the chat's scroll area; the box is at the bottom).
  */
 export default async function HomePage() {
   const ctx = await requireCtx();
@@ -135,7 +137,7 @@ export default async function HomePage() {
   const hasWakeBed = !!wakeBed(profile);
 
   return (
-    <div className="relative flex min-h-[calc(100dvh-4rem)] flex-col items-center pb-6 pt-2 md:pt-10">
+    <div className="relative mx-auto flex w-full max-w-[1120px] flex-col items-center pb-2 pt-2">
       <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-[-260px] -z-10 h-[620px] w-[900px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,color-mix(in_srgb,var(--navi-text)_10%,transparent)_0%,color-mix(in_srgb,var(--navi-text)_3%,transparent)_38%,transparent_70%)]" />
       <Stone size={120} lit className="mt-2" />
       <div aria-hidden="true" className="mt-3 h-3.5 w-[104px] rounded-full bg-[radial-gradient(ellipse_at_center,color-mix(in_srgb,var(--navi-mid)_18%,transparent)_0%,transparent_70%)]" />
@@ -213,8 +215,6 @@ export default async function HomePage() {
         <p className="mt-4 text-[13px] text-dim">Add your wake-up and bedtime in <Link href="/settings" className="underline">Settings</Link> and Navi can count your free time.</p>
       )}
 
-      <div className="h-16 flex-1" />
-      <HomeComposer />
     </div>
   );
 }

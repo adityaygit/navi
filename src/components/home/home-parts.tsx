@@ -7,53 +7,6 @@ import { Stone } from "../shell/stone";
 import { dismissSuggestionAction, markBriefingReadAction, startFocusAction } from "@/app/(app)/client-actions";
 import { announceChange } from "@/lib/offline-queue";
 
-/** Home's box: what you type here goes to Navi (the panel opens beside Home). */
-export function HomeComposer() {
-  const panel = usePanel();
-  const [text, setText] = useState("");
-  const send = () => {
-    const v = text.trim();
-    if (!v) return;
-    setText("");
-    panel.ask(v);
-  };
-  return (
-    <form
-      className="sticky bottom-7 z-10 mx-auto mt-auto flex h-[58px] w-full max-w-[660px] items-center gap-2.5 rounded-[29px] border border-white/[0.09] bg-[rgba(28,28,31,0.92)] pl-5 pr-2 shadow-[0_20px_50px_rgba(0,0,0,0.6)]"
-      onSubmit={(e) => {
-        e.preventDefault();
-        send();
-      }}
-    >
-      <label htmlFor="home-ask" className="sr-only">Tell Navi anything</label>
-      <input
-        id="home-ask"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="Tell Navi anything — a plan, a worry, a to-do"
-        className="bare-field h-full min-w-0 flex-1 p-0 text-[15px] text-text placeholder:text-[#8E8E96]"
-        autoComplete="off"
-      />
-      {text.trim() ? (
-        <button type="submit" className="flex h-[42px] items-center gap-2 rounded-[21px] bg-text px-4 font-semibold text-black">Send</button>
-      ) : (
-        <button
-          type="button"
-          onClick={() => {
-            panel.setHomeOpen(true);
-            window.dispatchEvent(new Event("navi:start-voice"));
-          }}
-          className="flex h-[42px] items-center gap-2 rounded-[21px] bg-[var(--navi-text)] px-4 font-semibold text-[var(--navi-ink)]"
-          aria-label="Talk to Navi"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" /></svg>
-          Talk
-        </button>
-      )}
-    </form>
-  );
-}
-
 export function StartFocusButton({ taskId, minutes, label = "Start focus" }: { taskId: string; minutes: number | null; label?: string }) {
   const router = useRouter();
   const [pending, start] = useTransition();

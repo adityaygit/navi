@@ -3,11 +3,12 @@ import Link from "next/link";
 import type { Message, ToolEvent } from "@/lib/types";
 import { readStepsLine, stepDone } from "@/lib/tool-labels";
 import { Pebble, type PebbleMood } from "./pebble";
+import { Stone } from "./shell/stone";
 import type { ActionView } from "@/lib/actions";
 import { ActionCard, UndoButton, useActions } from "./action-card";
 
 // How one turn of the conversation looks: the person's words in a light
-// bubble; Navi's reply under a small Pebble with its steps as hairline rows
+// bubble; Navi's reply under the small Navi stone with its steps as hairline rows
 // (each change it made on its own can be undone right there) and anything that
 // needs the person's OK as an inline action card. A live turn is
 // drawn from stream events (see src/lib/chat-stream.ts) and is swapped for the
@@ -37,7 +38,7 @@ export function UserBubble({ message }: { message: Message }) {
 function NaviHeader({ mood, voice }: { mood: PebbleMood; voice?: boolean }) {
   return (
     <div className="flex items-center gap-2.5">
-      <Pebble size={28} mood={mood} />
+      <Stone size={24} lit={mood !== "quiet"} />
       <span className="text-[15px] font-semibold">Navi</span>
       {voice && <span className="badge">voice</span>}
     </div>

@@ -19,7 +19,7 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
     shortcuts: [
       { name: "Capture", url: "/?capture=1" },
-      { name: "Talk to Navi", url: "/chat" },
+      { name: "Talk to Navi", url: "/" },
       { name: "Inbox", url: "/inbox" },
     ],
   };

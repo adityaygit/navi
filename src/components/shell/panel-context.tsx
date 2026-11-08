@@ -2,22 +2,19 @@
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 /**
- * Shared between the persistent Navi panel and the pages: whether the panel
- * is open, and a way for a page (Home's composer, "Ask Navi to help", the
- * command palette) to hand Navi a message. The panel lives in the app layout,
- * so this state survives moving between pages.
+ * Shared between the chat (centre of Home, or the Navi panel on other pages)
+ * and the pages: whether the panel is open, and a way for a page ("Ask Navi to
+ * help", Home's suggestion, the command palette) to hand Navi a message. The
+ * chat lives in the app layout, so this state survives moving between pages.
  */
 type Ask = { id: number; text: string };
 type PanelApi = {
-  /** The person's saved choice for regular pages. */
+  /** The person's saved choice for pages other than Home. */
   pref: "open" | "collapsed";
   setPref: (v: "open" | "collapsed") => void;
-  /** Opened from Home (Home has no panel unless asked). Reset on leaving Home. */
-  homeOpen: boolean;
-  setHomeOpen: (v: boolean) => void;
-  /** Open the panel and send this to Navi. */
+  /** Open the panel (off Home) and send this to Navi. */
   ask: (text: string) => void;
-  /** Open the panel with this text in the box, not sent. */
+  /** Open the panel (off Home) with this text in the box, not sent. */
   draft: (text: string) => void;
   pendingAsk: Ask | null;
   pendingDraft: Ask | null;
@@ -37,7 +34,6 @@ export function setShellCookie(name: string, value: string) {
 
 export function PanelProvider({ initialPref, children }: { initialPref: "open" | "collapsed"; children: React.ReactNode }) {
   const [pref, setPrefState] = useState(initialPref);
-  const [homeOpen, setHomeOpen] = useState(false);
   const [pendingAsk, setPendingAsk] = useState<Ask | null>(null);
   const [pendingDraft, setPendingDraft] = useState<Ask | null>(null);
   const setPref = useCallback((v: "open" | "collapsed") => {
@@ -48,15 +44,11 @@ export function PanelProvider({ initialPref, children }: { initialPref: "open" |
     () => ({
       pref,
       setPref,
-      homeOpen,
-      setHomeOpen,
       ask: (text) => {
-        setHomeOpen(true);
         setPref("open");
         setPendingAsk({ id: Date.now() + Math.random(), text });
       },
       draft: (text) => {
-        setHomeOpen(true);
         setPref("open");
         setPendingDraft({ id: Date.now() + Math.random(), text });
       },
@@ -67,7 +59,7 @@ export function PanelProvider({ initialPref, children }: { initialPref: "open" |
         setPendingDraft((d) => (d?.id === id ? null : d));
       },
     }),
-    [pref, setPref, homeOpen, pendingAsk, pendingDraft],
+    [pref, setPref, pendingAsk, pendingDraft],
   );
   return <PanelContext.Provider value={api}>{children}</PanelContext.Provider>;
 }

@@ -45,6 +45,8 @@ export async function proxy(request: NextRequest) {
   requestHeaders.set("Content-Security-Policy", csp);
   // The app layout reads this to gate unfinished setup (layouts don't get the path).
   requestHeaders.set("x-pathname", request.nextUrl.pathname);
+  // ...and this to open the chat the URL names (/?c=<id>) on a full load.
+  requestHeaders.set("x-search", request.nextUrl.search);
   const next = () => NextResponse.next({ request: { headers: requestHeaders } });
   let response = next();
 

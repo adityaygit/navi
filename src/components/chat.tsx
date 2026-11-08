@@ -21,7 +21,6 @@ class TurnError extends Error {
 
 type AiStatus = { ready: boolean; mode: string; reason?: string };
 
-const QUICK_PROMPTS = ["My plan broke", "What's next?", "Review my day"];
 // Stable defaults: fresh {} / [] each render would look like new server data every time.
 const NO_ACTIONS: Record<string, ActionView> = {};
 const NO_UNDONE: string[] = [];
@@ -64,6 +63,11 @@ export function Chat({
   endVoiceSignal = 0,
   startVoiceSignal = 0,
   emptyState,
+  header,
+  notice,
+  loading = false,
+  focusSignal = 0,
+  onConversationChange,
 }: {
   kind: "chat" | "onboarding";
   /** The chat being continued; null starts a new chat on the first message. Unused for onboarding. */
@@ -76,8 +80,11 @@ export function Chat({
   ai: AiStatus;
   voice: { ready: boolean; reason?: string };
   placeholder?: string;
-  /** "panel": the persistent Navi panel (stays on the current page, compact composer). */
-  variant?: "page" | "panel";
+  /**
+   * "panel": the Navi panel beside other pages (compact composer).
+   * "center": the chat in the centre of Home, under Home's own header.
+   */
+  variant?: "page" | "panel" | "center";
   /** What the person has open ("My day, Friday"), sent with each message. */
   viewing?: string;
   onVoiceChange?: (live: boolean) => void;
@@ -90,9 +97,20 @@ export function Chat({
   startVoiceSignal?: number;
   /** Shown instead of the default hint while there are no messages. */
   emptyState?: React.ReactNode;
+  /** Centre only: Home's greeting and cards, at the top of the scroll area (dimmed once the chat starts). */
+  header?: React.ReactNode;
+  /** A line above the conversation (e.g. "That chat doesn't exist anymore"). */
+  notice?: React.ReactNode;
+  /** The chat's messages are still loading. */
+  loading?: boolean;
+  /** Changing this number puts the cursor in the message box (New chat). */
+  focusSignal?: number;
+  /** A new chat was created by its first message (or for voice). */
+  onConversationChange?: (id: string) => void;
 }) {
   const panel = usePanelOptional();
   const isPanel = variant === "panel";
+  const isCenter = variant === "center";
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [text, setText] = useState("");
@@ -112,6 +130,8 @@ export function Chat({
     setSeenConv(initialConversationId);
     if (initialConversationId !== conversationId) {
       setConversationId(initialConversationId);
+      // Another chat (or a new one): its own messages, read from the bottom.
+      setMessages(initialMessages);
       setVoiceOpen(false);
       setError(null);
     }
@@ -126,8 +146,8 @@ export function Chat({
       if (pending) localStorage.setItem(`navi:chat-draft:chat:${id}`, pending);
     } catch {}
     setConversationId(id);
-    // The panel stays on the page the person is looking at.
-    if (!isPanel) router.replace(`/chat?c=${id}`, { scroll: false });
+    // The shell points the URL (on Home) and the sidebar list at it.
+    onConversationChange?.(id);
   }
 
   async function openVoice() {
@@ -182,10 +202,17 @@ export function Chat({
     try { setText(localStorage.getItem(draftKey) ?? ""); } catch {}
   }, [draftKey]);
   // Follow the conversation as it grows, unless the person scrolled up to read.
+  // Another chat opens at its newest message.
+  useLayoutEffect(() => {
+    stick.current = true;
+  }, [conversationId]);
+  // A new chat in the centre starts at the top, where Home's header is.
   useLayoutEffect(() => {
     const el = logRef.current;
-    if (el && stick.current) el.scrollTop = el.scrollHeight;
-  }, [messages, live]);
+    if (!el) return;
+    if (isCenter && messages.length === 0 && !live) el.scrollTop = 0;
+    else if (stick.current) el.scrollTop = el.scrollHeight;
+  }, [messages, live, isCenter]);
 
   function setDraft(v: string) {
     setText(v);
@@ -312,8 +339,9 @@ export function Chat({
   }
 
   // A page asked Navi something (Home's box, "Ask Navi to help", the palette).
-  const ask = isPanel ? panel?.pendingAsk : null;
-  const draftAsk = isPanel ? panel?.pendingDraft : null;
+  const shared = isPanel || isCenter;
+  const ask = shared ? panel?.pendingAsk : null;
+  const draftAsk = shared ? panel?.pendingDraft : null;
   useEffect(() => {
     if (!ask || sending) return;
     panel?.consume(ask.id);
@@ -332,36 +360,127 @@ export function Chat({
     inputRef.current?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftAsk?.id]);
+  // New chat: the cursor goes to the box (after the centre/panel box is drawn).
+  const focused = useRef(0);
+  useEffect(() => {
+    if (!focusSignal || focused.current === focusSignal || !inputRef.current) return;
+    focused.current = focusSignal;
+    inputRef.current.focus();
+  }, [focusSignal, variant]);
 
-  const quick = kind === "chat" && !isPanel && (
+  const hasChat = messages.length > 0 || !!live;
+  const keySend = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      void send(text);
+    }
+  };
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void send(text);
+  };
+  const micIcon = <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" /></svg>;
+  const sendIcon = (size: number) => <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>;
+
+  const unavailable = !ai.ready && (
+    <p className="notice notice-warn" role="status">
+      Navi's AI isn't available: {ai.reason} You can still use the dashboard and capture to your inbox.
+    </p>
+  );
+  const devsim = ai.mode === "devsim" && (
+    <p className="notice notice-warn text-xs" role="status">
+      Development mode: replies come from a rule-based simulator, not a real AI model.
+    </p>
+  );
+  const turns = (
     <>
-      {QUICK_PROMPTS.map((q) => (
-        <button key={q} type="button" className="surf inline-flex h-9 shrink-0 items-center pointer-coarse:h-11 whitespace-nowrap rounded-full px-3.5 text-[14px] text-[#d8d9dc] transition-colors hover:text-text disabled:opacity-45" disabled={sending} onClick={() => void send(q, "text", false)}>
-          {q}
-        </button>
-      ))}
+      {messages.map((m) => (m.role === "user" ? <UserBubble key={m.id} message={m} /> : <NaviMessage key={m.id} message={m} />))}
+      {live && <LiveNavi items={live} />}
+      {sending && <div className="sr-only" role="status">Navi is thinking…</div>}
     </>
   );
+  const errorLine = error && <p role="alert" className="notice notice-danger text-sm">{error}</p>;
+  const voicePanel = voiceOpen && (
+    <VoiceSession
+      kind={kind}
+      conversationId={kind === "chat" ? conversationId : null}
+      onClose={() => setVoiceOpen(false)}
+      onTurnSaved={() => {
+        announceChange();
+        router.refresh();
+      }}
+    />
+  );
+  const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  };
+
+  // The centre of Home: Home's own header at the top of one scroll area, the
+  // conversation under it, and the box at the bottom.
+  if (isCenter) {
+    return (
+      <ActionsContext.Provider value={actionState}>
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div ref={logRef} onScroll={onScroll} className="chat-log min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 md:px-10" role="region" aria-label="Home and conversation" tabIndex={0}>
+            {header && <div className={`transition-opacity duration-300 ${hasChat ? "opacity-40 hover:opacity-100 focus-within:opacity-100" : ""}`}>{header}</div>}
+            <div className={`mx-auto flex w-full max-w-[720px] flex-col gap-6 ${hasChat || notice || loading ? "pb-6 pt-8" : ""}`} role="log" aria-live="polite" aria-label="Conversation" data-chat-turns>
+              {notice}
+              {hasChat && devsim}
+              {loading && !hasChat && <p className="text-[15px] text-dim" role="status">Opening the chat…</p>}
+              {turns}
+            </div>
+          </div>
+          <div className="mx-auto flex w-full max-w-[720px] shrink-0 flex-col gap-3 px-4 pb-7 pt-2 md:px-0">
+            {unavailable}
+            {errorLine}
+            {voicePanel}
+            <form
+              className="composer flex min-h-[58px] w-full items-end gap-2.5 rounded-[29px] border border-white/[0.09] bg-[rgba(28,28,31,0.92)] py-2 pl-5 pr-2 shadow-[0_20px_50px_rgba(0,0,0,0.6)]"
+              onSubmit={submit}
+            >
+              <label htmlFor="chat-input-center" className="sr-only">Message Navi</label>
+              <textarea
+                id="chat-input-center"
+                ref={inputRef}
+                rows={1}
+                className="bare-field max-h-48 min-h-[42px] min-w-0 flex-1 resize-none px-0 py-[10px] text-[15px] leading-snug text-text [field-sizing:content] placeholder:text-[#8E8E96]"
+                placeholder={placeholder ?? "Tell Navi anything — a plan, a worry, a to-do"}
+                value={text}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={keySend}
+              />
+              {text.trim() ? (
+                <button type="submit" aria-label="Send" disabled={sending} className="flex h-[42px] shrink-0 items-center gap-2 rounded-[21px] bg-text px-4 font-semibold text-black disabled:opacity-40">
+                  Send
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void openVoice()}
+                  aria-pressed={voiceOpen}
+                  title={voice.ready ? "Talk to Navi" : voice.reason}
+                  className="flex h-[42px] shrink-0 items-center gap-2 rounded-[21px] bg-[var(--navi-text)] px-4 font-semibold text-[var(--navi-ink)]"
+                >
+                  {micIcon}
+                  {voiceOpen ? "Close voice" : "Talk"}
+                </button>
+              )}
+            </form>
+          </div>
+        </div>
+      </ActionsContext.Provider>
+    );
+  }
 
   return (
     <ActionsContext.Provider value={actionState}>
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      {!ai.ready && (
-        <p className="notice notice-warn" role="status">
-          Navi's AI isn't available: {ai.reason} You can still use the dashboard and capture to your inbox.
-        </p>
-      )}
-      {ai.mode === "devsim" && (
-        <p className="notice notice-warn text-xs" role="status">
-          Development mode: replies come from a rule-based simulator, not a real AI model.
-        </p>
-      )}
+      {unavailable}
+      {devsim}
       <div
         ref={logRef}
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-        }}
+        onScroll={onScroll}
         className="chat-log flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain py-3 pr-1"
         role="log"
         aria-live="polite"
@@ -369,8 +488,10 @@ export function Chat({
         // Scrollable, so reachable by keyboard.
         tabIndex={0}
       >
-        {messages.length === 0 && !live && emptyState}
-        {messages.length === 0 && !live && !emptyState && (
+        {notice}
+        {loading && !hasChat && <p className="m-auto text-[14px] text-dim" role="status">Opening the chat…</p>}
+        {!hasChat && !loading && emptyState}
+        {!hasChat && !loading && !emptyState && (
           <div className="m-auto flex max-w-sm flex-col items-center gap-3 py-8 text-center">
             {!isPanel && <Pebble size={56} mood="idle" float />}
             <p className="muted text-[15px]">
@@ -378,30 +499,12 @@ export function Chat({
             </p>
           </div>
         )}
-        {messages.map((m) => (m.role === "user" ? <UserBubble key={m.id} message={m} /> : <NaviMessage key={m.id} message={m} />))}
-        {live && <LiveNavi items={live} />}
-        {sending && <div className="sr-only" role="status">Navi is thinking…</div>}
+        {turns}
       </div>
-      {error && <p role="alert" className="notice notice-danger text-sm">{error}</p>}
-      {voiceOpen && (
-        <VoiceSession
-          kind={kind}
-          conversationId={kind === "chat" ? conversationId : null}
-          onClose={() => setVoiceOpen(false)}
-          onTurnSaved={() => {
-            announceChange();
-            router.refresh();
-          }}
-        />
-      )}
+      {errorLine}
+      {voicePanel}
       {isPanel ? (
-        <form
-          className="flex shrink-0 items-end gap-2 rounded-[26px] border border-white/[0.08] bg-white/[0.06] py-1.5 pl-[18px] pr-1.5"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void send(text);
-          }}
-        >
+        <form className="flex shrink-0 items-end gap-2 rounded-[26px] border border-white/[0.08] bg-white/[0.06] py-1.5 pl-[18px] pr-1.5" onSubmit={submit}>
           <label htmlFor="panel-input" className="sr-only">Message Navi</label>
           <textarea
             id="panel-input"
@@ -411,72 +514,56 @@ export function Chat({
             placeholder={placeholder ?? "Talk to Navi…"}
             value={text}
             onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                void send(text);
-              }
-            }}
+            onKeyDown={keySend}
           />
           {text.trim() ? (
             <button type="submit" aria-label="Send" disabled={sending} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-text text-black disabled:opacity-40">
-              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+              {sendIcon(16)}
             </button>
           ) : (
             <button type="button" onClick={() => void openVoice()} aria-pressed={voiceOpen} aria-label={voiceOpen ? "End voice" : "Talk to Navi"} title={voice.ready ? "Talk to Navi" : voice.reason} className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${voiceOpen ? "bg-[var(--navi-text)] text-black" : "bg-white/[0.08] text-text"}`}>
-              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" /></svg>
+              {micIcon}
             </button>
           )}
         </form>
-      ) : (<>
-      {quick && !voiceOpen && !text && <div className="chat-quick -mx-1 flex shrink-0 gap-2 overflow-x-auto px-1 md:hidden">{quick}</div>}
+      ) : (
       <form
         className={`lg composer flex shrink-0 gap-1 rounded-[22px] py-2 pl-4 pr-2 md:flex-col md:items-stretch md:py-3 md:pl-5 md:pr-3 ${text ? "flex-col" : "items-center"}`}
-        onSubmit={(e) => {
-          e.preventDefault();
-          void send(text);
-        }}
+        onSubmit={submit}
       >
         <label htmlFor={`chat-input-${kind}`} className="sr-only">Message Navi</label>
         <textarea
           id={`chat-input-${kind}`}
+          ref={inputRef}
           rows={1}
           className={`max-h-32 min-h-11 w-full min-w-0 bare-field resize-none ${text ? "" : "flex-1 md:flex-none"} px-0 py-2 md:max-h-40 text-[17px] leading-snug text-text [field-sizing:content] placeholder:text-dim`}
           placeholder={placeholder ?? "Tell Navi anything…"}
           value={text}
           onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              void send(text);
-            }
-          }}
+          onKeyDown={keySend}
         />
-        <div className="flex shrink-0 items-center gap-2">
-          <div className="hidden min-w-0 flex-1 flex-wrap gap-2 md:flex">{quick}</div>
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              type="button"
-              className="btn h-11 gap-2 px-4"
-              onClick={() => void openVoice()}
-              aria-pressed={voiceOpen}
-              title={voice.ready ? "Talk to Navi" : voice.reason}
-            >
-              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0" /><path d="M12 18v3" /></svg>
-              {voiceOpen ? "Close voice" : "Talk"}
-            </button>
-            <button
-              type="submit"
-              aria-label="Send"
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f2f2f2] text-[#060608] transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={sending || !text.trim()}
-            >
-              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
-            </button>
-          </div>
+        <div className="flex shrink-0 items-center justify-end gap-2">
+          <button
+            type="button"
+            className="btn h-11 gap-2 px-4"
+            onClick={() => void openVoice()}
+            aria-pressed={voiceOpen}
+            title={voice.ready ? "Talk to Navi" : voice.reason}
+          >
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0" /><path d="M12 18v3" /></svg>
+            {voiceOpen ? "Close voice" : "Talk"}
+          </button>
+          <button
+            type="submit"
+            aria-label="Send"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f2f2f2] text-[#060608] transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={sending || !text.trim()}
+          >
+            {sendIcon(18)}
+          </button>
         </div>
       </form>
-      </>)}
+      )}
     </div>
     </ActionsContext.Provider>
   );
