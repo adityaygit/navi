@@ -23,7 +23,7 @@ const tasksTitled = async (userId: string, title: string) => (await admin.from("
 test("ask first: change by talking, approve once, undo, decline, reload", async ({ page }, info) => {
   const userId = await freshSetUpAccount(page, `actions-ask-${info.project.name}@navi.test`);
   await admin.from("profiles").update({ preferences: { autonomy: "ask" } }).eq("id", userId);
-  await page.goto("/chat");
+  await page.goto("/");
   const log = page.getByRole("log", { name: "Conversation" });
 
   await say(page, "add a task to call the dentist tomorrow");
@@ -78,7 +78,7 @@ test("ask first: change by talking, approve once, undo, decline, reload", async 
 
 test("low-risk requests run at once and can be undone from the reply", async ({ page }, info) => {
   const userId = await freshSetUpAccount(page, `actions-auto-${info.project.name}@navi.test`);
-  await page.goto("/chat");
+  await page.goto("/");
   const log = page.getByRole("log", { name: "Conversation" });
   await say(page, "add a task to water the plants");
   const row = log.locator("li", { hasText: "Created task “water the plants”" });
@@ -121,7 +121,7 @@ test("a failing or expired action says so honestly", async ({ page }, info) => {
       { name: "request_external_action", ok: true, summary: "Waiting", action_id: email!.id },
     ],
   });
-  await page.goto(`/chat?c=${conv!.id}`);
+  await page.goto(`/?c=${conv!.id}`);
   const log = page.getByRole("log", { name: "Conversation" });
   await expect(log.getByText("Expired, so nothing was done.", { exact: false })).toBeVisible();
   const card = log.getByRole("group", { name: /Gmail send: Email coach@example.com/ });

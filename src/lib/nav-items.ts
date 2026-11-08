@@ -2,7 +2,7 @@ export type NavItem = { href: string; label: string; mobile?: boolean; badge?: "
 
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Today", mobile: true },
-  { href: "/chat", label: "Navi", mobile: true },
+  { href: "/", label: "Navi", mobile: true },
   { href: "/inbox", label: "Inbox", mobile: true, badge: "inbox" },
   { href: "/planner", label: "Planner", mobile: true },
   { href: "/tasks", label: "Tasks" },

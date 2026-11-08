@@ -44,7 +44,7 @@ export function viewingLabel(pathname: string, search: URLSearchParams | null, z
     "/activity": "Activity",
     "/settings": "Settings",
     "/review": "Review",
-    "/chat": "Chats",
+    "/chats": "All chats",
   };
   return simple[p] ?? "Navi";
 }

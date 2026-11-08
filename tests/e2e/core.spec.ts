@@ -104,7 +104,7 @@ test("onboarding conversation → reviewed setup → plan → capture → inbox 
   await page.screenshot({ path: `test-results/${info.project.name}-tasks.png`, fullPage: true });
 
   // Chat can operate the same system: plan the day.
-  await page.goto("/chat");
+  await page.goto("/");
   await say(page, "plan my day");
   // The reply carries the planner's own summary (placed / moved / didn't fit).
   await expect(page.getByText(/\w{3} \w{3} \d+: (placed \d+ blocks?|no flexible blocks placed)/).first()).toBeVisible();
@@ -133,7 +133,7 @@ test("voice says plainly when real-time voice isn't available and offers basic v
   test.skip(!!process.env.GEMINI_API_KEY, "Real-time voice is configured; this checks the fallback path");
   const email = info.project.name === "iphone" ? "alice@navi.test" : "dev@navi.test";
   await signInSetUp(page, email);
-  await page.goto("/chat");
+  await page.goto("/");
   await page.getByRole("button", { name: "Talk", exact: true }).click();
   const voice = page.getByRole("region", { name: "Voice conversation" });
   await expect(voice.getByText(/microphone turns on only after you tap/i)).toBeVisible();

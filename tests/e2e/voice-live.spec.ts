@@ -84,7 +84,7 @@ test("voice streams the mic, runs tools for real, plays replies and saves the tu
   const micStates = () => page.evaluate(() => (window as unknown as { __mic: MediaStreamTrack[] }).__mic.map((t) => t.readyState));
 
   // WebSocket routes apply to pages loaded after they're registered.
-  await page.goto("/chat");
+  await page.goto("/");
   await page.getByRole("button", { name: "Talk", exact: true }).click();
   const voice = page.getByRole("region", { name: "Voice conversation" });
   await voice.getByRole("button", { name: "Start talking" }).click();
@@ -254,7 +254,7 @@ test("words from a voice turn that can't be saved at the end are kept as a captu
   await context.grantPermissions(["microphone"], { origin: baseURL! });
   const userId = await freshSetUpAccount(page, `voice-keep-${info.project.name}@navi.test`);
   const { seen, send } = await standInLiveApi(page, userId, "chat");
-  await page.goto("/chat");
+  await page.goto("/");
   await page.getByRole("button", { name: "Talk", exact: true }).click();
   const voice = page.getByRole("region", { name: "Voice conversation" });
   await voice.getByRole("button", { name: "Start talking" }).click();
@@ -316,7 +316,7 @@ test.describe("strict browser audio rules", () => {
     const userId = await freshSetUpAccount(page, `voice-strict-${info.project.name}@navi.test`);
     const { seen } = await standInLiveApi(page, userId, "chat");
     await page.addInitScript(strictAutoplay);
-    await page.goto("/chat");
+    await page.goto("/");
     await page.getByRole("button", { name: "Talk", exact: true }).click();
     const voice = page.getByRole("region", { name: "Voice conversation" });
     const status = voice.getByRole("status").first();
@@ -359,7 +359,7 @@ test.describe("strict browser audio rules", () => {
         return stream;
       };
     });
-    await page.goto("/chat");
+    await page.goto("/");
     await page.getByRole("button", { name: "Talk", exact: true }).click();
     const voice = page.getByRole("region", { name: "Voice conversation" });
     await voice.getByRole("button", { name: "Start talking" }).click();
