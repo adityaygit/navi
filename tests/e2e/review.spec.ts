@@ -48,20 +48,20 @@ test("daily review: mark yesterday, see the review, plan ahead", async ({ page }
   const plan = page.getByRole("region", { name: "3. Plan the rest of today" });
   await plan.getByRole("button", { name: "Plan the rest of today" }).click();
   // Late in the day there may be no room left: then it says so instead of placing anything.
-  await expect(plan.getByRole("status")).toContainText(/placed \d+ blocks?|Didn't fit: “Read chapter 5” \(30 min left\)/);
+  await expect(plan.getByRole("status")).toContainText(/Planned (today|tonight): \d+ things?|1 thing didn't fit/);
 
   // Today no longer nags about yesterday; tonight's review plans tomorrow.
   await page.goto("/");
   await expect(page.getByText(/from yesterday aren't marked yet|from yesterday isn't marked yet/)).toHaveCount(0);
   await page.goto("/review");
   await page.getByRole("button", { name: "Plan tomorrow" }).click();
-  await expect(page.getByRole("region", { name: "3. Plan tomorrow" }).getByRole("status")).toContainText(/placed|no flexible blocks/);
+  await expect(page.getByRole("region", { name: "3. Plan tomorrow" }).getByRole("status")).toContainText(/Planned (today|tonight|tomorrow|the next \d+ days|\w+day): \d+ things?|Nothing new to plan|already works/);
 
   // Stopping focus asks why; with no reason the block counts as skipped.
   await page.goto("/planner");
   const replan = page.getByRole("button", { name: "Plan my day" });
   await replan.click();
-  await expect(replan.locator("xpath=..").getByRole("status")).toContainText(/\w{3} \w{3} \d+: (placed \d+ blocks?|no flexible blocks placed)/);
+  await expect(replan.locator("xpath=..").getByRole("status")).toContainText(/Planned (today|tonight|tomorrow|the next \d+ days|\w+day): \d+ things?|Nothing new to plan|already works/);
   // A block running right now (made by the person, so re-planning leaves it), whatever the time of day.
   const start = new Date(Date.now() - 5 * 60_000);
   await admin.from("plan_blocks").insert({ user_id: userId, title: "Focus drill", task_id: task!.id, plan_date: new Date().toISOString().slice(0, 10), starts_at: start.toISOString(), ends_at: new Date(start.getTime() + 30 * 60_000).toISOString(), created_by: "user" });

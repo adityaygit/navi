@@ -106,8 +106,9 @@ test("onboarding conversation → reviewed setup → plan → capture → inbox 
   // Chat can operate the same system: plan the day.
   await page.goto("/");
   await say(page, "plan my day");
-  // The reply carries the planner's own summary (placed / moved / didn't fit).
-  await expect(page.getByText(/\w{3} \w{3} \d+: (placed \d+ blocks?|no flexible blocks placed)/).first()).toBeVisible();
+  // One plain card for the plan ("Planned today: 3 things"); the reply doesn't recite the schedule.
+  await expect(page.getByText(/Planned (today|tonight|tomorrow|the next \d+ days|\w+day): \d+ things?|Nothing new to plan|already works/).first()).toBeVisible();
+  await expect(page.getByText(/\d{4}-\d{2}-\d{2}T|starts_at|blocks? placed/)).toHaveCount(0);
 });
 
 test("offline capture queues locally and syncs on reconnect", async ({ page, context }, info) => {

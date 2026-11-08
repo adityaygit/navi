@@ -81,7 +81,7 @@ test("low-risk requests run at once and can be undone from the reply", async ({ 
   await page.goto("/");
   const log = page.getByRole("log", { name: "Conversation" });
   await say(page, "add a task to water the plants");
-  const row = log.locator("li", { hasText: "Created task “water the plants”" });
+  const row = log.locator("li", { hasText: "Added “water the plants”" });
   await expect(row).toBeVisible();
   await expect(log.getByRole("group")).toHaveCount(0); // no card, no confirmation step
   expect(await tasksTitled(userId, "water the plants")).toHaveLength(1);

@@ -55,7 +55,7 @@ test("goals, projects, milestones and fixed commitments", async ({ page }, info)
   await expect(page.getByText("Added")).toBeVisible();
   const planWeek = page.getByRole("button", { name: "Plan next 7 days" });
   await planWeek.click();
-  await expect(planWeek.locator("xpath=..").getByRole("status")).toContainText(/placed|no flexible blocks/);
+  await expect(planWeek.locator("xpath=..").getByRole("status")).toContainText(/Planned (today|tonight|tomorrow|the next \d+ days|\w+day): \d+ things?|Nothing new to plan|already works/);
 
   const dentistStart = `${tomorrow}T10:00:00Z`;
   const dentistEnd = `${tomorrow}T11:30:00Z`;
