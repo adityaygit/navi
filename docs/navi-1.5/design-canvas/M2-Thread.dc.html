@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi conversation, M2</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer;text-align:left}
+</style>
+</helmet>
+<div style="width: 100%; display: flex; flex-direction: column; gap: 22px; font-family: Figtree, -apple-system, sans-serif; color: #F5F5F7; background: {{rootBg}}">
+  <sc-for list="{{items}}" as="m" hint-placeholder-count="4">
+    <sc-if value="{{m.isDivider}}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; align-items: center; gap: 12px; font-size: 13px; color: #7C7C85"><span style="flex: 1; height: 1px; background: rgba(255,255,255,0.08)"></span>{{m.text}}<span style="flex: 1; height: 1px; background: rgba(255,255,255,0.08)"></span></div>
+    </sc-if>
+    <sc-if value="{{m.isMe}}" hint-placeholder-val="{{ true }}">
+      <div style="align-self: flex-end; max-width: 78%; padding: 11px 16px; border-radius: 22px 22px 6px 22px; background: #1A1A1D; font-size: 16px; line-height: 1.45; color: #E8E8EC">{{m.text}}</div>
+    </sc-if>
+    <sc-if value="{{m.isNavi}}" hint-placeholder-val="{{ false }}">
+      <p style="margin: 0; font-size: 17px; line-height: 1.55; color: #F0F0F3; letter-spacing: -0.005em">{{m.text}}</p>
+    </sc-if>
+    <sc-if value="{{m.isDone}}" hint-placeholder-val="{{ false }}">
+      <p style="margin: 0; font-size: 17px; line-height: 1.55; color: #F0F0F3"><span style="color: #A7EBC0">Done.</span> {{m.text}} <button type="button" onClick="{{m.onAct}}" style="display: inline-block; padding: 11px 6px; margin: -11px 0; color: #A7EBC0; font-weight: 600; line-height: 1.55">{{m.actText}}</button></p>
+    </sc-if>
+    <sc-if value="{{m.isProposal}}" hint-placeholder-val="{{ false }}">
+      <div style="border-radius: 26px; background: linear-gradient(180deg, #141416 0%, #0F0F11 100%); border: 1px solid rgba(255,255,255,0.08); padding: 18px 18px 10px; display: flex; flex-direction: column">
+        <div style="font-size: 13px; color: #A0A0A8">{{m.head}}</div>
+        <ol style="list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px">
+          <sc-for list="{{m.rows}}" as="r" hint-placeholder-count="3">
+            <li style="display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: 14px; background: {{r.bg}}; border: {{r.border}}">
+              <span style="width: 40px; font-size: 13px; color: {{r.timeColor}}">{{r.t}}</span>
+              <span style="flex: 1; font-size: 15px; font-weight: {{r.weight}}; color: {{r.color}}">{{r.title}}</span>
+              <sc-if value="{{r.isNew}}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; font-weight: 600; color: #A7EBC0">{{r.tag}}</span></sc-if>
+            </li>
+          </sc-for>
+        </ol>
+        <button type="button" onClick="{{m.onP}}" style="margin-top: 16px; height: 52px; border-radius: 26px; background: #A7EBC0; color: #00140A; font-size: 16px; font-weight: 600; text-align: center">{{m.pText}}</button>
+        <button type="button" onClick="{{m.onS}}" style="height: 48px; font-size: 15px; color: #A0A0A8; text-align: center">{{m.sText}}</button>
+      </div>
+    </sc-if>
+  </sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"items":{"editor":null},"$preview":{"width":342,"height":560}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const noop = () => {};
+    const sample = [
+      { isMe: true, text: 'can I fit the dentist call in today?' },
+      { isNavi: true, text: 'Yes. 3:30 to 4:00 is free, and the call takes about 10 minutes.' },
+      { isProposal: true, head: 'Your afternoon, with the call in it', rows: [
+        { t: '2:00', title: 'Essay: write the intro', bg: 'transparent', border: '0', timeColor: '#7C7C85', color: '#A0A0A8', weight: 400, isNew: false },
+        { t: '3:30', title: 'Book the dentist', bg: 'rgba(167,235,192,0.10)', border: '1px solid rgba(167,235,192,0.45)', timeColor: '#D2F6DF', color: '#F5F5F7', weight: 600, isNew: true, tag: 'New' },
+        { t: '4:00', title: 'Shift at the café', bg: 'transparent', border: '0', timeColor: '#7C7C85', color: '#A0A0A8', weight: 400, isNew: false }
+      ], pText: 'Put it there', sText: 'Another time', onP: noop, onS: noop },
+      { isDone: true, text: 'Practise the new song is at 10:00, after dinner.', actText: 'Undo', onAct: noop }
+    ];
+    const items = this.props.items ?? sample;
+    return { items, rootBg: this.props.items ? 'transparent' : '#000000' };
+  }
+}
+</script>
+</body>
+</html>
