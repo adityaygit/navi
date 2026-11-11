@@ -97,9 +97,9 @@ class Component extends DCLogic {
     const s = this.state || {};
     const W = (t, c) => ({ t, c: c || '#FFFFFF' });
     const P = {
-      morning: { bg: 'linear-gradient(180deg, #2A1624 0%, #3B1D2C 38%, #6B3440 70%, #B8645A 100%)', a: 'rgba(255,190,160,0.45)', b: 'rgba(255,140,170,0.30)', k: '#FFD2BC', hi: '#FFC4A3', cta: 'linear-gradient(90deg, #FFD3B0, #FFA9C6)', stone: 'radial-gradient(circle at 34% 28%, #FFF6EE 0%, #FFC4A3 32%, #B65A5A 100%)', sh: 'rgba(255,150,130,0.45)' },
-      week: { bg: 'linear-gradient(180deg, #0D1A24 0%, #123040 40%, #1B4B55 75%, #2E6F6A 100%)', a: 'rgba(140,230,214,0.35)', b: 'rgba(185,178,255,0.30)', k: '#B7F0E3', hi: '#9FF0D8', cta: 'linear-gradient(90deg, #D6F7A8, #8EE6D6)', stone: 'radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%)', sh: 'rgba(140,230,214,0.4)' },
-      evening: { bg: 'linear-gradient(180deg, #0E0D24 0%, #1B1840 45%, #2C2463 80%, #4A3A8A 100%)', a: 'rgba(185,178,255,0.40)', b: 'rgba(143,211,255,0.28)', k: '#D2CEFF', hi: '#C7C1FF', cta: 'linear-gradient(90deg, #C9C3FF, #9FD8FF)', stone: 'radial-gradient(circle at 34% 28%, #F4F2FF 0%, #B9B2FF 32%, #4B3F9A 100%)', sh: 'rgba(160,150,255,0.45)' }
+      morning: { bg: 'linear-gradient(180deg, #2A1624 0%, #3B1D2C 38%, #6B3440 70%, #B8645A 100%)', a: 'rgba(255,190,160,0.45)', b: 'rgba(255,140,170,0.30)', k: '#FFD2BC', hi: '#FFC4A3', cta: '#FFC4A3', stone: 'radial-gradient(circle at 34% 28%, #FFF6EE 0%, #FFC4A3 32%, #B65A5A 100%)', sh: 'rgba(255,150,130,0.45)' },
+      week: { bg: 'linear-gradient(180deg, #0D1A24 0%, #123040 40%, #1B4B55 75%, #2E6F6A 100%)', a: 'rgba(140,230,214,0.35)', b: 'rgba(185,178,255,0.30)', k: '#B7F0E3', hi: '#9FF0D8', cta: '#B8F0C8', stone: 'radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%)', sh: 'rgba(140,230,214,0.4)' },
+      evening: { bg: 'linear-gradient(180deg, #0E0D24 0%, #1B1840 45%, #2C2463 80%, #4A3A8A 100%)', a: 'rgba(185,178,255,0.40)', b: 'rgba(143,211,255,0.28)', k: '#D2CEFF', hi: '#C7C1FF', cta: '#C7C1FF', stone: 'radial-gradient(circle at 34% 28%, #F4F2FF 0%, #B9B2FF 32%, #4B3F9A 100%)', sh: 'rgba(160,150,255,0.45)' }
     }[story];
     const pages = {
       morning: [

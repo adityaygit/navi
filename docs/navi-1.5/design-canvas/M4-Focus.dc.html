@@ -46,7 +46,7 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
         <div style="height: 1px; margin-left: 16px; background: rgba(255,255,255,0.07)"></div>
         <div style="min-height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 16px"><span style="flex: 1; font-size: 16px">Scene</span><span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 11px; background: {{swatch}}"></span><span style="font-size: 16px; color: rgba(255,255,255,0.75)">{{sceneName}}</span></div>
       </div>
-      <button type="button" onClick="{{start}}" style="margin-top: 8px; height: 56px; border-radius: 28px; background: {{cta}}; color: #0B0B0C; font-size: 17px; font-weight: 700; text-align: center">Start focus · {{mins}} min</button>
+      <button type="button" onClick="{{start}}" style="margin-top: 8px; height: 56px; border-radius: 28px; background: {{ctaGrad}}; color: #0B0B0C; font-size: 17px; font-weight: 700; text-align: center">Start focus · {{mins}} min</button>
       <button type="button" style="height: 44px; font-size: 15px; color: rgba(255,255,255,0.7); text-align: center">Schedule for later</button>
     </section>
   </sc-if>
@@ -128,7 +128,7 @@ class Component extends DCLogic {
     const endsAt = ((Math.floor(endMin / 60) - 1) % 12 + 1) + ':' + String(endMin % 60).padStart(2, '0') + ' PM';
     const close = this.props.onClose || (() => this.setState({ step: 'setup' }));
     return {
-      sky: t.sky, sun: t.sun, hill1: t.h1, hill2: t.h2, tint: t.tint, tintSoft: t.soft, cta: t.cta, stone: t.stone, stoneShadow: t.shadow, swatch: t.cta, sceneName: t.name,
+      sky: t.sky, ctaGrad: t.cta, cta: t.tint, sun: t.sun, hill1: t.h1, hill2: t.h2, tint: t.tint, tintSoft: t.soft, stone: t.stone, stoneShadow: t.shadow, swatch: t.tint, sceneName: t.name,
       spaceUpper: { school: 'SCHOOL', work: 'WORK', health: 'HEALTH', hobby: 'HOBBIES', friends: 'FRIENDS' }[space],
       sceneFilter: step === 'setup' ? 'saturate(0.8) brightness(0.75)' : step === 'done' ? 'saturate(1.15) brightness(1.1)' : 'none',
       sunTop: step === 'done' ? 150 : 200,
