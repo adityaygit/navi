@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi conversation parts</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer;text-align:left}
+</style>
+</helmet>
+<div style="width: 100%; display: flex; flex-direction: column; gap: 16px; font-family: Figtree, -apple-system, sans-serif; color: #F5F5F7; font-size: 15px; background: {{rootBg}}">
+  <sc-for list="{{items}}" as="m" hint-placeholder-count="4">
+    <sc-if value="{{m.isDivider}}" hint-placeholder-val="{{ false }}">
+      <div style="align-self: center; font-size: 12px; color: #7C7C85">{{m.text}}</div>
+    </sc-if>
+    <sc-if value="{{m.isMe}}" hint-placeholder-val="{{ true }}">
+      <div style="align-self: flex-end; max-width: 270px; padding: 10px 14px; border-radius: 18px; background: #1C1C1F; line-height: 1.4">{{m.text}}</div>
+    </sc-if>
+    <sc-if value="{{m.isNavi}}" hint-placeholder-val="{{ false }}">
+      <p style="margin: 0; line-height: 1.5; color: #E4E4E8">{{m.text}}</p>
+    </sc-if>
+    <sc-if value="{{m.isAct}}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; align-items: center; gap: 10px; font-size: 14px; color: #C8C8CE">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A7EBC0" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="flex: none"><path d="m5 12 4.5 4.5L19 7"></path></svg>
+        <span style="flex: 1; line-height: 1.4">{{m.text}}</span>
+        <button type="button" onClick="{{m.onAct}}" style="min-height: 44px; padding: 0 2px; color: #A7EBC0; font-weight: 600">{{m.actText}}</button>
+      </div>
+    </sc-if>
+    <sc-if value="{{m.isCard}}" hint-placeholder-val="{{ false }}">
+      <div style="padding: 14px; border-radius: 18px; background: #121214; border: 1px solid rgba(255,255,255,0.09); display: flex; flex-direction: column; gap: 12px">
+        <div><div style="font-weight: 600">{{m.title}}</div><div style="margin-top: 2px; font-size: 13px; color: #A0A0A8">{{m.sub}}</div></div>
+        <div style="display: flex; gap: 8px">
+          <button type="button" onClick="{{m.onP}}" style="height: 44px; padding: 0 18px; border-radius: 22px; background: #A7EBC0; color: #00140A; font-weight: 600">{{m.pText}}</button>
+          <button type="button" onClick="{{m.onS}}" style="height: 44px; padding: 0 18px; border-radius: 22px; background: rgba(255,255,255,0.08)">{{m.sText}}</button>
+        </div>
+      </div>
+    </sc-if>
+  </sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"items":{"editor":null},"$preview":{"width":358,"height":420}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const noop = () => {};
+    const sample = [
+      { isMe: true, text: 'can I fit the dentist call in today?' },
+      { isNavi: true, text: 'Yes. 3:30 to 4:00 is free, and you estimated the call at 10 minutes.' },
+      { isCard: true, title: 'Book the dentist', sub: 'Today · 3:30 PM · 10 min', pText: 'Put it there', sText: 'Another time', onP: noop, onS: noop },
+      { isAct: true, text: 'Moved “Practise the new song” to 10:00 PM', actText: 'Undo', onAct: noop }
+    ];
+    const items = this.props.items ?? sample;
+    return { items, rootBg: this.props.items ? 'transparent' : '#000000' };
+  }
+}
+</script>
+</body>
+</html>

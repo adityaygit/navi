@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi mobile, calmer</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#A7EBC0}a:hover{color:#D2F6DF}
+button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer;text-align:left}
+input{font:inherit;color:inherit}
+input::placeholder{color:#7C7C85}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: clip; background: #000000; color: #F5F5F7; font-family: Figtree, -apple-system, sans-serif; font-size: 15px; font-feature-settings: 'tnum'; user-select: none">
+
+  <div aria-hidden="true" style="position: absolute; left: -120px; top: -240px; width: 630px; height: 460px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(167,235,192,0.08) 0%, rgba(167,235,192,0.02) 40%, rgba(0,0,0,0) 70%); pointer-events: none"></div>
+
+  <!-- Top bar: quiet page names; ☰ only on the chat -->
+  <header style="position: absolute; left: 0; right: 0; top: 54px; height: 44px; display: flex; align-items: center; padding: 0 8px; z-index: 5">
+    <div style="width: 44px; height: 44px">
+      <sc-if value="{{showMenu}}" hint-placeholder-val="{{ true }}">
+        <button type="button" aria-label="Chats and account" onClick="{{openDrawer}}" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #A0A0A8"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 8h16M4 16h11"></path></svg></button>
+      </sc-if>
+    </div>
+    <nav aria-label="Pages" style="flex: 1; display: flex; justify-content: center; gap: 2px">
+      <sc-for list="{{labels}}" as="l" hint-placeholder-count="3">
+        <button type="button" aria-pressed="{{l.on}}" onClick="{{l.go}}" style="height: 44px; padding: 0 12px; display: flex; align-items: center; gap: 5px; font-size: 15px; font-weight: {{l.weight}}; color: {{l.color}}">{{l.text}}<sc-if value="{{l.dot}}" hint-placeholder-val="{{ false }}"><span aria-label="Something waiting" style="width: 6px; height: 6px; border-radius: 3px; background: #A7EBC0"></span></sc-if></button>
+      </sc-for>
+    </nav>
+    <div style="width: 44px; height: 44px"></div>
+  </header>
+
+  <sc-if value="{{voicePill}}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; left: 16px; right: 16px; top: 100px; height: 48px; z-index: 6; display: flex; align-items: center; gap: 8px; padding: 0 6px 0 14px; border-radius: 24px; background: #0F1F17; border: 1px solid rgba(167,235,192,0.22)">
+      <button type="button" onClick="{{openVoice}}" style="flex: 1; height: 44px; display: flex; align-items: center; gap: 10px"><span aria-hidden="true" style="width: 18px; height: 16px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%)"></span><span style="font-size: 14px; color: #D2F6DF">Talking · 0:42</span></button>
+      <button type="button" aria-label="End call" onClick="{{endVoice}}" style="width: 36px; height: 36px; border-radius: 18px; display: flex; align-items: center; justify-content: center; background: #F4A99F; color: #2A0B07"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 14c4.5-4 11.5-4 16 0l-2 2.5-3-1.2v-2.2a9 9 0 0 0-6 0v2.2l-3 1.2z"></path></svg></button>
+    </div>
+  </sc-if>
+
+  <div onPointerDown="{{down}}" onPointerUp="{{up}}" style="position: absolute; left: 0; top: 0; width: 1170px; height: 844px; display: flex; transform: translateX({{trackX}}px); transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); touch-action: pan-y">
+
+    <!-- ============ PROGRESS ============ -->
+    <section aria-label="Progress" style="width: 390px; height: 844px; flex: none; position: relative">
+      <div style="height: 844px; box-sizing: border-box; padding: 126px 24px 120px; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column">
+        <h1 style="margin: 0; font-size: 15px; font-weight: 500; color: #A0A0A8">{{progTitle}}</h1>
+        <p style="margin: 10px 0 0; font-size: 24px; line-height: 1.3; font-weight: 600; letter-spacing: -0.01em; color: #6E6E77">{{progA}}<span style="color: #F5F5F7">{{progB}}</span>{{progC}}<span style="color: #F5F5F7">{{progD}}</span>{{progE}}</p>
+
+        <sc-if value="{{evening}}" hint-placeholder-val="{{ false }}">
+          <button type="button" style="margin-top: 26px; height: 52px; padding: 0 22px; align-self: flex-start; border-radius: 26px; background: #F5F5F7; color: #000; font-weight: 600; display: flex; align-items: center; gap: 10px">Start tonight's wrap-up<span style="font-weight: 400; color: #5F5F67">about a minute</span></button>
+        </sc-if>
+
+        <div style="margin-top: 44px">
+          <div role="img" aria-label="This week, planned versus done, Monday to Friday" style="height: 132px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px; align-items: end">
+            <sc-for list="{{weekBars}}" as="b" hint-placeholder-count="5">
+              <div style="display: flex; flex-direction: column; align-items: center; gap: 8px">
+                <div style="width: 22px; height: {{b.planH}}px; border-radius: 6px; background: rgba(255,255,255,0.09); display: flex; align-items: flex-end; overflow: hidden"><div style="width: 22px; height: {{b.doneH}}px; background: {{b.fill}}"></div></div>
+                <span style="font-size: 12px; color: {{b.labelColor}}">{{b.d}}</span>
+              </div>
+            </sc-for>
+          </div>
+          <p style="margin: 14px 0 0; font-size: 13px; color: #7C7C85">Grey is what you planned, green is what got done.</p>
+        </div>
+
+        <div style="flex: 1"></div>
+        <sc-if value="{{dayTime}}" hint-placeholder-val="{{ true }}">
+          <button type="button" style="min-height: 52px; display: flex; align-items: center; gap: 10px; border-top: 1px solid rgba(255,255,255,0.08)"><span style="flex: 1; font-size: 15px">Tonight's wrap-up</span><span style="font-size: 14px; color: #A0A0A8">9:00 PM</span></button>
+        </sc-if>
+        <button type="button" style="min-height: 52px; display: flex; align-items: center; gap: 10px; border-top: 1px solid rgba(255,255,255,0.08)"><span style="flex: 1; font-size: 15px; color: #C8C8CE">All reviews</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7C7C85" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button>
+      </div>
+    </section>
+
+    <!-- ============ NAVI CHAT ============ -->
+    <section aria-label="Navi" style="width: 390px; height: 844px; flex: none; position: relative; display: flex; flex-direction: column">
+      <div style="height: 98px; flex: none"></div>
+      <div style="flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column-reverse">
+        <div style="display: flex; flex-direction: column; gap: 16px; padding: 12px 20px 16px">
+          <sc-if value="{{fresh}}" hint-placeholder-val="{{ true }}">
+            <div style="min-height: 420px; display: flex; flex-direction: column; justify-content: center; gap: 18px">
+              <span aria-hidden="true" style="width: 44px; height: 40px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%); box-shadow: 0 10px 30px rgba(167,235,192,0.18)"></span>
+              <p style="margin: 0; font-size: 28px; line-height: 1.25; font-weight: 600; letter-spacing: -0.015em; color: #6E6E77"><span style="color: #F5F5F7">Afternoon, Alex.</span> Four things today, <span style="color: #F5F5F7">one already done</span>. Your <span style="color: #F5F5F7">afternoon</span> is the busy part.</p>
+              <sc-if value="{{giftAsk}}" hint-placeholder-val="{{ true }}">
+                <div>
+                  <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #A0A0A8">Maya's birthday is Sunday and there's no gift task yet. Add one for Saturday?</p>
+                  <div style="display: flex; gap: 4px; margin-left: -10px">
+                    <button type="button" onClick="{{giftAdd}}" style="height: 44px; padding: 0 10px; color: #A7EBC0; font-weight: 600">Add it</button>
+                    <button type="button" onClick="{{giftNo}}" style="height: 44px; padding: 0 10px; color: #7C7C85">Not now</button>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+          <dc-import name="M1C-Thread" items="{{chatItems}}" hint-size="350px,200px"></dc-import>
+        </div>
+      </div>
+      <div style="flex: none; padding: 4px 12px 34px">
+        <sc-if value="{{hasCtx}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; margin: 0 0 8px 8px"><button type="button" onClick="{{clearCtx}}" style="height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border-radius: 15px; background: rgba(167,235,192,0.10); color: #D2F6DF; font-size: 12px">About · {{ctx}}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button></div>
+        </sc-if>
+        <div style="display: flex; align-items: center; gap: 8px; min-height: 56px; padding: 6px 6px 6px 18px; border-radius: 28px; background: #121214; border: 1px solid rgba(255,255,255,0.07)">
+          <label for="c-main" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Tell Navi anything</label>
+          <input id="c-main" value="{{draft}}" onChange="{{typeDraft}}" onKeyDown="{{sendOnEnter}}" placeholder="Tell Navi anything" style="flex: 1; min-width: 0; height: 44px; border: 0; outline: none; background: transparent; font-size: 16px">
+          <sc-if value="{{hasDraft}}" hint-placeholder-val="{{ false }}">
+            <button type="button" aria-label="Send" onClick="{{send}}" style="width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; background: #F5F5F7; color: #000"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"></path></svg></button>
+          </sc-if>
+          <sc-if value="{{noDraft}}" hint-placeholder-val="{{ true }}">
+            <button type="button" onClick="{{openVoice}}" style="height: 44px; padding: 0 16px; border-radius: 22px; display: flex; align-items: center; gap: 6px; background: #A7EBC0; color: #00140A; font-weight: 600"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>Talk</button>
+          </sc-if>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ PLAN ============ -->
+    <section aria-label="Plan" style="width: 390px; height: 844px; flex: none; position: relative">
+      <div style="height: 844px; box-sizing: border-box; padding: 110px 20px 120px; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column">
+        <div style="display: flex; align-items: center; justify-content: space-between">
+          <button type="button" aria-expanded="{{weekOpen}}" onClick="{{toggleWeek}}" style="min-height: 44px; display: flex; align-items: center; gap: 6px; font-size: 28px; font-weight: 700; letter-spacing: -0.015em">{{dayTitle}}<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7C7C85" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="{{chev}}"></path></svg></button>
+          <div role="group" aria-label="View" style="display: flex">
+            <sc-for list="{{views}}" as="v" hint-placeholder-count="3">
+              <button type="button" aria-pressed="{{v.on}}" onClick="{{v.pick}}" style="height: 44px; padding: 0 9px; font-size: 14px; font-weight: {{v.weight}}; color: {{v.color}}">{{v.t}}</button>
+            </sc-for>
+          </div>
+        </div>
+
+        <sc-if value="{{weekOpen}}" hint-placeholder-val="{{ false }}">
+          <div role="group" aria-label="Days this week" style="margin-top: 8px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px">
+            <sc-for list="{{days}}" as="d" hint-placeholder-count="7">
+              <button type="button" aria-pressed="{{d.on}}" onClick="{{d.pick}}" style="height: 50px; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: {{d.bg}}; color: {{d.color}}"><span style="font-size: 11px">{{d.w}}</span><span style="font-size: 16px; font-weight: 600">{{d.n}}</span></button>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <p style="margin: 8px 0 0; font-size: 16px; line-height: 1.4; color: #7C7C85"><span style="color: #F5F5F7">{{lead}}</span> {{rest}}</p>
+
+        <sc-if value="{{inboxWaiting}}" hint-placeholder-val="{{ true }}">
+          <button type="button" onClick="{{openInbox}}" style="margin-top: 6px; min-height: 44px; align-self: flex-start; display: flex; align-items: center; gap: 6px; font-size: 14px; color: #A0A0A8"><sc-if value="{{approvalPending}}" hint-placeholder-val="{{ false }}"><span style="color: #F4B37A">1 needs your OK</span><span>·</span></sc-if>{{reviewText}}<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button>
+        </sc-if>
+
+        <!-- Day -->
+        <sc-if value="{{viewDay}}" hint-placeholder-val="{{ true }}">
+          <ol aria-label="Timeline" style="list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px">
+            <sc-for list="{{timeline}}" as="it" hint-placeholder-count="8">
+              <li style="display: flex; flex-direction: column; border-radius: 14px; background: {{it.selBg}}">
+                <div style="display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 6px">
+                  <span style="width: 38px; flex: none; font-size: 12px; color: {{it.timeColor}}; text-align: right">{{it.t}}</span>
+                  <span aria-hidden="true" style="flex: none; width: 12px; height: 12px; box-sizing: border-box; border-radius: 6px; background: {{it.dotBg}}; border: {{it.dotBorder}}"></span>
+                  <button type="button" onClick="{{it.tap}}" aria-expanded="{{it.selected}}" style="flex: 1; min-width: 0; min-height: 48px; display: flex; flex-direction: column; justify-content: center">
+                    <span style="font-size: 15px; font-weight: {{it.weight}}; color: {{it.titleColor}}; text-decoration: {{it.strike}}">{{it.title}}</span>
+                    <sc-if value="{{it.hasSub}}" hint-placeholder-val="{{ true }}"><span style="font-size: 12px; color: #7C7C85">{{it.sub}}</span></sc-if>
+                  </button>
+                  <sc-if value="{{it.hasAction}}" hint-placeholder-val="{{ false }}">
+                    <button type="button" onClick="{{it.act}}" style="min-height: 44px; padding: 0 4px; color: #A7EBC0; font-size: 14px; font-weight: 600">{{it.actText}}</button>
+                  </sc-if>
+                </div>
+                <sc-if value="{{it.selected}}" hint-placeholder-val="{{ false }}">
+                  <div style="display: flex; gap: 6px; padding: 0 6px 8px 68px">
+                    <button type="button" onClick="{{it.focus}}" style="height: 40px; padding: 0 14px; border-radius: 20px; background: #F5F5F7; color: #000; font-size: 13px; font-weight: 600">Start focus</button>
+                    <button type="button" onClick="{{it.ask}}" style="height: 40px; padding: 0 14px; border-radius: 20px; background: rgba(255,255,255,0.08); font-size: 13px; display: flex; align-items: center; gap: 6px"><span aria-hidden="true" style="width: 11px; height: 10px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%)"></span>Ask Navi</button>
+                  </div>
+                </sc-if>
+              </li>
+            </sc-for>
+          </ol>
+          <sc-if value="{{needsOpen}}" hint-placeholder-val="{{ false }}">
+            <ul style="list-style: none; margin: 0 0 0 56px; padding: 0">
+              <sc-for list="{{needs}}" as="n" hint-placeholder-count="3">
+                <li style="min-height: 52px; display: flex; align-items: center; gap: 8px">
+                  <span style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 15px">{{n.t}}</span><span style="font-size: 12px; color: #7C7C85">{{n.s}}</span></span>
+                  <button type="button" onClick="{{n.go}}" style="min-height: 44px; padding: 0 4px; color: #A7EBC0; font-size: 14px; font-weight: 600">{{n.a}}</button>
+                </li>
+              </sc-for>
+            </ul>
+          </sc-if>
+        </sc-if>
+
+        <!-- Week -->
+        <sc-if value="{{viewWeek}}" hint-placeholder-val="{{ false }}">
+          <ul aria-label="This week" style="list-style: none; margin: 16px 0 0; padding: 0">
+            <sc-for list="{{weekRows}}" as="w" hint-placeholder-count="7">
+              <li><button type="button" onClick="{{w.open}}" style="width: 100%; min-height: 56px; display: flex; align-items: center; gap: 14px">
+                <span style="width: 64px; font-size: 15px; color: {{w.color}}">{{w.w}} {{w.n}}</span>
+                <span aria-hidden="true" style="flex: 1; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.07); display: flex; overflow: hidden"><span style="width: {{w.pct}}%; background: {{w.bar}}"></span></span>
+                <span style="width: 44px; text-align: right; font-size: 13px; color: #A0A0A8">{{w.h}}</span>
+              </button></li>
+            </sc-for>
+          </ul>
+        </sc-if>
+
+        <!-- List -->
+        <sc-if value="{{viewList}}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top: 10px; display: flex; gap: 2px; margin-left: -9px">
+            <sc-for list="{{listTabs}}" as="lt" hint-placeholder-count="4">
+              <button type="button" aria-pressed="{{lt.on}}" onClick="{{lt.pick}}" style="height: 44px; padding: 0 9px; font-size: 14px; font-weight: {{lt.weight}}; color: {{lt.color}}">{{lt.t}}</button>
+            </sc-for>
+          </div>
+          <ul style="list-style: none; margin: 4px 0 0; padding: 0">
+            <sc-for list="{{tasks}}" as="tk" hint-placeholder-count="5">
+              <li style="display: flex; align-items: center; gap: 6px; min-height: 52px">
+                <button type="button" aria-label="{{tk.label}}" aria-pressed="{{tk.done}}" onClick="{{tk.toggle}}" style="width: 44px; height: 44px; flex: none; display: flex; align-items: center; justify-content: center; margin-left: -10px"><span aria-hidden="true" style="width: 20px; height: 20px; box-sizing: border-box; border-radius: 10px; display: flex; align-items: center; justify-content: center; border: {{tk.ring}}; background: {{tk.fill}}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#00140A" stroke-width="3" stroke-linecap="round" aria-hidden="true" style="opacity: {{tk.tick}}"><path d="m5 12 4.5 4.5L19 7"></path></svg></span></button>
+                <span style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 15px; color: {{tk.color}}; text-decoration: {{tk.strike}}">{{tk.t}}</span><span style="font-size: 12px; color: #7C7C85">{{tk.s}}</span></span>
+              </li>
+            </sc-for>
+          </ul>
+          <button type="button" style="margin-top: 4px; min-height: 48px; display: flex; align-items: center; gap: 10px; font-size: 15px; color: #7C7C85"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Add a task</button>
+        </sc-if>
+      </div>
+    </section>
+  </div>
+
+  <!-- Ask Navi: quiet handle at the bottom of Plan and Progress -->
+  <sc-if value="{{showHandle}}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 96px; z-index: 4; background: linear-gradient(to bottom, rgba(0,0,0,0), #000 55%); display: flex; justify-content: center; align-items: flex-end; padding-bottom: 26px; box-sizing: border-box; pointer-events: none">
+      <button type="button" onClick="{{openAsk}}" style="pointer-events: auto; min-height: 48px; padding: 0 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px">
+        <span aria-hidden="true" style="width: 36px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.22)"></span>
+        <span style="display: flex; align-items: center; gap: 7px; font-size: 14px; color: #A0A0A8"><span aria-hidden="true" style="width: 12px; height: 11px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%)"></span>{{handleText}}</span>
+      </button>
+    </div>
+  </sc-if>
+
+  <!-- Ask Navi sheet: grows into the full chat, closes back to the same screen -->
+  <sc-if value="{{askOpen}}" hint-placeholder-val="{{ false }}">
+    <section aria-label="Ask Navi" style="position: absolute; left: 0; right: 0; bottom: 0; height: {{sheetH}}px; z-index: 12; background: #0E0E10; border-radius: 28px 28px 0 0; border-top: 1px solid rgba(255,255,255,0.10); box-shadow: 0 -20px 50px rgba(0,0,0,0.6); display: flex; flex-direction: column; transition: height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)">
+      <button type="button" aria-label="{{growLabel}}" onClick="{{toggleGrow}}" style="flex: none; height: 24px; display: flex; align-items: center; justify-content: center"><span aria-hidden="true" style="width: 36px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.22)"></span></button>
+      <div style="flex: none; display: flex; align-items: center; gap: 8px; padding: 0 12px 0 18px; min-height: 48px">
+        <span aria-hidden="true" style="width: 16px; height: 15px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%)"></span>
+        <span style="font-weight: 600">Navi</span>
+        <span style="font-size: 12px; padding: 4px 10px; border-radius: 12px; background: rgba(167,235,192,0.10); color: #D2F6DF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px">About · {{askCtx}}</span>
+        <span style="flex: 1"></span>
+        <button type="button" aria-label="{{growLabel}}" onClick="{{toggleGrow}}" style="width: 40px; height: 44px; display: flex; align-items: center; justify-content: center; color: #A0A0A8"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{growIcon}}"></path></svg></button>
+        <button type="button" aria-label="{{closeLabel}}" onClick="{{closeAsk}}" style="width: 40px; height: 44px; display: flex; align-items: center; justify-content: center; color: #A0A0A8"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+      </div>
+      <div style="flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column-reverse">
+        <div style="padding: 8px 20px 12px; display: flex; flex-direction: column; gap: 14px">
+          <sc-if value="{{askEmpty}}" hint-placeholder-val="{{ true }}">
+            <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #7C7C85">{{askHint}}</p>
+          </sc-if>
+          <dc-import name="M1C-Thread" items="{{sheetItems}}" hint-size="350px,160px"></dc-import>
+        </div>
+      </div>
+      <div style="flex: none; padding: 4px 12px 34px">
+        <div style="display: flex; align-items: center; gap: 8px; min-height: 56px; padding: 6px 6px 6px 18px; border-radius: 28px; background: #18181B; border: 1px solid rgba(255,255,255,0.07)">
+          <label for="c-ask" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Ask Navi</label>
+          <input id="c-ask" value="{{askDraft}}" onChange="{{typeAsk}}" onKeyDown="{{askOnEnter}}" placeholder="Ask about this…" style="flex: 1; min-width: 0; height: 44px; border: 0; outline: none; background: transparent; font-size: 16px">
+          <sc-if value="{{askHasDraft}}" hint-placeholder-val="{{ true }}">
+            <button type="button" aria-label="Send" onClick="{{askSend}}" style="width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; background: #F5F5F7; color: #000"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"></path></svg></button>
+          </sc-if>
+          <sc-if value="{{askNoDraft}}" hint-placeholder-val="{{ false }}">
+            <button type="button" aria-label="Talk" onClick="{{openVoice}}" style="width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; background: #A7EBC0; color: #00140A"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg></button>
+          </sc-if>
+        </div>
+      </div>
+    </section>
+  </sc-if>
+
+  <!-- Drawer -->
+  <sc-if value="{{drawer}}" hint-placeholder-val="{{ false }}">
+    <button type="button" aria-label="Close" onClick="{{closeDrawer}}" style="position: absolute; inset: 0; z-index: 10; background: rgba(0,0,0,0.6)"></button>
+    <aside aria-label="Chats and account" style="position: absolute; left: 0; top: 0; bottom: 0; width: 318px; z-index: 11; background: #0E0E10; box-sizing: border-box; padding: 58px 12px 34px; display: flex; flex-direction: column">
+      <div style="display: flex; align-items: center; gap: 8px">
+        <div style="flex: 1; height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: 14px; background: rgba(255,255,255,0.06); color: #7C7C85; font-size: 15px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4 4"></path></svg>Search</div>
+        <button type="button" aria-label="New chat" onClick="{{newChat}}" style="width: 44px; height: 44px; border-radius: 14px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.06)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h8"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg></button>
+      </div>
+      <div style="flex: 1; overflow: hidden; margin-top: 16px; display: flex; flex-direction: column">
+        <sc-for list="{{chatGroups}}" as="g" hint-placeholder-count="3">
+          <div style="padding: 14px 12px 4px; font-size: 12px; color: #7C7C85">{{g.h}}</div>
+          <sc-for list="{{g.items}}" as="c" hint-placeholder-count="2">
+            <button type="button" onClick="{{c.open}}" style="min-height: 44px; display: flex; align-items: center; padding: 0 12px; border-radius: 12px; font-size: 15px; background: {{c.bg}}; color: {{c.color}}">{{c.t}}</button>
+          </sc-for>
+        </sc-for>
+      </div>
+      <sc-if value="{{acct}}" hint-placeholder-val="{{ false }}">
+        <div style="margin-bottom: 8px; padding: 6px; border-radius: 16px; background: #1A1A1D; display: flex; flex-direction: column">
+          <sc-for list="{{acctItems}}" as="a" hint-placeholder-count="6">
+            <button type="button" style="min-height: 44px; display: flex; align-items: center; padding: 0 12px; border-radius: 10px; font-size: 15px; color: {{a.color}}">{{a.t}}</button>
+          </sc-for>
+        </div>
+      </sc-if>
+      <button type="button" aria-expanded="{{acct}}" onClick="{{toggleAcct}}" style="height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 8px; border-radius: 14px">
+        <span aria-hidden="true" style="width: 32px; height: 32px; border-radius: 16px; display: flex; align-items: center; justify-content: center; background: #2A2A2E; font-weight: 600; font-size: 14px">A</span>
+        <span style="flex: 1; font-size: 15px; font-weight: 500">Alex</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A0A0A8" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"></path></svg>
+      </button>
+    </aside>
+  </sc-if>
+
+  <!-- Inbox sheet -->
+  <sc-if value="{{inbox}}" hint-placeholder-val="{{ false }}">
+    <button type="button" aria-label="Close inbox" onClick="{{closeInbox}}" style="position: absolute; inset: 0; z-index: 10; background: rgba(0,0,0,0.6)"></button>
+    <section aria-label="Inbox" style="position: absolute; left: 0; right: 0; bottom: 0; height: 700px; z-index: 11; background: #0E0E10; border-radius: 28px 28px 0 0; box-sizing: border-box; padding: 10px 20px 34px; display: flex; flex-direction: column">
+      <span aria-hidden="true" style="align-self: center; width: 36px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.22)"></span>
+      <div style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between"><h2 style="margin: 0; font-size: 22px; font-weight: 700">Inbox</h2><button type="button" onClick="{{closeInbox}}" style="min-height: 44px; color: #A0A0A8">Done</button></div>
+      <p style="margin: 0; font-size: 14px; color: #7C7C85">Nothing here is on your plan until you accept it.</p>
+      <sc-if value="{{approvalPending}}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top: 18px; padding: 14px; border-radius: 18px; background: #151517; border: 1px solid rgba(244,179,122,0.35); display: flex; flex-direction: column; gap: 10px">
+          <div style="font-size: 15px; line-height: 1.4">Move the essay's <span style="color: #F4B37A">hard deadline</span> from Friday to Monday, 5:00 PM?</div>
+          <div style="display: flex; gap: 8px">
+            <button type="button" onClick="{{approve}}" style="height: 44px; padding: 0 18px; border-radius: 22px; background: #F5F5F7; color: #000; font-weight: 600">Move it</button>
+            <button type="button" onClick="{{decline}}" style="height: 44px; padding: 0 18px; border-radius: 22px; background: rgba(255,255,255,0.08)">Keep Friday</button>
+          </div>
+        </div>
+      </sc-if>
+      <div style="margin-top: 18px; display: flex; align-items: center; justify-content: space-between"><span style="font-size: 13px; color: #7C7C85">From your 1:40 capture</span><sc-if value="{{hasSaid}}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{acceptSaid}}" style="min-height: 44px; font-size: 14px; color: #A7EBC0; font-weight: 600">Accept the {{saidCount}} you said</button></sc-if></div>
+      <ul style="list-style: none; margin: 0; padding: 0">
+        <sc-for list="{{drafts}}" as="dr" hint-placeholder-count="3">
+          <li style="padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.07); display: flex; align-items: center; gap: 8px">
+            <span style="flex: 1; display: flex; flex-direction: column; gap: 3px"><span style="font-size: 15px; font-weight: 500">{{dr.t}}</span><span style="font-size: 13px; color: #7C7C85">“{{dr.q}}” · <span style="color: {{dr.tagColor}}">{{dr.tag}}</span></span></span>
+            <button type="button" onClick="{{dr.accept}}" style="min-height: 44px; padding: 0 6px; color: #A7EBC0; font-weight: 600; font-size: 14px">Accept</button>
+            <button type="button" onClick="{{dr.later}}" style="min-height: 44px; padding: 0 6px; color: #7C7C85; font-size: 14px">Later</button>
+          </li>
+        </sc-for>
+      </ul>
+      <sc-if value="{{noDrafts}}" hint-placeholder-val="{{ false }}"><p style="margin: 16px 0 0; color: #7C7C85">Nothing to review.</p></sc-if>
+    </section>
+  </sc-if>
+
+  <!-- Voice -->
+  <sc-if value="{{voiceFull}}" hint-placeholder-val="{{ false }}">
+    <section aria-label="Talking with Navi" style="position: absolute; inset: 0; z-index: 20; background: #000; display: flex; flex-direction: column; align-items: center; padding: 64px 24px 40px; box-sizing: border-box">
+      <div style="align-self: stretch; display: flex; justify-content: space-between; align-items: center">
+        <button type="button" aria-label="Keep working while you talk" onClick="{{minimizeVoice}}" style="width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.08)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <span style="font-size: 13px; color: #A0A0A8">0:42</span><span style="width: 44px"></span>
+      </div>
+      <span aria-hidden="true" style="margin-top: 90px; width: 140px; height: 128px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%); box-shadow: 0 0 0 16px rgba(167,235,192,0.06)"></span>
+      <p role="status" style="margin: 44px 0 0; font-size: 17px; color: #D2F6DF">Listening</p>
+      <p style="margin: 22px 0 0; font-size: 16px; line-height: 1.5; color: #A0A0A8; text-align: center">“remind me to text Maya tonight”</p>
+      <div style="flex: 1"></div>
+      <div style="display: flex; gap: 24px">
+        <button type="button" onClick="{{voiceToText}}" style="width: 60px; height: 60px; border-radius: 30px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.08)" aria-label="Type instead"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7V5h16v2M12 5v14M9 19h6"></path></svg></button>
+        <button type="button" onClick="{{endVoice}}" aria-label="End" style="width: 60px; height: 60px; border-radius: 30px; display: flex; align-items: center; justify-content: center; background: #F4A99F; color: #2A0B07"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 14c4.5-4 11.5-4 16 0l-2 2.5-3-1.2v-2.2a9 9 0 0 0-6 0v2.2l-3 1.2z"></path></svg></button>
+      </div>
+    </section>
+  </sc-if>
+
+  <!-- Focus -->
+  <sc-if value="{{focus}}" hint-placeholder-val="{{ false }}">
+    <section aria-label="Focus" style="position: absolute; inset: 0; z-index: 20; background: #000; display: flex; flex-direction: column; align-items: center; padding: 70px 24px 40px; box-sizing: border-box">
+      <div style="align-self: stretch; display: flex; justify-content: space-between; font-size: 13px; color: #A0A0A8"><span>Focus</span><span>Ends at 3:30 PM</span></div>
+      <h2 style="margin: 90px 0 0; font-size: 22px; font-weight: 600">{{focusTitle}}</h2>
+      <span role="timer" style="margin-top: 40px; font-size: 72px; font-weight: 300; letter-spacing: -0.03em">1:28:40</span>
+      <span style="font-size: 13px; color: #7C7C85">left of 90 min</span>
+      <div style="margin-top: 48px; display: flex; gap: 10px">
+        <button type="button" style="height: 52px; padding: 0 24px; border-radius: 26px; border: 1px solid rgba(255,255,255,0.18)">Pause</button>
+        <button type="button" onClick="{{endFocus}}" style="height: 52px; padding: 0 24px; border-radius: 26px; background: #A7EBC0; color: #00140A; font-weight: 600">I'm done</button>
+      </div>
+      <div style="flex: 1"></div>
+      <p style="margin: 0; font-size: 14px; color: #7C7C85">Navi is holding 2 things until you're done.</p>
+    </section>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"startPage":{"editor":"enum","options":["progress","navi","plan"],"default":"navi"},"startSession":{"editor":"enum","options":["fresh","resume"],"default":"resume"},"startMoment":{"editor":"enum","options":["calm","busy"],"default":"calm"},"startView":{"editor":"enum","options":["day","week","list"],"default":"day"},"startOverlay":{"editor":"enum","options":["none","drawer","inbox","voice","focus","ask","askFull"],"default":"none"},"startSelect":{"editor":"enum","options":["none","essay"],"default":"none"},"startAsked":{"editor":"enum","options":["no","answered","moved"],"default":"no"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const pr = this.props, s = this.state || {};
+    const pick = (k, v) => (s[k] !== undefined ? s[k] : v);
+    const P = { progress: 0, navi: 1, plan: 2 };
+    const ov = pr.startOverlay ?? 'none';
+    const busy = (pr.startMoment ?? 'calm') === 'busy';
+    const page = pick('page', P[pr.startPage] ?? 1);
+    const session = pick('session', pr.startSession ?? 'resume');
+    const view = pick('view', pr.startView ?? 'day');
+    const sel = pick('sel', pr.startSelect === 'essay' ? 'essay' : (busy && (pr.startPage === 'plan') ? 'essay' : null));
+    const weekOpen = pick('weekOpen', busy);
+    const ask = pick('ask', ov === 'ask' ? 'peek' : ov === 'askFull' ? 'full' : 'off');
+    const asked = pick('asked', pr.startAsked ?? 'no');
+    const approval = pick('approval', busy ? 'pending' : 'none');
+    const evening = pick('evening', busy && pr.startPage === 'progress');
+    const set = (o) => this.setState(o);
+
+    const placed = !!s.placed, songBack = !!s.songBack, gift = pick('gift', 'ask');
+    const moved = asked === 'moved';
+    const removed = s.removed || {}; const captured = s.captured || [];
+    const done = s.done || { run: true };
+    const day = pick('day', 4); const listTab = pick('listTab', 'Today');
+    const drawer = pick('drawer', ov === 'drawer'), inbox = pick('inbox', ov === 'inbox'), focus = pick('focus', ov === 'focus');
+    const voice = pick('voice', ov === 'voice' ? 'full' : 'off');
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+    // inbox
+    const base = [
+      { id: 'd1', t: 'Call the café about swapping Saturday', q: 'ask the café if I can swap saturday', said: true },
+      { id: 'd2', t: 'Buy new running shoes', q: 'need new running shoes before the season', said: true },
+      { id: 'd3', t: 'Run 3 times a week', q: 'I want to get back into running', said: false }
+    ];
+    const allDrafts = captured.map((c, i) => ({ id: 'c' + i, t: c, q: c, said: true })).concat(base).filter((d) => !removed[d.id]);
+    const rm = (id) => () => set({ removed: Object.assign({}, removed, { [id]: true }) });
+    const waiting = allDrafts.length + (approval === 'pending' ? 1 : 0);
+
+    // labels
+    const labels = ['Progress', 'Navi', 'Plan'].map((t, i) => ({ text: t, on: i === page, go: () => set({ page: i, ask: 'off' }), weight: i === page ? 600 : 500, color: i === page ? '#F5F5F7' : '#7C7C85', dot: i === 2 && waiting > 0 && page !== 2 }));
+
+    // conversation (one thread shared by the chat page and the Ask sheet)
+    const thread = [];
+    if (session === 'resume') {
+      thread.push({ isMe: true, text: 'move guitar practice to after dinner' });
+      thread.push({ isAct: true, text: songBack ? 'Put “Practise the new song” back at 1:30 PM' : 'Moved “Practise the new song” to 10:00 PM', actText: songBack ? 'Redo' : 'Undo', onAct: () => set({ songBack: !songBack }) });
+      thread.push({ isMe: true, text: 'can I fit the dentist call in today?' });
+      thread.push({ isNavi: true, text: 'Yes. 3:30 to 4:00 is free, and you estimated the call at 10 minutes.' });
+      if (placed) thread.push({ isAct: true, text: 'Put “Book the dentist” at 3:30 PM today', actText: 'Undo', onAct: () => set({ placed: false }) });
+      else if (s.deferred) thread.push({ isNavi: true, text: 'Okay. Monday morning is open too; tell me when suits.' });
+      else thread.push({ isCard: true, title: 'Book the dentist', sub: 'Today · 3:30 PM · 10 min', pText: 'Put it there', sText: 'Another time', onP: () => set({ placed: true }), onS: () => set({ deferred: true }) });
+    } else if (gift === 'added') {
+      thread.push({ isAct: true, text: 'Added “Get Maya a birthday gift” for Saturday', actText: 'Undo', onAct: () => set({ gift: 'ask' }) });
+    }
+    (s.caps || []).forEach((t) => { thread.push({ isMe: true, text: t }); thread.push({ isAct: true, text: 'Saved to your Inbox to review', actText: 'See it', onAct: () => set({ page: 2, inbox: true }) }); });
+    const askItems = [];
+    if (asked !== 'no') {
+      askItems.push({ isDivider: true, text: 'From Plan · Essay: write the intro' });
+      askItems.push({ isMe: true, text: 'move this to tomorrow morning' });
+      askItems.push({ isNavi: true, text: 'Saturday 9:00 to 10:30 is free, before brunch with Jo.' });
+      if (moved) askItems.push({ isAct: true, text: 'Moved “Essay: write the intro” to Saturday 9:00 AM', actText: 'Undo', onAct: () => set({ asked: 'answered' }) });
+      else if (asked === 'kept') askItems.push({ isNavi: true, text: 'Okay, it stays at 2:00 today.' });
+      else askItems.push({ isCard: true, title: 'Essay: write the intro', sub: 'Saturday · 9:00 – 10:30 AM', pText: 'Move it', sText: 'Keep today', onP: () => set({ asked: 'moved', sel: null }), onS: () => set({ asked: 'kept' }) });
+    }
+    const chatItems = thread.concat(askItems);
+
+    // Plan timeline
+    const showEssayFri = !moved;
+    const raw = [];
+    if (s.doneOpen) { raw.push({ id: 'run', m: 480, t: '8:00', title: 'Morning run', sub: '30 min', k: 'done' }); raw.push({ id: 'hist', m: 525, t: '8:45', title: 'Modern History', sub: 'Class · until 11:00', k: 'done' }); }
+    else raw.push({ id: 'earlier', m: 470, t: '', title: '2 done earlier', k: 'fold' });
+    raw.push({ id: 'now', m: 790, t: '1:10', title: 'Now · free until 2:00', k: 'now' });
+    if (songBack) raw.push({ id: 'song', m: 810, t: '1:30', title: 'Practise the new song', sub: '20 min', k: 'flex', c: '#B79CF2' });
+    if (showEssayFri) raw.push({ id: 'essay', m: 840, t: '2:00', title: 'Essay: write the intro', sub: '90 min · History essay', k: 'flex', c: '#8C9EFF', next: true });
+    raw.push(placed ? { id: 'dent', m: 930, t: '3:30', title: 'Book the dentist', sub: '10 min', k: 'flex', c: '#F3988C' } : { id: 'free', m: 930, t: '3:30', title: '30 min free — the dentist call fits', k: 'free' });
+    raw.push({ id: 'shift', m: 960, t: '4:00', title: 'Shift at the café', sub: 'until 7:00', k: 'fixed', c: '#8CC6EC' });
+    raw.push({ id: 'dinner', m: 1170, t: '7:30', title: 'Dinner with Maya', sub: 'Lupa, Elm St', k: 'fixed', c: '#F4B37A' });
+    if (!songBack) raw.push({ id: 'song', m: 1320, t: '10:00', title: 'Practise the new song', sub: '20 min', k: 'flex', c: '#B79CF2' });
+    raw.push({ id: 'wind', m: 1350, t: '10:30', title: 'Wind down', sub: 'bed by 11:30', k: 'routine' });
+    const needsList = [];
+    if (!placed) needsList.push({ t: 'Book the dentist', s: '10 min · before Monday', a: 'Fit at 3:30', go: () => set({ placed: true }) });
+    if (gift === 'added') needsList.push({ t: 'Get Maya a birthday gift', s: '45 min · before Sunday', a: 'Ask Navi', go: () => set({ ask: 'peek', askCtxOverride: 'Get Maya a birthday gift' }) });
+    needsList.push({ t: 'Plan the Lisbon trip', s: 'whenever · 3 steps', a: 'Ask Navi', go: () => set({ ask: 'peek', askCtxOverride: 'Plan the Lisbon trip' }) });
+    needsList.push({ t: 'Return library books', s: '20 min · before Tuesday', a: 'Ask Navi', go: () => set({ ask: 'peek', askCtxOverride: 'Return library books' }) });
+    raw.push({ id: 'needs', m: 1500, t: '', title: 'Still needs a time · ' + needsList.length, k: 'needs' });
+    raw.sort((a, b) => a.m - b.m);
+    let items = raw;
+    if (day === 5) items = (moved ? [{ id: 'essay', m: 540, t: '9:00', title: 'Essay: write the intro', sub: '90 min · moved from Friday', k: 'flex', c: '#8C9EFF' }] : []).concat([{ id: 'brunch', m: 660, t: '11:00', title: 'Brunch with Jo', sub: 'until 12:30', k: 'fixed', c: '#F4B37A' }]);
+    else if (day !== 4) items = [];
+    const timeline = items.map((it) => {
+      const k = it.k, selected = sel === it.id;
+      const isNote = k === 'now' || k === 'free' || k === 'fold' || k === 'needs';
+      let hasAction = false, actText = '', act = () => {};
+      if (k === 'free') { hasAction = true; actText = 'Fit it in'; act = () => set({ placed: true }); }
+      if (it.next && !selected) { hasAction = true; actText = 'Start'; act = () => set({ focus: true, focusTitle: it.title }); }
+      return {
+        t: it.t, title: it.title, sub: it.sub || '', hasSub: !!it.sub, selected, hasAction, actText, act,
+        tap: k === 'fold' ? () => set({ doneOpen: true }) : k === 'needs' ? () => set({ needsOpen: !s.needsOpen }) : isNote ? () => {} : () => set({ sel: selected ? null : it.id }),
+        focus: () => set({ focus: true, focusTitle: it.title, sel: null }),
+        ask: () => set({ ask: 'peek', sel: it.id }),
+        selBg: selected ? 'rgba(255,255,255,0.06)' : 'transparent',
+        timeColor: k === 'now' ? '#F5F5F7' : '#7C7C85',
+        dotBg: k === 'fixed' ? it.c : k === 'now' ? '#F5F5F7' : 'transparent',
+        dotBorder: k === 'flex' ? '2px solid ' + it.c : k === 'routine' ? '2px dashed #7C7C85' : k === 'done' ? '2px solid #3A3A3F' : k === 'free' ? '2px solid #2A2A2E' : k === 'now' ? '0' : k === 'fold' || k === 'needs' ? '0' : '0',
+        titleColor: k === 'done' ? '#7C7C85' : k === 'free' || k === 'fold' || k === 'needs' ? '#A0A0A8' : '#F5F5F7',
+        weight: k === 'now' ? 600 : k === 'fold' || k === 'needs' || k === 'free' ? 400 : 500,
+        strike: k === 'done' ? 'line-through' : 'none'
+      };
+    });
+
+    const fri = day === 4;
+    let lead = '', rest = '';
+    if (view === 'week') { lead = "Friday's the full one."; rest = 'Saturday has just brunch with Jo.'; }
+    else if (view === 'list') { lead = '4 left.'; rest = "The essay's the big one."; }
+    else if (fri) { lead = moved ? 'A full evening.' : 'A full afternoon.'; rest = moved ? '8 hours planned; the essay moved to Saturday.' : '9½ hours planned, 3½ free — most of it before 2.'; }
+    else if (day === 5) { lead = 'A quiet day.'; rest = moved ? 'The essay in the morning, then brunch with Jo.' : 'Just brunch with Jo at 11.'; }
+    else { lead = 'Nothing planned.'; rest = ''; }
+
+    const days = [['Mon', 2], ['Tue', 3], ['Wed', 4], ['Thu', 5], ['Fri', 6], ['Sat', 7], ['Sun', 8]].map(([w, n], i) => ({ w, n, on: i === day, pick: () => set({ day: i, view: 'day', sel: null }), bg: i === day ? '#F5F5F7' : 'rgba(255,255,255,0.05)', color: i === day ? '#000' : '#C8C8CE' }));
+    const views = [['day', 'Day'], ['week', 'Week'], ['list', 'List']].map(([k, t]) => ({ t, on: view === k, pick: () => set({ view: k }), weight: view === k ? 600 : 400, color: view === k ? '#F5F5F7' : '#7C7C85' }));
+    const weekRows = [['Mon', 2, 6], ['Tue', 3, 5], ['Wed', 4, 6.5], ['Thu', 5, 5], ['Fri', 6, moved ? 8 : 9.5], ['Sat', 7, moved ? 3 : 1.5], ['Sun', 8, 1]].map(([w, n, h], i) => ({ w, n, h: h + ' h', pct: Math.round(h * 10), bar: i === 4 ? '#D2F6DF' : 'rgba(167,235,192,0.6)', color: i === 4 ? '#F5F5F7' : '#A0A0A8', open: () => set({ day: i, view: 'day' }) }));
+    const listData = { Today: [['run', 'Morning run', ''], ['essay', 'History essay — first draft', 'due Friday · 1 of 3 steps'], ['sam', 'Reply to Sam about the flat', '5 min'], ['song', 'Practise the new song', '20 min'], ['maya', 'Text Maya about Sunday', '']], Upcoming: [['bio', 'Study for the bio quiz', 'Thursday']], Anytime: [['lis', 'Plan the Lisbon trip', '3 steps']], Someday: [['pasta', 'Learn to make fresh pasta', '']] };
+    const tasks = (listData[listTab] || []).map(([id, t, sub]) => { const d = !!done[id]; return { t, s: sub, done: d, label: (d ? 'Mark not done: ' : 'Mark done: ') + t, toggle: () => set({ done: Object.assign({}, done, { [id]: !d }) }), ring: d ? '0' : '2px solid #5F5F67', fill: d ? '#A7EBC0' : 'transparent', tick: d ? 1 : 0, color: d ? '#7C7C85' : '#F5F5F7', strike: d ? 'line-through' : 'none' }; });
+    const listTabs = ['Today', 'Upcoming', 'Anytime', 'Someday'].map((t) => ({ t, on: t === listTab, pick: () => set({ listTab: t }), weight: t === listTab ? 600 : 400, color: t === listTab ? '#F5F5F7' : '#7C7C85' }));
+
+    // Ask sheet context
+    const selItem = raw.find((r) => r.id === sel);
+    const planCtx = s.askCtxOverride || (selItem ? selItem.title : asked !== 'no' ? 'Essay: write the intro' : view === 'week' ? 'This week' : view === 'list' ? 'Tasks · ' + listTab : dayNames[day]);
+    const askCtx = page === 0 ? (evening ? "Tonight's wrap-up" : 'This week') : planCtx;
+    const handleText = page === 0 ? 'Ask Navi' : selItem ? 'Ask Navi about this' : 'Ask Navi about ' + (view === 'day' ? dayNames[day] : view === 'week' ? 'this week' : 'your tasks');
+    const askDraft = pick('askDraft', sel === 'essay' && asked === 'no' ? 'move this to tomorrow morning' : '');
+    const askSend = () => { const t = ((this.state && this.state.askDraft) ?? askDraft).trim(); if (!t) return; if (sel === 'essay' || planCtx.indexOf('Essay') === 0) set({ asked: 'answered', askDraft: '' }); else set({ askDraft: '', caps: (s.caps || []).concat([t]), captured: [t].concat(captured) }); };
+
+    // Progress
+    const wk = [['M', 6, 5], ['T', 5, 4.5], ['W', 6.5, 4], ['T', 5, 4.25], ['F', 9.5, evening ? 8 : 3.25]];
+    const weekBars = wk.map(([d, p, dn], i) => ({ d, planH: Math.round(p * 12), doneH: Math.round(dn * 12), fill: i === 4 ? '#D2F6DF' : '#A7EBC0', labelColor: i === 4 ? '#F5F5F7' : '#7C7C85' }));
+
+    const draft = pick('draft', '');
+    const sendIt = () => { const t = ((this.state && this.state.draft) || '').trim(); if (!t) return; set({ draft: '', caps: (s.caps || []).concat([t]), captured: [t].concat(captured) }); };
+
+    return {
+      down: (e) => { this._x = e.clientX; },
+      up: (e) => { if (this._x == null) return; const dx = e.clientX - this._x; this._x = null; if (Math.abs(dx) < 60 || ask !== 'off') return; const n = Math.max(0, Math.min(2, page + (dx < 0 ? 1 : -1))); if (n !== page) set({ page: n }); },
+      trackX: -page * 390, labels, showMenu: page === 1,
+      // progress
+      progTitle: evening ? 'Friday evening' : 'How it’s going', evening, dayTime: !evening,
+      progA: 'Today, ', progB: evening ? '3 of 4 done' : '1 of 4 done', progC: evening ? '. This week, ' : ' and the essay’s next. This week, ', progD: evening ? '15¼ of 17¼ hours' : '12¼ of 17¼ hours', progE: ' you planned got done.',
+      weekBars,
+      // chat
+      fresh: session === 'fresh', giftAsk: session === 'fresh' && gift === 'ask', giftAdd: () => set({ gift: 'added' }), giftNo: () => set({ gift: 'no' }),
+      chatItems, hasCtx: !!s.ctx, ctx: s.ctx || '', clearCtx: () => set({ ctx: null }),
+      draft, hasDraft: draft.trim().length > 0, noDraft: draft.trim().length === 0, typeDraft: (e) => set({ draft: e.target.value }), send: sendIt, sendOnEnter: (e) => { if (e.key === 'Enter') sendIt(); },
+      // plan
+      dayTitle: view === 'week' ? 'This week' : view === 'list' ? 'Tasks' : dayNames[day], chev: weekOpen ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6', weekOpen, toggleWeek: () => set({ weekOpen: !weekOpen }), days, views, lead, rest,
+      inboxWaiting: waiting > 0, approvalPending: approval === 'pending', reviewText: allDrafts.length + ' to review', openInbox: () => set({ inbox: true }),
+      viewDay: view === 'day', viewWeek: view === 'week', viewList: view === 'list', timeline, needsOpen: !!s.needsOpen && view === 'day' && fri, needs: needsList, weekRows, tasks, listTabs,
+      // ask
+      showHandle: page !== 1 && ask === 'off' && !focus && !inbox, handleText, openAsk: () => set({ ask: 'peek' }),
+      askOpen: ask !== 'off', sheetH: ask === 'full' ? 790 : 430, askCtx,
+      toggleGrow: () => set({ ask: ask === 'full' ? 'peek' : 'full' }), growLabel: ask === 'full' ? 'Shrink back' : 'Open the full chat', growIcon: ask === 'full' ? 'M9 15H4v5M15 9h5V4M4 20l6-6M20 4l-6 6' : 'M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7',
+      closeAsk: () => set({ ask: 'off', askCtxOverride: null }), closeLabel: page === 0 ? 'Back to Progress' : 'Back to Plan',
+      sheetItems: ask === 'full' ? chatItems : askItems, askEmpty: ask !== 'full' && askItems.length === 0,
+      askHint: page === 0 ? 'Ask how the week went, or what to change for next week.' : 'Ask Navi to move, fit or plan anything on ' + (selItem ? 'this' : askCtx) + '.',
+      askDraft, askHasDraft: askDraft.trim().length > 0, askNoDraft: askDraft.trim().length === 0, typeAsk: (e) => set({ askDraft: e.target.value }), askSend, askOnEnter: (e) => { if (e.key === 'Enter') askSend(); },
+      // drawer
+      drawer, openDrawer: () => set({ drawer: true }), closeDrawer: () => set({ drawer: false, acct: false }), acct: !!s.acct, toggleAcct: () => set({ acct: !s.acct }),
+      newChat: () => set({ drawer: false, session: 'fresh', caps: [] }),
+      chatGroups: [
+        { h: 'Today', items: [{ t: 'Fitting in the dentist', bg: session === 'resume' ? 'rgba(255,255,255,0.08)' : 'transparent', color: '#F5F5F7', open: () => set({ drawer: false, session: 'resume' }) }] },
+        { h: 'Earlier', items: [{ t: 'Plan this week', bg: 'transparent', color: '#C8C8CE', open: () => set({ drawer: false }) }, { t: 'Essay outline', bg: 'transparent', color: '#C8C8CE', open: () => set({ drawer: false }) }] }
+      ],
+      acctItems: [['Settings', '#F5F5F7'], ['Spaces and projects', '#F5F5F7'], ['What Navi remembers', '#F5F5F7'], ['Notes', '#F5F5F7'], ['Activity', '#F5F5F7'], ['Sign out', '#F4A99F']].map(([t, color]) => ({ t, color })),
+      // inbox
+      inbox, closeInbox: () => set({ inbox: false }), approve: () => set({ approval: 'done' }), decline: () => set({ approval: 'done' }),
+      drafts: allDrafts.map((d) => ({ t: d.t, q: d.q, tag: d.said ? 'you said this' : 'Navi’s guess', tagColor: d.said ? '#7C7C85' : '#F4B37A', accept: rm(d.id), later: rm(d.id) })),
+      noDrafts: allDrafts.length === 0, hasSaid: allDrafts.some((d) => d.said), saidCount: allDrafts.filter((d) => d.said).length,
+      acceptSaid: () => { const r = Object.assign({}, removed); allDrafts.forEach((d) => { if (d.said) r[d.id] = true; }); set({ removed: r }); },
+      // voice & focus
+      voiceFull: voice === 'full', voicePill: voice === 'pill', openVoice: () => set({ voice: 'full' }), minimizeVoice: () => set({ voice: 'pill' }), endVoice: () => set({ voice: 'off' }), voiceToText: () => set({ voice: 'pill', page: 1 }),
+      focus, focusTitle: s.focusTitle || 'Essay: write the intro', endFocus: () => set({ focus: false })
+    };
+  }
+}
+</script>
+</body>
+</html>
