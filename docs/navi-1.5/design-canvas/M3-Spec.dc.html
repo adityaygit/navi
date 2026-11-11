@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi mobile M3 interaction spec</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 2990px; height: 2580px; box-sizing: border-box; padding: 44px 48px 48px; background: #0A0A0B; color: #F5F5F7; font-family: Figtree, -apple-system, sans-serif; display: flex; flex-direction: column; gap: 56px">
+  <div><h1 style="margin: 0; font-size: 40px; font-weight: 700; letter-spacing: -0.02em">How it behaves, not just how it looks</h1>
+  <p style="margin: 10px 0 0; font-size: 18px; line-height: 1.5; color: #A0A0A8; max-width: 1800px">The rules a native build has to follow: what the stone does, how the timeline scales, gestures, motion, haptics, keyboard, safe areas, and what happens when things load slowly, go offline or get interrupted. Live Activities, haptics and the keyboard behaviour need native code whatever the app shell turns out to be.</p></div>
+
+  <div style="display: flex; gap: 64px; align-items: flex-start">
+    <div style="flex: 1.25">
+      <h2 style="margin: 0 0 6px; font-size: 28px; font-weight: 700">The stone</h2>
+      <p style="margin: 0 0 26px; font-size: 16px; line-height: 1.5; color: #A0A0A8">On the chat, the stone is Navi. Tap it to talk; hold it to talk while held. At the top, the stone mark takes you to the chat, or jumps to the latest message if you’re already there. It never pretends the microphone is on.</p>
+      <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 18px">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center">
+        <div style="width: 150px; height: 130px; display: flex; align-items: center; justify-content: center; position: relative"><span aria-hidden="true" style="width: 84px; height: 76px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%); box-shadow: 0 14px 34px rgba(167,235,192,0.20); position: relative"></span></div>
+        <div style="font-size: 17px; font-weight: 600">Idle</div>
+        <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #A0A0A8">Breathes slowly (6 s). Still when Reduce Motion is on.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center">
+        <div style="width: 150px; height: 130px; display: flex; align-items: center; justify-content: center; position: relative"><span aria-hidden="true" style="width: 84px; height: 76px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%); box-shadow: 0 0 0 10px rgba(167,235,192,0.16), 0 0 0 22px rgba(167,235,192,0.07); position: relative"></span></div>
+        <div style="font-size: 17px; font-weight: 600">Listening</div>
+        <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #A0A0A8">The rim swells with your voice level. Only after you tap or hold.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center">
+        <div style="width: 150px; height: 130px; display: flex; align-items: center; justify-content: center; position: relative"><span aria-hidden="true" style="position: absolute; width: 104px; height: 96px; border-radius: 50%; border: 2px solid rgba(167,235,192,0.25); border-top-color: #A7EBC0"></span><span aria-hidden="true" style="width: 84px; height: 76px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%); filter: brightness(0.9); position: relative"></span></div>
+        <div style="font-size: 17px; font-weight: 600">Thinking</div>
+        <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #A0A0A8">A slow light circles while a reply or an action is in progress.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center">
+        <div style="width: 150px; height: 130px; display: flex; align-items: center; justify-content: center; position: relative"><span aria-hidden="true" style="position: absolute; width: 132px; height: 120px; border-radius: 50%; border: 1px solid rgba(167,235,192,0.25)"></span><span aria-hidden="true" style="width: 84px; height: 76px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%); box-shadow: 0 0 40px rgba(167,235,192,0.35); position: relative"></span></div>
+        <div style="font-size: 17px; font-weight: 600">Speaking</div>
+        <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #A0A0A8">Soft ripples follow Navi’s voice. Tap to interrupt.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center">
+        <div style="width: 150px; height: 130px; display: flex; align-items: center; justify-content: center; position: relative"><span aria-hidden="true" style="position: absolute; right: 30px; top: 18px; width: 16px; height: 16px; border-radius: 8px; background: #F4B37A; border: 3px solid #0A0A0B; z-index: 1"></span><span aria-hidden="true" style="width: 84px; height: 76px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%); ; position: relative"></span></div>
+        <div style="font-size: 17px; font-weight: 600">Needs you</div>
+        <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #A0A0A8">An amber dot when an approval is waiting. Never a pop-up.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center">
+        <div style="width: 150px; height: 130px; display: flex; align-items: center; justify-content: center; position: relative"><span aria-hidden="true" style="width: 84px; height: 76px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%); filter: saturate(0.15) brightness(0.65); position: relative"></span></div>
+        <div style="font-size: 17px; font-weight: 600">Offline</div>
+        <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #A0A0A8">Grey. Typing still works and waits; talking is off.</p>
+      </div>
+      </div>
+    </div>
+    <div style="flex: 1">
+      <h2 style="margin: 0 0 6px; font-size: 28px; font-weight: 700">One timeline scale</h2>
+      <p style="margin: 0 0 18px; font-size: 16px; line-height: 1.5; color: #A0A0A8">48 px per hour, with two exceptions that keep the day usable on a phone. Overlaps sit side by side with an amber edge.</p>
+        <div style="display: flex; align-items: flex-start; gap: 18px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07)">
+          <div style="width: 150px; flex: none; display: flex; justify-content: center"><div style="width: 120px; height: 52px; box-sizing: border-box; background: rgba(140,158,255,0.07); border: 1.5px solid rgba(140,158,255,0.55); border-radius: 12px"></div></div>
+          <div style="flex: 1"><div style="font-size: 16px; font-weight: 600">15-minute call</div><div style="margin-top: 4px; font-size: 14px; line-height: 1.5; color: #A0A0A8">Never below 52 px, so it can always be tapped and read. Shows its exact times, so height alone never misleads.</div></div>
+        </div>
+        <div style="display: flex; align-items: flex-start; gap: 18px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07)">
+          <div style="width: 150px; flex: none; display: flex; justify-content: center"><div style="width: 120px; height: 72px; box-sizing: border-box; background: rgba(140,158,255,0.07); border: 1.5px solid rgba(140,158,255,0.55); border-radius: 12px"></div></div>
+          <div style="flex: 1"><div style="font-size: 16px; font-weight: 600">90-minute block</div><div style="margin-top: 4px; font-size: 14px; line-height: 1.5; color: #A0A0A8">To scale: 48 px per hour, everywhere, every day.</div></div>
+        </div>
+        <div style="display: flex; align-items: flex-start; gap: 18px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07)">
+          <div style="width: 150px; flex: none; display: flex; justify-content: center"><div style="width: 120px; height: 144px; box-sizing: border-box; background: rgba(140,198,236,0.22); border: 1px solid rgba(140,198,236,0.3); border-radius: 12px"></div></div>
+          <div style="flex: 1"><div style="font-size: 16px; font-weight: 600">3-hour shift</div><div style="margin-top: 4px; font-size: 14px; line-height: 1.5; color: #A0A0A8">To scale. Long fixed things look long.</div></div>
+        </div>
+        <div style="display: flex; align-items: flex-start; gap: 18px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07)">
+          <div style="width: 150px; flex: none; display: flex; justify-content: center"><div style="width: 120px; height: 8px; box-sizing: border-box; "></div></div>
+          <div style="flex: 1"><div style="font-size: 16px; font-weight: 600">Gap under 15 minutes</div><div style="margin-top: 4px; font-size: 14px; line-height: 1.5; color: #A0A0A8">Collapses to 8 px with no label.</div></div>
+        </div>
+        <div style="display: flex; align-items: flex-start; gap: 18px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07)">
+          <div style="width: 150px; flex: none; display: flex; justify-content: center"><div style="width: 120px; height: 24px; box-sizing: border-box; border-left: 2px dotted rgba(255,255,255,0.25)"></div></div>
+          <div style="flex: 1"><div style="font-size: 16px; font-weight: 600">Gap 15–45 minutes</div><div style="margin-top: 4px; font-size: 14px; line-height: 1.5; color: #A0A0A8">To scale, no label, unless something fits there (“Add dentist call”).</div></div>
+        </div>
+        <div style="display: flex; align-items: flex-start; gap: 18px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07)">
+          <div style="width: 150px; flex: none; display: flex; justify-content: center"><div style="width: 120px; height: 56px; box-sizing: border-box; border-left: 2px dotted rgba(255,255,255,0.25)"></div></div>
+          <div style="flex: 1"><div style="font-size: 16px; font-weight: 600">Gap 45 minutes to 2 hours</div><div style="margin-top: 4px; font-size: 14px; line-height: 1.5; color: #A0A0A8">To scale, labelled “1 hour free”.</div></div>
+        </div>
+        <div style="display: flex; align-items: flex-start; gap: 18px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07)">
+          <div style="width: 150px; flex: none; display: flex; justify-content: center"><div style="width: 120px; height: 56px; box-sizing: border-box; border-left: 2px dotted rgba(255,255,255,0.25)"></div></div>
+          <div style="flex: 1"><div style="font-size: 16px; font-weight: 600">Gap over 2 hours</div><div style="margin-top: 4px; font-size: 14px; line-height: 1.5; color: #A0A0A8">Folded into a 56 px break labelled “6½ hours free”, so a quiet afternoon doesn’t push the evening off screen.</div></div>
+        </div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px">
+      <div style="padding: 22px 24px; border-radius: 24px; background: #121214; border: 1px solid rgba(255,255,255,0.07)">
+        <h3 style="margin: 0 0 12px; font-size: 19px; font-weight: 700">Gestures</h3>
+        <ul style="margin: 0; padding-left: 18px; font-size: 15px; color: #C8C8CE"><li style="margin: 0 0 10px; line-height: 1.5">Swipe left or right anywhere to change page. Nothing inside a page scrolls sideways, so there are no conflicts.</li><li style="margin: 0 0 10px; line-height: 1.5">Every page name is also a button; VoiceOver users get “Page 2 of 3”.</li><li style="margin: 0 0 10px; line-height: 1.5">Tap a block to open it in place. Long-press for a menu (Start focus, Move, Ask Navi, Mark done).</li><li style="margin: 0 0 10px; line-height: 1.5">Hold the stone to talk; release to send. Tap it to start a normal voice conversation.</li><li style="margin: 0 0 10px; line-height: 1.5">Sheets: drag the handle up to grow, down to shrink or close. A fast flick skips a height.</li><li style="margin: 0 0 10px; line-height: 1.5">Pull down on Plan to refresh; the swipe-back edge is used only inside pushed screens.</li></ul>
+      </div>
+      <div style="padding: 22px 24px; border-radius: 24px; background: #121214; border: 1px solid rgba(255,255,255,0.07)">
+        <h3 style="margin: 0 0 12px; font-size: 19px; font-weight: 700">Motion</h3>
+        <ul style="margin: 0; padding-left: 18px; font-size: 15px; color: #C8C8CE"><li style="margin: 0 0 10px; line-height: 1.5">Page change: 340 ms, slight overshoot; the page names travel with the finger.</li><li style="margin: 0 0 10px; line-height: 1.5">Sheet heights: spring, no bounce past the top.</li><li style="margin: 0 0 10px; line-height: 1.5">An accepted proposal: the block slides into the timeline with a 1.2 s green glow.</li><li style="margin: 0 0 10px; line-height: 1.5">The stone grows into the voice screen (shared element, 300 ms).</li><li style="margin: 0 0 10px; line-height: 1.5">Reduce Motion: every move becomes a 150 ms cross-fade; the stone stops breathing.</li></ul>
+      </div>
+      <div style="padding: 22px 24px; border-radius: 24px; background: #121214; border: 1px solid rgba(255,255,255,0.07)">
+        <h3 style="margin: 0 0 12px; font-size: 19px; font-weight: 700">Haptics (few, and meaningful)</h3>
+        <ul style="margin: 0; padding-left: 18px; font-size: 15px; color: #C8C8CE"><li style="margin: 0 0 10px; line-height: 1.5">Success tick: a proposal accepted, a task done, focus finished.</li><li style="margin: 0 0 10px; line-height: 1.5">Light tap: long-press menu, holding the stone to talk.</li><li style="margin: 0 0 10px; line-height: 1.5">Selection tick: Day · Week · Tasks, choosing a day.</li><li style="margin: 0 0 10px; line-height: 1.5">Warning: only when an approval that costs money or messages someone is confirmed.</li><li style="margin: 0 0 10px; line-height: 1.5">None for page swipes, scrolling or sheet movement.</li></ul>
+      </div>
+      <div style="padding: 22px 24px; border-radius: 24px; background: #121214; border: 1px solid rgba(255,255,255,0.07)">
+        <h3 style="margin: 0 0 12px; font-size: 19px; font-weight: 700">Keyboard</h3>
+        <ul style="margin: 0; padding-left: 18px; font-size: 15px; color: #C8C8CE"><li style="margin: 0 0 10px; line-height: 1.5">The composer rides on top of the keyboard; the conversation stays pinned to the latest message.</li><li style="margin: 0 0 10px; line-height: 1.5">Typing in a half sheet grows it to full, so the reply stays in view.</li><li style="margin: 0 0 10px; line-height: 1.5">Drag down on the conversation to put the keyboard away.</li><li style="margin: 0 0 10px; line-height: 1.5">Drafts are kept per place (chat, each sheet context) and survive leaving the app.</li><li style="margin: 0 0 10px; line-height: 1.5">Return sends; a newline needs Shift (hardware keyboard) or a long message.</li></ul>
+      </div>
+      <div style="padding: 22px 24px; border-radius: 24px; background: #121214; border: 1px solid rgba(255,255,255,0.07)">
+        <h3 style="margin: 0 0 12px; font-size: 19px; font-weight: 700">Safe areas and size</h3>
+        <ul style="margin: 0; padding-left: 18px; font-size: 15px; color: #C8C8CE"><li style="margin: 0 0 10px; line-height: 1.5">Nothing interactive in the top 54 px (status bar, Dynamic Island) or the bottom 34 px (home indicator).</li><li style="margin: 0 0 10px; line-height: 1.5">Composer and the Ask bar sit 34 px above the bottom edge; sheets extend under the home indicator.</li><li style="margin: 0 0 10px; line-height: 1.5">Touch targets at least 44 × 44 px; body text at least 15 px; supports Dynamic Type up to XL by wrapping, never clipping.</li><li style="margin: 0 0 10px; line-height: 1.5">Portrait only in 1.5 (to confirm).</li></ul>
+      </div>
+      <div style="padding: 22px 24px; border-radius: 24px; background: #121214; border: 1px solid rgba(255,255,255,0.07)">
+        <h3 style="margin: 0 0 12px; font-size: 19px; font-weight: 700">Loading, offline, interruptions</h3>
+        <ul style="margin: 0; padding-left: 18px; font-size: 15px; color: #C8C8CE"><li style="margin: 0 0 10px; line-height: 1.5">Plan opens from the copy on the phone instantly, then refreshes; skeletons only on first launch. No spinners.</li><li style="margin: 0 0 10px; line-height: 1.5">Navi “thinking” is the stone state, not a typing indicator.</li><li style="margin: 0 0 10px; line-height: 1.5">Offline: typing always works and waits; anything that needs the internet is dimmed with the reason.</li><li style="margin: 0 0 10px; line-height: 1.5">A phone call pauses voice and keeps the transcript; “Resume talking” continues the same conversation.</li><li style="margin: 0 0 10px; line-height: 1.5">Leaving the app keeps the page, scroll position, open sheet and draft. Focus continues on the Lock Screen (Live Activity, native).</li><li style="margin: 0 0 10px; line-height: 1.5">A notification opens the exact card it’s about, not just the app.</li></ul>
+      </div>
+  </div>
+
+  <div style="display: flex; gap: 48px; align-items: flex-start">
+    <div style="width: 390px; flex: none; display: flex; flex-direction: column; gap: 14px">
+      <div style="font-size: 13px; font-weight: 600; color: #A0A0A8; letter-spacing: 0.05em">FIRST LAUNCH · LOADING</div>
+      <div style="width: 390px; height: 844px; border-radius: 48px; overflow: hidden; border: 1px solid rgba(255,255,255,0.14)"><dc-import name="M3-Proto" start-page="plan" start-overlay="loading" hint-size="390px,844px"></dc-import></div>
+      <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #C8C8CE">Skeletons in the real layout; the title and switch are there at once.</p>
+    </div>
+    <div style="width: 390px; flex: none; display: flex; flex-direction: column; gap: 14px">
+      <div style="font-size: 13px; font-weight: 600; color: #A0A0A8; letter-spacing: 0.05em">VOICE · INTERRUPTED BY A CALL</div>
+      <div style="width: 390px; height: 844px; border-radius: 48px; overflow: hidden; border: 1px solid rgba(255,255,255,0.14)"><dc-import name="M3-Proto" start-page="navi" start-overlay="voicePaused" hint-size="390px,844px"></dc-import></div>
+      <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #C8C8CE">The stone goes grey, the transcript stays, and one button picks the conversation back up.</p>
+    </div>
+    <div style="flex: 1; padding: 26px 28px; border-radius: 28px; background: rgba(244,179,122,0.06); border: 1px solid rgba(244,179,122,0.22)">
+      <h2 style="margin: 0 0 14px; font-size: 26px; font-weight: 700">Where M3 still falls short</h2>
+      <ul style="margin: 0; padding-left: 20px; font-size: 16px; line-height: 1.6; color: #E2D3C6">
+        <li style="margin-bottom: 12px"><b style="color: #F5F5F7">Motion is described, not shown.</b> Opal, Structured and Tiimo earn much of their polish in motion. These boards are still stills; the transitions need a motion prototype before we can judge them.</li>
+        <li style="margin-bottom: 12px"><b style="color: #F5F5F7">The stone is a gradient, not an object.</b> Opal’s hero gem has depth, light and material. Navi’s stone needs a proper rendered asset (or a 3D/shader pass) to carry the brand at 88 px.</li>
+        <li style="margin-bottom: 12px"><b style="color: #F5F5F7">Short blocks lose their length.</b> With a 52 px minimum, 15, 30 and 60 minutes look alike. Exact times are printed, but Structured shows duration more clearly with its pill heights. A thin duration marker inside small blocks may help.</li>
+        <li style="margin-bottom: 12px"><b style="color: #F5F5F7">Plan has two switches stacked</b> if we choose navigation option C. Option A avoids that; it’s the main reason I recommend it.</li>
+        <li style="margin-bottom: 12px"><b style="color: #F5F5F7">Progress is text-heavy.</b> It has substance now, but compared with Opal’s weekly story it reads more than it shows. A swipeable weekly story on Sundays is the obvious next step.</li>
+        <li style="margin-bottom: 12px"><b style="color: #F5F5F7">Iconography is placeholder.</b> Stroke icons are generic; a small consistent icon set would lift the whole app.</li>
+        <li><b style="color: #F5F5F7">Light mode, Dynamic Type at the largest sizes, and Android</b> are not designed yet.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2990,"height":2580}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
