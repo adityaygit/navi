@@ -37,12 +37,15 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
       <span aria-hidden="true" style="margin-top: 54px; width: 132px; height: 120px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: {{stoneBg}}; box-shadow: 0 30px 70px {{stoneShadow}}"></span>
     </sc-if>
     <sc-if value="{{p.vDay}}" hint-placeholder-val="{{ false }}">
-      <div style="margin-top: 48px; align-self: stretch">
-        <div style="position: relative; height: 56px; border-radius: 18px; background: rgba(255,255,255,0.10)">
-          <sc-for list="{{daySegs}}" as="d" hint-placeholder-count="5"><span style="position: absolute; top: 8px; bottom: 8px; left: {{d.l}}%; width: {{d.w}}%; border-radius: 10px; background: {{d.c}}"></span></sc-for>
-        </div>
-        <div style="margin-top: 10px; display: flex; justify-content: space-between; font-size: 13px; color: rgba(255,255,255,0.7)"><span>7 AM</span><span>Noon</span><span>6 PM</span><span>11 PM</span></div>
-      </div>
+      <ol aria-label="Today, in order" style="margin: 30px 0 0; padding: 0; list-style: none; align-self: stretch; display: flex; flex-direction: column; gap: 6px; text-align: left">
+        <sc-for list="{{dayRows}}" as="r" hint-placeholder-count="6">
+          <li style="display: flex; align-items: flex-start; gap: 12px; min-height: {{r.h}}px">
+            <span style="width: 44px; flex: none; padding-top: 2px; text-align: right; font-size: 13px; font-weight: {{r.tw}}; color: {{r.tc}}">{{r.t}}</span>
+            <span aria-hidden="true" style="width: 6px; flex: none; align-self: stretch; border-radius: 3px; background: {{r.bar}}; border: {{r.barBorder}}; box-sizing: border-box"></span>
+            <span style="flex: 1; display: flex; flex-direction: column; gap: 1px; padding-top: 1px"><span style="font-size: 16px; font-weight: {{r.nw}}; color: {{r.nc}}">{{r.name}}</span><span style="font-size: 13px; color: rgba(255,255,255,0.55)">{{r.sub}}</span></span>
+          </li>
+        </sc-for>
+      </ol>
     </sc-if>
     <sc-if value="{{p.vBars}}" hint-placeholder-val="{{ false }}">
       <div role="img" aria-label="Kept and slipped, Monday to Friday" style="margin-top: 40px; align-self: stretch; height: 200px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; align-items: end">
@@ -104,7 +107,7 @@ class Component extends DCLogic {
     const pages = {
       morning: [
         { kicker: 'FRIDAY · YOUR MORNING', vStone: true, big: [W('Good morning, Alex.')], bigSize: 34, body: '9½ hours planned today. Here’s the shape of it.' },
-        { kicker: 'TODAY’S SHAPE', vDay: true, big: [W('Class until 11, '), W('a free stretch at 1', P.hi), W(', then your shift at 4.')], bigSize: 30, body: 'Dinner with Maya at 7:30. Bed by 11:30.' },
+        { kicker: 'TODAY’S SHAPE', vDay: true, big: [W('A free hour at 1', P.hi), W(', then your shift at 4.')], bigSize: 28, body: '' },
         { kicker: 'ONE THING TO WATCH', big: [W('The essay is due at '), W('5:00 PM', '#FFC77A'), W(' today.')], bigSize: 34, body: 'Your 2:00 block is the last free stretch before the shift. The intro isn’t started yet.' },
         { kicker: 'NAVI SUGGESTS', vStone: true, big: [W('Start the essay at 2:00. '), W('I’ll hold everything else.', P.hi)], bigSize: 30, body: '', cta: 'Start my day', cta2: 'Change the plan' }
       ],
@@ -130,9 +133,18 @@ class Component extends DCLogic {
       bg: P.bg, blobA: P.a, blobB: P.b, kickerColor: P.k, cta: P.cta, stoneBg: P.stone, stoneShadow: P.sh,
       count: pages.length, progressAria: 'Page ' + (step + 1) + ' of ' + pages.length,
       segs: pages.map((_, i) => ({ c: i <= step ? '#FFFFFF' : 'rgba(255,255,255,0.28)' })),
-      p, bigTop: p.vStone || p.vStones ? 40 : p.vDay || p.vBars || p.vSpaces ? 28 : 140,
+      p, bigTop: p.vStone || p.vStones ? 40 : p.vDay ? 22 : p.vBars || p.vSpaces ? 28 : 140,
       next: () => this.setState({ step: Math.min(pages.length - 1, step + 1) }), prev: () => this.setState({ step: Math.max(0, step - 1) }), close,
       ctaAct: this.props.onCta || (() => close()), cta2Act: () => close(),
+      dayRows: [
+        ['7:10', 'Now', '', 'rgba(255,255,255,0.9)', '0', 18, 600, '#FFFFFF', 600, '#FFFFFF'],
+        ['8:45', 'Modern History', 'Class · until 11:00', 'rgba(140,158,255,0.55)', '0', 64, 400, 'rgba(255,255,255,0.6)', 600, '#FFFFFF'],
+        ['1:00', 'Free · 1 hour', 'The best time for the essay', 'transparent', '2px dashed ' + P.hi, 34, 600, P.hi, 700, P.hi],
+        ['2:00', 'Essay intro', '90 min', 'rgba(140,158,255,0.55)', '0', 44, 400, 'rgba(255,255,255,0.6)', 600, '#FFFFFF'],
+        ['4:00', 'Shift at the café', 'until 7:00', 'rgba(140,198,236,0.5)', '0', 76, 400, 'rgba(255,255,255,0.6)', 600, '#FFFFFF'],
+        ['7:30', 'Dinner with Maya', 'Lupa, Elm St', 'rgba(244,179,122,0.55)', '0', 52, 400, 'rgba(255,255,255,0.6)', 600, '#FFFFFF'],
+        ['11:30', 'Bed', 'Wind down from 10:30', 'rgba(255,255,255,0.18)', '0', 18, 400, 'rgba(255,255,255,0.6)', 500, 'rgba(255,255,255,0.75)']
+      ].map(([t, name, sub, bar, barBorder, h, tw, tc, nw, nc]) => ({ t, name, sub, bar, barBorder, h, tw, tc, nw, nc })),
       daySegs: [seg(525, 660, C.school), seg(780, 840, 'rgba(255,255,255,0.35)'), seg(840, 930, C.school), seg(960, 1140, C.work), seg(1170, 1290, C.friends), seg(1350, 1410, 'rgba(255,255,255,0.3)')],
       bars: [['M', 3, 0], ['T', 4, 1], ['W', 3, 0], ['T', 2, 1], ['F', 2, 0]].map(([d, k, sl], i) => ({ d, v: String(k), h: (k + sl) * 34, slip: sl * 34, lc: i === 2 ? '#CFF7A6' : i === 3 ? '#FF9A9A' : 'rgba(255,255,255,0.7)' })),
       spaces: [['School', '14h', C.school, 46], ['Work', '9h', C.work, 38], ['Friends', '5h', C.friends, 32], ['Health', '3h', C.health, 28]].map(([t, h, c, size]) => ({ t, h, c, size })),
