@@ -6,6 +6,14 @@
 **Product source of truth:** `Navi_Product_Spec.md` · **Ops guide:** `docs/OPERATIONS.md` (local dev, tests, hosted Supabase, deploy, env vars, scheduler, spend limits).
 **Last checkpoint:** 2026-10-30, session 4 — voice mic/budget fix (see the "Voice connected-but-didn't-hear-me fix" section), uncommitted on `claude/dazzling-cray-isusbm` from `main` 031017e. Before: 2026-10-30 late, session 3 — accountability & reviews pass (see "Accountability & reviews pass"), **uncommitted working tree**, no new migration. Before that: security-review fixes (see "Security review (session 3)"), **uncommitted working tree at time of writing**, including new migration `20261102000001_security_hardening.sql` (applied locally only; hosted needs owner OK). See `git log -1` + `git status`.
 
+## ▶ Navi 1.5 Mobile — Phase 1 proposal (2026-11-11, branch `claude/awesome-cannon-criq1l`, docs only)
+- Owner started a dedicated mobile-first 1.5 (native iOS/Android packaging possibly via Capacitor; architecture NOT decided). This reverses the 2026-11-07 "desktop only" decision. R4 desktop + onboarding boards are approved and are the design direction; current production UI and the old PWA are not the base.
+- Process the owner set: Phase 1 written proposal → owner approval → Phase 2 boards on the existing canvas (390×844, desktop boards untouched) → lock → Phase 3 implementation plan. **No code or prototypes until approved.**
+- Proposal: `docs/navi-1.5/mobile/MOBILE_PLAN.md` (research, carry over/adapt/rethink, approaches A/B/C with recommendation A = tab bar + stone button + Navi sheet, all sections, journeys, gates M0–M7, 8 owner questions). Status: awaiting owner discussion.
+- Research evidence: rendered all canvas boards locally with the canvas runtime; ran the app locally (demo account, `scripts/local-only.sh`, devsim) at phone + desktop width: at 390 px the current app has no navigation (mobile shell was removed). Mobbin: both owner collections read in full + ~10 searches.
+- Flagged: Sign in with Apple likely required on iOS if Google sign-in is offered (App Review 4.8, verify in Phase 3); Google blocks embedded-webview sign-in.
+- Next action: discuss/refine the proposal with the owner; on explicit approval start gate M0 (foundations board).
+
 ## ▶ Planner v2, constraint-first (2026-11-08, branch `claude/planning-audit`, local only)
 Built M1–M7 behind `profiles.preferences.planner_v2` (default off; v1 unchanged). Plan, status, bugs fixed and limits: `docs/navi-1.5/PLANNING_AUDIT.md` Part 6. New migration `20261110000001_constraint_planning.sql` is applied to LOCAL only; hosted needs owner OK. Flag per account: `scripts/planner-flag.mjs on|off|status <email>`. Verified: tsc, eslint, vitest 375/375, Playwright `planner-v2.spec.ts`. Not verified: real-model behaviour (devsim only), hosted.
 Learning: in a worktree whose `node_modules` is a symlink, `next build` (Turbopack) fails; use `next build --webpack`.
