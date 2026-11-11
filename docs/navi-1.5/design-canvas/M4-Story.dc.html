@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi story</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer;text-align:left}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: {{bg}}; color: #FFFFFF; font-family: Figtree, -apple-system, sans-serif; user-select: none">
+  <div aria-hidden="true" style="position: absolute; left: -80px; top: -120px; width: 560px; height: 520px; border-radius: 50%; background: radial-gradient(ellipse at center, {{blobA}} 0%, rgba(0,0,0,0) 65%)"></div>
+  <div aria-hidden="true" style="position: absolute; right: -160px; bottom: 80px; width: 520px; height: 520px; border-radius: 50%; background: radial-gradient(ellipse at center, {{blobB}} 0%, rgba(0,0,0,0) 65%)"></div>
+
+  <!-- progress segments + close -->
+  <div style="position: absolute; left: 16px; right: 16px; top: 56px; z-index: 3; display: flex; align-items: center; gap: 12px">
+    <div role="progressbar" aria-label="{{progressAria}}" style="flex: 1; display: grid; grid-template-columns: repeat({{count}}, minmax(0, 1fr)); gap: 5px">
+      <sc-for list="{{segs}}" as="g" hint-placeholder-count="4"><span style="height: 3px; border-radius: 2px; background: {{g.c}}"></span></sc-for>
+    </div>
+    <button type="button" aria-label="Close" onClick="{{close}}" style="width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.12)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+  </div>
+
+  <!-- tap zones -->
+  <button type="button" aria-label="Previous" onClick="{{prev}}" style="position: absolute; left: 0; top: 110px; width: 35%; bottom: 200px; z-index: 1"></button>
+  <button type="button" aria-label="Next" onClick="{{next}}" style="position: absolute; right: 0; top: 110px; width: 65%; bottom: 200px; z-index: 1"></button>
+
+  <div style="position: absolute; left: 0; right: 0; top: 120px; bottom: 34px; padding: 0 28px; display: flex; flex-direction: column; align-items: center; text-align: center; pointer-events: none">
+    <div style="font-size: 14px; font-weight: 600; letter-spacing: 0.08em; color: {{kickerColor}}">{{p.kicker}}</div>
+
+    <sc-if value="{{p.vStone}}" hint-placeholder-val="{{ false }}">
+      <span aria-hidden="true" style="margin-top: 54px; width: 132px; height: 120px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: {{stoneBg}}; box-shadow: 0 30px 70px {{stoneShadow}}"></span>
+    </sc-if>
+    <sc-if value="{{p.vDay}}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top: 48px; align-self: stretch">
+        <div style="position: relative; height: 56px; border-radius: 18px; background: rgba(255,255,255,0.10)">
+          <sc-for list="{{daySegs}}" as="d" hint-placeholder-count="5"><span style="position: absolute; top: 8px; bottom: 8px; left: {{d.l}}%; width: {{d.w}}%; border-radius: 10px; background: {{d.c}}"></span></sc-for>
+        </div>
+        <div style="margin-top: 10px; display: flex; justify-content: space-between; font-size: 13px; color: rgba(255,255,255,0.7)"><span>7 AM</span><span>Noon</span><span>6 PM</span><span>11 PM</span></div>
+      </div>
+    </sc-if>
+    <sc-if value="{{p.vBars}}" hint-placeholder-val="{{ false }}">
+      <div role="img" aria-label="Kept and slipped, Monday to Friday" style="margin-top: 40px; align-self: stretch; height: 200px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; align-items: end">
+        <sc-for list="{{bars}}" as="b" hint-placeholder-count="5">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 8px">
+            <span style="font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.85)">{{b.v}}</span>
+            <div style="width: 100%; height: {{b.h}}px; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column">
+              <span style="height: {{b.slip}}px; background: linear-gradient(180deg, #FF8A8A, #E0566C)"></span>
+              <span style="flex: 1; background: linear-gradient(180deg, #CFF7A6, #7FE0C8)"></span>
+            </div>
+            <span style="font-size: 13px; color: {{b.lc}}">{{b.d}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{p.vSpaces}}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top: 36px; align-self: stretch; display: flex; flex-direction: column; gap: 4px">
+        <sc-for list="{{spaces}}" as="sp" hint-placeholder-count="4">
+          <div style="display: flex; align-items: baseline; justify-content: space-between; padding: 6px 0"><span style="font-size: {{sp.size}}px; font-weight: 800; letter-spacing: -0.02em; color: {{sp.c}}">{{sp.t}}</span><span style="font-size: 20px; font-weight: 600; color: rgba(255,255,255,0.85)">{{sp.h}}</span></div>
+        </sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{p.vStones}}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top: 56px; display: flex; gap: 8px">
+        <sc-for list="{{stones}}" as="s" hint-placeholder-count="7">
+          <span aria-hidden="true" style="width: 40px; height: 36px; position: relative; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: rgba(255,255,255,0.14); overflow: hidden"><span style="position: absolute; left: 0; right: 0; bottom: 0; height: {{s.f}}%; background: {{s.c}}"></span></span>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <p style="margin: {{bigTop}}px 0 0; font-size: {{p.bigSize}}px; line-height: 1.18; font-weight: 700; letter-spacing: -0.025em">
+      <sc-for list="{{p.big}}" as="w" hint-placeholder-count="2"><span style="color: {{w.c}}">{{w.t}}</span></sc-for>
+    </p>
+    <sc-if value="{{p.hasBody}}" hint-placeholder-val="{{ true }}"><p style="margin: 18px 0 0; font-size: 17px; line-height: 1.5; color: rgba(255,255,255,0.78)">{{p.body}}</p></sc-if>
+    <div style="flex: 1"></div>
+    <sc-if value="{{p.hasCta}}" hint-placeholder-val="{{ false }}">
+      <div style="align-self: stretch; display: flex; flex-direction: column; gap: 4px; pointer-events: auto; position: relative; z-index: 2">
+        <button type="button" onClick="{{ctaAct}}" style="height: 56px; border-radius: 28px; background: {{cta}}; color: #0B0B0C; font-size: 17px; font-weight: 700; text-align: center">{{p.cta}}</button>
+        <button type="button" onClick="{{cta2Act}}" style="height: 48px; font-size: 16px; color: rgba(255,255,255,0.8); text-align: center">{{p.cta2}}</button>
+      </div>
+    </sc-if>
+    <sc-if value="{{p.noCta}}" hint-placeholder-val="{{ true }}">
+      <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.6)">Tap to continue</p>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"story":{"editor":"enum","options":["morning","week","evening"],"default":"morning"},"step":{"editor":"int","default":0},"onClose":{"editor":null},"onCta":{"editor":null},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const story = this.props.story ?? 'morning';
+    const s = this.state || {};
+    const W = (t, c) => ({ t, c: c || '#FFFFFF' });
+    const P = {
+      morning: { bg: 'linear-gradient(180deg, #2A1624 0%, #3B1D2C 38%, #6B3440 70%, #B8645A 100%)', a: 'rgba(255,190,160,0.45)', b: 'rgba(255,140,170,0.30)', k: '#FFD2BC', hi: '#FFC4A3', cta: 'linear-gradient(90deg, #FFD3B0, #FFA9C6)', stone: 'radial-gradient(circle at 34% 28%, #FFF6EE 0%, #FFC4A3 32%, #B65A5A 100%)', sh: 'rgba(255,150,130,0.45)' },
+      week: { bg: 'linear-gradient(180deg, #0D1A24 0%, #123040 40%, #1B4B55 75%, #2E6F6A 100%)', a: 'rgba(140,230,214,0.35)', b: 'rgba(185,178,255,0.30)', k: '#B7F0E3', hi: '#9FF0D8', cta: 'linear-gradient(90deg, #D6F7A8, #8EE6D6)', stone: 'radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%)', sh: 'rgba(140,230,214,0.4)' },
+      evening: { bg: 'linear-gradient(180deg, #0E0D24 0%, #1B1840 45%, #2C2463 80%, #4A3A8A 100%)', a: 'rgba(185,178,255,0.40)', b: 'rgba(143,211,255,0.28)', k: '#D2CEFF', hi: '#C7C1FF', cta: 'linear-gradient(90deg, #C9C3FF, #9FD8FF)', stone: 'radial-gradient(circle at 34% 28%, #F4F2FF 0%, #B9B2FF 32%, #4B3F9A 100%)', sh: 'rgba(160,150,255,0.45)' }
+    }[story];
+    const pages = {
+      morning: [
+        { kicker: 'FRIDAY · YOUR MORNING', vStone: true, big: [W('Good morning, Alex.')], bigSize: 34, body: '9½ hours planned today. Here’s the shape of it.' },
+        { kicker: 'TODAY’S SHAPE', vDay: true, big: [W('Class until 11, '), W('a free stretch at 1', P.hi), W(', then your shift at 4.')], bigSize: 30, body: 'Dinner with Maya at 7:30. Bed by 11:30.' },
+        { kicker: 'ONE THING TO WATCH', big: [W('The essay is due at '), W('5:00 PM', '#FFC77A'), W(' today.')], bigSize: 34, body: 'Your 2:00 block is the last free stretch before the shift. The intro isn’t started yet.' },
+        { kicker: 'NAVI SUGGESTS', vStone: true, big: [W('Start the essay at 2:00. '), W('I’ll hold everything else.', P.hi)], bigSize: 30, body: '', cta: 'Start my day', cta2: 'Change the plan' }
+      ],
+      week: [
+        { kicker: 'NOV 2 – 8 · YOUR WEEK', vStones: true, big: [W('Your week, '), W('told back.', P.hi)], bigSize: 38, body: 'Five stones, filled by what you kept of what you planned for yourself.' },
+        { kicker: 'KEPT AND SLIPPED', vBars: true, big: [W('Wednesday', '#CFF7A6'), W(' was your strongest day. '), W('Thursday', '#FF9A9A'), W(' slipped most.')], bigSize: 26, body: 'Green is what you kept, coral what slipped. Thursday’s bio review after the shift is the pattern worth fixing.' },
+        { kicker: 'WHERE YOUR 31 HOURS WENT', vSpaces: true, big: [], bigSize: 1, body: 'Friends got 5 hours, up from 2 last week.' },
+        { kicker: 'SOMETHING NAVI NOTICED', big: [W('You focus best after '), W('4 PM', P.hi), W(' on days without a shift.')], bigSize: 32, body: 'Your three longest sessions this month all started after 4. Should I plan with that?', cta: 'Plan with this', cta2: 'Not true for me' },
+        { kicker: 'NEXT WEEK', vStone: true, big: [W('A first draft of next week is '), W('ready', P.hi), W('.')], bigSize: 32, body: 'The essay intro first thing Monday, bio review moved off Thursday, two runs before class.', cta: 'Open next week', cta2: 'Talk it through with Navi' }
+      ],
+      evening: [
+        { kicker: 'FRIDAY · TONIGHT', vStone: true, big: [W('2 of 4 kept', P.hi), W(' so far.')], bigSize: 36, body: 'Class, the shift and dinner with Maya all happened.' },
+        { kicker: 'LET’S CLOSE THE DAY', big: [W('Two quick questions, '), W('then tomorrow.', P.hi)], bigSize: 32, body: 'The essay intro and the reply to Sam are still open. About a minute.', cta: 'Start the wrap-up', cta2: 'Not tonight' }
+      ]
+    }[story];
+    const step = Math.max(0, Math.min(pages.length - 1, s.step ?? (this.props.step ?? 0)));
+    const p = Object.assign({ vStone: false, vDay: false, vBars: false, vSpaces: false, vStones: false, body: '', cta: '', cta2: '' }, pages[step]);
+    p.hasBody = !!p.body; p.hasCta = !!p.cta; p.noCta = !p.cta;
+    const close = this.props.onClose || (() => this.setState({ step: 0 }));
+    const C = { school: '#8C9EFF', work: '#8CC6EC', friends: '#F4B37A', health: '#F3988C', hobby: '#B79CF2' };
+    const seg = (a, b, c) => ({ l: ((a - 420) / 960 * 100).toFixed(1), w: ((b - a) / 960 * 100).toFixed(1), c });
+    return {
+      bg: P.bg, blobA: P.a, blobB: P.b, kickerColor: P.k, cta: P.cta, stoneBg: P.stone, stoneShadow: P.sh,
+      count: pages.length, progressAria: 'Page ' + (step + 1) + ' of ' + pages.length,
+      segs: pages.map((_, i) => ({ c: i <= step ? '#FFFFFF' : 'rgba(255,255,255,0.28)' })),
+      p, bigTop: p.vStone || p.vStones ? 40 : p.vDay || p.vBars || p.vSpaces ? 28 : 140,
+      next: () => this.setState({ step: Math.min(pages.length - 1, step + 1) }), prev: () => this.setState({ step: Math.max(0, step - 1) }), close,
+      ctaAct: this.props.onCta || (() => close()), cta2Act: () => close(),
+      daySegs: [seg(525, 660, C.school), seg(780, 840, 'rgba(255,255,255,0.35)'), seg(840, 930, C.school), seg(960, 1140, C.work), seg(1170, 1290, C.friends), seg(1350, 1410, 'rgba(255,255,255,0.3)')],
+      bars: [['M', 3, 0], ['T', 4, 1], ['W', 3, 0], ['T', 2, 1], ['F', 2, 0]].map(([d, k, sl], i) => ({ d, v: String(k), h: (k + sl) * 34, slip: sl * 34, lc: i === 2 ? '#CFF7A6' : i === 3 ? '#FF9A9A' : 'rgba(255,255,255,0.7)' })),
+      spaces: [['School', '14h', C.school, 46], ['Work', '9h', C.work, 38], ['Friends', '5h', C.friends, 32], ['Health', '3h', C.health, 28]].map(([t, h, c, size]) => ({ t, h, c, size })),
+      stones: [100, 80, 100, 67, 50, 0, 0].map((f) => ({ f, c: 'linear-gradient(180deg, #E8FFD6 0%, #9FF0D8 45%, #3E9C86 100%)' }))
+    };
+  }
+}
+</script>
+</body>
+</html>
