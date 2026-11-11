@@ -81,21 +81,25 @@ Design rules that follow from this:
 ## 3. Navigation approaches
 
 ### ▶ Owner direction, 2026-11-11: swipe layout with chat in the middle (supersedes the A / A+D recommendation below)
+**Exactly three pages (owner, 2026-11-11):**
 ```
- ← swipe                                              swipe →
-[ How it's going ]  ←  [ Navi chat ]  →  [ My day ]  →  [ Tasks + Inbox ]
-   stats, reviews       center, home      timeline,        lists, drafts,
-   (looking back)       (now)             calendar         approvals
-                                          (looking ahead)
+ ← swipe                          swipe →
+[ How it's going ]  ←  [ Navi chat ]  →  [ Plan ]
+   looking back          now, home         looking ahead
 ☰ on chat → drawer: chats list; your account bottom-left → Settings, Memory, etc.
 ```
+- **Plan** combines My day, Tasks and Inbox. A tappable "3 to review · 1 needs your OK" row is pinned at the top when anything is waiting, and opens Inbox as a sheet. Below it are the week strip, the sentence, and a **Day · Week · List** switch:
+  - **Day** (default) is the timeline, with tasks merged in: scheduled blocks, "due today, no time yet", and the "need a time" tray.
+  - **Week** is the calendar overview.
+  - **List** shows all tasks: Today / Upcoming / Anytime / Someday.
+- **How it's going**: today so far (planned vs done), this week's follow-through, what Navi noticed, and the daily and weekly reviews. Real numbers only, no score tiles.
 - No tab bar. Pages are reached by swiping or by tapping short labels at the top. You can always see where you are.
 - The chat page is not a blank ChatGPT screen. A slim now/next line sits at the top, and Navi's first line each day comes from real data.
 - The drawer opens only from the ☰ button, not an edge swipe, so it doesn't fight the swipe to "How it's going".
 - On other pages, a small stone takes you back to the chat with context ("About: My day, Friday").
 - Focus and full-screen voice cover all pages.
 - No sideways swipes inside pages: tap to complete, long-press for options, tap the week strip to change days.
-- Open: is the right side one page or two (My day, then Tasks)? What exactly goes on "How it's going"?
+- Open: confirm the Plan page combination and the "How it's going" contents.
 
 The earlier options are kept below for the record.
 
