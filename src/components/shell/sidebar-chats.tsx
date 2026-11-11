@@ -72,6 +72,7 @@ function ChatRow({ chat, current, edits }: { chat: ChatSummary; current: boolean
   // Open: the first item takes focus; a click elsewhere or Escape closes it.
   useEffect(() => {
     if (!menu) return;
+    menuRef.current?.scrollIntoView({ block: "nearest" });
     menuRef.current?.querySelector("button")?.focus();
     const onDown = (e: PointerEvent) => {
       if (!menuRef.current?.contains(e.target as Node) && !trigger.current?.contains(e.target as Node)) setMenu(false);

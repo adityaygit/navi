@@ -100,6 +100,15 @@ body {
   display: none;
 }
 
+.sidebar-scroll { scrollbar-width: none; scroll-padding-block: 28px; }
+.sidebar-scroll.is-scrolling { scrollbar-width: thin; scrollbar-color: #67676e transparent; }
+.sidebar-scroll::-webkit-scrollbar { display: none; width: 5px; }
+.sidebar-scroll.is-scrolling::-webkit-scrollbar { display: block; }
+.sidebar-scroll::-webkit-scrollbar-thumb { background: #67676e; border-radius: 5px; }
+.sidebar-fade { position: absolute; left: 0; right: 6px; height: 26px; pointer-events: none; z-index: 10; }
+.sidebar-fade-top { top: 0; background: linear-gradient(to bottom, #000, transparent); }
+.sidebar-fade-bottom { bottom: 0; background: linear-gradient(to top, #000, transparent); }
+
 ::selection {
   background: rgba(167, 235, 192, 0.3);
 }

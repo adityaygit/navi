@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Stone } from "./stone";
 import { NAV_COOKIE, setShellCookie } from "./panel-context";
 import { shortcutLabel } from "@/lib/viewing";
@@ -59,6 +59,30 @@ export function Sidebar({
   const session = useChatSession();
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const [kbd, setKbd] = useState("Ctrl K");
+  const scrollRef = useRef<HTMLElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [edges, setEdges] = useState({ top: false, bottom: false });
+  const [scrolling, setScrolling] = useState(false);
+  useEffect(() => {
+    const el = scrollRef.current;
+    const content = contentRef.current;
+    if (!el || !content) return;
+    const update = () => setEdges({ top: el.scrollTop > 1, bottom: el.scrollTop + el.clientHeight < el.scrollHeight - 1 });
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    observer.observe(content);
+    update();
+    return () => { observer.disconnect(); if (timerRef.current) clearTimeout(timerRef.current); };
+  }, []);
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setEdges({ top: el.scrollTop > 1, bottom: el.scrollTop + el.clientHeight < el.scrollHeight - 1 });
+    setScrolling(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setScrolling(false), 1000);
+  };
   useEffect(() => {
     // The platform is only known in the browser; the label is a hint, not content.
     const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
@@ -76,10 +100,14 @@ export function Sidebar({
   const initial = (name ?? "").trim().charAt(0).toUpperCase() || "·";
 
   return (
+    <div className={`relative hidden min-h-0 shrink-0 md:block ${collapsed ? "w-[68px]" : "w-[236px]"}`}>
     <nav
+      ref={scrollRef}
+      onScroll={onScroll}
       aria-label="Main"
-      className={`relative hidden shrink-0 flex-col gap-0.5 overflow-y-auto px-3 py-[18px] md:flex ${collapsed ? "w-[68px]" : "w-[236px]"}`}
+      className={`sidebar-scroll h-full overflow-y-auto ${scrolling ? "is-scrolling" : ""}`}
     >
+      <div ref={contentRef} className="flex min-h-full flex-col gap-0.5 px-3 py-[18px]">
       <div className={`mb-4 flex h-[34px] items-center gap-2.5 ${collapsed ? "justify-center" : "px-2.5"}`}>
         <button type="button" onClick={toggle} className="flex items-center gap-2.5 rounded-full" aria-label={collapsed ? "Expand the sidebar" : "Navi, collapse the sidebar"} aria-expanded={!collapsed}>
           <Stone size={18} />
@@ -151,7 +179,10 @@ export function Sidebar({
       {!collapsed && <SidebarChats />}
 
       <span className="flex-1" />
-      <details className="group relative">
+      <details className="group relative" onToggle={(event) => {
+        const details = event.currentTarget;
+        if (details.open) requestAnimationFrame(() => details.querySelector<HTMLElement>(".account-menu")?.scrollIntoView({ block: "nearest" }));
+      }}>
         <summary className={`flex h-11 cursor-pointer list-none items-center gap-3 rounded-[12px] hover:bg-white/[0.04] [&::-webkit-details-marker]:hidden ${collapsed ? "justify-center" : "px-2.5"}`}>
           <span className="relative flex h-7 w-7 items-center justify-center rounded-full bg-[#1C1C1F] text-[12px] font-semibold">
             {initial}
@@ -160,7 +191,7 @@ export function Sidebar({
           {!collapsed && <span className="flex-1 truncate text-[14px] text-[#C8C8CE]">{name || "You"}</span>}
           {!collapsed && <span className="sr-only">More pages and settings</span>}
         </summary>
-        <div className="absolute bottom-12 left-0 z-40 flex w-56 flex-col rounded-[16px] border border-border bg-[#111113] p-1.5 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
+        <div className="account-menu absolute bottom-12 left-0 z-40 flex w-56 flex-col rounded-[16px] border border-border bg-[#111113] p-1.5 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
           {MORE.map((l) => (
             <Link key={l.href} href={l.href} aria-current={active(l.href) ? "page" : undefined} className="flex min-h-9 items-center justify-between rounded-[10px] px-3 text-[14px] text-muted hover:bg-white/[0.06] hover:text-text aria-[current=page]:text-text">
               {l.label}
@@ -172,6 +203,10 @@ export function Sidebar({
           </div>
         </div>
       </details>
+      </div>
     </nav>
+    {edges.top && <div aria-hidden="true" className="sidebar-fade sidebar-fade-top" />}
+    {edges.bottom && <div aria-hidden="true" className="sidebar-fade sidebar-fade-bottom" />}
+    </div>
   );
 }
