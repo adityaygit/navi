@@ -4,7 +4,7 @@ import * as I from './icons.jsx';
 // Shared pieces for every page: routing, nav, page header, FAQ, join block, footer.
 
 export const img = (name) => `${import.meta.env.BASE_URL}img/${name}`;
-export const CONTACT = 'aditya.a.yadav011@gmail.com';
+export const CONTACT = 'support@mail.meetnavi.app';
 
 // ---------- routing ----------
 // The app build (base "/landing/") is served at real paths like /guides/voice.
