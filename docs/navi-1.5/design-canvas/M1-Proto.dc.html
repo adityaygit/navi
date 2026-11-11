@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi mobile structure prototype</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#A7EBC0}a:hover{color:#D2F6DF}
+button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer;text-align:left}
+input{font:inherit;color:inherit}
+input::placeholder{color:#7C7C85}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: clip; background: #000000; color: #F5F5F7; font-family: Figtree, -apple-system, sans-serif; font-size: 15px; font-feature-settings: 'tnum'; user-select: none">
+
+  <div aria-hidden="true" style="position: absolute; left: -120px; top: -220px; width: 630px; height: 460px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(167,235,192,0.10) 0%, rgba(167,235,192,0.03) 40%, rgba(0,0,0,0) 70%); pointer-events: none"></div>
+
+  <!-- Top bar: shared by all three pages. Leaves the top 54px for the real status bar. -->
+  <header style="position: absolute; left: 0; right: 0; top: 54px; height: 44px; display: flex; align-items: center; padding: 0 8px; z-index: 5">
+    <div style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center">
+      <sc-if value="{{onChat}}" hint-placeholder-val="{{ true }}">
+        <button type="button" aria-label="Chats and account" onClick="{{openDrawer}}" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 22px; color: #C8C8CE"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"></path></svg></button>
+      </sc-if>
+    </div>
+    <nav aria-label="Pages" style="flex: 1; display: flex; justify-content: center; gap: 4px">
+      <sc-for list="{{labels}}" as="l" hint-placeholder-count="3">
+        <button type="button" aria-pressed="{{l.on}}" onClick="{{l.go}}" style="height: 34px; padding: 0 12px; border-radius: 17px; font-size: 14px; font-weight: {{l.weight}}; color: {{l.color}}; background: {{l.bg}}">{{l.text}}</button>
+      </sc-for>
+    </nav>
+    <div style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center">
+      <sc-if value="{{onChat}}" hint-placeholder-val="{{ true }}">
+        <button type="button" aria-label="New chat" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 22px; color: #C8C8CE"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h8"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg></button>
+      </sc-if>
+    </div>
+  </header>
+
+  <!-- Talking pill: voice keeps going while you move between pages -->
+  <sc-if value="{{voicePill}}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; left: 16px; right: 16px; top: 102px; height: 48px; z-index: 6; display: flex; align-items: center; gap: 10px; padding: 0 6px 0 12px; border-radius: 24px; background: #0F1F17; border: 1px solid rgba(167,235,192,0.25)">
+      <button type="button" onClick="{{openVoice}}" style="flex: 1; display: flex; align-items: center; gap: 10px; height: 44px">
+        <span aria-hidden="true" style="width: 20px; height: 18px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%)"></span>
+        <span style="font-size: 14px; color: #D2F6DF">Talking · 0:42</span>
+      </button>
+      <button type="button" aria-label="{{muteLabel}}" onClick="{{toggleMute}}" style="width: 36px; height: 36px; border-radius: 18px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.08)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg></button>
+      <button type="button" aria-label="End call" onClick="{{endVoice}}" style="width: 36px; height: 36px; border-radius: 18px; display: flex; align-items: center; justify-content: center; background: #F4A99F; color: #2A0B07"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 14c4.5-4 11.5-4 16 0l-2 2.5-3-1.2v-2.2a9 9 0 0 0-6 0v2.2l-3 1.2z"></path></svg></button>
+    </div>
+  </sc-if>
+
+  <!-- The three pages, side by side; swipe or tap a label to move -->
+  <div onPointerDown="{{down}}" onPointerUp="{{up}}" style="position: absolute; left: 0; top: 0; width: 1170px; height: 844px; display: flex; transform: translateX({{trackX}}px); transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); touch-action: pan-y">
+
+    <!-- ============ PAGE 1 · PROGRESS (looking back) ============ -->
+    <section aria-label="How it's going" style="width: 390px; height: 844px; flex: none; position: relative">
+      <div style="height: 844px; box-sizing: border-box; padding: 112px 20px 130px; overflow-y: auto; scrollbar-width: none">
+      <h1 style="margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.01em">How it's going</h1>
+      <p style="margin: 8px 0 0; font-size: 19px; line-height: 1.35; color: #7C7C85">Today: <span style="color: #F5F5F7">1 of 4 done</span>, and the essay's next. This week you've finished <span style="color: #F5F5F7">12¼ of 17¼ hours</span> you planned.</p>
+
+      <div style="margin-top: 26px; display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; justify-content: space-between; font-size: 13px; color: #A0A0A8"><span>Today so far</span><span>3¼ h done · 6¼ h to go</span></div>
+        <div role="img" aria-label="Today: 3 and a quarter hours done of 9 and a half planned" style="height: 10px; border-radius: 5px; background: rgba(255,255,255,0.08); display: flex; overflow: hidden">
+          <div style="width: 34%; background: #A7EBC0"></div>
+        </div>
+      </div>
+
+      <div style="margin-top: 26px">
+        <div style="display: flex; justify-content: space-between; font-size: 13px; color: #A0A0A8"><span>This week, planned vs done</span><span>Mon – Fri</span></div>
+        <div role="img" aria-label="Planned versus done, Monday to Friday" style="margin-top: 12px; height: 124px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; align-items: end">
+          <sc-for list="{{weekBars}}" as="b" hint-placeholder-count="5">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 6px">
+              <div style="width: 26px; height: {{b.planH}}px; border-radius: 6px; background: rgba(255,255,255,0.10); display: flex; align-items: flex-end; overflow: hidden">
+                <div style="width: 26px; height: {{b.doneH}}px; background: {{b.fill}}"></div>
+              </div>
+              <span style="font-size: 12px; color: {{b.labelColor}}">{{b.d}}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="margin-top: 10px; display: flex; gap: 16px; font-size: 12px; color: #A0A0A8">
+          <span style="display: flex; align-items: center; gap: 6px"><span aria-hidden="true" style="width: 10px; height: 10px; border-radius: 3px; background: rgba(255,255,255,0.18)"></span>Planned</span>
+          <span style="display: flex; align-items: center; gap: 6px"><span aria-hidden="true" style="width: 10px; height: 10px; border-radius: 3px; background: #A7EBC0"></span>Done</span>
+        </div>
+      </div>
+
+      <div style="margin-top: 26px; display: flex; gap: 12px; align-items: flex-start">
+        <span aria-hidden="true" style="flex: none; margin-top: 3px; width: 14px; height: 13px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%)"></span>
+        <div style="flex: 1">
+          <sc-if value="{{noticeOpen}}" hint-placeholder-val="{{ true }}">
+            <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">The essay intro has taken two more sessions than you estimated. Raise its estimate to 3 hours?</p>
+            <div style="margin-top: 8px; display: flex; gap: 6px">
+              <button type="button" onClick="{{raiseIt}}" style="height: 44px; padding: 0 12px; color: #A7EBC0; font-weight: 600">Raise it</button>
+              <button type="button" onClick="{{noticeNotNow}}" style="height: 44px; padding: 0 12px; color: #A0A0A8">Not now</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{noticeRaised}}" hint-placeholder-val="{{ false }}">
+            <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">Raised the essay intro to 3 hours. <button type="button" onClick="{{noticeUndo}}" style="color: #A7EBC0; font-weight: 600; min-height: 44px">Undo</button></p>
+          </sc-if>
+          <sc-if value="{{noticeHidden}}" hint-placeholder-val="{{ false }}">
+            <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #7C7C85">Okay. I won't suggest that again.</p>
+          </sc-if>
+        </div>
+      </div>
+
+      <div style="margin-top: 22px; border-top: 1px solid rgba(255,255,255,0.08)">
+        <sc-for list="{{reviews}}" as="r" hint-placeholder-count="3">
+          <button type="button" style="width: 100%; min-height: 56px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.08)">
+            <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 16px; font-weight: 500">{{r.t}}</span><span style="font-size: 13px; color: #A0A0A8">{{r.s}}</span></span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7C7C85" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
+          </button>
+        </sc-for>
+      </div>
+
+      </div>
+      <button type="button" aria-label="Talk to Navi about this page" onClick="{{stoneFromProgress}}" style="position: absolute; right: 20px; bottom: 46px; width: 56px; height: 56px; border-radius: 28px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10)"><span aria-hidden="true" style="width: 30px; height: 27px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%)"></span></button>
+    </section>
+
+    <!-- ============ PAGE 2 · NAVI CHAT (home) ============ -->
+    <section aria-label="Navi" style="width: 390px; height: 844px; flex: none; position: relative; display: flex; flex-direction: column">
+      <div style="height: 104px; flex: none"></div>
+      <button type="button" onClick="{{goPlan}}" style="flex: none; margin: 0 16px; min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-radius: 22px; background: rgba(255,255,255,0.05); font-size: 13px; color: #A0A0A8">
+        <span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 4px; background: #F5F5F7"></span>
+        <span style="flex: 1"><span style="color: #F5F5F7">Now</span> free until 2:00 · <span style="color: #F5F5F7">Next</span> Essay intro</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7C7C85" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
+      </button>
+
+      <div style="flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column-reverse">
+      <div style="display: flex; flex-direction: column; gap: 14px; padding: 12px 16px 12px">
+        <div style="display: flex; gap: 10px; align-items: flex-start">
+          <span aria-hidden="true" style="flex: none; margin-top: 4px; width: 22px; height: 20px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%)"></span>
+          <p style="margin: 0; font-size: 20px; line-height: 1.32; font-weight: 600; letter-spacing: -0.01em; color: #6E6E77">Afternoon, Alex. <span style="color: #F5F5F7">Four things today, one already done.</span> Your <span style="color: #F5F5F7">afternoon</span> is the busy part.</p>
+        </div>
+
+        <sc-if value="{{giftAsk}}" hint-placeholder-val="{{ true }}">
+          <div style="margin-left: 32px; display: flex; flex-direction: column; gap: 4px">
+            <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">Maya's birthday is Sunday and there's no gift task yet. Add one for Saturday?</p>
+            <div style="display: flex; gap: 4px; margin-left: -12px">
+              <button type="button" onClick="{{giftAdd}}" style="height: 44px; padding: 0 12px; color: #A7EBC0; font-weight: 600">Add it</button>
+              <button type="button" onClick="{{giftNo}}" style="height: 44px; padding: 0 12px; color: #A0A0A8">Not now</button>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{giftAdded}}" hint-placeholder-val="{{ false }}">
+          <div style="margin-left: 32px; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,0.05); font-size: 14px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A7EBC0" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"></path></svg>
+            <span style="flex: 1">Added “Get Maya a birthday gift” for Saturday</span>
+            <button type="button" onClick="{{giftUndo}}" style="min-height: 44px; color: #A7EBC0; font-weight: 600">Undo</button>
+          </div>
+        </sc-if>
+
+        <div style="align-self: flex-end; max-width: 280px; padding: 10px 14px; border-radius: 18px; background: #1C1C1F; font-size: 15px">move guitar practice to after dinner</div>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,0.05); font-size: 14px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A7EBC0" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"></path></svg>
+          <span style="flex: 1">{{songLine}}</span>
+          <button type="button" onClick="{{songToggle}}" style="min-height: 44px; color: #A7EBC0; font-weight: 600">{{songAction}}</button>
+        </div>
+
+        <div style="align-self: flex-end; max-width: 280px; padding: 10px 14px; border-radius: 18px; background: #1C1C1F; font-size: 15px">can I fit the dentist call in today?</div>
+        <p style="margin: 0; font-size: 15px; line-height: 1.45">Yes. 3:30 to 4:00 is free, and you estimated the call at 10 minutes.</p>
+        <sc-if value="{{dentistAsk}}" hint-placeholder-val="{{ true }}">
+          <div style="padding: 14px; border-radius: 18px; background: #111113; border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; gap: 10px">
+            <div><div style="font-weight: 600">Book the dentist</div><div style="font-size: 13px; color: #A0A0A8">Today · 3:30 PM · 10 min</div></div>
+            <div style="display: flex; gap: 8px">
+              <button type="button" onClick="{{placeDentist}}" style="height: 44px; padding: 0 18px; border-radius: 22px; background: #A7EBC0; color: #00140A; font-weight: 600">Put it there</button>
+              <button type="button" onClick="{{dentistLater}}" style="height: 44px; padding: 0 18px; border-radius: 22px; background: rgba(255,255,255,0.08)">Another time</button>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{dentistPlaced}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,0.05); font-size: 14px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A7EBC0" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"></path></svg>
+            <span style="flex: 1">Put “Book the dentist” at 3:30 PM today</span>
+            <button type="button" onClick="{{unplaceDentist}}" style="min-height: 44px; color: #A7EBC0; font-weight: 600">Undo</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{dentistDeferred}}" hint-placeholder-val="{{ false }}">
+          <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">Okay. Monday morning is open too; tell me when suits.</p>
+        </sc-if>
+
+        <sc-for list="{{sent}}" as="m" hint-placeholder-count="0">
+          <div style="align-self: flex-end; max-width: 280px; padding: 10px 14px; border-radius: 18px; background: #1C1C1F; font-size: 15px">{{m.text}}</div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,0.05); font-size: 14px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A7EBC0" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"></path></svg>
+            <span style="flex: 1">Saved to your Inbox to review</span>
+            <button type="button" onClick="{{m.go}}" style="min-height: 44px; color: #A7EBC0; font-weight: 600">See it</button>
+          </div>
+        </sc-for>
+      </div>
+      </div>
+
+      <div style="flex: none; padding: 0 12px 34px">
+        <sc-if value="{{hasCtx}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; margin: 0 0 8px 6px">
+            <button type="button" onClick="{{clearCtx}}" style="height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border-radius: 15px; background: rgba(167,235,192,0.10); color: #D2F6DF; font-size: 12px">About · {{ctx}}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+          </div>
+        </sc-if>
+        <div style="display: flex; align-items: center; gap: 8px; min-height: 56px; padding: 6px 6px 6px 18px; border-radius: 28px; background: #141416; border: 1px solid rgba(255,255,255,0.08)">
+          <label for="navi-composer" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Tell Navi anything</label>
+          <input id="navi-composer" value="{{draft}}" onChange="{{typeDraft}}" onKeyDown="{{sendOnEnter}}" placeholder="Tell Navi anything" style="flex: 1; min-width: 0; height: 44px; border: 0; outline: none; background: transparent; font-size: 16px">
+          <sc-if value="{{hasDraft}}" hint-placeholder-val="{{ false }}">
+            <button type="button" aria-label="Send" onClick="{{send}}" style="width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; background: #F5F5F7; color: #000"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"></path></svg></button>
+          </sc-if>
+          <sc-if value="{{noDraft}}" hint-placeholder-val="{{ true }}">
+            <button type="button" onClick="{{openVoice}}" style="height: 44px; padding: 0 16px; border-radius: 22px; display: flex; align-items: center; gap: 6px; background: #A7EBC0; color: #00140A; font-weight: 600"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>Talk</button>
+          </sc-if>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ PAGE 3 · PLAN (looking ahead) ============ -->
+    <section aria-label="Plan" style="width: 390px; height: 844px; flex: none; position: relative; display: flex; flex-direction: column">
+      <div style="height: 104px; flex: none"></div>
+      <div style="flex: 1; overflow-y: auto; scrollbar-width: none; padding: 0 16px 120px; display: flex; flex-direction: column">
+        <sc-if value="{{inboxWaiting}}" hint-placeholder-val="{{ true }}">
+          <button type="button" onClick="{{openInbox}}" style="flex: none; min-height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-radius: 16px; background: rgba(167,235,192,0.09); border: 1px solid rgba(167,235,192,0.22); margin-bottom: 12px">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A7EBC0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13h5l1.5 3h5L16 13h5"></path><path d="M5 5h14l2 8v6H3v-6z"></path></svg>
+            <span style="flex: 1; font-size: 14px; color: #D2F6DF">{{inboxLine}}</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A7EBC0" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
+          </button>
+        </sc-if>
+
+        <div role="group" aria-label="Days this week" style="flex: none; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px">
+          <sc-for list="{{days}}" as="d" hint-placeholder-count="7">
+            <button type="button" aria-pressed="{{d.on}}" onClick="{{d.pick}}" style="height: 52px; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-align: center; background: {{d.bg}}; color: {{d.color}}">
+              <span style="font-size: 11px">{{d.w}}</span><span style="font-size: 16px; font-weight: 600">{{d.n}}</span>
+            </button>
+          </sc-for>
+        </div>
+
+        <div style="flex: none; margin-top: 14px; display: flex; align-items: flex-end; justify-content: space-between; gap: 8px">
+          <h2 style="margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.01em">{{dayTitle}}</h2>
+          <div role="group" aria-label="View" style="display: flex; padding: 3px; border-radius: 18px; background: rgba(255,255,255,0.07)">
+            <sc-for list="{{views}}" as="v" hint-placeholder-count="3">
+              <button type="button" aria-pressed="{{v.on}}" onClick="{{v.pick}}" style="height: 32px; padding: 0 12px; border-radius: 15px; font-size: 13px; font-weight: 500; background: {{v.bg}}; color: {{v.color}}">{{v.t}}</button>
+            </sc-for>
+          </div>
+        </div>
+        <p style="flex: none; margin: 6px 0 0; font-size: 15px; line-height: 1.4; color: #7C7C85">{{dayLead}} <span>{{dayRest}}</span></p>
+
+        <!-- Day -->
+        <sc-if value="{{viewDay}}" hint-placeholder-val="{{ true }}">
+          <ol aria-label="Timeline" style="list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px">
+            <sc-for list="{{timeline}}" as="it" hint-placeholder-count="8">
+              <li style="display: flex; align-items: center; gap: 10px; min-height: 48px">
+                <span style="width: 40px; flex: none; font-size: 12px; color: {{it.timeColor}}; text-align: right">{{it.t}}</span>
+                <span aria-hidden="true" style="flex: none; width: 22px; height: 22px; box-sizing: border-box; border-radius: 11px; background: {{it.dotBg}}; border: {{it.dotBorder}}"></span>
+                <sc-if value="{{it.isBlock}}" hint-placeholder-val="{{ true }}">
+                  <div style="flex: 1; min-width: 0; min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 12px; background: {{it.cardBg}}">
+                    <span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-size: 15px; font-weight: 500; color: {{it.titleColor}}; text-decoration: {{it.strike}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{it.title}}</span><span style="font-size: 12px; color: #A0A0A8">{{it.sub}}</span></span>
+                    <sc-if value="{{it.canStart}}" hint-placeholder-val="{{ false }}">
+                      <button type="button" onClick="{{it.start}}" style="height: 36px; padding: 0 14px; border-radius: 18px; background: #F5F5F7; color: #000; font-size: 13px; font-weight: 600">Start</button>
+                    </sc-if>
+                  </div>
+                </sc-if>
+                <sc-if value="{{it.isNote}}" hint-placeholder-val="{{ false }}">
+                  <div style="flex: 1; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #A0A0A8">
+                    <span style="flex: 1; color: {{it.noteColor}}">{{it.title}}</span>
+                    <sc-if value="{{it.canFit}}" hint-placeholder-val="{{ false }}">
+                      <button type="button" onClick="{{it.fit}}" style="min-height: 44px; padding: 0 4px; color: #A7EBC0; font-weight: 600">Fit it in</button>
+                    </sc-if>
+                  </div>
+                </sc-if>
+              </li>
+            </sc-for>
+          </ol>
+        </sc-if>
+
+        <!-- Week -->
+        <sc-if value="{{viewWeek}}" hint-placeholder-val="{{ false }}">
+          <ul aria-label="This week" style="list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column">
+            <sc-for list="{{weekRows}}" as="w" hint-placeholder-count="7">
+              <li>
+                <button type="button" onClick="{{w.open}}" style="width: 100%; min-height: 60px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.07)">
+                  <span style="width: 54px; flex: none; display: flex; flex-direction: column"><span style="font-size: 12px; color: #A0A0A8">{{w.w}}</span><span style="font-size: 17px; font-weight: 600; color: {{w.color}}">{{w.n}}</span></span>
+                  <span style="flex: 1; display: flex; flex-direction: column; gap: 6px">
+                    <span aria-hidden="true" style="height: 8px; border-radius: 4px; background: rgba(255,255,255,0.07); display: flex; overflow: hidden"><span style="width: {{w.pct}}%; background: {{w.bar}}"></span></span>
+                    <span style="font-size: 13px; color: #A0A0A8">{{w.s}}</span>
+                  </span>
+                  <span style="font-size: 13px; color: #C8C8CE">{{w.h}}</span>
+                </button>
+              </li>
+            </sc-for>
+          </ul>
+        </sc-if>
+
+        <!-- List -->
+        <sc-if value="{{viewList}}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top: 12px; display: flex; gap: 6px">
+            <sc-for list="{{listTabs}}" as="lt" hint-placeholder-count="4">
+              <button type="button" aria-pressed="{{lt.on}}" onClick="{{lt.pick}}" style="height: 34px; padding: 0 12px; border-radius: 17px; font-size: 13px; background: {{lt.bg}}; color: {{lt.color}}">{{lt.t}}</button>
+            </sc-for>
+          </div>
+          <div style="margin-top: 10px; min-height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-radius: 16px; background: rgba(255,255,255,0.05); font-size: 14px; color: #7C7C85"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Add a task — try “call mum sat”</div>
+          <ul style="list-style: none; margin: 6px 0 0; padding: 0">
+            <sc-for list="{{tasks}}" as="tk" hint-placeholder-count="5">
+              <li style="display: flex; align-items: center; gap: 4px; min-height: 52px; border-bottom: 1px solid rgba(255,255,255,0.06)">
+                <button type="button" aria-label="{{tk.label}}" aria-pressed="{{tk.done}}" onClick="{{tk.toggle}}" style="width: 44px; height: 44px; flex: none; display: flex; align-items: center; justify-content: center"><span aria-hidden="true" style="width: 22px; height: 22px; box-sizing: border-box; border-radius: 11px; display: flex; align-items: center; justify-content: center; border: {{tk.ring}}; background: {{tk.fill}}; color: #00140A; font-size: 13px; font-weight: 700">{{tk.mark}}</span></button>
+                <span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-size: 15px; color: {{tk.color}}; text-decoration: {{tk.strike}}">{{tk.t}}</span><span style="font-size: 12px; color: #A0A0A8">{{tk.s}}</span></span>
+              </li>
+            </sc-for>
+          </ul>
+        </sc-if>
+      </div>
+
+      <div style="position: absolute; left: 16px; right: 20px; bottom: 46px; display: flex; align-items: center; justify-content: space-between; gap: 12px">
+        <sc-if value="{{viewDay}}" hint-placeholder-val="{{ true }}">
+          <button type="button" onClick="{{openTray}}" style="height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-radius: 22px; background: #141416; border: 1px solid rgba(255,255,255,0.10); font-size: 14px"><span style="color: #F5F5F7">{{trayCount}} need a time</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A0A0A8" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 15 6-6 6 6"></path></svg></button>
+        </sc-if>
+        <span></span>
+        <button type="button" aria-label="Talk to Navi about this page" onClick="{{stoneFromPlan}}" style="width: 56px; height: 56px; border-radius: 28px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10)"><span aria-hidden="true" style="width: 30px; height: 27px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%)"></span></button>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===== Drawer: chats + account (from ☰ only) ===== -->
+  <sc-if value="{{drawer}}" hint-placeholder-val="{{ false }}">
+    <button type="button" aria-label="Close" onClick="{{closeDrawer}}" style="position: absolute; inset: 0; z-index: 10; background: rgba(0,0,0,0.6)"></button>
+    <aside aria-label="Chats and account" style="position: absolute; left: 0; top: 0; bottom: 0; width: 318px; z-index: 11; background: #0E0E10; border-right: 1px solid rgba(255,255,255,0.08); box-sizing: border-box; padding: 58px 12px 34px; display: flex; flex-direction: column">
+      <div style="display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 8px">
+        <span aria-hidden="true" style="width: 18px; height: 16px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%)"></span>
+        <span style="font-weight: 700; font-size: 17px; flex: 1">Navi</span>
+      </div>
+      <div style="margin-top: 8px; height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: 14px; background: rgba(255,255,255,0.06); color: #7C7C85; font-size: 15px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4 4"></path></svg>Search chats and tasks</div>
+      <button type="button" onClick="{{closeDrawer}}" style="margin-top: 8px; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 12px; border-radius: 14px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>New chat</button>
+      <div style="flex: 1; overflow: hidden; margin-top: 14px; display: flex; flex-direction: column; gap: 2px">
+        <sc-for list="{{chatGroups}}" as="g" hint-placeholder-count="3">
+          <div style="padding: 12px 12px 4px; font-size: 12px; color: #7C7C85">{{g.h}}</div>
+          <sc-for list="{{g.items}}" as="c" hint-placeholder-count="2">
+            <button type="button" onClick="{{closeDrawer}}" style="min-height: 44px; display: flex; align-items: center; padding: 0 12px; border-radius: 12px; font-size: 15px; background: {{c.bg}}; color: {{c.color}}">{{c.t}}</button>
+          </sc-for>
+        </sc-for>
+      </div>
+      <sc-if value="{{acct}}" hint-placeholder-val="{{ false }}">
+        <div style="margin-bottom: 8px; padding: 6px; border-radius: 16px; background: #1A1A1D; border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column">
+          <sc-for list="{{acctItems}}" as="a" hint-placeholder-count="6">
+            <button type="button" style="min-height: 44px; display: flex; align-items: center; padding: 0 12px; border-radius: 10px; font-size: 15px; color: {{a.color}}">{{a.t}}</button>
+          </sc-for>
+        </div>
+      </sc-if>
+      <button type="button" aria-expanded="{{acct}}" onClick="{{toggleAcct}}" style="height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 8px; border-radius: 14px">
+        <span aria-hidden="true" style="width: 32px; height: 32px; border-radius: 16px; display: flex; align-items: center; justify-content: center; background: #2A2A2E; font-weight: 600; font-size: 14px">A</span>
+        <span style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 15px; font-weight: 500">Alex</span><span style="font-size: 12px; color: #A0A0A8">Settings and account</span></span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A0A0A8" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"></path></svg>
+      </button>
+    </aside>
+  </sc-if>
+
+  <!-- ===== Inbox sheet (from the pinned row on Plan) ===== -->
+  <sc-if value="{{inbox}}" hint-placeholder-val="{{ false }}">
+    <button type="button" aria-label="Close inbox" onClick="{{closeInbox}}" style="position: absolute; inset: 0; z-index: 10; background: rgba(0,0,0,0.6)"></button>
+    <section aria-label="Inbox" style="position: absolute; left: 0; right: 0; bottom: 0; height: 690px; z-index: 11; background: #0E0E10; border-radius: 28px 28px 0 0; border-top: 1px solid rgba(255,255,255,0.10); box-sizing: border-box; padding: 10px 16px 34px; display: flex; flex-direction: column">
+      <span aria-hidden="true" style="align-self: center; width: 40px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.22)"></span>
+      <div style="margin-top: 12px; display: flex; align-items: center; justify-content: space-between">
+        <h2 style="margin: 0; font-size: 22px; font-weight: 700">Inbox</h2>
+        <button type="button" onClick="{{closeInbox}}" style="min-height: 44px; padding: 0 4px; color: #A0A0A8">Done</button>
+      </div>
+      <p style="margin: 2px 0 0; font-size: 14px; color: #A0A0A8">Nothing here is on your plan until you accept it.</p>
+
+      <sc-if value="{{approvalPending}}" hint-placeholder-val="{{ true }}">
+        <div style="margin-top: 16px; font-size: 12px; color: #A0A0A8">Needs your OK</div>
+        <div style="margin-top: 8px; padding: 14px; border-radius: 18px; background: #151517; border: 1px solid rgba(244,179,122,0.35); display: flex; flex-direction: column; gap: 10px">
+          <div style="font-size: 15px; line-height: 1.4">Move the essay's <span style="color: #F4B37A">hard deadline</span> from Friday 5:00 PM to Monday 5:00 PM?</div>
+          <div style="font-size: 13px; color: #A0A0A8">You asked this morning. Your plan for today stays as it is.</div>
+          <div style="display: flex; gap: 8px">
+            <button type="button" onClick="{{approve}}" style="height: 44px; padding: 0 18px; border-radius: 22px; background: #F5F5F7; color: #000; font-weight: 600">Move it</button>
+            <button type="button" onClick="{{decline}}" style="height: 44px; padding: 0 18px; border-radius: 22px; background: rgba(255,255,255,0.08)">Keep Friday</button>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{approvalDone}}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top: 16px; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,0.05); font-size: 14px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A7EBC0" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"></path></svg>
+          <span style="flex: 1">{{approvalLine}}</span>
+          <button type="button" onClick="{{approvalUndo}}" style="min-height: 44px; color: #A7EBC0; font-weight: 600">Undo</button>
+        </div>
+      </sc-if>
+
+      <div style="margin-top: 18px; display: flex; justify-content: space-between; align-items: center">
+        <span style="font-size: 12px; color: #A0A0A8">To review · from your 1:40 capture</span>
+        <sc-if value="{{hasSaid}}" hint-placeholder-val="{{ true }}">
+          <button type="button" onClick="{{acceptSaid}}" style="min-height: 44px; font-size: 13px; color: #A7EBC0; font-weight: 600">Accept the {{saidCount}} you said</button>
+        </sc-if>
+      </div>
+      <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column; gap: 8px; margin-top: 4px">
+        <sc-for list="{{drafts}}" as="dr" hint-placeholder-count="3">
+          <div style="padding: 12px 14px; border-radius: 16px; background: #151517; display: flex; flex-direction: column; gap: 6px">
+            <div style="display: flex; align-items: center; gap: 8px"><span style="font-size: 12px; color: #A0A0A8; flex: 1">{{dr.kind}}</span><span style="font-size: 11px; padding: 3px 8px; border-radius: 10px; background: {{dr.tagBg}}; color: {{dr.tagColor}}">{{dr.tag}}</span></div>
+            <div style="font-size: 16px; font-weight: 600">{{dr.t}}</div>
+            <div style="font-size: 13px; color: #A0A0A8; font-style: italic">“{{dr.q}}”</div>
+            <div style="display: flex; gap: 6px; margin-left: -10px">
+              <button type="button" onClick="{{dr.accept}}" style="height: 44px; padding: 0 10px; color: #A7EBC0; font-weight: 600">Accept</button>
+              <button type="button" style="height: 44px; padding: 0 10px; color: #C8C8CE">Edit</button>
+              <button type="button" onClick="{{dr.later}}" style="height: 44px; padding: 0 10px; color: #A0A0A8">Later</button>
+            </div>
+          </div>
+        </sc-for>
+        <sc-if value="{{noDrafts}}" hint-placeholder-val="{{ false }}">
+          <p style="margin: 18px 0 0; font-size: 15px; color: #A0A0A8">Nothing to review.</p>
+        </sc-if>
+      </div>
+    </section>
+  </sc-if>
+
+  <!-- ===== "Need a time" tray ===== -->
+  <sc-if value="{{tray}}" hint-placeholder-val="{{ false }}">
+    <button type="button" aria-label="Close" onClick="{{closeTray}}" style="position: absolute; inset: 0; z-index: 10; background: rgba(0,0,0,0.5)"></button>
+    <section aria-label="Needs a time" style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 11; background: #0E0E10; border-radius: 28px 28px 0 0; border-top: 1px solid rgba(255,255,255,0.10); padding: 10px 16px 34px; display: flex; flex-direction: column">
+      <span aria-hidden="true" style="align-self: center; width: 40px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.22)"></span>
+      <h2 style="margin: 12px 0 2px; font-size: 20px; font-weight: 700">Still needs a time</h2>
+      <p style="margin: 0 0 8px; font-size: 14px; color: #A0A0A8">Place one in a free stretch, or ask Navi to place it.</p>
+      <sc-for list="{{trayItems}}" as="ti" hint-placeholder-count="3">
+        <div style="min-height: 60px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.07)">
+          <span style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 15px; font-weight: 500">{{ti.t}}</span><span style="font-size: 12px; color: #A0A0A8">{{ti.s}}</span></span>
+          <button type="button" onClick="{{ti.place}}" style="height: 44px; padding: 0 14px; color: #A7EBC0; font-weight: 600">{{ti.action}}</button>
+        </div>
+      </sc-for>
+    </section>
+  </sc-if>
+
+  <!-- ===== Voice, full screen ===== -->
+  <sc-if value="{{voiceFull}}" hint-placeholder-val="{{ false }}">
+    <section aria-label="Talking with Navi" style="position: absolute; inset: 0; z-index: 20; background: #000; display: flex; flex-direction: column; align-items: center; padding: 64px 24px 40px; box-sizing: border-box">
+      <div aria-hidden="true" style="position: absolute; left: 50%; top: 150px; width: 520px; height: 520px; margin-left: -260px; border-radius: 50%; background: radial-gradient(circle, rgba(167,235,192,0.16) 0%, rgba(167,235,192,0.04) 45%, rgba(0,0,0,0) 70%)"></div>
+      <div style="align-self: stretch; display: flex; justify-content: space-between; align-items: center; position: relative">
+        <button type="button" aria-label="Keep working while you talk" onClick="{{minimizeVoice}}" style="width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.08)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <span style="font-size: 13px; color: #A0A0A8">0:42</span>
+        <span style="width: 44px"></span>
+      </div>
+      <span aria-hidden="true" style="margin-top: 70px; width: 150px; height: 136px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%); box-shadow: 0 0 0 14px rgba(167,235,192,0.08), 0 0 0 30px rgba(167,235,192,0.04); position: relative"></span>
+      <p role="status" style="margin: 44px 0 0; font-size: 17px; color: #D2F6DF; position: relative">{{voiceStatus}}</p>
+      <div aria-label="Live transcript" style="margin-top: 26px; align-self: stretch; display: flex; flex-direction: column; gap: 10px; font-size: 16px; line-height: 1.45; position: relative">
+        <p style="margin: 0; color: #A0A0A8">You: remind me to text Maya tonight</p>
+        <p style="margin: 0; color: #F5F5F7">Done. I'll remind you at 8:00, after your shift. Earlier?</p>
+      </div>
+      <div style="flex: 1"></div>
+      <div style="display: flex; gap: 22px; position: relative">
+        <button type="button" aria-pressed="{{muted}}" onClick="{{toggleMute}}" style="width: 64px; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: #C8C8CE; text-align: center"><span style="width: 60px; height: 60px; border-radius: 30px; display: flex; align-items: center; justify-content: center; background: {{muteBg}}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg></span>{{muteLabel}}</button>
+        <button type="button" onClick="{{voiceToText}}" style="width: 64px; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: #C8C8CE; text-align: center"><span style="width: 60px; height: 60px; border-radius: 30px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.08)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7V5h16v2M12 5v14M9 19h6"></path></svg></span>Type</button>
+        <button type="button" onClick="{{endVoice}}" style="width: 64px; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: #C8C8CE; text-align: center"><span style="width: 60px; height: 60px; border-radius: 30px; display: flex; align-items: center; justify-content: center; background: #F4A99F; color: #2A0B07"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 14c4.5-4 11.5-4 16 0l-2 2.5-3-1.2v-2.2a9 9 0 0 0-6 0v2.2l-3 1.2z"></path></svg></span>End</button>
+      </div>
+    </section>
+  </sc-if>
+
+  <!-- ===== Focus takeover ===== -->
+  <sc-if value="{{focus}}" hint-placeholder-val="{{ false }}">
+    <section aria-label="Focus" style="position: absolute; inset: 0; z-index: 20; background: #000; display: flex; flex-direction: column; align-items: center; padding: 70px 24px 40px; box-sizing: border-box">
+      <div style="align-self: stretch; display: flex; justify-content: space-between; font-size: 13px; color: #A0A0A8"><span>Focus · School</span><span>Ends at 3:30 PM</span></div>
+      <h2 style="margin: 64px 0 0; font-size: 24px; font-weight: 600; text-align: center">Essay: write the intro</h2>
+      <div style="margin-top: 36px; width: 250px; height: 250px; position: relative; display: flex; align-items: center; justify-content: center">
+        <svg width="250" height="250" viewBox="0 0 250 250" aria-hidden="true" style="position: absolute; inset: 0"><circle cx="125" cy="125" r="115" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="4"></circle><circle cx="125" cy="125" r="115" fill="none" stroke="#A7EBC0" stroke-width="4" stroke-linecap="round" stroke-dasharray="722" stroke-dashoffset="40" transform="rotate(-90 125 125)"></circle></svg>
+        <div style="display: flex; flex-direction: column; align-items: center"><span role="timer" style="font-size: 56px; font-weight: 300; letter-spacing: -0.02em">{{focusTime}}</span><span style="font-size: 13px; color: #A0A0A8">left of 90 min</span></div>
+      </div>
+      <div style="margin-top: 40px; display: flex; gap: 10px">
+        <button type="button" onClick="{{togglePause}}" style="height: 52px; padding: 0 24px; border-radius: 26px; border: 1px solid rgba(255,255,255,0.18); font-weight: 500">{{pauseLabel}}</button>
+        <button type="button" onClick="{{endFocus}}" style="height: 52px; padding: 0 24px; border-radius: 26px; background: #A7EBC0; color: #00140A; font-weight: 600">I'm done</button>
+      </div>
+      <div style="flex: 1"></div>
+      <p style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 14px; color: #A0A0A8"><span aria-hidden="true" style="width: 12px; height: 11px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%)"></span>Navi is holding 2 things until you're done.</p>
+    </section>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"startPage":{"editor":"enum","options":["progress","navi","plan"],"default":"navi"},"startOverlay":{"editor":"enum","options":["none","drawer","inbox","voice","focus","tray"],"default":"none"},"startView":{"editor":"enum","options":["day","week","list"],"default":"day"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const P = { progress: 0, navi: 1, plan: 2 };
+    const s = this.state || {};
+    const ov = this.props.startOverlay ?? 'none';
+    const page = s.page ?? (P[this.props.startPage] ?? 1);
+    const view = s.view ?? (this.props.startView ?? 'day');
+    const drawer = s.drawer ?? ov === 'drawer';
+    const inbox = s.inbox ?? ov === 'inbox';
+    const tray = s.tray ?? ov === 'tray';
+    const voice = s.voice ?? (ov === 'voice' ? 'full' : 'off');
+    const focus = s.focus ?? ov === 'focus';
+    const set = (o) => this.setState(o);
+    const go = (p) => () => set({ page: p, drawer: false, acct: false });
+
+    const placed = !!s.placed, deferred = !!s.deferred;
+    const gift = s.gift ?? 'ask';
+    const songBack = !!s.songBack;
+    const approval = s.approval ?? 'pending';
+    const removed = s.removed || {};
+    const captured = s.captured || [];
+    const done = s.done || { run: true };
+    const day = s.day ?? 4;
+    const listTab = s.listTab ?? 'Today';
+    const notice = s.notice ?? 'open';
+    const muted = !!s.muted;
+    const paused = !!s.paused;
+
+    // labels
+    const names = ['Progress', 'Navi', 'Plan'];
+    const labels = names.map((t, i) => ({ text: t, on: i === page, go: go(i), weight: i === page ? 600 : 500, color: i === page ? '#F5F5F7' : '#7C7C85', bg: i === page ? 'rgba(255,255,255,0.08)' : 'transparent' }));
+
+    // progress
+    const wk = [['M', 6, 5], ['T', 5, 4.5], ['W', 6.5, 4], ['T', 5, 4.25], ['F', 9.5, 3.25]];
+    const weekBars = wk.map(([d, p, dn], i) => ({ d, planH: Math.round(p * 9.5), doneH: Math.round(dn * 9.5), fill: i === 4 ? '#D2F6DF' : '#A7EBC0', labelColor: i === 4 ? '#F5F5F7' : '#A0A0A8' }));
+    const reviews = [{ t: "Tonight's wrap-up", s: '9:00 PM · about a minute' }, { t: 'Weekly review', s: 'Sunday evening' }, { t: "Last week's story", s: 'Oct 26 – Nov 1' }];
+
+    // drafts
+    const baseDrafts = [
+      { id: 'd1', kind: 'Task', t: 'Call the café about swapping Saturday', q: 'ask the café if I can swap saturday', said: true },
+      { id: 'd2', kind: 'Task', t: 'Buy new running shoes', q: 'need new running shoes before the season', said: true },
+      { id: 'd3', kind: 'Goal', t: 'Run 3 times a week', q: 'honestly I want to get back into running', said: false }
+    ];
+    const allDrafts = captured.map((c, i) => ({ id: 'c' + i, kind: 'Capture', t: c, q: c, said: true })).concat(baseDrafts).filter((d) => !removed[d.id]);
+    const rm = (id) => () => set({ removed: Object.assign({}, removed, { [id]: true }) });
+    const drafts = allDrafts.map((d) => ({ kind: d.kind, t: d.t, q: d.q, tag: d.said ? 'You said this' : 'Navi inferred · check it', tagBg: d.said ? 'rgba(255,255,255,0.08)' : 'rgba(244,179,122,0.14)', tagColor: d.said ? '#C8C8CE' : '#F4B37A', accept: rm(d.id), later: rm(d.id) }));
+    const saidCount = allDrafts.filter((d) => d.said).length;
+    const waiting = allDrafts.length + (approval === 'pending' ? 1 : 0);
+    const inboxLine = allDrafts.length + ' to review' + (approval === 'pending' ? ' · 1 needs your OK' : '');
+
+    // timeline (Friday)
+    const blk = (m, t, title, sub, kind, color, extra) => Object.assign({ m, t, title, sub, kind, color }, extra || {});
+    let items = [
+      blk(480, '8:00', 'Morning run', '30 min · Health', 'done', '#F3988C'),
+      blk(525, '8:45', 'Modern History', 'Class until 11:00 · Room 204', 'fixed', '#8C9EFF'),
+      { m: 790, t: '1:10', kind: 'now', title: 'Now — free until 2:00' },
+      blk(840, '2:00', 'Essay: write the intro', '90 min · History essay', 'flex', '#8C9EFF', { canStart: true }),
+      placed ? blk(930, '3:30', 'Book the dentist', '10 min · Health', 'flex', '#F3988C') : { m: 930, t: '3:30', kind: 'free', title: '30 free minutes — the dentist call fits here', canFit: true },
+      blk(960, '4:00', 'Shift at the café', 'Until 7:00', 'fixed', '#8CC6EC'),
+      blk(1170, '7:30', 'Dinner with Maya', 'Lupa, Elm St · until 9:30', 'fixed', '#F4B37A'),
+      songBack ? blk(1050, '5:30', 'Practise the new song', '20 min', 'flex', '#B79CF2') : blk(1320, '10:00', 'Practise the new song', '20 min', 'flex', '#B79CF2'),
+      blk(1350, '10:30', 'Wind down', 'No screens · bed by 11:30', 'routine', '#A0A0A8')
+    ];
+    items.sort((a, b) => a.m - b.m);
+    const timeline = items.map((it) => {
+      const isNote = it.kind === 'now' || it.kind === 'free';
+      const d = it.kind;
+      return {
+        t: it.t, title: it.title, sub: it.sub || '', isBlock: !isNote, isNote, canFit: !!it.canFit, canStart: !!it.canStart,
+        timeColor: d === 'now' ? '#F5F5F7' : '#7C7C85',
+        dotBg: d === 'fixed' ? it.color : d === 'now' ? '#F5F5F7' : 'transparent',
+        dotBorder: d === 'flex' ? '2px solid ' + it.color : d === 'routine' ? '2px dashed #7C7C85' : d === 'done' ? '2px solid #3A3A3F' : d === 'free' ? '2px solid #2A2A2E' : d === 'now' ? '5px solid #3A3A3F' : '0',
+        cardBg: d === 'done' ? 'transparent' : 'rgba(255,255,255,0.05)',
+        titleColor: d === 'done' ? '#7C7C85' : '#F5F5F7', strike: d === 'done' ? 'line-through' : 'none',
+        noteColor: d === 'now' ? '#F5F5F7' : '#A0A0A8',
+        start: () => set({ focus: true }), fit: () => set({ placed: true, deferred: false })
+      };
+    });
+
+    // days
+    const dn = [['Mon', 2], ['Tue', 3], ['Wed', 4], ['Thu', 5], ['Fri', 6], ['Sat', 7], ['Sun', 8]];
+    const days = dn.map(([w, n], i) => ({ w, n, on: i === day, pick: () => set({ day: i, view: 'day' }), bg: i === day ? '#F5F5F7' : 'rgba(255,255,255,0.05)', color: i === day ? '#000' : '#C8C8CE' }));
+    const fri = day === 4;
+    const dayTitle = view === 'week' ? 'This week' : view === 'list' ? 'Tasks' : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][day];
+    let dayLead = '', dayRest = '';
+    if (view === 'week') { dayLead = "Friday's the full one — 9½ hours planned."; dayRest = 'Saturday has just brunch with Jo.'; }
+    else if (view === 'list') { dayLead = '4 left.'; dayRest = "The essay's the big one — everything else takes under 15 minutes."; }
+    else if (fri) { dayLead = 'A full afternoon.'; dayRest = '9½ hours planned, 3½ free — most of it before 2.'; }
+    else if (day === 5) { dayLead = 'A quiet day.'; dayRest = 'Just brunch with Jo at 11.'; }
+    else { dayLead = 'Past day.'; dayRest = 'Open it in Progress to see how it went.'; }
+    const views = [['day', 'Day'], ['week', 'Week'], ['list', 'List']].map(([k, t]) => ({ t, on: view === k, pick: () => set({ view: k }), bg: view === k ? '#F5F5F7' : 'transparent', color: view === k ? '#000' : '#C8C8CE' }));
+
+    const wr = [['Mon', 2, 6, 'History, Biology, café shift'], ['Tue', 3, 5, 'Biology, essay outline'], ['Wed', 4, 6.5, 'History, run, guitar'], ['Thu', 5, 5, 'Biology, café shift'], ['Fri', 6, 9.5, 'Class, essay, shift, dinner with Maya'], ['Sat', 7, 1.5, 'Brunch with Jo'], ['Sun', 8, 1, "Laundry, Maya's birthday"]];
+    const weekRows = wr.map(([w, n, h, sum], i) => ({ w, n, s: sum, h: h + ' h', pct: Math.round(h / 10 * 100), bar: i === 4 ? '#D2F6DF' : '#A7EBC0', color: i === 4 ? '#F5F5F7' : '#C8C8CE', open: () => set({ day: i, view: 'day' }) }));
+
+    const listData = {
+      Today: [['run', 'Morning run', 'Health · 30 min'], ['essay', 'History essay — first draft', 'School · due Friday · 1 of 3 steps'], ['sam', 'Reply to Sam about the flat', '5 min'], ['song', 'Practise the new song', 'Hobbies · 20 min'], ['maya', 'Text Maya about Sunday', 'Friends']],
+      Upcoming: [['bio', 'Study for the bio quiz', 'School · Thu'], ['lib', 'Return library books', 'before Tuesday']],
+      Anytime: [['lis', 'Plan the Lisbon trip', 'with Jo · 3 steps'], ['dent', 'Book the dentist', 'Health · 10 min']],
+      Someday: [['pasta', 'Learn to make fresh pasta', '']]
+    };
+    const tasks = (listData[listTab] || []).map(([id, t, sub]) => {
+      const isDone = !!done[id];
+      return { t, s: sub, done: isDone, label: (isDone ? 'Mark not done: ' : 'Mark done: ') + t, toggle: () => set({ done: Object.assign({}, done, { [id]: !isDone }) }), ring: isDone ? '0' : '2px solid #5F5F67', fill: isDone ? '#A7EBC0' : 'transparent', mark: isDone ? '✓' : '', color: isDone ? '#7C7C85' : '#F5F5F7', strike: isDone ? 'line-through' : 'none' };
+    });
+    const listTabs = ['Today', 'Upcoming', 'Anytime', 'Someday'].map((t) => ({ t, on: t === listTab, pick: () => set({ listTab: t }), bg: t === listTab ? 'rgba(255,255,255,0.12)' : 'transparent', color: t === listTab ? '#F5F5F7' : '#A0A0A8' }));
+
+    // tray
+    const toChat = (c) => () => set({ page: 1, tray: false, ctx: c });
+    let trayRaw = [];
+    if (!placed) trayRaw.push({ t: 'Book the dentist', s: '10 min · before Monday', action: 'Fit at 3:30', place: () => set({ placed: true, tray: false }) });
+    if (gift === 'added') trayRaw.push({ t: 'Get Maya a birthday gift', s: '45 min · before Sunday', action: 'Ask Navi', place: toChat('Get Maya a birthday gift') });
+    trayRaw.push({ t: 'Plan the Lisbon trip', s: 'whenever · 3 steps', action: 'Ask Navi', place: toChat('Plan the Lisbon trip') });
+    trayRaw.push({ t: 'Return library books', s: '20 min · before Tuesday', action: 'Ask Navi', place: toChat('Return library books') });
+
+    const chatGroups = [
+      { h: 'Today', items: [{ t: 'Fitting in the dentist', bg: 'rgba(255,255,255,0.08)', color: '#F5F5F7' }] },
+      { h: 'Yesterday', items: [{ t: 'Plan this week', bg: 'transparent', color: '#C8C8CE' }] },
+      { h: 'Earlier', items: [{ t: 'Essay outline', bg: 'transparent', color: '#C8C8CE' }, { t: 'Lisbon ideas with Jo', bg: 'transparent', color: '#C8C8CE' }] }
+    ];
+    const acctItems = [['Settings', '#F5F5F7'], ['Spaces and projects', '#F5F5F7'], ['What Navi remembers', '#F5F5F7'], ['Notes', '#F5F5F7'], ['Activity', '#F5F5F7'], ['Sign out', '#F4A99F']].map(([t, color]) => ({ t, color }));
+
+    const draft = s.draft ?? '';
+    const sendIt = () => { const t = (this.state && this.state.draft || '').trim(); if (!t) return; set({ draft: '', captured: [t].concat(captured), sent: [{ text: t }].concat(s.sent || []) }); };
+
+    const frames = { down: (e) => { this._x = e.clientX; }, up: (e) => { if (this._x == null) return; const dx = e.clientX - this._x; this._x = null; if (Math.abs(dx) < 60) return; const n = Math.max(0, Math.min(2, page + (dx < 0 ? 1 : -1))); if (n !== page) set({ page: n }); } };
+
+    return Object.assign(frames, {
+      trackX: -page * 390, onChat: page === 1, labels,
+      openDrawer: () => set({ drawer: true }), closeDrawer: () => set({ drawer: false, acct: false }), drawer, acct: !!s.acct, toggleAcct: () => set({ acct: !s.acct }), chatGroups, acctItems,
+      goPlan: () => set({ page: 2, view: 'day', day: 4 }),
+      weekBars, reviews,
+      noticeOpen: notice === 'open', noticeRaised: notice === 'raised', noticeHidden: notice === 'hidden',
+      raiseIt: () => set({ notice: 'raised' }), noticeNotNow: () => set({ notice: 'hidden' }), noticeUndo: () => set({ notice: 'open' }),
+      giftAsk: gift === 'ask', giftAdded: gift === 'added', giftAdd: () => set({ gift: 'added' }), giftNo: () => set({ gift: 'no' }), giftUndo: () => set({ gift: 'ask' }),
+      songLine: songBack ? 'Put “Practise the new song” back at 5:30 PM' : 'Moved “Practise the new song” to 10:00 PM', songAction: songBack ? 'Redo' : 'Undo', songToggle: () => set({ songBack: !songBack }),
+      dentistAsk: !placed && !deferred, dentistPlaced: placed, dentistDeferred: deferred && !placed,
+      placeDentist: () => set({ placed: true, deferred: false }), unplaceDentist: () => set({ placed: false }), dentistLater: () => set({ deferred: true }),
+      sent: (s.sent || []).map((m) => ({ text: m.text, go: () => set({ page: 2, view: 'day', day: 4, inbox: true }) })),
+      hasCtx: !!s.ctx, ctx: s.ctx || '', clearCtx: () => set({ ctx: null }),
+      stoneFromPlan: () => set({ page: 1, ctx: view === 'list' ? 'Tasks, Today' : view === 'week' ? 'This week' : 'My day, ' + dayTitle }),
+      stoneFromProgress: () => set({ page: 1, ctx: 'Progress, this week' }),
+      draft, hasDraft: draft.trim().length > 0, noDraft: draft.trim().length === 0,
+      typeDraft: (e) => set({ draft: e.target.value }), send: sendIt, sendOnEnter: (e) => { if (e.key === 'Enter') sendIt(); },
+      inboxWaiting: waiting > 0, inboxLine, openInbox: () => set({ inbox: true }), closeInbox: () => set({ inbox: false }), inbox,
+      approvalPending: approval === 'pending', approvalDone: approval !== 'pending', approvalLine: approval === 'approved' ? "Moved the essay's hard deadline to Monday 5:00 PM" : 'Kept the deadline on Friday',
+      approve: () => set({ approval: 'approved' }), decline: () => set({ approval: 'kept' }), approvalUndo: () => set({ approval: 'pending' }),
+      drafts, noDrafts: allDrafts.length === 0, hasSaid: saidCount > 0, saidCount,
+      acceptSaid: () => { const r = Object.assign({}, removed); allDrafts.forEach((d) => { if (d.said) r[d.id] = true; }); set({ removed: r }); },
+      days, dayTitle, dayLead, dayRest, views, viewDay: view === 'day', viewWeek: view === 'week', viewList: view === 'list',
+      timeline: fri ? timeline : (day === 5 ? [{ t: '11:00', title: 'Brunch with Jo', sub: 'until 12:30', isBlock: true, isNote: false, canFit: false, canStart: false, timeColor: '#7C7C85', dotBg: '#F4B37A', dotBorder: '0', cardBg: 'rgba(255,255,255,0.05)', titleColor: '#F5F5F7', strike: 'none', noteColor: '#A0A0A8', start: () => {}, fit: () => {} }] : []),
+      startFocus: () => set({ focus: true }), weekRows, listTabs, tasks,
+      tray, openTray: () => set({ tray: true }), closeTray: () => set({ tray: false }), trayItems: trayRaw, trayCount: trayRaw.length,
+      voiceFull: voice === 'full', voicePill: voice === 'pill', openVoice: () => set({ voice: 'full' }), minimizeVoice: () => set({ voice: 'pill' }), endVoice: () => set({ voice: 'off', muted: false }), voiceToText: () => set({ voice: 'pill', page: 1 }),
+      muted, toggleMute: () => set({ muted: !muted }), muteLabel: muted ? 'Unmute' : 'Mute', muteBg: muted ? '#F5F5F7' : 'rgba(255,255,255,0.08)', voiceStatus: muted ? 'Muted — Navi can’t hear you' : 'Listening',
+      focus, focusTime: paused ? '1:28:40' : '1:28:40', pauseLabel: paused ? 'Resume' : 'Pause', togglePause: () => set({ paused: !paused }), endFocus: () => set({ focus: false })
+    });
+  }
+}
+</script>
+</body>
+</html>

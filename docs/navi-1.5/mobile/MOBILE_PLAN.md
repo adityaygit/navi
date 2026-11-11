@@ -99,7 +99,7 @@ Design rules that follow from this:
 - On other pages, a small stone takes you back to the chat with context ("About: My day, Friday").
 - Focus and full-screen voice cover all pages.
 - No sideways swipes inside pages: tap to complete, long-press for options, tap the week strip to change days.
-- Open: confirm the Plan page combination and the "How it's going" contents.
+- Owner confirmed (2026-11-11): Plan opens on **Day**; Inbox is a pinned row that opens a sheet. **Phase 2 approved to start.** First boards: M1 structure (clickable prototype + map) on the existing canvas.
 
 The earlier options are kept below for the record.
 
