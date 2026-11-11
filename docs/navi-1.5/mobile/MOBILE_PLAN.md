@@ -78,7 +78,26 @@ Design rules that follow from this:
 
 ---
 
-## 3. Three navigation approaches
+## 3. Navigation approaches
+
+### ▶ Owner direction, 2026-11-11: swipe layout with chat in the middle (supersedes the A / A+D recommendation below)
+```
+ ← swipe                                              swipe →
+[ How it's going ]  ←  [ Navi chat ]  →  [ My day ]  →  [ Tasks + Inbox ]
+   stats, reviews       center, home      timeline,        lists, drafts,
+   (looking back)       (now)             calendar         approvals
+                                          (looking ahead)
+☰ on chat → drawer: chats list; your account bottom-left → Settings, Memory, etc.
+```
+- No tab bar. Pages are reached by swiping or by tapping short labels at the top. You can always see where you are.
+- The chat page is not a blank ChatGPT screen. A slim now/next line sits at the top, and Navi's first line each day comes from real data.
+- The drawer opens only from the ☰ button, not an edge swipe, so it doesn't fight the swipe to "How it's going".
+- On other pages, a small stone takes you back to the chat with context ("About: My day, Friday").
+- Focus and full-screen voice cover all pages.
+- No sideways swipes inside pages: tap to complete, long-press for options, tap the week strip to change days.
+- Open: is the right side one page or two (My day, then Tasks)? What exactly goes on "How it's going"?
+
+The earlier options are kept below for the record.
 
 ### A. Tab bar + companion button (recommended)
 Floating tab bar with **Today · My day · Tasks · Inbox**, plus a separate round **stone button** to its right (the pattern iOS uses for a search button next to tabs; see Oura, Linear, Structured). Tap the stone → Navi sheet over the current screen. **Press and hold → voice starts immediately.** On Today, the stone stretches into a wide "Tell Navi anything" bar (the companion state). On other tabs it's just the stone (the orb state). Focus is a mode, not a tab. Secondary screens live in a "You" sheet opened from your initial, top-right.
