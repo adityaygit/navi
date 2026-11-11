@@ -98,7 +98,13 @@ A single Today canvas (sentence + timeline). A bottom sheet pulls up into Tasks 
 - **For:** very fluid and distinctive. The fewest taps to see everything. It feels like one living object.
 - **Against:** gesture-heavy and hard to discover (where are Tasks?). Nested sheets fight the Navi sheet. Weaker for VoiceOver and Dynamic Type. Focus, settings and deep links have no natural home. It's the biggest build risk and the hardest to keep reliable, which goes against the 1.5 goal "reliable before impressive".
 
-**Recommendation: A, borrowing two things from C:** the Today screen reads as one calm canvas (sentence → now/next → continue → one insight), and My day uses sheet detents for the "need a time" tray. B's strength (voice-first) comes in through press-and-hold on the stone.
+### D. Hybrid Today: your day on top, Navi below (owner suggestion, 2026-11-11)
+Approach A's tabs stay. **Today itself becomes a split screen**: the top is a glance of your day (sentence, a compact day / calendar strip, two or three real facts) and the bottom is the conversation with Navi, inline rather than in a sheet. Details are in §5.
+
+- **For:** it's the most faithful mobile version of the desktop Home, which already stacks sentence → day bar → next up → composer, and since 2026-11-08 shows the chat in the centre. You see the *effect* of what you ask: "Put it there" and the block appears in the strip above. It gives the companion a real home without making it a blank chat. Insights become Navi's opening line instead of a separate row.
+- **Against:** a phone keyboard takes about 40% of the screen, so the top must collapse while you type. A long conversation could bury the day unless the thread starts fresh each day. "Stats" can slide into a dashboard, so the top is limited to the sentence plus real counts (no tiles, scores or streaks).
+
+**Recommendation (updated): A + D.** Tabs and the stone as in A. The Today tab is D's split screen, where the stone has nothing to open because Navi is already on the page. On My day, Tasks and Inbox, the stone opens the **same conversation** as a sheet. From C: My day uses sheet heights for the "need a time" tray. B's voice-first strength comes in through press-and-hold on the stone.
 
 **Inbox as a tab (open question).** Inbox is where capture lands, so on a capture-heavy device it earns a tab with a badge. The alternative is three tabs, with Inbox as a row on Today ("3 things to review") and a filter in Tasks. I recommend the four-tab version and want your call.
 
