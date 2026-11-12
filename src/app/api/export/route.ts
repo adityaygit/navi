@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { requireApiCtx } from "@/server/context";
 import { apiError } from "@/server/http";
 
-const TABLES = ["profiles", "workspaces", "goals", "projects", "milestones", "tasks", "routines", "events", "plan_blocks", "focus_sessions", "plan_disruptions", "notes", "conversations", "messages", "captures", "proposals", "memories", "activity_log", "approvals", "briefings", "notifications", "ai_usage"];
+const TABLES = ["profiles", "workspaces", "goals", "projects", "milestones", "tasks", "routines", "events", "plan_blocks", "focus_sessions", "plan_disruptions", "notes", "conversations", "messages", "captures", "proposals", "memories", "activity_log", "approvals", "briefings", "notifications", "ai_usage", "integration_connections", "external_courses", "external_items", "integration_sync_runs"];
+// integration_secrets (encrypted feed links) is deliberately not exportable: it is a credential.
 
 // Full export of the signed-in user's data (RLS limits every query to them).
 export async function GET() {

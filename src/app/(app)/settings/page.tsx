@@ -22,6 +22,10 @@ import { NaviColorPicker } from "./navi-color-picker";
 import { savedNaviColor } from "./navi-color";
 import { ActionButton } from "@/components/action-button";
 import { restartOnboardingAction } from "../actions";
+import { DateTime } from "luxon";
+import { CanvasConnect, CanvasConnection, type CanvasConnectionView } from "./canvas-settings";
+import { integrationCryptoReady } from "@/server/integrations/crypto";
+import { feedSummaryText, type FeedSummary } from "@/lib/feed-summary";
 
 export const metadata = { title: "Settings · Navi" };
 
@@ -57,6 +61,32 @@ export default async function SettingsPage() {
     ctx.db.from("notifications").select("id,title,status,last_error,created_at,sent_at,deliver_after").order("created_at", { ascending: false }).limit(10),
     ctx.db.auth.getClaims(),
   ]);
+  // Canvas connections (status only: the feed link itself is never readable here).
+  const [{ data: connRows }, { data: dupRows }] = await Promise.all([
+    ctx.db.from("integration_connections").select("id,display_host,status,last_success_at,next_sync_at,last_error,item_count,last_summary").eq("provider", "canvas").order("created_at"),
+    ctx.db.from("external_items").select("connection_id").eq("hidden", true).eq("hidden_reason", "duplicate").eq("state", "active"),
+  ]);
+  const rel = (iso: string | null, future = false) => {
+    if (!iso) return null;
+    const d = DateTime.fromISO(iso).setZone(profile.timezone);
+    if (future) return d.diffNow().as("minutes") < 1 ? "soon" : `around ${d.toFormat(d.hasSame(DateTime.now().setZone(profile.timezone), "day") ? "h:mm a" : "ccc h:mm a")}`;
+    return d.toRelative() ?? d.toFormat("LLL d, h:mm a");
+  };
+  const canvas: CanvasConnectionView[] = (connRows ?? []).map((c) => {
+    const s = (c.last_summary ?? {}) as FeedSummary;
+    return {
+      id: c.id,
+      host: c.display_host,
+      status: c.status,
+      lastSynced: rel(c.last_success_at),
+      nextSync: rel(c.next_sync_at, true),
+      lastError: c.last_error,
+      itemCount: c.item_count,
+      summary: feedSummaryText(s),
+      warnings: s.warnings ?? [],
+      duplicates: (dupRows ?? []).filter((d) => d.connection_id === c.id).length,
+    };
+  });
   const ai = aiAvailability();
   const voice = voiceAvailability();
   const email = (claims?.claims?.email as string | undefined) ?? "";
@@ -185,8 +215,12 @@ export default async function SettingsPage() {
         </section>
 
         <section id="services" className="flex scroll-mt-24 flex-col gap-3" aria-labelledby="int-h">
-          <SectionHead id="int-h" title="Connected services" desc="Not part of V1 yet. Navi's own planner and calendar work without them. When connected, anything that affects other people or outside systems will still require your approval." />
-          <ul className={GROUP}>
+          <SectionHead id="int-h" title="Connected services" desc="Optional. Navi's own planner and calendar work without them. Anything that would affect other people or outside systems always needs your approval." />
+          <div className={GROUP}>
+            {canvas.map((c) => <CanvasConnection key={c.id} c={c} />)}
+            {canvas.length === 0 && <CanvasConnect ready={integrationCryptoReady()} />}
+          </div>
+          <ul className={GROUP} aria-label="Coming later">
             {integrations.map((i) => (
               <li key={i.id} className="flex items-center gap-3 px-4 py-3.5 sm:px-5">
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">

@@ -145,6 +145,23 @@ export default async function MyDayPage({ searchParams }: { searchParams: Promis
       if (!days.includes(d)) continue;
       dueByDay.set(d, [...(dueByDay.get(d) ?? []), t]);
     }
+    // All-day Canvas events (holidays, "no class") don't block planning time, so they
+    // aren't events rows; they show in the all-day strip from the imported items.
+    const { data: allDayRows } = await ctx.db
+      .from("external_items")
+      .select("id,title,all_day_date,course:external_courses(excluded)")
+      .eq("kind", "event")
+      .eq("all_day", true)
+      .eq("state", "active")
+      .eq("hidden", false)
+      .neq("source_status", "cancelled")
+      .gte("all_day_date", days[0])
+      .lte("all_day_date", days[days.length - 1]);
+    const externalAllDay = new Map<string, { id: string; title: string }[]>();
+    for (const r of (allDayRows ?? []) as unknown as { id: string; title: string; all_day_date: string; course: { excluded: boolean } | null }[]) {
+      if (r.course?.excluded) continue;
+      externalAllDay.set(r.all_day_date, [...(externalAllDay.get(r.all_day_date) ?? []), r]);
+    }
     const calDays: CalendarDay[] = dayData.map((dd) => ({
       date: dd.date,
       entries: dd.items.filter((i) => !longEvent(i)).map(toEntry),
@@ -154,6 +171,7 @@ export default async function MyDayPage({ searchParams }: { searchParams: Promis
           return { key: `e${i.id}`, label: i.title, kind: "event" as const, color: e.color, href: href({ date: dd.date }) };
         }),
         ...(dueByDay.get(dd.date) ?? []).map((t) => ({ key: `t${t.id}`, label: t.title, kind: "due" as const, color: "", href: `/tasks?open=${t.id}` })),
+        ...(externalAllDay.get(dd.date) ?? []).map((x) => ({ key: `x${x.id}`, label: x.title, kind: "event" as const, color: "#C8C8CE", href: "/settings/canvas" })),
       ],
     }));
     const allMinutes = calDays.flatMap((d) => d.entries.map((e) => ({ start: z.minuteOfDay(e.startMs), end: z.minuteOfDay(e.endMs) || 24 * 60 })));
