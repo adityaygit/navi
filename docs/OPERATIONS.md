@@ -85,6 +85,8 @@ accounts, whatever the machine's `TZ`.
 
 ## Deploying
 
+> Canvas calendar feeds: extra env var `NAVI_INTEGRATION_ENCRYPTION_KEY`, migration `20261111000001_external_calendar_feeds.sql`, Trigger.dev task `navi-integrations-sync`. See `docs/CANVAS_INTEGRATION.md`.
+
 ### 1. Supabase
 
 #### Moving to hosted Supabase (project `gxfkumxjeemceoygtuod`, "Navi")

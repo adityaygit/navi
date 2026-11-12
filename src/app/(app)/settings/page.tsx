@@ -82,7 +82,8 @@ export default async function SettingsPage() {
       nextSync: rel(c.next_sync_at, true),
       lastError: c.last_error,
       itemCount: c.item_count,
-      summary: feedSummaryText(s),
+      // Pending duplicates get their own (current) line below, so leave them out of the summary.
+      summary: feedSummaryText({ ...s, duplicates: 0 }),
       warnings: s.warnings ?? [],
       duplicates: (dupRows ?? []).filter((d) => d.connection_id === c.id).length,
     };
