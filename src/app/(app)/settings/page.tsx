@@ -22,6 +22,10 @@ import { NaviColorPicker } from "./navi-color-picker";
 import { savedNaviColor } from "./navi-color";
 import { ActionButton } from "@/components/action-button";
 import { restartOnboardingAction } from "../actions";
+import { LinearSettings } from "./linear-settings";
+import { listLinearConnections } from "@/server/linear/connections";
+import { linearMissingConfig } from "@/server/linear/config";
+import { linearResultMessage } from "@/server/linear/redirects";
 
 export const metadata = { title: "Settings · Navi" };
 
@@ -32,7 +36,7 @@ const SECTIONS: [string, string][] = [
   ["notifications", "Notifications"],
   ["budget", "AI & testing budget"],
   ["privacy", "Privacy & your data"],
-  ["services", "Connected services"],
+  ["services", "Integrations"],
   ["password", "Password"],
   ["delete", "Delete account"],
 ];
@@ -47,15 +51,18 @@ function DisclosureMark() {
   );
 }
 
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ linear?: string }> }) {
   const ctx = await requireCtx();
   const profile = await getProfile(ctx);
-  const [budget, usageRes, subsRes, notifRes, { data: claims }] = await Promise.all([
+  const linearNotice = linearResultMessage((await searchParams).linear);
+  const [budget, usageRes, subsRes, notifRes, { data: claims }, linearConnections] = await Promise.all([
     getBudgetStatus(),
     ctx.db.from("ai_usage").select("provider,model,purpose,cost_usd,input_tokens,output_tokens,audio_seconds,created_at").order("created_at", { ascending: false }).limit(20),
     ctx.db.from("push_subscriptions").select("id,user_agent,created_at,last_success_at,last_error"),
     ctx.db.from("notifications").select("id,title,status,last_error,created_at,sent_at,deliver_after").order("created_at", { ascending: false }).limit(10),
     ctx.db.auth.getClaims(),
+    // Null if the Linear tables aren't there yet (code deployed before its migration): Settings still renders.
+    listLinearConnections(ctx.db).catch((err) => (console.error("[settings] linear connections", (err as Error).message), null)),
   ]);
   const ai = aiAvailability();
   const voice = voiceAvailability();
@@ -185,8 +192,10 @@ export default async function SettingsPage() {
         </section>
 
         <section id="services" className="flex scroll-mt-24 flex-col gap-3" aria-labelledby="int-h">
-          <SectionHead id="int-h" title="Connected services" desc="Not part of V1 yet. Navi's own planner and calendar work without them. When connected, anything that affects other people or outside systems will still require your approval." />
+          <SectionHead id="int-h" title="Integrations" desc="Bring work in from other tools. Navi's own planner and calendar work without them, and anything that would affect other people or outside systems always needs your approval." />
+          {linearNotice && <p role="status" className="notice px-4 py-3 text-sm">{linearNotice}</p>}
           <ul className={GROUP}>
+            <LinearSettings connections={linearConnections ?? []} configured={linearConnections !== null && linearMissingConfig().length === 0} zone={ctx.timezone} />
             {integrations.map((i) => (
               <li key={i.id} className="flex items-center gap-3 px-4 py-3.5 sm:px-5">
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">

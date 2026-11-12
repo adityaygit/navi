@@ -92,6 +92,25 @@ export type Task = {
   completed_at: string | null;
   created_at: string;
   updated_at: string;
+  /** Imported items (Linear): where it came from. Set only by the sync. */
+  external_source?: "linear" | null;
+  external_id?: string | null;
+  external_url?: string | null;
+  /** Set while the source is connected; then the source owns title, priority, due date and project. */
+  external_connection_id?: string | null;
+  external_data?: ExternalTaskData | null;
+};
+
+/** What Navi keeps about an imported Linear issue (see src/server/linear/mapping.ts). */
+export type ExternalTaskData = {
+  identifier?: string;
+  team_key?: string;
+  state_name?: string;
+  state_type?: string;
+  priority_label?: string;
+  project_name?: string | null;
+  due_date?: string | null;
+  detached?: "unassigned" | "archived" | "missing" | null;
 };
 
 export type Routine = {

@@ -36,7 +36,7 @@ export function ctxFor(db: SupabaseClient, userId: string, timezone = "America/N
 /** Wipe one user's rows (service role) so tests start clean. */
 export async function resetUser(userId: string) {
   const a = admin();
-  for (const t of ["plan_changesets", "day_exceptions", "availability_rules", "event_occurrence_overrides", "task_dependencies", "plan_blocks", "focus_sessions", "proposals", "captures", "messages", "conversations", "tasks", "milestones", "projects", "goals", "routines", "events", "memories", "notes", "approvals", "activity_log", "briefings", "notifications", "push_subscriptions", "plan_disruptions", "workspaces"]) {
+  for (const t of ["integration_connections", "plan_changesets", "day_exceptions", "availability_rules", "event_occurrence_overrides", "task_dependencies", "plan_blocks", "focus_sessions", "proposals", "captures", "messages", "conversations", "tasks", "milestones", "projects", "goals", "routines", "events", "memories", "notes", "approvals", "activity_log", "briefings", "notifications", "push_subscriptions", "plan_disruptions", "workspaces"]) {
     await a.from(t).delete().eq("user_id", userId);
   }
   await a.from("profiles").update({ timezone: "America/New_York", availability: [], onboarding_status: "not_started", onboarding_conversation_id: null, quiet_hours_start: null, quiet_hours_end: null }).eq("id", userId);

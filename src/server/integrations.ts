@@ -1,5 +1,7 @@
 import "server-only";
 
+// Linear has its own read-only import (src/server/linear, Settings → Integrations);
+// it never acts on Linear, so it is not an entry here.
 // Extension point for external services (Google Calendar, Gmail, GitHub,
 // Drive, school platforms). None are connected in V1: each entry reports
 // isConnected() = false, so any external action Navi proposes is shown for

@@ -171,6 +171,12 @@ function TaskRow({ task, space, zone, stepsCount, onOpen }: { task: Task; space:
               {task.estimate_minutes} min
             </span>
           )}
+          {task.external_source === "linear" && (
+            <span className="rounded-[6px] bg-white/[0.07] px-1.5 text-[12px]" title="Imported from Linear">
+              {task.external_data?.identifier ?? "Linear"}
+              <span className="sr-only"> (from Linear)</span>
+            </span>
+          )}
           {stepsCount > 0 && !done && <span className="sr-only">, {stepsCount} steps</span>}
         </span>
       </button>

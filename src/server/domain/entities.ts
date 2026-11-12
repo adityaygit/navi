@@ -4,6 +4,8 @@ import type { Ctx } from "@/server/context";
 import { logActivity, sameValue } from "./activity";
 import { requestApproval } from "./approvals";
 import { fieldWords } from "@/lib/plain-text";
+import { UserFacingError } from "@/server/http";
+import { LINEAR_BLOCKED, LINEAR_OWNED } from "@/server/linear/mapping";
 
 // Generic create/update/delete for the user's structured items, with an
 // activity-log entry for every change so it can be reviewed and undone.
@@ -70,6 +72,27 @@ export async function createEntity<T = Record<string, unknown>>(
     reversible: true,
   });
   return data as T;
+}
+
+/**
+ * Items imported from Linear: Linear owns the issue's own fields, so Navi
+ * refuses to change them (and to delete the item, which the next sync would
+ * bring back). Planning fields stay editable. Disconnecting lifts this.
+ */
+function linkedRefusal(table: EntityTable, before: Record<string, unknown>, patch: Record<string, unknown> | null): string | null {
+  if (!before.external_connection_id) return null;
+  const where = before.external_source === "linear" ? "Linear" : "the connected service";
+  if (table === "tasks") {
+    if (!patch) return `“${nameOf(before)}” comes from ${where}. Finish, cancel or unassign it there (or mark it done or cancelled here); it can't be deleted while ${where} is connected.`;
+    const owned = [...LINEAR_OWNED, ...LINEAR_BLOCKED].filter((k) => k in patch && !sameValue(patch[k], before[k]));
+    if (owned.length) return `“${nameOf(before)}” comes from ${where}, which owns its ${fieldWords(owned)}. Change that in ${where}; Navi will pick it up on the next sync.`;
+  }
+  if (table === "projects") {
+    if (!patch) return `“${nameOf(before)}” comes from ${where} and can't be deleted while it's connected.`;
+    const owned = ["name", "due_date", "status"].filter((k) => k in patch && !sameValue(patch[k], before[k]));
+    if (owned.length) return `“${nameOf(before)}” comes from ${where}, which owns its ${fieldWords(owned)}. Change that in ${where}.`;
+  }
+  return null;
 }
 
 export async function getEntity<T = Record<string, unknown>>(ctx: Ctx, table: EntityTable, id: string): Promise<T> {
@@ -143,6 +166,8 @@ export async function updateEntity<T = Record<string, unknown>>(
   opts: { summary?: string; unless?: Record<string, string> } = {},
 ): Promise<UpdateResult<T>> {
   const before = await getEntity<Record<string, unknown>>(ctx, table, id);
+  const linked = linkedRefusal(table, before, patch);
+  if (linked) throw new UserFacingError(linked);
   if (ctx.actor === "navi") {
     if (table === "tasks" && patch.status === "done" && before.status !== "done") throw new Error("Only you can mark a task done.");
     const rule = needsApproval(table, before, patch);
@@ -193,6 +218,8 @@ export type DeleteResult = { kind: "deleted" } | { kind: "approval_requested"; a
 
 export async function deleteEntity(ctx: Ctx, table: EntityTable, id: string): Promise<DeleteResult> {
   const before = await getEntity<Record<string, unknown>>(ctx, table, id);
+  const linked = linkedRefusal(table, before, null);
+  if (linked) throw new UserFacingError(linked);
   if (ctx.actor === "navi") {
     const approval = await requestApproval(ctx, {
       actionType: `internal.delete.${table}`,

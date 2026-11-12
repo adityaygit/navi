@@ -1,8 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+// /api/integrations/linear/webhook: authenticated by its HMAC signature, not a session.
 // /pcm-worklet.js: the static, non-personal voice audio worklet; loading it must not depend on the session cookie.
-const PUBLIC_PATHS = ["/login", "/auth", "/early-access", "/api/waitlist", "/landing", "/offline", "/manifest.webmanifest", "/sw.js", "/pcm-worklet.js", "/api/cron", "/icons"];
+const PUBLIC_PATHS = ["/login", "/auth", "/early-access", "/api/waitlist", "/landing", "/offline", "/manifest.webmanifest", "/sw.js", "/pcm-worklet.js", "/api/cron", "/icons", "/api/integrations/linear/webhook"];
 
 // Refreshes the Supabase session cookie on every request and sends signed-out
 // visitors to /login. Authorization itself is enforced by RLS and by

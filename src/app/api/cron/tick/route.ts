@@ -3,6 +3,8 @@ import { timingSafeEqual } from "node:crypto";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { serverEnv } from "@/lib/env";
 import { tickAll } from "@/server/jobs/tick";
+import { syncDueConnections } from "@/server/linear/sync";
+import { linearConfig } from "@/server/linear/config";
 
 export const maxDuration = 300;
 
@@ -20,8 +22,18 @@ function authorized(request: NextRequest): boolean {
 async function handle(request: NextRequest) {
   if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const started = Date.now();
-  const summary = await tickAll(createSupabaseAdmin());
-  return NextResponse.json({ ok: true, ms: Date.now() - started, users: summary });
+  const admin = createSupabaseAdmin();
+  const summary = await tickAll(admin);
+  // Periodic Linear reconciliation (read-only). A failure here never fails the tick.
+  let linear: Record<string, string> | string = "not configured";
+  if (linearConfig()) {
+    try {
+      linear = await syncDueConnections(admin, { budgetMs: 120_000 });
+    } catch (err) {
+      linear = `error: ${(err as Error).message}`;
+    }
+  }
+  return NextResponse.json({ ok: true, ms: Date.now() - started, users: summary, linear });
 }
 
 export const GET = handle;

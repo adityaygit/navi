@@ -40,6 +40,9 @@ export function TaskCard({ task, steps, space, spaces, zone, onClose }: { task: 
   const openSteps = steps.filter((s) => s.status !== "done");
   const nextStepId = openSteps[0]?.id;
   const focusMinutes = Math.min(task.estimate_minutes ?? 25, 50);
+  // Imported from Linear (and still connected): Linear owns the name, priority, due date and project.
+  const linked = Boolean(task.external_connection_id);
+  const ext = task.external_data;
 
   const save = (patch: Record<string, unknown>) =>
     start(async () => {
@@ -93,7 +96,9 @@ export function TaskCard({ task, steps, space, spaces, zone, onClose }: { task: 
             id={`title-${task.id}`}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            onBlur={() => title.trim() && title.trim() !== task.title && save({ title: title.trim() })}
+            readOnly={linked}
+            title={linked ? "Change the name in Linear" : undefined}
+            onBlur={() => !linked && title.trim() && title.trim() !== task.title && save({ title: title.trim() })}
             onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
             className={`w-full rounded-md bg-transparent text-[16px] font-semibold outline-none focus-visible:bg-white/[0.04] ${done ? "line-through" : ""}`}
           />
@@ -114,6 +119,20 @@ export function TaskCard({ task, steps, space, spaces, zone, onClose }: { task: 
       </div>
 
       <div className="ml-9 flex flex-col gap-3">
+        {task.external_source === "linear" && (
+          <p className="flex flex-wrap items-center gap-x-1.5 text-[13px] text-[#8E8E96]">
+            <span>From Linear{ext?.identifier ? ` · ${ext.identifier}` : ""}</span>
+            {ext?.state_name && <span>· {ext.state_name}</span>}
+            {ext?.priority_label && ext.priority_label !== "No priority" && <span>· {ext.priority_label}</span>}
+            {ext?.detached && <span className="text-recovery">· {ext.detached === "unassigned" ? "no longer assigned to you" : ext.detached === "archived" ? "archived in Linear" : "no longer in Linear"}</span>}
+            {task.external_url && (
+              <a href={task.external_url} target="_blank" rel="noopener noreferrer" className="text-[var(--navi-text)] hover:underline">
+                Open in Linear<span className="sr-only"> (opens in a new tab)</span>
+              </a>
+            )}
+            {linked && <span className="w-full">Name, priority and due date follow Linear. Planning here is yours.</span>}
+          </p>
+        )}
         {(steps.length > 0 || !done) && (
           <ul className="flex flex-col gap-2" aria-label="Steps">
             {steps.map((s) => (
@@ -180,11 +199,11 @@ export function TaskCard({ task, steps, space, spaces, zone, onClose }: { task: 
           </div>
         )}
 
-        <MoreDetails task={task} zone={zone} spaces={spaces} open={more} setOpen={setMore} save={save} pending={pending} />
+        <MoreDetails task={task} zone={zone} spaces={spaces} open={more} setOpen={setMore} save={save} pending={pending} linked={linked} />
 
         {error && <p role="alert" className="text-[13px] text-clash">{error}</p>}
 
-        <div className="flex justify-end">
+        {!linked && <div className="flex justify-end">
           <button
             type="button"
             className="text-[13px] text-dim hover:text-clash disabled:opacity-50"
@@ -201,7 +220,7 @@ export function TaskCard({ task, steps, space, spaces, zone, onClose }: { task: 
           >
             Delete task
           </button>
-        </div>
+        </div>}
       </div>
     </div>
   );
@@ -215,6 +234,7 @@ function MoreDetails({
   setOpen,
   save,
   pending,
+  linked,
 }: {
   task: Task;
   zone: string;
@@ -223,6 +243,8 @@ function MoreDetails({
   setOpen: (v: boolean) => void;
   save: (patch: Record<string, unknown>) => void;
   pending: boolean;
+  /** Linear owns due date and priority; repeating would copy the issue. */
+  linked: boolean;
 }) {
   const local = (iso: string | null | undefined) => (iso ? DateTime.fromISO(iso).setZone(zone).toFormat(LOCAL_FMT) : "");
   const fromLocal = (v: string) => (v ? DateTime.fromFormat(v, LOCAL_FMT, { zone }).toISO() : null);
@@ -256,7 +278,7 @@ function MoreDetails({
           <div>
             <div className={row}>
               <label htmlFor={`due-${task.id}`} className="text-[14.5px]">Due</label>
-              <input id={`due-${task.id}`} type="datetime-local" defaultValue={local(task.due_at)} onChange={(e) => save({ due_at: fromLocal(e.target.value), ...(e.target.value ? {} : { due_is_hard: false }) })} className={pill} />
+              <input id={`due-${task.id}`} type="datetime-local" defaultValue={local(task.due_at)} disabled={linked} onChange={(e) => save({ due_at: fromLocal(e.target.value), ...(e.target.value ? {} : { due_is_hard: false }) })} className={pill} />
             </div>
           </div>
           <div>
@@ -305,6 +327,7 @@ function MoreDetails({
                   save({ recurrence: v === "never" ? null : v === "daily" ? { freq: "daily" } : v === "weekdays" ? { freq: "weekly", days: [1, 2, 3, 4, 5] } : { freq: "weekly", days: [weekday] } });
                 }}
                 className={pill}
+                disabled={linked}
               >
                 <option value="never">Never</option>
                 <option value="daily">Every day</option>
@@ -343,7 +366,7 @@ function MoreDetails({
                 role="switch"
                 aria-checked={task.priority === 4}
                 aria-labelledby={`someday-${task.id}`}
-                disabled={pending}
+                disabled={pending || linked}
                 onClick={() => save({ priority: task.priority === 4 ? 3 : 4 })}
                 className={`relative h-[26px] w-[44px] rounded-full transition-colors disabled:opacity-40 ${task.priority === 4 ? "bg-[var(--navi-text)]" : "bg-white/[0.14]"}`}
               >

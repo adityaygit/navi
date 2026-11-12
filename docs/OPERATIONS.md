@@ -221,6 +221,54 @@ subscriptions on localhost, for tests only; otherwise only the browsers' push
 services are accepted: `fcm.googleapis.com`, `*.push.apple.com`,
 `updates.push.services.mozilla.com`, `*.notify.windows.com`.)
 
+### Linear integration (read-only issue import)
+
+Settings → Integrations → **Connect Linear** runs an OAuth 2.0 authorization-code
+flow with PKCE (S256) and a CSRF state (encrypted httpOnly cookie, single use,
+10 minutes, bound to the signed-in account). The code is exchanged server-side;
+tokens are encrypted with AES-256-GCM (`NAVI_TOKEN_ENCRYPTION_KEY`) and stored in
+`integration_tokens`, which no API role but the service role can read. Access
+tokens (24 h) are refreshed automatically; refresh tokens rotate, and only one
+refresh runs at a time (lease on the token row).
+
+| Variable | Notes |
+| --- | --- |
+| `LINEAR_CLIENT_ID` | OAuth app client id (Linear → Settings → API → OAuth applications) |
+| `LINEAR_CLIENT_SECRET` | OAuth app secret. Server only |
+| `LINEAR_REDIRECT_URL` | Must exactly match a callback URL on the Linear app. Production: `https://meetnavi.app/api/integrations/linear/callback` (the apex 308-redirects to www with the query intact). Defaults to `<NEXT_PUBLIC_SITE_URL>/api/integrations/linear/callback` |
+| `NAVI_TOKEN_ENCRYPTION_KEY` | 32 random bytes, `openssl rand -base64 32`. Same value in production and preview (they share the database). Changing it makes existing connections undecryptable: people would have to reconnect |
+| `LINEAR_WEBHOOK_SECRET` | Optional. Only for future real-time sync (below) |
+
+What it does: imports the person's **open assigned issues** as tasks (source
+`linear`) and their Linear projects as projects; priority, status, due date
+(23:59 local) and project follow Linear. Navi never writes to Linear and never
+moves plan blocks for other work. Planning (estimate, must-do, not-before,
+hard-deadline flag, notes, steps, space, plan blocks) stays Navi's. Linear-owned
+fields can't be edited or the task deleted in Navi while connected (server-side
+check); marking done or cancelled locally sticks until the issue's status changes
+in Linear. Issues that are unassigned, archived or deleted are marked and
+cancelled in Navi, never deleted. Dedupe: unique `(user_id, external_source,
+external_id)` on tasks and projects; the Linear issue id is kept in `external_id`.
+
+Sync runs on connect, from **Sync now**, and every 30 minutes via `/api/cron/tick`
+(oldest first, 2-minute budget per tick). Expired or revoked access marks the
+connection "reconnect needed" (imported tasks stay). **Disconnect** revokes the
+tokens at Linear, deletes them, and leaves imported tasks as ordinary Navi tasks;
+reconnecting the same workspace re-links them without duplicates.
+
+Webhooks (optional, not required): in the Linear OAuth app, enable webhooks with
+URL `https://www.meetnavi.app/api/integrations/linear/webhook` (Issue and Project
+events), and put its signing secret in `LINEAR_WEBHOOK_SECRET`. Navi verifies the
+`Linear-Signature` HMAC and the timestamp, then flags the workspace's
+connections for the next scheduler tick (it doesn't trust the body as data). An
+"OAuth app revoked" event marks connections as needing reconnection. Without the
+secret the endpoint answers 404.
+
+Local testing: `tests/unit/linear.test.ts`, `tests/integration/linear.test.ts`
+(simulated Linear API), `tests/e2e/linear.spec.ts` (start the app with
+`LINEAR_CLIENT_ID`, `LINEAR_CLIENT_SECRET` and `NAVI_TOKEN_ENCRYPTION_KEY` set to
+test values to cover the connect redirect).
+
 ### Pre-deploy check
 
 With the production values in the environment (or `.env.local`), run:
