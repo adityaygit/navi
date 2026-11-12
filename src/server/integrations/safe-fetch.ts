@@ -43,16 +43,18 @@ export class FeedError extends Error {
   }
 }
 
-const blocked = new BlockList();
+// Separate lists: Node matches IPv4 addresses against IPv4-mapped IPv6 rules.
+const blocked4 = new BlockList();
+const blocked6 = new BlockList();
 for (const [net, prefix] of [
   ["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8], ["169.254.0.0", 16], ["172.16.0.0", 12],
   ["192.0.0.0", 24], ["192.0.2.0", 24], ["192.88.99.0", 24], ["192.168.0.0", 16], ["198.18.0.0", 15],
   ["198.51.100.0", 24], ["203.0.113.0", 24], ["224.0.0.0", 4], ["240.0.0.0", 4],
-] as const) blocked.addSubnet(net, prefix, "ipv4");
+] as const) blocked4.addSubnet(net, prefix, "ipv4");
 for (const [net, prefix] of [
   ["::", 128], ["::1", 128], ["::ffff:0:0", 96], ["64:ff9b::", 96], ["64:ff9b:1::", 48], ["100::", 64], ["2001::", 32],
   ["2001:db8::", 32], ["2002::", 16], ["fc00::", 7], ["fe80::", 10], ["fec0::", 10], ["ff00::", 8],
-] as const) blocked.addSubnet(net, prefix, "ipv6");
+] as const) blocked6.addSubnet(net, prefix, "ipv6");
 const loopback = new BlockList();
 loopback.addSubnet("127.0.0.0", 8, "ipv4");
 loopback.addAddress("::1", "ipv6");
@@ -81,7 +83,8 @@ export function isBlockedAddress(ip: string, opts: { allowLoopback?: boolean } =
   if (!family) return true;
   const type = family === 4 ? "ipv4" : "ipv6";
   if (opts.allowLoopback && loopback.check(ip, type)) return false;
-  if (blocked.check(ip, type)) {
+  if (family === 4) return blocked4.check(ip, "ipv4");
+  if (blocked6.check(ip, "ipv6")) {
     const v4 = family === 6 ? embeddedV4(ip) : null;
     // A mapped/NAT64/6to4 address is judged by the IPv4 address inside it.
     if (v4) return isBlockedAddress(v4, opts);

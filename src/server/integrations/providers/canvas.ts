@@ -115,7 +115,17 @@ export function safeCanvasLink(url: string | null, feedHost: string, rules = can
 
 export function toCanvasItems(feed: ParsedFeed, ctx: { host: string; zone: string }): NormalizedItem[] {
   const rules = canvasHostRules();
-  return feed.occurrences.map((o) => {
+  // Course from the Canvas link (only links back into Canvas count); an item
+  // known only by its "[Course]" suffix joins the same-named course if there is one.
+  const linked = feed.occurrences.map((o) => ({ o, url: safeCanvasLink(o.url, ctx.host, rules) }));
+  const keyByName = new Map<string, string>();
+  for (const { o, url } of linked) {
+    const c = canvasCourse({ summary: o.summary, url });
+    if (c && !c.key.startsWith("name:")) keyByName.set(c.name.toLowerCase(), c.key);
+  }
+  return linked.map(({ o, url }) => {
+    let course = canvasCourse({ summary: o.summary, url });
+    if (course?.key.startsWith("name:")) course = { ...course, key: keyByName.get(course.name.toLowerCase()) ?? course.key };
     const startsAt = o.start.allDay ? DateTime.fromISO(o.start.date, { zone: ctx.zone }).startOf("day").toUTC().toISO()! : o.start.utc;
     const endsAt = !o.end ? null : o.end.allDay ? DateTime.fromISO(o.end.date, { zone: ctx.zone }).startOf("day").toUTC().toISO()! : o.end.utc;
     return {
@@ -125,9 +135,9 @@ export function toCanvasItems(feed: ParsedFeed, ctx: { host: string; zone: strin
       kind: isCanvasAssignment(o.uid) ? "assignment" : "event",
       title: o.summary,
       description: o.description,
-      url: safeCanvasLink(o.url, ctx.host, rules),
+      url,
       location: o.location,
-      course: canvasCourse(o),
+      course,
       startsAt,
       endsAt,
       allDay: o.start.allDay,
@@ -149,12 +159,12 @@ export const canvasProvider: FeedProvider = {
     maxRedirects: 3,
   }),
   confirmedWindow: (now) => ({
-    start: DateTime.fromJSDate(now).minus({ days: PAST_DAYS - MARGIN_DAYS }).toJSDate(),
-    end: DateTime.fromJSDate(now).plus({ days: FUTURE_DAYS - MARGIN_DAYS }).toJSDate(),
+    start: DateTime.fromJSDate(now, { zone: "UTC" }).minus({ days: PAST_DAYS - MARGIN_DAYS }).toJSDate(),
+    end: DateTime.fromJSDate(now, { zone: "UTC" }).plus({ days: FUTURE_DAYS - MARGIN_DAYS }).toJSDate(),
   }),
   expansionWindow: (now) => ({
-    start: DateTime.fromJSDate(now).minus({ days: PAST_DAYS + 1 }).toJSDate(),
-    end: DateTime.fromJSDate(now).plus({ days: FUTURE_DAYS + 1 }).toJSDate(),
+    start: DateTime.fromJSDate(now, { zone: "UTC" }).minus({ days: PAST_DAYS + 1 }).toJSDate(),
+    end: DateTime.fromJSDate(now, { zone: "UTC" }).plus({ days: FUTURE_DAYS + 1 }).toJSDate(),
   }),
   maxFeedItems: 1000,
   toItems: toCanvasItems,

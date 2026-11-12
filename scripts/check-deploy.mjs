@@ -50,6 +50,10 @@ function checkEnv() {
   const supa = env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   if (supa) check(/^https:\/\/[a-z0-9]+\.supabase\.co$/.test(supa), "Supabase URL", "hosted project", "not a hosted *.supabase.co URL (local stack?)", warn);
 
+  const ik = env.NAVI_INTEGRATION_ENCRYPTION_KEY ? Buffer.from(env.NAVI_INTEGRATION_ENCRYPTION_KEY, "base64") : null;
+  check(ik?.length === 32, "calendar feed encryption key", "32 bytes", ik ? `NAVI_INTEGRATION_ENCRYPTION_KEY is ${ik.length} bytes, needs 32 (base64)` : "NAVI_INTEGRATION_ENCRYPTION_KEY missing: Canvas can't be connected", warn);
+  check(env.NAVI_ALLOW_LOCAL_FEEDS !== "true", "local feeds", "not allowed", "NAVI_ALLOW_LOCAL_FEEDS=true must not be set in production");
+
   if (env.CRON_SECRET) check(env.CRON_SECRET.length >= 32, "scheduler secret", `${env.CRON_SECRET.length} characters`, "CRON_SECRET should be at least 32 random characters");
 
   if (env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY) {

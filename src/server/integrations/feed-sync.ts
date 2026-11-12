@@ -202,10 +202,10 @@ export async function settleItems(db: Db, userId: string, zone: Zone, items: Ite
   const eventIds = items.map((i) => i.event_id).filter((x): x is string => !!x);
   const tasks = new Map<string, { id: string; status: string; title: string; due_at: string | null }>();
   const events = new Map<string, { id: string; status: string; title: string; starts_at: string; ends_at: string; location: string | null }>();
-  await inChunks(taskIds, 300, async (ids) => {
+  await inChunks(taskIds, 100, async (ids) => {
     for (const t of must(await db.from("tasks").select("id,status,title,due_at").eq("user_id", userId).in("id", ids), "load tasks") ?? []) tasks.set(t.id, t);
   });
-  await inChunks(eventIds, 300, async (ids) => {
+  await inChunks(eventIds, 100, async (ids) => {
     for (const e of must(await db.from("events").select("id,status,title,starts_at,ends_at,location").eq("user_id", userId).in("id", ids), "load events") ?? []) events.set(e.id, e);
   });
 
@@ -309,7 +309,7 @@ export async function settleItems(db: Db, userId: string, zone: Zone, items: Ite
       must(await db.from("tasks").upsert(chunk, { onConflict: "user_id,external_ref", ignoreDuplicates: true }), "create tasks");
     });
     const ids = new Map<string, string>();
-    await inChunks(toCreateTasks.map((i) => `ext:${i.id}`), 300, async (refs) => {
+    await inChunks(toCreateTasks.map((i) => `ext:${i.id}`), 100, async (refs) => {
       for (const t of must(await db.from("tasks").select("id,external_ref").eq("user_id", userId).in("external_ref", refs), "read tasks") ?? []) ids.set(t.external_ref, t.id);
     });
     for (const i of toCreateTasks) {
@@ -327,7 +327,7 @@ export async function settleItems(db: Db, userId: string, zone: Zone, items: Ite
       must(await db.from("events").upsert(chunk, { onConflict: "user_id,external_ref", ignoreDuplicates: true }), "create events");
     });
     const ids = new Map<string, string>();
-    await inChunks(toCreateEvents.map((i) => `ext:${i.id}`), 300, async (refs) => {
+    await inChunks(toCreateEvents.map((i) => `ext:${i.id}`), 100, async (refs) => {
       for (const e of must(await db.from("events").select("id,external_ref").eq("user_id", userId).in("external_ref", refs), "read events") ?? []) ids.set(e.external_ref, e.id);
     });
     for (const i of toCreateEvents) {
@@ -373,8 +373,7 @@ export async function reconcile(
     const rows = newCourses.map(([key, name]) => ({ user_id: userId, connection_id: conn.id, course_key: key, name, ...autoAssociate(name, spaces.data ?? [], projects.data ?? []), last_seen_at: nowIso }));
     const made = must(await db.from("external_courses").upsert(rows, { onConflict: "connection_id,course_key", ignoreDuplicates: true }).select("id,course_key,name,excluded,workspace_id,project_id"), "create courses") as CourseRow[];
     for (const c of made ?? []) courseByKey.set(c.course_key, c);
-    if (existingCourses.length || opts.allowRemovals) counts.newCourses = newCourses.map(([, n]) => n);
-    if (!existingCourses.length) counts.newCourses = newCourses.map(([, n]) => n);
+    counts.newCourses = newCourses.map(([, n]) => n);
   }
   const renamed = [...seenCourses].filter(([k, n]) => courseByKey.get(k) && courseByKey.get(k)!.name !== n);
   await pool(renamed, 4, async ([k, n]) => {
@@ -382,7 +381,7 @@ export async function reconcile(
     courseByKey.get(k)!.name = n;
   });
   if (seenCourses.size) {
-    await inChunks([...seenCourses.keys()].map((k) => courseByKey.get(k)?.id).filter((x): x is string => !!x), 300, async (ids) => {
+    await inChunks([...seenCourses.keys()].map((k) => courseByKey.get(k)?.id).filter((x): x is string => !!x), 100, async (ids) => {
       must(await db.from("external_courses").update({ last_seen_at: nowIso }).in("id", ids), "touch courses");
     });
   }
@@ -465,7 +464,7 @@ export async function reconcile(
   await inChunks(changed, 200, async (chunk) => {
     must(await db.from("external_items").upsert(chunk, { onConflict: "connection_id,external_id" }), "update items");
   });
-  await inChunks(seenIds, 300, async (ids) => {
+  await inChunks(seenIds, 100, async (ids) => {
     must(await db.from("external_items").update({ last_seen_at: nowIso }).in("id", ids), "touch items");
   });
   for (const i of incoming) if (i.status === "cancelled" && !byExt.has(i.externalId)) counts.cancelled++;
@@ -565,7 +564,8 @@ export async function runSync(
       }
       text = await (opts.fetchFeed ?? defaultFetchFeed)(url, provider);
     }
-    const parsed = parseIcs(text, { ...provider.expansionWindow(now), windowStart: provider.expansionWindow(now).start, windowEnd: provider.expansionWindow(now).end, defaultZone: zone });
+    const expand = provider.expansionWindow(now);
+    const parsed = parseIcs(text, { windowStart: expand.start, windowEnd: expand.end, defaultZone: zone });
     const items = provider.toItems(parsed, { host: conn.display_host, zone });
 
     const warnings: string[] = [];
