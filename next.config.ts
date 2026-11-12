@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   // force Suspense boundaries around every session read for no benefit here.
   cacheComponents: false,
   poweredByHeader: false,
+  // Development logs every server function call WITH its arguments, which would
+  // put credentials (a Canvas feed link) and personal text in the terminal log.
+  logging: { serverFunctions: false },
   turbopack: {
     rules: {
       "*.css": {

@@ -4,6 +4,7 @@ import type { Ctx } from "@/server/context";
 import { logActivity, sameValue } from "./activity";
 import { requestApproval } from "./approvals";
 import { fieldWords } from "@/lib/plain-text";
+import { UserFacingError } from "@/server/http";
 
 // Generic create/update/delete for the user's structured items, with an
 // activity-log entry for every change so it can be reviewed and undone.
@@ -143,6 +144,11 @@ export async function updateEntity<T = Record<string, unknown>>(
   opts: { summary?: string; unless?: Record<string, string> } = {},
 ): Promise<UpdateResult<T>> {
   const before = await getEntity<Record<string, unknown>>(ctx, table, id);
+  // Imported from a connected calendar (Canvas): its title and due date belong
+  // to that service and are refreshed on every sync. Planning fields stay Navi's.
+  if (table === "tasks" && before.external_ref && changes(before, patch, ["title", "due_at"])) {
+    throw new UserFacingError("That title and due date come from Canvas, so change them there. You can still set its priority, estimate, notes and status here.", 409);
+  }
   if (ctx.actor === "navi") {
     if (table === "tasks" && patch.status === "done" && before.status !== "done") throw new Error("Only you can mark a task done.");
     const rule = needsApproval(table, before, patch);

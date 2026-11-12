@@ -1,7 +1,9 @@
 import "server-only";
 
-// Extension point for external services (Google Calendar, Gmail, GitHub,
-// Drive, school platforms). None are connected in V1: each entry reports
+// Extension point for external services that Navi would ACT on (Google
+// Calendar, Gmail, GitHub, Drive). Read-only calendar feeds (Canvas) live in
+// ./feed-sync.ts, ./connections.ts and ./providers/: they import data and never
+// act outside Navi, so they aren't listed here. None of these are connected yet: each entry reports
 // isConnected() = false, so any external action Navi proposes is shown for
 // approval but fails honestly instead of claiming success. To add one,
 // implement OAuth with scoped permissions, store tokens server-side, and

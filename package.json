@@ -25,6 +25,7 @@
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
     "@trigger.dev/sdk": "^4.8.2",
+    "ical.js": "^2.2.1",
     "luxon": "^3.7.2",
     "next": "16.4.3",
     "react": "19.3.0",

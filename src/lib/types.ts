@@ -89,6 +89,8 @@ export type Task = {
   /** Don't plan work on it before this time. */
   not_before?: string | null;
   source: string;
+  /** Set while the task is owned by a connected calendar (Canvas): its title and due date come from there. */
+  external_ref?: string | null;
   completed_at: string | null;
   created_at: string;
   updated_at: string;
