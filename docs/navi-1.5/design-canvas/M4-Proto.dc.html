@@ -71,35 +71,71 @@ input::placeholder{color:#8E8E96}
     <!-- ===================== PROGRESS ===================== -->
     <section aria-label="Progress" style="width: 390px; height: 844px; flex: none; position: relative">
       <div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 0; height: 460px; background: {{pageScene}}; pointer-events: none"></div>
-      <div style="position: relative; height: 844px; box-sizing: border-box; padding: 108px 24px 140px; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column">
+      <div onScroll="{{progScroll}}" style="position: relative; height: 844px; box-sizing: border-box; padding: 108px 24px 140px; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column">
         <sc-if value="{{weekMode}}" hint-placeholder-val="{{ true }}">
           <div style="display: flex; align-items: baseline; gap: 10px"><h1 style="margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -0.02em">This week</h1><span style="font-size: 17px; color: #8E8E96">Nov 2 – 8</span></div>
-          <div role="group" aria-label="Days of this week" style="margin-top: 22px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px">
+          <div role="group" aria-label="Days of this week" style="margin-top: 26px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px">
             <sc-for list="{{stones}}" as="p" hint-placeholder-count="7">
-              <button type="button" aria-label="{{p.aria}}" onClick="{{p.open}}" style="height: 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px">
-                <span aria-hidden="true" style="width: 42px; height: 38px; position: relative; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: {{p.shell}}; border: {{p.border}}; box-sizing: border-box; overflow: hidden; box-shadow: {{p.glow}}"><span style="position: absolute; left: 0; right: 0; bottom: 0; height: {{p.fill}}%; background: linear-gradient(180deg, #E8FFD6 0%, #9FF0D8 45%, #3E9C86 100%)"></span></span>
+              <button type="button" aria-label="{{p.aria}}" onClick="{{p.open}}" style="height: 84px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px">
+                <span aria-hidden="true" style="width: 46px; height: 42px; position: relative; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: {{p.shell}}; border: {{p.border}}; box-sizing: border-box; overflow: hidden; box-shadow: {{p.glow}}"><span style="position: absolute; left: 0; right: 0; bottom: 0; height: {{p.fill}}%; background: linear-gradient(180deg, #E8FFD6 0%, #9FF0D8 45%, #3E9C86 100%)"></span></span>
                 <span style="font-size: 13px; font-weight: {{p.weight}}; color: {{p.labelColor}}">{{p.d}}</span>
               </button>
             </sc-for>
           </div>
-          <div style="margin-top: 14px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 16px 0; border-top: 1px solid rgba(255,255,255,0.08); border-bottom: 1px solid rgba(255,255,255,0.08)">
-            <div style="display: flex; flex-direction: column; align-items: center; gap: 4px"><span style="font-size: 12px; letter-spacing: 0.07em; color: #8E8E96">KEPT</span><span style="font-size: 22px; font-weight: 700; color: #9FF0D8">13 of 16</span></div>
-            <div style="display: flex; flex-direction: column; align-items: center; gap: 4px"><span style="font-size: 12px; letter-spacing: 0.07em; color: #8E8E96">FOCUSED</span><span style="font-size: 22px; font-weight: 700">6h 40m</span></div>
-            <div style="display: flex; flex-direction: column; align-items: center; gap: 4px"><span style="font-size: 12px; letter-spacing: 0.07em; color: #8E8E96">SLIPPING</span><span style="font-size: 22px; font-weight: 700; color: #FF9A9A">Essay</span></div>
+          <p style="margin: 30px 0 0; font-size: 28px; line-height: 1.25; font-weight: 600; letter-spacing: -0.02em; color: rgba(255,255,255,0.5)">You kept <span style="color: #9FF0D8">every morning run</span>. The <span style="color: #FF9A9A">essay</span> keeps slipping.</p>
+          <p style="margin: 14px 0 0; font-size: 14px; color: #7C7C85">Scroll for why ↓</p>
+
+          <div style="margin-top: 64px; display: flex; flex-direction: column; gap: 26px">
+            <div><div style="font-size: 44px; font-weight: 800; letter-spacing: -0.03em; color: #9FF0D8">13 of 16</div><div style="font-size: 16px; color: #C8C8CE">things you planned for yourself, kept · <span style="color: #9FF0D8">up from 11</span> last week</div></div>
+            <div><div style="font-size: 44px; font-weight: 800; letter-spacing: -0.03em">6h 40m</div><div style="font-size: 16px; color: #C8C8CE">focused · mostly after 4 PM</div></div>
+            <div><div style="font-size: 44px; font-weight: 800; letter-spacing: -0.03em; color: #FF9A9A">1 slipping</div><div style="font-size: 16px; color: #C8C8CE">the essay intro, moved twice</div></div>
           </div>
-          <div style="margin-top: 8px; display: flex; flex-direction: column">
-            <sc-for list="{{signals}}" as="sg" hint-placeholder-count="4">
-              <button type="button" onClick="{{sg.open}}" style="padding: 14px 0; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.06)">
-                <span style="display: flex; align-items: baseline; gap: 8px; width: 100%"><span style="font-size: 16px; font-weight: 600">{{sg.t}}</span><span style="flex: 1; font-size: 14px; color: #8E8E96">{{sg.v}}</span><span style="font-size: 15px; font-weight: 700; color: {{sg.c}}">{{sg.word}}</span></span>
-                <span aria-hidden="true" style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; width: 100%"><sc-for list="{{sg.days}}" as="dd" hint-placeholder-count="7"><span style="height: 6px; border-radius: 3px; background: {{dd.c}}"></span></sc-for></span>
-              </button>
-            </sc-for>
+
+          <h2 style="margin: 70px 0 0; font-size: 22px; font-weight: 700">What happened</h2>
+
+          <section style="margin-top: 22px; padding-top: 22px; border-top: 1px solid rgba(255,255,255,0.08)">
+            <div style="display: flex; align-items: baseline; justify-content: space-between"><span style="font-size: 20px; font-weight: 700">Morning runs</span><span style="font-size: 15px; font-weight: 700; color: #9FF0D8">Strong</span></div>
+            <div aria-label="Runs: Monday 7:40, Wednesday 7:52, Thursday 7:35, Friday 7:48" style="margin-top: 16px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; text-align: center">
+              <sc-for list="{{runDays}}" as="r" hint-placeholder-count="7"><div style="display: flex; flex-direction: column; align-items: center; gap: 6px"><span style="width: 14px; height: 14px; border-radius: 7px; background: {{r.c}}"></span><span style="font-size: 12px; color: #8E8E96">{{r.d}}</span><span style="font-size: 12px; color: #C8C8CE">{{r.t}}</span></div></sc-for>
+            </div>
+            <p style="margin: 14px 0 0; font-size: 15px; line-height: 1.5; color: #A0A0A8">4 of 4 planned, all before class. Tuesday was a rest day.</p>
+            <button type="button" onClick="{{whyOpen}}" style="min-height: 44px; font-size: 15px; color: {{ac}}; font-weight: 600">Why I think this</button>
+          </section>
+
+          <section style="margin-top: 18px; padding-top: 22px; border-top: 1px solid rgba(255,255,255,0.08)">
+            <div style="display: flex; align-items: baseline; justify-content: space-between"><span style="font-size: 20px; font-weight: 700">Essay intro</span><span style="font-size: 15px; font-weight: 700; color: #FF9A9A">Slipping</span></div>
+            <ol style="list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px">
+              <li style="display: flex; align-items: center; gap: 12px"><span style="width: 10px; height: 10px; border-radius: 5px; border: 2px solid #FF9A9A; box-sizing: border-box"></span><span style="flex: 1; font-size: 15px; color: #8E8E96; text-decoration: line-through">Wed 6:10 PM</span><span style="font-size: 13px; color: #8E8E96">moved after the shift</span></li>
+              <li style="display: flex; align-items: center; gap: 12px"><span style="width: 10px; height: 10px; border-radius: 5px; border: 2px solid #FF9A9A; box-sizing: border-box"></span><span style="flex: 1; font-size: 15px; color: #8E8E96; text-decoration: line-through">Fri 2:00 PM</span><span style="font-size: 13px; color: #8E8E96">moved this morning</span></li>
+              <li style="display: flex; align-items: center; gap: 12px"><span style="width: 10px; height: 10px; border-radius: 5px; background: #F5F5F7"></span><span style="flex: 1; font-size: 15px; font-weight: 600">Sat 9:00 AM</span><span style="font-size: 13px; color: #C8C8CE">now</span></li>
+            </ol>
+            <button type="button" style="margin-top: 16px; height: 48px; padding: 0 20px; border-radius: 24px; background: #FF9A9A; color: #0B0B0C; font-size: 15px; font-weight: 700">Give it a fixed slot</button>
+          </section>
+
+          <section style="margin-top: 22px; padding-top: 22px; border-top: 1px solid rgba(255,255,255,0.08)">
+            <div style="display: flex; align-items: baseline; justify-content: space-between"><span style="font-size: 20px; font-weight: 700">Wind-down</span><span style="font-size: 15px; font-weight: 700; color: #C7C1FF">Steady</span></div>
+            <p style="margin: 10px 0 0; font-size: 15px; line-height: 1.5; color: #A0A0A8">5 of 5 nights. In bed by 11:20 on average.</p>
+          </section>
+
+          <section style="margin-top: 22px; padding-top: 22px; border-top: 1px solid rgba(255,255,255,0.08)">
+            <div style="display: flex; align-items: baseline; justify-content: space-between"><span style="font-size: 20px; font-weight: 700">Focus after 4 PM</span><span style="font-size: 15px; font-weight: 700; color: {{ac}}">New</span></div>
+            <p style="margin: 10px 0 0; font-size: 15px; line-height: 1.5; color: #A0A0A8">Your three longest sessions this month all started after 4, on days without a shift.</p>
+            <div style="margin: 6px 0 0 -10px; display: flex; gap: 4px"><button type="button" style="height: 44px; padding: 0 10px; font-size: 15px; font-weight: 600; color: {{ac}}">Plan with this</button><button type="button" style="height: 44px; padding: 0 10px; font-size: 15px; color: #A0A0A8">Not true for me</button></div>
+          </section>
+
+          <h2 style="margin: 60px 0 0; font-size: 22px; font-weight: 700">Where your 31 hours went</h2>
+          <div role="img" aria-label="School 14 hours, Work 9, Friends 5, Health 3" style="margin-top: 18px; height: 16px; display: flex; gap: 3px"><span style="flex: 14; border-radius: 8px; background: #8C9EFF"></span><span style="flex: 9; border-radius: 8px; background: #8CC6EC"></span><span style="flex: 5; border-radius: 8px; background: #F4B37A"></span><span style="flex: 3; border-radius: 8px; background: #F3988C"></span></div>
+          <div style="margin-top: 14px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 10px; font-size: 15px">
+            <span><span style="color: #8C9EFF; font-weight: 700">School</span> 14h</span><span><span style="color: #8CC6EC; font-weight: 700">Work</span> 9h</span>
+            <span><span style="color: #F4B37A; font-weight: 700">Friends</span> 5h <span style="color: #9FF0D8">+3h</span></span><span><span style="color: #F3988C; font-weight: 700">Health</span> 3h</span>
           </div>
-          <button type="button" onClick="{{openWeekStory}}" style="margin-top: 22px; min-height: 92px; display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: 24px; background: linear-gradient(135deg, rgba(14,52,62,0.9), rgba(30,40,80,0.9)); border: 1px solid rgba(159,240,216,0.25); text-align: left">
-            <span style="flex: 1; display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: 600; letter-spacing: 0.07em; color: #9FF0D8">YOUR WEEK, TOLD BACK</span><span style="font-size: 18px; font-weight: 700">5 cards · about a minute</span><span style="font-size: 13px; color: rgba(255,255,255,0.65)">The full story arrives Sunday evening.</span></span>
-            <span style="height: 40px; padding: 0 18px; border-radius: 20px; background: #B8F0C8; color: #0B0B0C; font-weight: 700; display: flex; align-items: center">Open</span>
+
+          <button type="button" onClick="{{openWeekStory}}" style="margin-top: 56px; min-height: 180px; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; padding: 22px; border-radius: 28px; background: radial-gradient(ellipse 120% 90% at 20% 0%, rgba(80,170,150,0.45) 0%, rgba(20,40,50,0.9) 60%), #0D1418; border: 1px solid rgba(159,240,216,0.22); text-align: left">
+            <span style="font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: #9FF0D8">YOUR WEEK, TOLD BACK</span>
+            <span style="font-size: 24px; font-weight: 700; letter-spacing: -0.015em">Five cards, about a minute</span>
+            <span style="font-size: 14px; color: rgba(255,255,255,0.65)">The full story arrives Sunday evening.</span>
           </button>
-          <p style="margin: 16px 0 0; font-size: 14px; color: #8E8E96">Tap any line to see what it’s based on. Something off? <button type="button" onClick="{{reflectWrong}}" style="display: inline-block; padding: 11px 2px; margin: -11px 0; color: {{ac}}; font-weight: 600">Tell Navi</button></p>
+          <p style="margin: 22px 0 0; font-size: 14px; color: #8E8E96">Something off? <button type="button" onClick="{{reflectWrong}}" style="display: inline-block; padding: 11px 2px; margin: -11px 0; color: {{ac}}; font-weight: 600">Tell Navi</button></p>
         </sc-if>
         <sc-if value="{{eveningMode}}" hint-placeholder-val="{{ false }}">
           <div style="display: flex; align-items: baseline; gap: 10px"><h1 style="margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -0.02em">Tonight</h1><span style="font-size: 17px; color: #8E8E96">Friday</span></div>
@@ -333,6 +369,13 @@ input::placeholder{color:#8E8E96}
     </section>
   </div>
 
+
+  <sc-if value="{{progCompact}}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; left: 0; right: 0; top: 96px; z-index: 6; height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 24px; background: rgba(0,0,0,0.92); border-bottom: 1px solid rgba(255,255,255,0.08)">
+      <span style="font-size: 17px; font-weight: 700">This week</span><span style="font-size: 15px; color: #9FF0D8; font-weight: 600">13 of 16</span><span style="flex: 1"></span>
+      <sc-for list="{{stones}}" as="p" hint-placeholder-count="7"><span aria-hidden="true" style="width: 14px; height: 13px; position: relative; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: {{p.shell}}; overflow: hidden"><span style="position: absolute; left: 0; right: 0; bottom: 0; height: {{p.fill}}%; background: #9FF0D8"></span></span></sc-for>
+    </div>
+  </sc-if>
   <!-- Contextual entry to Navi on Plan and Progress -->
   <sc-if value="{{showAskBar}}" hint-placeholder-val="{{ false }}">
     <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 130px; z-index: 4; background: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.92) 45%, #000 100%); pointer-events: none"></div>
@@ -788,6 +831,10 @@ class Component extends DCLogic {
       showMenu: page === 1, offline,
       // progress
       weekMode: !evening, eveningMode: evening, stones, learned, signals,
+      progScroll: (e) => { const c = e.target.scrollTop > 150; if (c !== !!(this.state && this.state.progCompact)) set({ progCompact: c }); },
+      progCompact: page === 0 && !evening && !!s.progCompact,
+      whyOpen: () => set({ sheet: 'stone', full: false }),
+      runDays: [['M','7:40',1],['T','rest',0],['W','7:52',1],['T','7:35',1],['F','7:48',1],['S','',0],['S','',0]].map(([d, t, k]) => ({ d, t, c: k ? '#9FF0D8' : 'rgba(255,255,255,0.12)' })),
       pageScene: T.scene.replace('at 50% 0%', 'at 50% 14%'), ac: T.a1, cta: T.cta, stoneBg: T.stone, stoneShadow: T.sh, scene: T.scene, greet: T.greet, greetA: T.a, greetB: T.b, greetC: T.c, hiWord: T.hi,
       hasMoment: !!T.moment, momentTitle: T.moment ? T.moment[0] : '', momentSub: T.moment ? T.moment[1] : '', momentBtn: T.moment ? T.moment[2] : '',
       momentAct: () => set({ storyName: time === 'evening' ? 'evening' : 'morning' }),
