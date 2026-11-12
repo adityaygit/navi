@@ -47,9 +47,14 @@ function expectPlain(m: Message) {
   }
 }
 
-/** Four of Navi's planned items in a row from about now. */
+/**
+ * Four of Navi's planned items in a row, from the first full hour at least 20
+ * minutes away (so 20–80 minutes from now). All of them are still ahead:
+ * shifting only moves work that hasn't started, so a first block that began
+ * before now (e.g. 9:00 at 9:17) would make every count here one short.
+ */
 async function fourBlocks() {
-  const start = now().plus({ minutes: 20 }).startOf("hour").plus({ minutes: 0 });
+  const start = now().plus({ minutes: 80 }).startOf("hour");
   const titles = ["02.03a Heimler Video + Quiz (AP World)", "Finish LEQ paper (AP World)", "Course Check-in (Spanish)", "02.04 Vocabulary (Spanish)"];
   const rows = titles.map((title, i) => ({ user_id: me.userId, title, plan_date: today(), starts_at: start.plus({ minutes: 40 * i }).toISO(), ends_at: start.plus({ minutes: 40 * i + 30 }).toISO(), created_by: "navi", is_flexible: true, status: "planned" }));
   await me.db.from("plan_blocks").insert(rows);
