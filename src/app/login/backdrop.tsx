@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Pebble } from "@/components/pebble";
+import { BrandMark } from "@/components/brand-mark";
 
 /** The landing page's horizon, darkened, behind the public pages (sign-in, early access). */
 export function HorizonBackdrop() {
@@ -11,11 +11,11 @@ export function HorizonBackdrop() {
   );
 }
 
-/** Pebble and the Navi wordmark, linking home. */
-export function Wordmark({ glow = false }: { glow?: boolean }) {
+/** The Navi logo mark and wordmark, linking home. */
+export function Wordmark() {
   return (
     <Link href="/" className="inline-flex min-h-11 items-center gap-2.5 text-[19px] font-semibold tracking-[-0.02em] text-[#f2f2f2]">
-      <Pebble size={34} glow={glow} />
+      <BrandMark size={26} />
       Navi
     </Link>
   );

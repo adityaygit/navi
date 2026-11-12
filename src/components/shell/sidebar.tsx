@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Stone } from "./stone";
+import { BrandMark } from "../brand-mark";
 import { NAV_COOKIE, setShellCookie } from "./panel-context";
 import { shortcutLabel } from "@/lib/viewing";
 import { SignOutButton } from "../sign-out";
@@ -110,7 +110,7 @@ export function Sidebar({
       <div ref={contentRef} className="flex min-h-full flex-col gap-0.5 px-3 py-[18px]">
       <div className={`mb-4 flex h-[34px] items-center gap-2.5 ${collapsed ? "justify-center" : "px-2.5"}`}>
         <button type="button" onClick={toggle} className="flex items-center gap-2.5 rounded-full" aria-label={collapsed ? "Expand the sidebar" : "Navi, collapse the sidebar"} aria-expanded={!collapsed}>
-          <Stone size={18} />
+          <BrandMark size={18} />
           {!collapsed && <span className="text-[16px] font-bold tracking-[-0.01em]">Navi</span>}
         </button>
         {!collapsed && <span className="flex-1" />}

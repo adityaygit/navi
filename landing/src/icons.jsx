@@ -2,12 +2,7 @@
 const S = ({ size = 24, children, ...p }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}>{children}</svg>
 );
-export const Logo = (p) => (
-  <svg width="22" height="26" viewBox="0 0 22 26" aria-hidden="true" {...p}>
-    <path d="M11 1.5 20 24.5 11 19.2 2 24.5Z" fill="currentColor" />
-    <path d="M11 1.5V19.2L2 24.5Z" fill="#000" opacity=".28" />
-  </svg>
-);
+export const Logo = (p) => <img src={`${import.meta.env.BASE_URL}brand/navi-mark.png`} width="30" height="22" alt="" aria-hidden="true" {...p} />;
 export const Chevron = ({ dir = 'down', size = 12 }) => {
   const d = { down: 'M6 9l6 6 6-6', right: 'M9 6l6 6-6 6', left: 'M15 6l-6 6 6 6' }[dir];
   return <S size={size} strokeWidth="2.2"><path d={d} /></S>;
@@ -33,13 +28,7 @@ export const Clock = (p) => <S {...p}><circle cx="12" cy="12" r="8.5" /><path d=
 export const Lock = (p) => <S {...p}><rect x="5" y="10.5" width="14" height="9.5" rx="2" /><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" /></S>;
 export const Moon = (p) => <S {...p}><path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z" /></S>;
 export const Mail = (p) => <S {...p}><rect x="3.5" y="5.5" width="17" height="13" rx="2" /><path d="m4 7 8 6 8-6" /></S>;
-export const Wordmark = (p) => (
-  <svg width="74" height="22" viewBox="0 0 74 22" aria-hidden="true" {...p}>
-    <path d="M9 1.5 16.5 20.5 9 16.2 1.5 20.5Z" fill="currentColor" />
-    <path d="M9 1.5V16.2L1.5 20.5Z" fill="#000" opacity=".3" />
-    <text x="24" y="16.5" fontFamily="Instrument Sans, sans-serif" fontSize="17" fontWeight="600" letterSpacing="-0.3" fill="currentColor">Navi</text>
-  </svg>
-);
+export const Wordmark = (p) => <img src={`${import.meta.env.BASE_URL}brand/navi-logo.png`} width="88" height="24" alt="" aria-hidden="true" {...p} />;
 export const Phone = (p) => <S {...p}><rect x="7" y="2.5" width="10" height="19" rx="2.5" /><path d="M11 18.5h2" /></S>;
 export const Cloud = (p) => <S {...p}><path d="M7 18.5h10a4 4 0 0 0 .6-7.96A5.5 5.5 0 0 0 7.1 9.6 4.5 4.5 0 0 0 7 18.5Z" /></S>;
 export const Bell = (p) => <S {...p}><path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 2h-15Z" /><path d="M10 21h4" /></S>;

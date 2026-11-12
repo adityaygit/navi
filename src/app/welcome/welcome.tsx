@@ -8,6 +8,7 @@ import type { WelcomeStep } from "@/lib/onboarding";
 import type { Line } from "@/lib/sentences";
 import { Chat } from "@/components/chat";
 import { Stone } from "@/components/shell/stone";
+import { BrandMark } from "@/components/brand-mark";
 import { ProposalCard, proposalSummary, titleOf } from "@/components/proposal-card";
 import {
   completeOnboardingAction,
@@ -66,7 +67,7 @@ export function Welcome(props: Props) {
     <div className="relative flex min-h-dvh flex-col bg-black" style={props.naviVars}>
       <header className="flex h-20 shrink-0 items-center px-6 md:px-10">
         <div className="flex flex-1 items-center gap-2.5">
-          <Stone size={18} />
+          <BrandMark size={18} />
           <span className="text-[16px] font-bold">Navi</span>
         </div>
         <ol className="flex gap-1.5" aria-label={`Step ${Math.min(stepIndex + 1, DOT_STEPS.length)} of ${DOT_STEPS.length}`}>
