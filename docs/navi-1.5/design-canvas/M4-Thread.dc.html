@@ -10,13 +10,15 @@
 <helmet>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;display=swap">
 <style>
+@keyframes nRise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:0.01ms !important}}
 body{margin:0}
 button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer;text-align:left}
 </style>
 </helmet>
 <div style="width: 100%; display: flex; flex-direction: column; font-family: Figtree, -apple-system, sans-serif; color: #F5F5F7; background: {{rootBg}}">
   <sc-for list="{{items}}" as="m" hint-placeholder-count="4">
-    <div style="margin-top: {{m.mt}}px; display: flex; flex-direction: column">
+    <div style="margin-top: {{m.mt}}px; display: flex; flex-direction: column; animation: nRise 0.36s cubic-bezier(0.2, 0.9, 0.25, 1) both">
       <sc-if value="{{m.isStamp}}" hint-placeholder-val="{{ false }}">
         <div style="align-self: center; font-size: 13px; color: {{m.stampColor}}; padding: 4px 0">{{m.text}}</div>
       </sc-if>
