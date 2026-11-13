@@ -33,28 +33,28 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
   <!-- ========= SETUP (sheet over the dimmed scene) ========= -->
   <sc-if value="{{isSetup}}" hint-placeholder-val="{{ true }}">
     <div aria-hidden="true" style="animation: fFade 0.3s ease both; position: absolute; inset: 0; background: rgba(0,0,0,0.45)"></div>
-    <section aria-label="Set up focus" style="animation: fUp 0.42s cubic-bezier(0.2, 0.9, 0.25, 1) both; position: absolute; left: 0; right: 0; bottom: 0; border-radius: 32px 32px 0 0; background: rgba(22,22,26,0.94); border-top: 1px solid rgba(255,255,255,0.1); padding: 10px 18px 34px; display: flex; flex-direction: column; gap: 10px">
+    <section aria-label="Set up focus" style="animation: fUp 0.42s cubic-bezier(0.2, 0.9, 0.25, 1) both; position: absolute; left: 0; right: 0; bottom: 0; border-radius: 32px 32px 0 0; background: rgba(22,22,26,0.94); border-top: 1px solid rgba(255,255,255,0.1); padding: 8px 16px 34px; display: flex; flex-direction: column; gap: 12px">
       <span aria-hidden="true" style="align-self: center; width: 40px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.25)"></span>
-      <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 2px; padding: 0 4px"><span style="font-size: 13px; font-weight: 600; letter-spacing: 0.06em; color: {{tint}}">FOCUS · {{spaceUpper}}</span><span style="font-size: 24px; font-weight: 700; letter-spacing: -0.015em">Essay: write the intro</span></div>
-      <div style="margin-top: 6px; border-radius: 20px; background: rgba(255,255,255,0.06); display: flex; flex-direction: column">
-        <div style="min-height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 8px 0 16px">
-          <span style="flex: 1; font-size: 16px">Length</span>
+      <div style="margin: 12px 0 4px; display: flex; flex-direction: column; gap: 4px; padding: 0 4px"><span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: {{tint}}">FOCUS · {{spaceUpper}}</span><span style="font-size: 24px; font-weight: 700; letter-spacing: -0.015em">Essay: write the intro</span></div>
+      <div style="border-radius: 16px; background: rgba(255,255,255,0.06); display: flex; flex-direction: column">
+        <div style="min-height: 56px; display: flex; align-items: center; gap: 8px; padding: 0 6px 0 16px">
+          <span style="flex: 1; font-size: 17px">Length</span>
           <button type="button" aria-label="Shorter" onClick="{{less}}" style="width: 44px; height: 44px; border-radius: 22px; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
-          <span style="width: 70px; text-align: center; font-size: 17px; font-weight: 600">{{mins}} min</span>
+          <span style="width: 72px; text-align: center; font-size: 17px; font-weight: 600">{{mins}} min</span>
           <button type="button" aria-label="Longer" onClick="{{more}}" style="width: 44px; height: 44px; border-radius: 22px; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
         </div>
         <div style="height: 1px; margin-left: 16px; background: rgba(255,255,255,0.07)"></div>
-        <div style="min-height: 52px; display: flex; align-items: center; padding: 0 16px"><span style="flex: 1; font-size: 16px">Ends at</span><span style="font-size: 16px; color: rgba(255,255,255,0.75)">{{endsAt}}</span></div>
+        <div style="min-height: 52px; display: flex; align-items: center; padding: 0 16px"><span style="flex: 1; font-size: 17px">Ends at</span><span style="font-size: 17px; color: rgba(255,255,255,0.6)">{{endsAt}}</span></div>
       </div>
-      <div style="border-radius: 20px; background: rgba(255,255,255,0.06); display: flex; flex-direction: column">
-        <div style="min-height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 16px"><span style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 16px">Hold everything else</span><span style="font-size: 13px; color: rgba(255,255,255,0.6)">Your shift and Maya can still reach you</span></span><span aria-hidden="true" style="width: 50px; height: 30px; border-radius: 15px; background: {{tint}}; position: relative"><span style="position: absolute; right: 3px; top: 3px; width: 24px; height: 24px; border-radius: 12px; background: #fff"></span></span></div>
+      <div style="border-radius: 16px; background: rgba(255,255,255,0.06); display: flex; flex-direction: column">
+        <div style="min-height: 64px; display: flex; align-items: center; gap: 12px; padding: 8px 16px; box-sizing: border-box"><span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 17px">Hold everything else</span><span style="font-size: 13px; color: rgba(255,255,255,0.6)">Your shift and Maya can still reach you</span></span><span aria-hidden="true" style="width: 50px; height: 30px; border-radius: 15px; background: {{tint}}; position: relative"><span style="position: absolute; right: 3px; top: 3px; width: 24px; height: 24px; border-radius: 12px; background: #fff"></span></span></div>
         <div style="height: 1px; margin-left: 16px; background: rgba(255,255,255,0.07)"></div>
-        <div style="min-height: 52px; display: flex; align-items: center; padding: 0 16px"><span style="flex: 1; font-size: 16px">Break</span><span style="font-size: 16px; color: rgba(255,255,255,0.75)">One, 5 min</span></div>
+        <div style="min-height: 52px; display: flex; align-items: center; padding: 0 16px"><span style="flex: 1; font-size: 17px">Break</span><span style="font-size: 17px; color: rgba(255,255,255,0.6)">One, 5 min</span></div>
         <div style="height: 1px; margin-left: 16px; background: rgba(255,255,255,0.07)"></div>
-        <div style="min-height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 16px"><span style="flex: 1; font-size: 16px">Scene</span><span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 11px; background: {{swatch}}"></span><span style="font-size: 16px; color: rgba(255,255,255,0.75)">{{sceneName}}</span></div>
+        <div style="min-height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 16px"><span style="flex: 1; font-size: 17px">Scene</span><span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 11px; background: {{swatch}}"></span><span style="font-size: 17px; color: rgba(255,255,255,0.6)">{{sceneName}}</span></div>
       </div>
-      <button type="button" onClick="{{start}}" style="margin-top: 8px; height: 56px; border-radius: 28px; background: {{ctaGrad}}; color: #0B0B0C; font-size: 17px; font-weight: 700; text-align: center">Start focus · {{mins}} min</button>
-      <button type="button" style="height: 44px; font-size: 15px; color: rgba(255,255,255,0.7); text-align: center">Schedule for later</button>
+      <button type="button" onClick="{{start}}" style="margin-top: 8px; height: 56px; border-radius: 28px; background: {{ctaGrad}}; color: #0B0B0C; font-size: 17px; font-weight: 600; text-align: center">Start focus · {{mins}} min</button>
+      <button type="button" style="margin-top: -4px; height: 44px; font-size: 15px; color: rgba(255,255,255,0.7); text-align: center">Schedule for later</button>
     </section>
   </sc-if>
 
@@ -67,53 +67,53 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
 
   <!-- ========= RUNNING ========= -->
   <sc-if value="{{isRun}}" hint-placeholder-val="{{ false }}">
-    <div style="animation: fFade 0.5s ease both; position: absolute; left: 16px; right: 16px; top: 56px; display: flex; justify-content: space-between">
+    <div style="animation: fFade 0.5s ease both; position: absolute; left: 20px; right: 20px; top: 56px; display: flex; align-items: center; justify-content: space-between">
       <button type="button" aria-label="Minimise" onClick="{{minimize}}" style="width: 44px; height: 44px; border-radius: 22px; background: rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
-      <span style="height: 36px; padding: 0 14px; border-radius: 18px; background: rgba(0,0,0,0.25); display: flex; align-items: center; gap: 8px; font-size: 14px"><span aria-hidden="true" style="width: 14px; height: 13px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: {{stone}}"></span>Holding 2 things</span>
+      <span style="height: 36px; padding: 0 14px 0 12px; border-radius: 18px; background: rgba(0,0,0,0.25); display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600"><span aria-hidden="true" style="width: 14px; height: 13px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: {{stone}}"></span>Holding 2 things</span>
     </div>
-    <div style="animation: fRise 0.5s cubic-bezier(0.2, 0.9, 0.25, 1) 0.1s both; position: absolute; left: 16px; right: 16px; bottom: 34px; display: flex; flex-direction: column; gap: 12px">
-      <div style="padding: 0 4px"><div style="font-size: 13px; font-weight: 600; letter-spacing: 0.06em; color: {{tintSoft}}">FOCUS · {{spaceUpper}}</div><div style="margin-top: 6px; font-size: 28px; font-weight: 700; letter-spacing: -0.02em">Essay: write the intro</div><div style="margin-top: 4px; font-size: 17px; color: rgba(255,255,255,0.8)">{{remainLabel}} <span style="font-weight: 700; color: #fff; font-feature-settings: 'tnum'">{{remaining}}</span></div></div>
-      <div style="padding: 0 4px">
-        <div role="progressbar" aria-label="{{progressAria}}" style="position: relative; height: 14px; border-radius: 7px; background: rgba(255,255,255,0.16); overflow: hidden"><div style="height: 14px; width: {{pct}}%; background: {{cta}}; transition: width 1s linear"></div></div>
+    <div style="animation: fRise 0.5s cubic-bezier(0.2, 0.9, 0.25, 1) 0.1s both; position: absolute; left: 20px; right: 20px; bottom: 34px; display: flex; flex-direction: column; gap: 16px">
+      <div><div style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: {{tintSoft}}">FOCUS · {{spaceUpper}}</div><div style="margin-top: 8px; font-size: 28px; line-height: 1.15; font-weight: 700; letter-spacing: -0.02em">Essay: write the intro</div><div style="margin-top: 8px; font-size: 17px; color: rgba(255,255,255,0.8)">{{remainLabel}} <span style="font-weight: 700; color: #fff; font-feature-settings: 'tnum'">{{remaining}}</span></div></div>
+      <div>
+        <div role="progressbar" aria-label="{{progressAria}}" style="position: relative; height: 12px; border-radius: 6px; background: rgba(255,255,255,0.16); overflow: hidden"><div style="height: 12px; width: {{pct}}%; background: {{cta}}; transition: width 1s linear"></div></div>
         <div style="margin-top: 8px; display: flex; justify-content: space-between; font-size: 13px; color: rgba(255,255,255,0.7)"><span>2:00 PM</span><span>{{endsAt}}</span></div>
       </div>
-      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
-        <div style="min-height: 72px; padding: 12px 14px; border-radius: 18px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.10); display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; letter-spacing: 0.05em; color: rgba(255,255,255,0.6)">NEXT STEP</span><span style="font-size: 15px; font-weight: 600">Write the opening paragraph</span></div>
-        <div style="min-height: 72px; padding: 12px 14px; border-radius: 18px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.10); display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; letter-spacing: 0.05em; color: rgba(255,255,255,0.6)">AFTER THIS</span><span style="font-size: 15px; font-weight: 600">Dentist call · 3:30</span></div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+        <div style="min-height: 72px; padding: 14px 16px; box-sizing: border-box; border-radius: 16px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.10); display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: rgba(255,255,255,0.6)">NEXT STEP</span><span style="font-size: 15px; font-weight: 600">Write the opening paragraph</span></div>
+        <div style="min-height: 72px; padding: 14px 16px; box-sizing: border-box; border-radius: 16px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.10); display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: rgba(255,255,255,0.6)">AFTER THIS</span><span style="font-size: 15px; font-weight: 600">Dentist call · 3:30</span></div>
       </div>
-      <button type="button" onClick="{{toggleBreak}}" style="margin-top: 4px; height: 56px; border-radius: 28px; background: {{cta}}; color: #0B0B0C; font-size: 17px; font-weight: 700; text-align: center">{{breakLabel}}</button>
-      <button type="button" onClick="{{leave}}" style="height: 44px; font-size: 16px; font-weight: 600; color: #FF9A9A; text-align: center">End early</button>
+      <button type="button" onClick="{{toggleBreak}}" style="height: 56px; border-radius: 28px; background: {{cta}}; color: #0B0B0C; font-size: 17px; font-weight: 600; text-align: center">{{breakLabel}}</button>
+      <button type="button" onClick="{{leave}}" style="margin-top: -8px; height: 44px; font-size: 15px; font-weight: 600; color: #FF9A9A; text-align: center">End early</button>
     </div>
   </sc-if>
 
   <!-- ========= END EARLY (no guilt) ========= -->
   <sc-if value="{{isLeave}}" hint-placeholder-val="{{ false }}">
     <div aria-hidden="true" style="animation: fFade 0.25s ease both; position: absolute; inset: 0; background: rgba(0,0,0,0.55)"></div>
-    <section aria-label="End early" style="animation: fUp 0.4s cubic-bezier(0.2, 0.9, 0.25, 1) both; position: absolute; left: 10px; right: 10px; bottom: 24px; border-radius: 30px; background: rgba(28,28,32,0.96); border: 1px solid rgba(255,255,255,0.1); padding: 26px 20px 10px; display: flex; flex-direction: column; align-items: center; text-align: center">
+    <section aria-label="End early" style="animation: fUp 0.4s cubic-bezier(0.2, 0.9, 0.25, 1) both; position: absolute; left: 12px; right: 12px; bottom: 24px; border-radius: 28px; background: rgba(28,28,32,0.96); border: 1px solid rgba(255,255,255,0.1); padding: 28px 20px 8px; display: flex; flex-direction: column; align-items: center; text-align: center">
       <span aria-hidden="true" style="width: 56px; height: 51px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: {{stone}}"></span>
       <div style="margin-top: 16px; font-size: 24px; font-weight: 700; letter-spacing: -0.015em">End focus now?</div>
-      <p style="margin: 10px 0 0; font-size: 16px; line-height: 1.5; color: rgba(255,255,255,0.75)">You focused <span style="color: #fff; font-weight: 600">12 of 50 minutes</span>. That still counts, and I’ll keep the rest for later today.</p>
-      <button type="button" onClick="{{run}}" style="margin-top: 22px; align-self: stretch; height: 56px; border-radius: 28px; background: {{cta}}; color: #0B0B0C; font-size: 17px; font-weight: 700; text-align: center">Keep going</button>
-      <button type="button" onClick="{{finish}}" style="align-self: stretch; height: 52px; font-size: 16px; font-weight: 600; color: #FF9A9A; text-align: center">End and save 12 minutes</button>
+      <p style="margin: 8px 0 0; font-size: 15px; line-height: 1.45; color: rgba(255,255,255,0.75)">You focused <span style="color: #fff; font-weight: 600">12 of 50 minutes</span>. That still counts, and I’ll keep the rest for later today.</p>
+      <button type="button" onClick="{{run}}" style="margin-top: 24px; align-self: stretch; height: 56px; border-radius: 28px; background: {{cta}}; color: #0B0B0C; font-size: 17px; font-weight: 600; text-align: center">Keep going</button>
+      <button type="button" onClick="{{finish}}" style="align-self: stretch; height: 48px; font-size: 15px; font-weight: 600; color: #FF9A9A; text-align: center">End and save 12 minutes</button>
     </section>
   </sc-if>
 
   <!-- ========= DONE ========= -->
   <sc-if value="{{isDone}}" hint-placeholder-val="{{ false }}">
-    <div style="animation: fRise 0.6s cubic-bezier(0.2, 0.9, 0.25, 1) both; position: absolute; left: 0; right: 0; top: 120px; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 28px">
+    <div style="animation: fRise 0.6s cubic-bezier(0.2, 0.9, 0.25, 1) both; position: absolute; left: 0; right: 0; top: 120px; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 24px">
       <span aria-hidden="true" style="width: 120px; height: 110px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: {{stone}}; box-shadow: 0 30px 70px {{stoneShadow}}"></span>
-      <span style="margin-top: 26px; font-size: 14px; font-weight: 700; letter-spacing: 0.08em; color: #CFF7A6">KEPT</span>
+      <span style="margin-top: 24px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; color: #CFF7A6">KEPT</span>
       <div style="margin-top: 8px; font-size: 34px; line-height: 1.15; font-weight: 700; letter-spacing: -0.025em">50 minutes on the essay intro.</div>
-      <div style="margin-top: 22px; display: flex; gap: 26px">
-        <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; letter-spacing: 0.06em; color: rgba(255,255,255,0.6)">FOCUSED</span><span style="font-size: 20px; font-weight: 700">50 min</span></div>
-        <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; letter-spacing: 0.06em; color: rgba(255,255,255,0.6)">BREAKS</span><span style="font-size: 20px; font-weight: 700">1</span></div>
-        <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; letter-spacing: 0.06em; color: rgba(255,255,255,0.6)">HELD</span><span style="font-size: 20px; font-weight: 700">2 things</span></div>
+      <div style="margin-top: 24px; display: flex; gap: 32px">
+        <div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: rgba(255,255,255,0.6)">FOCUSED</span><span style="font-size: 20px; font-weight: 700">50 min</span></div>
+        <div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: rgba(255,255,255,0.6)">BREAKS</span><span style="font-size: 20px; font-weight: 700">1</span></div>
+        <div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: rgba(255,255,255,0.6)">HELD</span><span style="font-size: 20px; font-weight: 700">2 things</span></div>
       </div>
     </div>
-    <div style="position: absolute; left: 16px; right: 16px; bottom: 34px; display: flex; flex-direction: column; gap: 4px">
-      <p style="margin: 0 4px 12px; font-size: 16px; line-height: 1.5; color: rgba(255,255,255,0.85)">Is the intro done, or is there more for tomorrow?</p>
-      <button type="button" onClick="{{close}}" style="height: 56px; border-radius: 28px; background: {{cta}}; color: #0B0B0C; font-size: 17px; font-weight: 700; text-align: center">Mark the intro done</button>
-      <button type="button" onClick="{{close}}" style="height: 48px; font-size: 16px; color: rgba(255,255,255,0.8); text-align: center">Still in progress</button>
+    <div style="position: absolute; left: 20px; right: 20px; bottom: 34px; display: flex; flex-direction: column; gap: 4px">
+      <p style="margin: 0 0 12px; font-size: 17px; line-height: 1.45; color: rgba(255,255,255,0.85)">Is the intro done, or is there more for tomorrow?</p>
+      <button type="button" onClick="{{close}}" style="height: 56px; border-radius: 28px; background: {{cta}}; color: #0B0B0C; font-size: 17px; font-weight: 600; text-align: center">Mark the intro done</button>
+      <button type="button" onClick="{{close}}" style="height: 48px; font-size: 15px; color: rgba(255,255,255,0.8); text-align: center">Still in progress</button>
     </div>
   </sc-if>
 </div>
