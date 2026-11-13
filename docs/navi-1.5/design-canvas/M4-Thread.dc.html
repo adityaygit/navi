@@ -18,7 +18,7 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
 </helmet>
 <div style="width: 100%; display: flex; flex-direction: column; font-family: Figtree, -apple-system, sans-serif; color: #F5F5F7; background: {{rootBg}}">
   <sc-for list="{{items}}" as="m" hint-placeholder-count="4">
-    <div style="margin-top: {{m.mt}}px; display: flex; flex-direction: column; animation: nRise 0.36s cubic-bezier(0.2, 0.9, 0.25, 1) both">
+    <div style="margin-top: {{m.mt}}px; display: flex; flex-direction: column; animation: {{m.anim}}">
       <sc-if value="{{m.isStamp}}" hint-placeholder-val="{{ false }}">
         <div style="align-self: center; font-size: 13px; color: {{m.stampColor}}; padding: 4px 0">{{m.text}}</div>
       </sc-if>
@@ -89,7 +89,7 @@ class Component extends DCLogic {
       ], hasNote: false, pText: 'Add at 3:30 PM', sText: 'Pick another time', pBg: '#A7EBC0', pColor: '#00140A', onP: noop, onS: noop, mt: 14 },
       { isReceipt: true, text: 'Practise the new song moved to 10:00 PM', hasAct: true, actText: 'Undo', ac: '#A7EBC0', onAct: noop, mt: 22 }
     ];
-    const items = this.props.items ?? sample;
+    const items = (this.props.items ?? sample).map((m) => Object.assign({ anim: 'none' }, m));
     return { items, rootBg: this.props.items ? 'transparent' : '#000000' };
   }
 }

@@ -10,6 +10,9 @@
 <helmet>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&amp;display=swap">
 <style>
+@keyframes sA{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes sB{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:0.01ms !important;transition-duration:0.01ms !important}}
 body{margin:0}
 button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer;text-align:left}
 </style>
@@ -21,7 +24,7 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
   <!-- progress segments + close -->
   <div style="position: absolute; left: 16px; right: 16px; top: 56px; z-index: 3; display: flex; align-items: center; gap: 12px">
     <div role="progressbar" aria-label="{{progressAria}}" style="flex: 1; display: grid; grid-template-columns: repeat({{count}}, minmax(0, 1fr)); gap: 5px">
-      <sc-for list="{{segs}}" as="g" hint-placeholder-count="4"><span style="height: 3px; border-radius: 2px; background: {{g.c}}"></span></sc-for>
+      <sc-for list="{{segs}}" as="g" hint-placeholder-count="4"><span style="height: 3px; border-radius: 2px; background: {{g.c}}; transition: background-color 0.3s"></span></sc-for>
     </div>
     <button type="button" aria-label="Close" onClick="{{close}}" style="width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.12)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
   </div>
@@ -30,7 +33,7 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
   <button type="button" aria-label="Previous" onClick="{{prev}}" style="position: absolute; left: 0; top: 110px; width: 35%; bottom: 200px; z-index: 1"></button>
   <button type="button" aria-label="Next" onClick="{{next}}" style="position: absolute; right: 0; top: 110px; width: 65%; bottom: 200px; z-index: 1"></button>
 
-  <div style="position: absolute; left: 0; right: 0; top: 120px; bottom: 34px; padding: 0 28px; display: flex; flex-direction: column; align-items: center; text-align: center; pointer-events: none">
+  <div style="animation: {{stepAnim}}; position: absolute; left: 0; right: 0; top: 120px; bottom: 34px; padding: 0 28px; display: flex; flex-direction: column; align-items: center; text-align: center; pointer-events: none">
     <div style="font-size: 14px; font-weight: 600; letter-spacing: 0.08em; color: {{kickerColor}}">{{p.kicker}}</div>
 
     <sc-if value="{{p.vStone}}" hint-placeholder-val="{{ false }}">
@@ -133,6 +136,7 @@ class Component extends DCLogic {
       bg: P.bg, blobA: P.a, blobB: P.b, kickerColor: P.k, cta: P.cta, stoneBg: P.stone, stoneShadow: P.sh,
       count: pages.length, progressAria: 'Page ' + (step + 1) + ' of ' + pages.length,
       segs: pages.map((_, i) => ({ c: i <= step ? '#FFFFFF' : 'rgba(255,255,255,0.28)' })),
+      stepAnim: (step % 2 ? 'sB' : 'sA') + ' 0.38s cubic-bezier(0.2, 0.9, 0.25, 1) both',
       p, bigTop: p.vStone || p.vStones ? 40 : p.vDay ? 22 : p.vBars || p.vSpaces ? 28 : 140,
       next: () => this.setState({ step: Math.min(pages.length - 1, step + 1) }), prev: () => this.setState({ step: Math.max(0, step - 1) }), close,
       ctaAct: this.props.onCta || (() => close()), cta2Act: () => close(),

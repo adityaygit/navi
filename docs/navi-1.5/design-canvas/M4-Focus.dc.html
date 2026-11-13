@@ -10,6 +10,13 @@
 <helmet>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700;800&amp;display=swap">
 <style>
+@keyframes fUp{from{transform:translateY(100%)}to{transform:none}}
+@keyframes fFade{from{opacity:0}to{opacity:1}}
+@keyframes fRise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes fPopB{0%{opacity:0;transform:scale(1.25)}20%{opacity:1;transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:scale(0.9)}}
+@keyframes fPopC{0%{opacity:0;transform:scale(1.25)}20%{opacity:1;transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:scale(0.9)}}
+@keyframes fPop{0%{opacity:0;transform:scale(1.25)}20%{opacity:1;transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:scale(0.9)}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:0.01ms !important;transition-duration:0.01ms !important}}
 body{margin:0}
 button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer;text-align:left}
 </style>
@@ -25,8 +32,8 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
 
   <!-- ========= SETUP (sheet over the dimmed scene) ========= -->
   <sc-if value="{{isSetup}}" hint-placeholder-val="{{ true }}">
-    <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(0,0,0,0.45)"></div>
-    <section aria-label="Set up focus" style="position: absolute; left: 0; right: 0; bottom: 0; border-radius: 32px 32px 0 0; background: rgba(22,22,26,0.94); border-top: 1px solid rgba(255,255,255,0.1); padding: 10px 18px 34px; display: flex; flex-direction: column; gap: 10px">
+    <div aria-hidden="true" style="animation: fFade 0.3s ease both; position: absolute; inset: 0; background: rgba(0,0,0,0.45)"></div>
+    <section aria-label="Set up focus" style="animation: fUp 0.42s cubic-bezier(0.2, 0.9, 0.25, 1) both; position: absolute; left: 0; right: 0; bottom: 0; border-radius: 32px 32px 0 0; background: rgba(22,22,26,0.94); border-top: 1px solid rgba(255,255,255,0.1); padding: 10px 18px 34px; display: flex; flex-direction: column; gap: 10px">
       <span aria-hidden="true" style="align-self: center; width: 40px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.25)"></span>
       <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 2px; padding: 0 4px"><span style="font-size: 13px; font-weight: 600; letter-spacing: 0.06em; color: {{tint}}">FOCUS · {{spaceUpper}}</span><span style="font-size: 24px; font-weight: 700; letter-spacing: -0.015em">Essay: write the intro</span></div>
       <div style="margin-top: 6px; border-radius: 20px; background: rgba(255,255,255,0.06); display: flex; flex-direction: column">
@@ -53,34 +60,36 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
 
   <!-- ========= COUNTDOWN ========= -->
   <sc-if value="{{isCount}}" hint-placeholder-val="{{ false }}">
-    <button type="button" aria-label="Skip countdown" onClick="{{run}}" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 140px; font-weight: 700; color: #fff; text-align: center">3</button>
+    <button type="button" aria-label="Skip countdown" onClick="{{run}}" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center">
+      <span aria-live="polite" style="animation: {{countAnim}}; font-size: 140px; font-weight: 700; color: #fff">{{countN}}</span>
+    </button>
   </sc-if>
 
   <!-- ========= RUNNING ========= -->
   <sc-if value="{{isRun}}" hint-placeholder-val="{{ false }}">
-    <div style="position: absolute; left: 16px; right: 16px; top: 56px; display: flex; justify-content: space-between">
-      <button type="button" aria-label="Minimise" style="width: 44px; height: 44px; border-radius: 22px; background: rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+    <div style="animation: fFade 0.5s ease both; position: absolute; left: 16px; right: 16px; top: 56px; display: flex; justify-content: space-between">
+      <button type="button" aria-label="Minimise" onClick="{{minimize}}" style="width: 44px; height: 44px; border-radius: 22px; background: rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
       <span style="height: 36px; padding: 0 14px; border-radius: 18px; background: rgba(0,0,0,0.25); display: flex; align-items: center; gap: 8px; font-size: 14px"><span aria-hidden="true" style="width: 14px; height: 13px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: {{stone}}"></span>Holding 2 things</span>
     </div>
-    <div style="position: absolute; left: 16px; right: 16px; bottom: 34px; display: flex; flex-direction: column; gap: 12px">
-      <div style="padding: 0 4px"><div style="font-size: 13px; font-weight: 600; letter-spacing: 0.06em; color: {{tintSoft}}">FOCUS · {{spaceUpper}}</div><div style="margin-top: 6px; font-size: 28px; font-weight: 700; letter-spacing: -0.02em">Essay: write the intro</div><div style="margin-top: 4px; font-size: 17px; color: rgba(255,255,255,0.8)">Remaining <span style="font-weight: 700; color: #fff; font-feature-settings: 'tnum'">{{remaining}}</span></div></div>
+    <div style="animation: fRise 0.5s cubic-bezier(0.2, 0.9, 0.25, 1) 0.1s both; position: absolute; left: 16px; right: 16px; bottom: 34px; display: flex; flex-direction: column; gap: 12px">
+      <div style="padding: 0 4px"><div style="font-size: 13px; font-weight: 600; letter-spacing: 0.06em; color: {{tintSoft}}">FOCUS · {{spaceUpper}}</div><div style="margin-top: 6px; font-size: 28px; font-weight: 700; letter-spacing: -0.02em">Essay: write the intro</div><div style="margin-top: 4px; font-size: 17px; color: rgba(255,255,255,0.8)">{{remainLabel}} <span style="font-weight: 700; color: #fff; font-feature-settings: 'tnum'">{{remaining}}</span></div></div>
       <div style="padding: 0 4px">
-        <div role="progressbar" aria-label="{{progressAria}}" style="position: relative; height: 14px; border-radius: 7px; background: rgba(255,255,255,0.16); overflow: hidden"><div style="height: 14px; width: {{pct}}%; background: {{cta}}"></div></div>
+        <div role="progressbar" aria-label="{{progressAria}}" style="position: relative; height: 14px; border-radius: 7px; background: rgba(255,255,255,0.16); overflow: hidden"><div style="height: 14px; width: {{pct}}%; background: {{cta}}; transition: width 1s linear"></div></div>
         <div style="margin-top: 8px; display: flex; justify-content: space-between; font-size: 13px; color: rgba(255,255,255,0.7)"><span>2:00 PM</span><span>{{endsAt}}</span></div>
       </div>
       <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
         <div style="min-height: 72px; padding: 12px 14px; border-radius: 18px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.10); display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; letter-spacing: 0.05em; color: rgba(255,255,255,0.6)">NEXT STEP</span><span style="font-size: 15px; font-weight: 600">Write the opening paragraph</span></div>
         <div style="min-height: 72px; padding: 12px 14px; border-radius: 18px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.10); display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; letter-spacing: 0.05em; color: rgba(255,255,255,0.6)">AFTER THIS</span><span style="font-size: 15px; font-weight: 600">Dentist call · 3:30</span></div>
       </div>
-      <button type="button" style="margin-top: 4px; height: 56px; border-radius: 28px; background: {{cta}}; color: #0B0B0C; font-size: 17px; font-weight: 700; text-align: center">Take a 5-min break</button>
+      <button type="button" onClick="{{toggleBreak}}" style="margin-top: 4px; height: 56px; border-radius: 28px; background: {{cta}}; color: #0B0B0C; font-size: 17px; font-weight: 700; text-align: center">{{breakLabel}}</button>
       <button type="button" onClick="{{leave}}" style="height: 44px; font-size: 16px; font-weight: 600; color: #FF9A9A; text-align: center">End early</button>
     </div>
   </sc-if>
 
   <!-- ========= END EARLY (no guilt) ========= -->
   <sc-if value="{{isLeave}}" hint-placeholder-val="{{ false }}">
-    <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(0,0,0,0.55)"></div>
-    <section aria-label="End early" style="position: absolute; left: 10px; right: 10px; bottom: 24px; border-radius: 30px; background: rgba(28,28,32,0.96); border: 1px solid rgba(255,255,255,0.1); padding: 26px 20px 10px; display: flex; flex-direction: column; align-items: center; text-align: center">
+    <div aria-hidden="true" style="animation: fFade 0.25s ease both; position: absolute; inset: 0; background: rgba(0,0,0,0.55)"></div>
+    <section aria-label="End early" style="animation: fUp 0.4s cubic-bezier(0.2, 0.9, 0.25, 1) both; position: absolute; left: 10px; right: 10px; bottom: 24px; border-radius: 30px; background: rgba(28,28,32,0.96); border: 1px solid rgba(255,255,255,0.1); padding: 26px 20px 10px; display: flex; flex-direction: column; align-items: center; text-align: center">
       <span aria-hidden="true" style="width: 56px; height: 51px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: {{stone}}"></span>
       <div style="margin-top: 16px; font-size: 24px; font-weight: 700; letter-spacing: -0.015em">End focus now?</div>
       <p style="margin: 10px 0 0; font-size: 16px; line-height: 1.5; color: rgba(255,255,255,0.75)">You focused <span style="color: #fff; font-weight: 600">12 of 50 minutes</span>. That still counts, and I’ll keep the rest for later today.</p>
@@ -91,7 +100,7 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
 
   <!-- ========= DONE ========= -->
   <sc-if value="{{isDone}}" hint-placeholder-val="{{ false }}">
-    <div style="position: absolute; left: 0; right: 0; top: 120px; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 28px">
+    <div style="animation: fRise 0.6s cubic-bezier(0.2, 0.9, 0.25, 1) both; position: absolute; left: 0; right: 0; top: 120px; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 28px">
       <span aria-hidden="true" style="width: 120px; height: 110px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: {{stone}}; box-shadow: 0 30px 70px {{stoneShadow}}"></span>
       <span style="margin-top: 26px; font-size: 14px; font-weight: 700; letter-spacing: 0.08em; color: #CFF7A6">KEPT</span>
       <div style="margin-top: 8px; font-size: 34px; line-height: 1.15; font-weight: 700; letter-spacing: -0.025em">50 minutes on the essay intro.</div>
@@ -109,8 +118,9 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
   </sc-if>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"space":{"editor":"enum","options":["school","work","health","hobby","friends"],"default":"school"},"step":{"editor":"enum","options":["setup","count","run","leave","done"],"default":"setup"},"onClose":{"editor":null},"$preview":{"width":390,"height":844}}'>
+<script type="text/x-dc" data-dc-script data-props='{"space":{"editor":"enum","options":["school","work","health","hobby","friends"],"default":"school"},"step":{"editor":"enum","options":["setup","count","run","leave","done"],"default":"setup"},"onClose":{"editor":null},"onMinimize":{"editor":null},"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
+  componentWillUnmount() { clearInterval(this._iv); this._iv = null; }
   renderVals() {
     const S = {
       school: { name: 'Dusk', sky: 'linear-gradient(180deg, #2A2C6E 0%, #5652B0 22%, #A79BE6 40%, #F3B8D2 47%, #2A2350 52%, #120F26 100%)', sun: 'rgba(255,214,230,0.55)', h1: '#2A2B63', h2: '#191A3E', tint: '#B9B2FF', soft: '#D9D5FF', cta: 'linear-gradient(90deg, #C9C3FF, #FFC2DD)', stone: 'radial-gradient(circle at 34% 28%, #F4F2FF 0%, #B9B2FF 32%, #4B3F9A 100%)', shadow: 'rgba(160,150,255,0.5)' },
@@ -127,15 +137,23 @@ class Component extends DCLogic {
     const endMin = 14 * 60 + mins;
     const endsAt = ((Math.floor(endMin / 60) - 1) % 12 + 1) + ':' + String(endMin % 60).padStart(2, '0') + ' PM';
     const close = this.props.onClose || (() => this.setState({ step: 'setup' }));
+    const total = mins * 60;
+    const left = s.left ?? (step === 'run' ? total - 12 * 60 + 12 : total);
+    const tick = () => { clearInterval(this._iv); this._iv = setInterval(() => { const st = this.state || {}; if (st.onBreak || (st.step ?? this.props.step) !== 'run') return; this.setState({ left: Math.max(0, (st.left ?? left) - 1) }); }, 1000); };
+    if (step === 'run' && !this._iv) tick();
+    if (step !== 'run' && this._iv) { clearInterval(this._iv); this._iv = null; }
+    const countN = s.countN ?? 3;
+    if (step === 'count' && !this._ct) { this._ct = true; [2, 1].forEach((n, i) => setTimeout(() => this.setState({ countN: n }), (i + 1) * 900)); setTimeout(() => { this._ct = false; this.setState({ step: 'run', countN: 3 }); }, 2700); }
+    const fmt = (x) => Math.floor(x / 60) + ':' + String(x % 60).padStart(2, '0');
     return {
       sky: t.sky, ctaGrad: t.cta, cta: t.tint, sun: t.sun, hill1: t.h1, hill2: t.h2, tint: t.tint, tintSoft: t.soft, stone: t.stone, stoneShadow: t.shadow, swatch: t.tint, sceneName: t.name,
       spaceUpper: { school: 'SCHOOL', work: 'WORK', health: 'HEALTH', hobby: 'HOBBIES', friends: 'FRIENDS' }[space],
-      sceneFilter: step === 'setup' ? 'saturate(0.8) brightness(0.75)' : step === 'done' ? 'saturate(1.15) brightness(1.1)' : 'none',
+      sceneFilter: s.onBreak ? 'saturate(0.4) brightness(0.6)' : step === 'setup' ? 'saturate(0.8) brightness(0.75)' : step === 'done' ? 'saturate(1.15) brightness(1.1)' : 'none',
       sunTop: step === 'done' ? 150 : 200,
       isSetup: step === 'setup', isCount: step === 'count', isRun: step === 'run', isLeave: step === 'leave', isDone: step === 'done',
       mins, endsAt, less: () => this.setState({ mins: Math.max(10, mins - 10) }), more: () => this.setState({ mins: Math.min(120, mins + 10) }),
-      start: () => this.setState({ step: 'count' }), run: () => this.setState({ step: 'run' }), leave: () => this.setState({ step: 'leave' }), finish: () => this.setState({ step: 'done' }), close,
-      remaining: '38:12', pct: 24, progressAria: '12 of 50 minutes done'
+      start: () => this.setState({ step: 'count', countN: 3 }), run: () => this.setState({ step: 'run' }), leave: () => this.setState({ step: 'leave' }), finish: () => this.setState({ step: 'done' }), close,
+      remaining: fmt(left), pct: Math.round((1 - left / total) * 100), progressAria: Math.round((total - left) / 60) + ' of ' + mins + ' minutes done', countN, countAnim: ({ 3: 'fPop', 2: 'fPopB', 1: 'fPopC' }[countN]) + ' 0.9s ease both', minimize: this.props.onMinimize || (() => {}), toggleBreak: () => this.setState({ onBreak: !s.onBreak }), breakLabel: s.onBreak ? 'Back to focus' : 'Take a 5-min break', remainLabel: s.onBreak ? 'On a break ·' : 'Remaining'
     };
   }
 }
