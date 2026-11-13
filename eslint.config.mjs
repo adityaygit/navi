@@ -24,6 +24,8 @@ const eslintConfig = defineConfig([
     ".claude/**",
     // The Windows/Mac desktop shell: a separate Node (Electron) project with its own tests.
     "desktop/**",
+    // The Capacitor phone app: a separate Vite project with its own type check and tests.
+    "mobile/**",
   ]),
 ]);
 
