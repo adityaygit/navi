@@ -70,7 +70,7 @@ input::placeholder{color:#8E8E96}
   <div onPointerDown="{{down}}" onPointerMove="{{move}}" onPointerUp="{{up}}" onPointerCancel="{{up}}" style="position: absolute; left: 0; top: 0; width: 1170px; height: 844px; display: flex; transform: translateX({{trackX}}px); transition: {{trackT}}; touch-action: pan-y">
 
     <!-- ===================== PROGRESS ===================== -->
-    <section aria-label="Progress" style="width: 390px; height: 844px; flex: none; position: relative; background: #000; overflow: hidden; border-radius: {{pg0.r}}px; transform: scale({{pg0.s}}); filter: {{pg0.f}}; transition: {{secT}}">
+    <section aria-label="Progress" style="width: 390px; height: 844px; flex: none; position: relative; background: #000; overflow: hidden; border-radius: {{pg0.r}}px; transform: {{pg0.t}}; z-index: {{pg0.z}}; filter: {{pg0.f}}; transition: {{secT}}">
       <div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 0; height: 460px; background: {{pageScene}}; pointer-events: none"></div>
       <sc-if value="{{weekHero}}" hint-placeholder-val="{{ true }}">
         <div aria-hidden="{{heroHidden}}" style="position: absolute; left: 0; right: 0; top: 108px; padding: 0 24px; opacity: {{heroO}}; transform: translateY({{heroY}}px) scale({{heroS}}); transform-origin: 50% 0; pointer-events: none">
@@ -137,7 +137,7 @@ input::placeholder{color:#8E8E96}
     </section>
 
     <!-- ===================== NAVI CHAT ===================== -->
-    <section aria-label="Navi" style="width: 390px; height: 844px; flex: none; position: relative; background: #000; overflow: hidden; border-radius: {{pg1.r}}px; transform: scale({{pg1.s}}); filter: {{pg1.f}}; transition: {{secT}}; display: flex; flex-direction: column">
+    <section aria-label="Navi" style="width: 390px; height: 844px; flex: none; position: relative; background: #000; overflow: hidden; border-radius: {{pg1.r}}px; transform: {{pg1.t}}; z-index: {{pg1.z}}; filter: {{pg1.f}}; transition: {{secT}}; display: flex; flex-direction: column">
       <div style="height: 98px; flex: none"></div>
       <sc-if value="{{fresh}}" hint-placeholder-val="{{ true }}">
         <div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 0; height: 520px; background: {{scene}}; pointer-events: none"></div>
@@ -196,7 +196,7 @@ input::placeholder{color:#8E8E96}
     </section>
 
     <!-- ===================== PLAN ===================== -->
-    <section aria-label="Plan" style="width: 390px; height: 844px; flex: none; position: relative; background: #000; overflow: hidden; border-radius: {{pg2.r}}px; transform: scale({{pg2.s}}); filter: {{pg2.f}}; transition: {{secT}}">
+    <section aria-label="Plan" style="width: 390px; height: 844px; flex: none; position: relative; background: #000; overflow: hidden; border-radius: {{pg2.r}}px; transform: {{pg2.t}}; z-index: {{pg2.z}}; filter: {{pg2.f}}; transition: {{secT}}">
       <div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 0; height: 460px; background: {{pageScene}}; pointer-events: none"></div>
       <div ref="{{planRef}}" style="position: relative; height: 844px; box-sizing: border-box; padding: 102px 0 150px; overflow-y: auto; scrollbar-width: none">
         <div style="padding: 0 16px 0 24px; display: flex; align-items: center; justify-content: space-between">
@@ -802,24 +802,25 @@ class Component extends DCLogic {
     const showLabel = navStyle === 'marks' && (pr.startLabel === 'yes' || (s.lastNav && Date.now() - s.lastNav < 1600));
     if (navStyle === 'marks' && s.lastNav && !this._t) { this._t = setTimeout(() => { this._t = null; this.forceUpdate(); }, 1700); }
 
-    const dragDx = s.dragDx !== undefined && s.dragDx !== 0 ? s.dragDx : (s.dragDx === 0 ? 0 : Number(pr.startDrag || 0));
-    const dragging = dragDx !== 0;
+    const dragDx = s.dragDx !== undefined ? s.dragDx : Number(pr.startDrag || 0);
+    const settling = !!s.settling;
+    const dragging = dragDx !== 0 || settling;
+    const target = (s.dragDir !== undefined ? s.dragDir : (dragDx < 0 ? 1 : -1)) + page;
     const prog = Math.min(1, Math.abs(dragDx) / 390);
-    const target = dragDx < 0 ? page + 1 : page - 1;
     const pageLook = (i) => {
-      if (!dragging) return { r: 0, s: 1, f: 'none' };
-      if (i === page) { const k = Math.min(1, prog * 2.2); return { r: Math.round(44 * k), s: (1 - 0.07 * k).toFixed(3), f: 'brightness(' + (1 - 0.35 * prog).toFixed(2) + ')' }; }
-      if (i === target) { return { r: Math.round(44 * (1 - prog)), s: (0.93 + 0.07 * prog).toFixed(3), f: 'blur(' + (14 * (1 - prog)).toFixed(1) + 'px) brightness(' + (0.55 + 0.45 * prog).toFixed(2) + ')' }; }
-      return { r: 44, s: 0.93, f: 'blur(14px) brightness(0.5)' };
+      if (!dragging) return { r: 0, t: 'none', z: 0, f: 'none' };
+      if (i === page) { const k = Math.min(1, prog * 2.2); return { r: Math.round(44 * k), t: 'translateX(' + dragDx + 'px) scale(' + (1 - 0.07 * k).toFixed(3) + ')', z: 2, f: 'brightness(' + (1 - 0.35 * prog).toFixed(2) + ')' }; }
+      if (i === target && target >= 0 && target <= 2) { return { r: Math.round(44 * (1 - prog)), t: 'translateX(' + ((page - target) * 390) + 'px) scale(' + (0.93 + 0.07 * prog).toFixed(3) + ')', z: 1, f: 'blur(' + (14 * (1 - prog)).toFixed(1) + 'px) brightness(' + (0.55 + 0.45 * prog).toFixed(2) + ')' }; }
+      return { r: 0, t: 'none', z: 0, f: 'none' };
     };
     return {
       down: (e) => { if (sheet !== 'off' || daysOpen || inbox) return; this._x = e.clientX; this._y = e.clientY; this._drag = false; },
-      move: (e) => { if (this._x == null) return; const dx = e.clientX - this._x; if (!this._drag) { if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(e.clientY - this._y)) return; this._drag = true; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {} } let d = dx; if ((page === 0 && d > 0) || (page === 2 && d < 0)) d = d * 0.25; set({ dragDx: Math.max(-390, Math.min(390, d)) }); },
-      up: (e) => { if (this._x == null) return; const dx = this._drag ? (this.state && this.state.dragDx) || 0 : 0; this._x = null; const was = this._drag; this._drag = false; if (!was) return; const n = Math.abs(dx) > 110 ? Math.max(0, Math.min(2, page + (dx < 0 ? 1 : -1))) : page; set({ dragDx: 0, page: n, sel: n !== page ? null : sel, lastNav: n !== page ? Date.now() : s.lastNav }); },
-      trackX: -page * 390 + dragDx,
-      trackT: dragging ? 'none' : 'transform 0.42s cubic-bezier(0.2, 0.9, 0.25, 1)',
-      secT: dragging ? 'none' : 'transform 0.42s cubic-bezier(0.2, 0.9, 0.25, 1), border-radius 0.42s, filter 0.42s',
-      gapO: dragging ? 1 : 0,
+      move: (e) => { if (this._x == null) return; const dx = e.clientX - this._x; if (!this._drag) { if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(e.clientY - this._y)) return; this._drag = true; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {} } let d = dx; if ((page === 0 && d > 0) || (page === 2 && d < 0)) d = d * 0.25; set({ dragDx: Math.max(-390, Math.min(390, d)), dragDir: d < 0 ? 1 : -1, settling: false }); },
+      up: (e) => { if (this._x == null) return; const was = this._drag; this._x = null; this._drag = false; if (!was) return; const dx = (this.state && this.state.dragDx) || 0; const n = Math.abs(dx) > 110 ? Math.max(0, Math.min(2, page + (dx < 0 ? 1 : -1))) : page; const fin = n !== page ? (dx < 0 ? -390 : 390) : 0; set({ dragDx: fin, settling: true }); setTimeout(() => { this.setState({ noAnim: true, page: n, dragDx: 0, settling: false, dragDir: undefined, sel: n !== page ? null : this.state.sel, lastNav: Date.now() }); setTimeout(() => this.setState({ noAnim: false }), 30); }, 400); },
+      trackX: -page * 390,
+      trackT: 'none',
+      secT: s.noAnim || (dragging && !settling) ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0.9, 0.25, 1), border-radius 0.4s, filter 0.4s',
+      gapO: dragging ? 1 : 0, 
       pg0: pageLook(0), pg1: pageLook(1), pg2: pageLook(2),
       glowTop: page === 1 && freshish ? 120 : page === 1 && urgentish ? -200 : -260, glowColor: urgentish && page === 1 ? 'rgba(244,179,122,0.10)' : T.glow,
       navWords: navStyle === 'words', navMarks: navStyle === 'marks', navCapsule: navStyle === 'capsule', navItems, navX: 195 - (page * 96 + 48),
