@@ -32,7 +32,7 @@ input::placeholder{color:#8E8E96}
   <header style="position: absolute; left: 0; right: 0; top: 50px; height: 48px; z-index: 5">
     <sc-if value="{{navWords}}" hint-placeholder-val="{{ true }}">
       <nav aria-label="Pages" style="position: absolute; inset: 0; overflow: hidden; -webkit-mask-image: linear-gradient(to right, transparent 0, #000 70px, #000 320px, transparent 390px); mask-image: linear-gradient(to right, transparent 0, #000 70px, #000 320px, transparent 390px)">
-        <div style="position: absolute; top: 0; height: 48px; left: 0; width: 288px; display: flex; transform: translateX({{navX}}px); transition: transform 0.34s cubic-bezier(0.2, 0.8, 0.2, 1)">
+        <div style="position: absolute; top: 0; height: 48px; left: 0; width: 288px; display: flex; transform: translateX({{navX}}px); transition: {{navT}}">
           <sc-for list="{{navItems}}" as="n" hint-placeholder-count="3">
             <button type="button" aria-current="{{n.cur}}" onClick="{{n.go}}" style="width: 96px; height: 48px; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: {{n.size}}px; font-weight: {{n.weight}}; color: {{n.color}}; opacity: {{n.wo}}; text-align: center; transition: all 0.25s">{{n.t}}<sc-if value="{{n.dot}}" hint-placeholder-val="{{ false }}"><span aria-label="something waiting" style="width: 6px; height: 6px; border-radius: 3px; background: {{n.dotColor}}"></span></sc-if></button>
           </sc-for>
@@ -57,7 +57,7 @@ input::placeholder{color:#8E8E96}
       </nav>
     </sc-if>
     <sc-if value="{{showMenu}}" hint-placeholder-val="{{ true }}">
-      <button type="button" aria-label="Chats and account" onClick="{{openDrawer}}" style="position: absolute; left: 6px; top: 2px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #C8C8CE"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 9h16M4 15h10"></path></svg></button>
+      <button type="button" aria-label="Chats and account" onClick="{{openDrawer}}" style="opacity: {{menuO}}; position: absolute; left: 6px; top: 2px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #C8C8CE"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 9h16M4 15h10"></path></svg></button>
     </sc-if>
   </header>
 
@@ -836,9 +836,9 @@ class Component extends DCLogic {
       gapO: dragging ? 1 : 0, 
       pg0: pageLook(0), pg1: pageLook(1), pg2: pageLook(2),
       glowTop: page === 1 && freshish ? 120 : page === 1 && urgentish ? -200 : -260, glowColor: urgentish && page === 1 ? 'rgba(244,179,122,0.10)' : T.glow,
-      navWords: navStyle === 'words', navMarks: navStyle === 'marks', navCapsule: navStyle === 'capsule', navItems, navX: 195 - (page * 96 + 48),
+      navWords: navStyle === 'words', navMarks: navStyle === 'marks', navCapsule: navStyle === 'capsule', navItems, navX: 195 - (page * 96 + 48) + Math.round(dragDx * 96 / 390), navT: s.noAnim || (dragging && !settling) ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0.9, 0.25, 1)',
       curName: names[page], markLabelO: showLabel ? 1 : 0,
-      showMenu: page === 1, offline,
+      showMenu: page === 1 || (dragging && target === 1), menuO: page === 1 ? (1 - prog).toFixed(2) : (dragging && target === 1 ? prog.toFixed(2) : 1), offline,
       // progress
       weekMode: !evening, eveningMode: evening, stones, learned, signals,
       progScroll: (e) => { const y = Math.round(e.target.scrollTop / 10) * 10; if (y !== (this.state && this.state.progY)) set({ progY: y }); },
