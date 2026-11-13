@@ -583,7 +583,7 @@ class Component extends DCLogic {
     // ---------- navigation ----------
     const names = ['Progress', 'Navi', 'Plan'];
     const navItems = names.map((t, i) => ({
-      t, cur: i === page ? 'page' : 'false', go: () => set({ page: i, sel: null, lastNav: Date.now() }),
+      t, cur: i === page ? 'page' : 'false', go: () => goTo(i),
       size: i === page ? 17 : 15, wo: Math.abs(i - page) > 1 ? 0 : 1, weight: i === page ? 600 : 500, color: i === page ? '#F5F5F7' : '#8E8E96',
       dot: i === 2 && waiting > 0 && page !== 2, dotColor: approvals.length ? '#F4B37A' : T.a1,
       markW: i === 1 ? 14 : (i === page ? 18 : 6), markH: i === 1 ? 13 : 6, markR: i === 1 ? '50% 50% 46% 54% / 56% 52% 48% 44%' : '3px',
@@ -614,7 +614,7 @@ class Component extends DCLogic {
         { t: 'Sat 1:00 PM', title: 'Flat viewing with Sam', bg: 'rgba(244,179,122,0.10)', border: '1px solid rgba(244,179,122,0.45)', timeColor: '#F8D2B0', color: '#F5F5F7', weight: 600, strike: 'none' }
       ], hasNote: true, note: 'Navi sends Sam one message from your account. Your plan changes only if Sam agrees.', pText: 'Send Sam “1:00 PM?”', sText: 'Not now', pBg: '#F5F5F7', pColor: '#000', onP: () => set({ samSent: true }), onS: () => set({ samSent: true }), mt: 14 }));
     }
-    (s.caps || []).forEach((t) => { thread.push(R({ isMe: true, text: t, pending: offline })); if (!offline) thread.push(R({ isReceipt: true, ac: T.a1, text: 'Saved to your Inbox to look at later', hasAct: true, actText: 'See it', onAct: () => set({ page: 2, inbox: true }), mt: 10 })); });
+    (s.caps || []).forEach((t) => { thread.push(R({ isMe: true, text: t, pending: offline })); if (!offline) thread.push(R({ isReceipt: true, ac: T.a1, text: 'Saved to your Inbox to look at later', hasAct: true, actText: 'See it', onAct: () => goTo(2, { inbox: true }), mt: 10 })); });
     if (offline && !(s.caps || []).length && session === 'resume') thread.push(R({ isMe: true, text: 'remind me to buy a card for Maya', pending: true }));
 
     // ask sheet content
@@ -663,7 +663,7 @@ class Component extends DCLogic {
       if (review >= 2) {
         reviewItems.push(R({ isMe: true, text: reviewAns[1], mt: 12 }));
         const kept = 2 + (reviewAns[0] === 'Done' ? 1 : 0) + (reviewAns[1] === 'Done' ? 1 : 0);
-        reviewItems.push(R({ isSummary: true, sumBg: 'linear-gradient(180deg, rgba(120,110,220,0.22) 0%, rgba(80,70,160,0.08) 100%)', pBg: T.cta, title: kept + ' of 4 kept today.', body: (reviewAns[0] === 'Done' ? '' : 'The essay intro moves to tomorrow at 9:00. ') + 'Tomorrow is light: the essay, then brunch with Jo at 11. Anything I got wrong, just say so.', pText: 'See tomorrow', sText: 'Done for tonight', onP: () => set({ sheet: 'off', page: 2, day: 5, view: 'day' }), onS: () => set({ sheet: 'off' }), mt: 22 }));
+        reviewItems.push(R({ isSummary: true, sumBg: 'linear-gradient(180deg, rgba(120,110,220,0.22) 0%, rgba(80,70,160,0.08) 100%)', pBg: T.cta, title: kept + ' of 4 kept today.', body: (reviewAns[0] === 'Done' ? '' : 'The essay intro moves to tomorrow at 9:00. ') + 'Tomorrow is light: the essay, then brunch with Jo at 11. Anything I got wrong, just say so.', pText: 'See tomorrow', sText: 'Done for tonight', onP: () => goTo(2, { sheet: 'off', day: 5, view: 'day' }), onS: () => set({ sheet: 'off' }), mt: 22 }));
       }
     }
 
@@ -807,6 +807,13 @@ class Component extends DCLogic {
     const dragging = dragDx !== 0 || settling;
     const target = (s.dragDir !== undefined ? s.dragDir : (dragDx < 0 ? 1 : -1)) + page;
     const prog = Math.min(1, Math.abs(dragDx) / 390);
+    const goTo = (n, extra) => {
+      if (n === page || s.settling) { if (extra) set(extra); return; }
+      const dir = n > page ? 1 : -1;
+      set({ dragDir: n - page, settling: true, dragDx: 0, sel: null });
+      setTimeout(() => this.setState({ dragDx: dir > 0 ? -390 : 390 }), 20);
+      setTimeout(() => { this.setState(Object.assign({ noAnim: true, page: n, dragDx: 0, settling: false, dragDir: undefined, lastNav: Date.now() }, extra || {})); setTimeout(() => this.setState({ noAnim: false }), 30); }, 440);
+    };
     const pageLook = (i) => {
       if (!dragging) return { r: 0, t: 'none', z: 0, f: 'none' };
       if (i === page) { const k = Math.min(1, prog * 2.2); return { r: Math.round(44 * k), t: 'translateX(' + dragDx + 'px) scale(' + (1 - 0.07 * k).toFixed(3) + ')', z: 2, f: 'brightness(' + (1 - 0.35 * prog).toFixed(2) + ')' }; }
@@ -845,14 +852,14 @@ class Component extends DCLogic {
       momentAct: () => set({ storyName: time === 'evening' ? 'evening' : 'morning' }),
       giftAskFresh: gift === 'ask' && time === 'afternoon',
       storyOpen: !!storyName, storyName: storyName || 'morning', storyStep: 0, closeStory: () => set({ storyName: null }),
-      storyCta: () => { if (storyName === 'evening') set({ storyName: null, sheet: 'review', full: true, review: 0, reviewAns: [] }); else if (storyName === 'morning') set({ storyName: null, page: 2 }); else set({ storyName: null, page: 2, view: 'week' }); },
+      storyCta: () => { if (storyName === 'evening') set({ storyName: null, sheet: 'review', full: true, review: 0, reviewAns: [] }); else if (storyName === 'morning') goTo(2, { storyName: null }); else goTo(2, { storyName: null, view: 'week' }); },
       openWeekStory: () => set({ storyName: 'week' }),
       reflectOpen: reflect === 'open', reflectThanks: reflect === 'right', reflectRight: () => set({ reflect: 'right' }), reflectWrong: () => set({ sheet: 'correct', full: false }),
       openReview: () => set({ storyName: 'evening' }),
       // chat
       fresh: freshish, urgent: urgentish, resume: !freshish && !urgentish,
       giftAsk: gift === 'ask', giftDoneLine: gift === 'added', giftAdd: () => set({ gift: 'added' }), giftNo: () => set({ gift: 'no' }), giftUndo: () => set({ gift: 'ask' }),
-      startFocus: () => set({ focus: true, focusTitle: 'Essay: write the intro' }), askReplan: () => set({ page: 2, sheet: 'ask', ctxOverride: 'This afternoon' }),
+      startFocus: () => set({ focus: true, focusTitle: 'Essay: write the intro' }), askReplan: () => goTo(2, { sheet: 'ask', ctxOverride: 'This afternoon' }),
       chatItems: thread, draft, hasDraft: draft.trim().length > 0, noDraft: draft.trim().length === 0, typeDraft: (e) => set({ draft: e.target.value }), send: sendIt, sendOnEnter: (e) => { if (e.key === 'Enter') sendIt(); },
       talkBg: offline ? 'rgba(255,255,255,0.08)' : T.cta, talkColor: offline ? '#8E8E96' : '#0B0B0C',
       // plan
@@ -867,7 +874,7 @@ class Component extends DCLogic {
       showFooter: day === 4, needsText: needsList.length + ' things still need a time', needsChev: s.needsOpen ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6', toggleNeeds: () => set({ needsOpen: !s.needsOpen }), needsOpen: !!s.needsOpen, needs: needsList,
       weekRows, taskGroups,
       // ask & sheets
-      showAskBar: page !== 1 && sheet === 'off' && !focus && !inbox && !daysOpen && !(page === 0 && evening && false), askBarText, openAsk: () => set({ sheet: 'ask', full: false }),
+      showAskBar: page !== 1 && !dragging && sheet === 'off' && !focus && !inbox && !daysOpen && !(page === 0 && evening && false), askBarText, openAsk: () => set({ sheet: 'ask', full: false }),
       sheetOpen: sheet !== 'off', sheetFull: full, sheetH: full ? 796 : (sheet === 'stone' ? 560 : askItems.some((x) => x.isProposal) ? 610 : 500), sheetTitle: sheetTitles[sheet] || 'Navi', sheetCtx, sheetAria: sheetTitles[sheet] || 'Navi',
       stoneDetail: sheet === 'stone', canGrow: sheet === 'ask' || sheet === 'overlap' || sheet === 'correct',
       toggleGrow: () => set({ full: !full }), growLabel: full ? 'Back to half height' : 'Open the full conversation', growIcon: full ? 'M9 15H4v5M15 9h5V4M4 20l6-6M20 4l-6 6' : 'M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7',
@@ -885,7 +892,7 @@ class Component extends DCLogic {
       // voice + focus
       voiceFull: voice === 'full' || voice === 'paused', voicePaused: voice === 'paused', voicePill: voice === 'pill',
       voiceStatus: voice === 'paused' ? 'Paused while you’re on a phone call' : 'Listening', voiceStatusColor: voice === 'paused' ? '#C8C8CE' : '#D2F6DF', voiceFilter: voice === 'paused' ? 'saturate(0.2) brightness(0.7)' : 'none', voiceGlow: voice === 'paused' ? 'rgba(255,255,255,0.05)' : 'rgba(167,235,192,0.16)',
-      resumeVoice: () => set({ voice: 'full' }), openVoice: () => set({ voice: 'full' }), minimizeVoice: () => set({ voice: 'pill' }), endVoice: () => set({ voice: 'off' }), voiceToText: () => set({ voice: 'pill', page: 1 }),
+      resumeVoice: () => set({ voice: 'full' }), openVoice: () => set({ voice: 'full' }), minimizeVoice: () => set({ voice: 'pill' }), endVoice: () => set({ voice: 'off' }), voiceToText: () => goTo(1, { voice: 'pill' }),
       focus, focusTitle: s.focusTitle || 'Essay: write the intro', endFocus: () => set({ focus: false })
     };
   }
