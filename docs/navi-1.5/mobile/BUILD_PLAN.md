@@ -63,3 +63,20 @@ Outward messages (for example "Send Sam 1:00 PM?") always require the owner's OK
 
 - Which computer the owner will use to install on the iPhone (Windows, Mac or Linux), to pick the sideloading tool.
 - Lock Screen / Dynamic Island focus timer and home-screen widgets need native extensions; planned after step 6, not promised in the first version.
+
+## Execution (proposed 2026-11-13, awaiting "approved, start coding")
+
+Checked in this environment: Android SDK, Google Maven, Gradle and npm are reachable and Java 21 is installed, so Android builds can be made and checked here and in CI. iPhone builds run only on GitHub's macOS runners (`.github/workflows/mobile.yml`), unsigned; the owner signs and installs them with a free Apple ID from Windows or Mac (Sideloadly).
+
+What the server needs: the web app does most writes through 53 server actions, which a phone app can't call. Step 1 adds bearer-token auth to `requireApiCtx`, CORS for the app origins, and a small JSON API under `/api/m/*` that wraps the existing actions (no logic copied). Additive only.
+
+Team:
+- Lead (main session): `mobile/` foundation (Vite + React + TS, M4 tokens, three-page pull navigation, motion, haptics service, API client, offline queue), integration, review, screenshots against the M4 canvas, BUILD_INTELLIGENCE.
+- Server agent (worktree): bearer auth, CORS, `/api/m/*` endpoints, emailed-code sign-in, tests against local Supabase.
+- Native agent (worktree): Capacitor iOS/Android projects, plugins, icon and splash, `mobile.yml` producing an Android APK and an unsigned iPhone app; verifies the APK builds here.
+- From step 3: one agent per screen area (Plan, Focus/voice, Progress/stories) working in parallel against the agreed API contract; at most three at a time.
+
+Owner checkpoints (the only planned interruptions):
+1. End of step 1: approve merging the server changes to main (production) and the Supabase email change (code in the sign-in email); install the first build on both phones.
+2. Any hosted database migration (step 5 stones/patterns).
+3. Device feedback after steps 2, 4 and 6 (haptics and feel can only be judged on the phone).
