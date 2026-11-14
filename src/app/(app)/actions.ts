@@ -2,8 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireApiCtx, type Ctx } from "@/server/context";
-import { createSupabaseAdmin } from "@/lib/supabase/server";
-import { createTask, updateTask, completeTask, startFocus, endFocus, pauseFocus, resumeFocus } from "@/server/domain/tasks";
+import { createTask, changeTask, completeTask, startFocus, endFocus, pauseFocus, resumeFocus, FocusEndInput } from "@/server/domain/tasks";
 import { createEntity, deleteEntity, updateEntity, type EntityTable } from "@/server/domain/entities";
 import {
   acceptMany,
@@ -14,11 +13,11 @@ import {
   setProposalStatus,
 } from "@/server/domain/proposals";
 import { confirmMemory, correctMemory, deleteMemory, rejectMemory, addMemory } from "@/server/domain/memory";
-import { actionView, decideApproval, revertedAmong } from "@/server/domain/approvals";
+import { decideActionView, decisionMessage } from "@/server/domain/approvals";
 import { revertActivities, revertActivity } from "@/server/domain/activity";
 import type { ActionView } from "@/lib/actions";
-import { generateDayPlan, generateWeekPlan, recoverPlan, setBlockOutcome } from "@/server/planner/plan";
-import { planMessage, planView } from "@/lib/plan-summary";
+import { BlockOutcomeInput, dayPlanMessage, generateDayPlan, generateWeekPlan, recoverPlan, setBlockOutcome, weekPlanMessage } from "@/server/planner/plan";
+import { generateBriefing, markBriefingRead } from "@/server/domain/briefings";
 import {
   EventCreate,
   GoalCreate,
@@ -29,7 +28,6 @@ import {
   ProjectCreate,
   RoutineCreate,
   TaskCreate,
-  TaskUpdate,
   WorkspaceCreate,
   compact,
 } from "@/server/domain/schemas";
@@ -78,13 +76,8 @@ export async function createTaskAction(input: unknown) {
   return act((ctx) => createTask(ctx, TaskCreate.parse(input), { id: ClientId.parse(input ?? {}).id }), "Task added");
 }
 export async function updateTaskAction(id: string, input: unknown) {
-  return act(async (ctx) => {
-    const { status, ...rest } = TaskUpdate.parse(input);
-    const r = await updateTask(ctx, id, status === "done" ? rest : { ...rest, ...(status ? { status } : {}) });
-    // Completion goes through completeTask so recurring tasks spawn their next occurrence.
-    if (status === "done") return completeTask(ctx, id);
-    return r;
-  }, "Saved");
+  // Completion goes through completeTask so recurring tasks spawn their next occurrence.
+  return act((ctx) => changeTask(ctx, id, input), "Saved");
 }
 export async function completeTaskAction(id: string, actualMinutes?: number | null) {
   return act((ctx) => completeTask(ctx, id, actualMinutes), "Done");
@@ -92,16 +85,10 @@ export async function completeTaskAction(id: string, actualMinutes?: number | nu
 export async function startFocusAction(input: { task_id?: string | null; block_id?: string | null; planned_minutes?: number | null }) {
   return act((ctx) => startFocus(ctx, input));
 }
-const FocusEnd = z.object({
-  outcome: z.enum(["completed", "progress", "interrupted", "abandoned"]),
-  note: z.string().max(300).nullish(),
-  reason: z.enum(["rest", "missing_info", "estimate"]).nullish(),
-});
 export async function endFocusAction(id: string, outcome: "completed" | "progress" | "interrupted" | "abandoned", note?: string | null, reason?: "rest" | "missing_info" | "estimate" | null, moreMinutes?: number | null) {
   return act((ctx) => {
-    const v = FocusEnd.parse({ outcome, note, reason });
-    const more = moreMinutes == null ? null : z.number().int().min(5).max(480).parse(moreMinutes);
-    return endFocus(ctx, id, v.outcome, v.note, v.reason, more);
+    const v = FocusEndInput.parse({ outcome, note, reason, moreMinutes });
+    return endFocus(ctx, id, v.outcome, v.note, v.reason, v.moreMinutes ?? null);
   });
 }
 const SessionId = z.string().uuid();
@@ -195,18 +182,14 @@ export async function restartOnboardingAction() {
 const PlanDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish();
 // Planning results are told in one plain sentence (how much was planned, how much didn't fit); My day shows the rest.
 export async function planDayAction(date?: string | null) {
-  return act((ctx) => generateDayPlan(ctx, PlanDate.parse(date) ?? undefined), (r, ctx) => planMessage(planView([r], ctx.timezone, { changes: r.run?.changes, unchanged: r.run?.status === "unchanged" })));
+  return act((ctx) => generateDayPlan(ctx, PlanDate.parse(date) ?? undefined), (r, ctx) => dayPlanMessage(r, ctx.timezone));
 }
 export async function planWeekAction(start?: string | null) {
-  return act((ctx) => generateWeekPlan(ctx, PlanDate.parse(start)), (rs, ctx) => planMessage(planView(rs, ctx.timezone, { unchanged: rs[0]?.run?.status === "unchanged" })));
+  return act((ctx) => generateWeekPlan(ctx, PlanDate.parse(start)), (rs, ctx) => weekPlanMessage(rs, ctx.timezone));
 }
-const BlockOutcome = z.object({
-  status: z.enum(["done", "partial", "skipped", "missed", "rest", "interrupted", "planned"]),
-  reason: z.string().max(300).nullish(),
-});
 export async function blockOutcomeAction(id: string, status: "done" | "partial" | "skipped" | "missed" | "rest" | "interrupted" | "planned", reason?: string | null) {
   return act((ctx) => {
-    const v = BlockOutcome.parse({ status, reason });
+    const v = BlockOutcomeInput.parse({ status, reason });
     return setBlockOutcome(ctx, id, v.status, v.reason);
   });
 }
@@ -245,14 +228,7 @@ export async function deleteMemoryAction(id: string) {
  * Tapping twice or retrying is safe: the action runs at most once.
  */
 export async function decideApprovalAction(id: string, decision: "approve" | "reject", revision?: number): Promise<ActionResult<ActionView>> {
-  return act(
-    async (ctx) => {
-      const row = await decideApproval(ctx, id, decision, createSupabaseAdmin(), typeof revision === "number" ? revision : undefined);
-      const undo = Array.isArray((row.result as { undo?: unknown } | null)?.undo) ? ((row.result as { undo: string[] }).undo) : [];
-      return actionView(row, ctx.timezone, await revertedAmong(ctx, undo));
-    },
-    (v) => v.result ?? v.error ?? v.status,
-  );
+  return act((ctx) => decideActionView(ctx, id, decision, revision), decisionMessage);
 }
 /** Undo everything one of Navi's steps (or an approved action) changed. */
 export async function undoChangesAction(activityIds: string[]) {
@@ -302,31 +278,12 @@ export async function approveBudgetOverrideAction(extraUsd: number) {
   }, "Override approved for today");
 }
 export async function markBriefingReadAction(id: string) {
-  return act(async (ctx) => {
-    await ctx.db.from("briefings").update({ read_at: new Date().toISOString() }).eq("id", id);
-  });
+  return act((ctx) => markBriefingRead(ctx, id));
 }
 
 // ---- reviews ---------------------------------------------------------------
 export async function generateBriefingAction(kind: "morning" | "evening" | "weekly") {
-  return act(async (ctx) => {
-    const { getProfile } = await import("@/server/context");
-    const { buildBriefing } = await import("@/server/jobs/briefings");
-    const { nowIn } = await import("@/lib/time");
-    const profile = await getProfile(ctx);
-    const date = nowIn(profile.timezone).toISODate()!;
-    const b = await buildBriefing(ctx.db, profile, kind, date);
-    if ("week" in b && b.week) {
-      const { learnFromWeek } = await import("@/server/domain/patterns");
-      await learnFromWeek(ctx.db, ctx.userId, b.week);
-    }
-    // On-demand reviews replace today's stored one of the same kind (data may have changed).
-    const { error } = await ctx.db
-      .from("briefings")
-      .upsert({ user_id: ctx.userId, kind, local_date: date, title: b.title, body: b.body, data: b.data, generated_by: "rules", read_at: null }, { onConflict: "user_id,kind,local_date" });
-    if (error) throw new Error(error.message);
-    return { title: b.title, body: b.body };
-  });
+  return act((ctx) => generateBriefing(ctx, kind));
 }
 
 // ---- chats -----------------------------------------------------------------

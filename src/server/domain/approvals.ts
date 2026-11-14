@@ -555,3 +555,18 @@ export function actionStatusForModel(v: ActionView): string {
       return `expired without running: ${v.error ?? ""}`;
   }
 }
+
+/**
+ * The person approves or declines an action card (web and phone app). Answers
+ * with the card as it really is afterwards. Safe to repeat: it runs at most once.
+ */
+export async function decideActionView(ctx: Ctx, id: string, decision: "approve" | "reject", revision?: number): Promise<ActionView> {
+  const row = await decideApproval(ctx, id, decision, createSupabaseAdmin(), typeof revision === "number" ? revision : undefined);
+  const undo = Array.isArray((row.result as { undo?: unknown } | null)?.undo) ? (row.result as { undo: string[] }).undo : [];
+  return actionView(row, ctx.timezone, await revertedAmong(ctx, undo));
+}
+
+/** What a decided card says in one line (the toast after Approve / Decline). */
+export function decisionMessage(v: ActionView): string {
+  return v.result ?? v.error ?? v.status;
+}

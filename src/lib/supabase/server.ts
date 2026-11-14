@@ -22,6 +22,24 @@ export async function createSupabaseServer(): Promise<SupabaseClient> {
 }
 
 /**
+ * Client acting as the holder of a Supabase access token (the phone app's
+ * `Authorization: Bearer` header). The token rides in every request, so RLS
+ * applies exactly as for a cookie session. Nothing is stored or refreshed:
+ * the app refreshes its own session. `auth.getClaims()` with no argument
+ * checks this token, so code that reads the signed-in user's claims works the
+ * same for both kinds of client. Verify the token (getCtx does) before use.
+ */
+export function createSupabaseForToken(accessToken: string): SupabaseClient {
+  const db = createPlainClient(publicEnv.supabaseUrl, publicEnv.supabaseAnonKey, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
+  });
+  const getClaims = db.auth.getClaims.bind(db.auth);
+  db.auth.getClaims = ((jwt?: string, options?: Parameters<typeof getClaims>[1]) => getClaims(jwt ?? accessToken, options)) as typeof db.auth.getClaims;
+  return db;
+}
+
+/**
  * Service-role client. Bypasses RLS, so it must only be used by trusted server
  * code (scheduled jobs, budget accounting) that scopes every query by user_id.
  */
