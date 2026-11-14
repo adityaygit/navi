@@ -1,0 +1,14 @@
+node_modules
+dist
+.env.local
+
+# Native build outputs (ios/ and android/ have their own ignores too)
+*.apk
+*.aab
+*.ipa
+ipa/
+ios/build
+ios/App/build
+android/.gradle
+android/build
+android/app/build
