@@ -408,3 +408,9 @@ See `landing/PROGRESS.md` (branch `claude/landing-reconstruction`). It does not 
 - Decision: deleting a chat removes its messages permanently (no archive) — simplest, matches "dead basic"; an archive would need a migration.
 **Verified (local stack, simulator):** tsc + lint clean; vitest **22 files 209/209** (new `tests/integration/chats.test.ts` ×7: separate histories, new chat per omitted id, auto-name, rename sticks, delete then refused, onboarding excluded, voice gets only its chat's history, cross-user access refused; `voice-server.test` updated to pass the chat id); `next build` pass; Playwright full suite **52/52** (26 × desktop + iPhone, incl. new `chats.spec`; `voice-live.spec` assertion scoped to the conversation pane since the chat title now repeats the first spoken words). One earlier full run had `structure.spec` (planner) fail once on desktop; it passed on rerun and in the final run — unrelated to chats, possibly flaky. Phone header has a one-tap "New" button; sidebar is `w-72`.
 **Not verified:** hosted production deploy of this commit.
+
+### 2026-11-13 — Mobile black-screen fix (d233270)
+- Cause: `mobile/.env.production` was gitignored (root `.env*`), so CI builds had no Supabase config and `createClient` threw at start-up → black screen after splash.
+- Fix: un-ignored the public `.env.production`/`.env.development` in `mobile/.gitignore`; `main.tsx` now shows a "Navi couldn't start" screen on any start-up error; `config.ts` names a missing value.
+- Icon/splash now use the website's arrowhead mark (`landing/src/icons.jsx` Logo) via `mobile/scripts/make-icons.py`. The in-app stone is unchanged (approved M4 design).
+- Verified: production build renders sign-in in Playwright with no page errors; CI run 43557261560 green; downloaded APK contains the Supabase URL in its bundle. Owner device check pending.
