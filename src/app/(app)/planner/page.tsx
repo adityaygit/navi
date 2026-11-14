@@ -1,14 +1,13 @@
 import Link from "next/link";
 import { DateTime } from "luxon";
 import { requireCtx, getProfile } from "@/server/context";
-import type { PlanBlock, Task } from "@/lib/types";
 import { awakeSpan, dayFrom, loadSources, wakeBed, zoneHelpers, type DayItem } from "@/server/day";
-import { freeGaps, mergeSpans, myDayHeadline, weekHeadline, type Line, type Span } from "@/lib/sentences";
+import { myDayHeadline, weekHeadline, type Line } from "@/lib/sentences";
+import { freeStretches, isLongEvent, itemLooks, loadOpenWork, plannedSpans, roundUp5, weekSummary } from "@/server/day-view";
 import { findFits, gridHours, weekOf, type FitCandidate } from "@/lib/day-layout";
-import { spaceColor } from "@/lib/space-color";
 import { ActionButton } from "@/components/action-button";
 import { RecoveryButton } from "@/components/recovery";
-import { DayTimeline, Legend, type Kind, type TimelineEntry } from "@/components/day/timeline";
+import { DayTimeline, Legend, type TimelineEntry } from "@/components/day/timeline";
 import { CalendarGrid, type CalendarDay } from "@/components/day/calendar";
 import { PlaceIt } from "@/components/day/day-actions";
 import { planDayAction, planWeekAction } from "../actions";
@@ -20,8 +19,6 @@ import { Assumptions, ProposedPlan } from "@/components/day/plan-v2";
 export const metadata = { title: "My day · Navi" };
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
-const NAVI = "#A7EBC0";
-const ROUTINE = "#6E6E77";
 
 type Search = { date?: string; start?: string; view?: string; span?: string };
 
@@ -85,39 +82,14 @@ export default async function MyDayPage({ searchParams }: { searchParams: Promis
   const week = weekOf(date, zone);
   const z = zoneHelpers(zone);
 
-  const [src, focusRes, openTasksRes, scheduledRes, stepsRes] = await Promise.all([
+  const [src, focusRes, { openTasks, scheduled, steps }] = await Promise.all([
     loadSources(ctx, week[0], week[6]),
     ctx.db.from("focus_sessions").select("id").is("ended_at", null).maybeSingle(),
-    ctx.db
-      .from("tasks")
-      .select("id,title,status,due_at,due_is_hard,estimate_minutes,workspace_id,created_at")
-      .is("parent_task_id", null)
-      .in("status", ["todo", "in_progress", "blocked"])
-      .order("due_at", { ascending: true, nullsFirst: false })
-      .limit(200),
-    ctx.db.from("plan_blocks").select("task_id").gte("plan_date", today).in("status", ["planned", "in_progress"]).not("task_id", "is", null),
-    ctx.db.from("tasks").select("parent_task_id").not("parent_task_id", "is", null).in("status", ["todo", "in_progress", "blocked"]),
+    loadOpenWork(ctx, today),
   ]);
-  const blockById = new Map(src.blocks.map((b) => [b.id, b]));
-  const routineFixed = new Map(src.routines.map((r) => [r.id, r.is_fixed]));
-  const openTasks = (openTasksRes.data ?? []) as Pick<Task, "id" | "title" | "status" | "due_at" | "due_is_hard" | "estimate_minutes" | "workspace_id" | "created_at">[];
-  const scheduled = new Set(((scheduledRes.data ?? []) as { task_id: string }[]).map((b) => b.task_id));
-  const steps = new Map<string, number>();
-  for (const s of (stepsRes.data ?? []) as { parent_task_id: string }[]) steps.set(s.parent_task_id, (steps.get(s.parent_task_id) ?? 0) + 1);
 
-  const toEntry = (i: DayItem): TimelineEntry => {
-    const block: PlanBlock | null = i.kind === "block" ? (blockById.get(i.id) ?? null) : null;
-    const look: Kind =
-      i.kind === "event" ? "fixed"
-      : i.kind === "routine" ? (routineFixed.get(i.id) ? "fixed" : "routine")
-      : block?.routine_id ? (routineFixed.get(block.routine_id) ? "fixed" : "routine")
-      : block && !block.is_flexible ? "fixed"
-      : "flex";
-    const space = i.spaceId ? src.spaces.get(i.spaceId) : undefined;
-    return { ...i, look, block, color: space ? spaceColor(space) : look === "routine" ? ROUTINE : look === "flex" ? NAVI : "#C8C8CE", spaceName: space?.name ?? null };
-  };
-  // What counts as "planned" in the headlines: events and plan blocks (V4 sources contract).
-  const plannedSpans = (items: DayItem[]): Span[] => items.filter((i) => i.kind !== "routine").map((i) => ({ start: i.startMs, end: i.endMs }));
+  // Look, colour and space of each row, and what counts as planned: shared with the phone app (src/server/day-view.ts).
+  const toEntry: (i: DayItem) => TimelineEntry = itemLooks(src);
   const wb = wakeBed(profile);
   const toMinute = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 
@@ -137,7 +109,7 @@ export default async function MyDayPage({ searchParams }: { searchParams: Promis
     const days = span === "day" ? [date] : week;
     const step = span === "day" ? 1 : 7;
     const dayData = days.map((d) => dayFrom(src, d));
-    const longEvent = (i: DayItem) => i.kind === "event" && i.endMs - i.startMs >= 20 * 3600000;
+    const longEvent = isLongEvent;
     const dueByDay = new Map<string, typeof openTasks>();
     for (const t of openTasks) {
       if (!t.due_at) continue;
@@ -160,13 +132,7 @@ export default async function MyDayPage({ searchParams }: { searchParams: Promis
     const hours = gridHours(wb ? { wakeMinute: toMinute(wb.wake), bedMinute: toMinute(wb.bed) } : null, allMinutes);
     const headline =
       span === "week"
-        ? weekHeadline(
-            dayData.map((dd) => {
-              const items = dd.items.filter((i) => i.kind !== "routine" && !longEvent(i));
-              const minutes = mergeSpans(plannedSpans(items)).reduce((t, s) => t + (s.end - s.start) / 60000, 0);
-              return { name: DateTime.fromISO(dd.date, { zone }).toFormat("cccc"), minutes, titles: items.map((i) => i.title), routines: dd.items.filter((i) => i.kind === "routine").length };
-            }),
-          )
+        ? weekHeadline(weekSummary(dayData, zone))
         : myDayHeadline(plannedSpans(dayData[0].items.filter((i) => !longEvent(i))), awakeSpan(profile, date, zone), z.fmtHour, z.minuteOfDay);
     const first = DateTime.fromISO(days[0], { zone });
     const last = DateTime.fromISO(days[days.length - 1], { zone });
@@ -209,13 +175,10 @@ export default async function MyDayPage({ searchParams }: { searchParams: Promis
   const headline = myDayHeadline(plannedSpans(day.items), awake, z.fmtHour, z.minuteOfDay);
 
   // Free stretches still ahead (whole day for future days), between everything on the line.
-  const windowStart = awake?.start ?? DateTime.fromISO(`${date}T07:00`, { zone }).toMillis();
-  const windowEnd = awake?.end ?? DateTime.fromISO(`${date}T23:00`, { zone }).toMillis();
-  const from = isToday ? Math.max(windowStart, Math.ceil(nowMs / (5 * 60000)) * 5 * 60000) : windowStart;
-  const v2 = plannerV2(profile.preferences) ? await myDayV2(ctx, date, src.blocks, isToday ? Math.ceil(nowMs / (5 * 60000)) * 5 * 60000 : 0) : null;
+  const v2 = plannerV2(profile.preferences) ? await myDayV2(ctx, date, src.blocks, isToday ? roundUp5(nowMs) : 0) : null;
   const busySpans = entries.map((e) => ({ start: e.startMs, end: e.endMs }));
   // Planner v2 (B4): the same free time the planner uses (confirmed or assumed, never unknown), not a 7 AM–11 PM guess.
-  const gaps = isPast ? [] : v2 ? v2.capacity.flatMap((c) => freeGaps(busySpans, Math.max(c.start, from), c.end)) : freeGaps(busySpans, from, windowEnd);
+  const gaps = freeStretches({ date, zone, nowMs, isToday, isPast, awake, busy: busySpans, capacity: v2 ? v2.capacity : null });
   const unscheduled = openTasks.filter((t) => !scheduled.has(t.id));
   const candidates: FitCandidate[] = unscheduled.map((t) => ({ id: t.id, title: t.title, estimate: t.estimate_minutes, dueMs: t.due_at ? Date.parse(t.due_at) : null }));
   const fits = findFits(gaps, candidates);

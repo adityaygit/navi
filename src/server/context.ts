@@ -1,7 +1,9 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
-import { createSupabaseServer } from "@/lib/supabase/server";
+import { headers } from "next/headers";
+import { createSupabaseForToken, createSupabaseServer } from "@/lib/supabase/server";
+import { bearerToken, hasBearer } from "@/server/cors";
 import type { Profile } from "@/lib/types";
 
 /**
@@ -40,10 +42,31 @@ export type Ctx = {
 
 export class AuthError extends Error {}
 
-export async function getCtx(): Promise<Ctx | null> {
-  const db = await createSupabaseServer();
-  const { data } = await db.auth.getClaims();
-  const userId = data?.claims?.sub;
+/**
+ * The signed-in person, from either the web's session cookie or (the phone
+ * app) an `Authorization: Bearer <Supabase access token>` header. A bearer
+ * header always wins and never falls back to cookies: a bad or expired token
+ * is "signed out". The token is verified (signature via the project's keys,
+ * or with the Auth server) and must belong to a signed-in user.
+ * `source`: the request's headers; by default the current request's.
+ */
+export async function getCtx(source?: Request | Headers): Promise<Ctx | null> {
+  const hdrs = source instanceof Request ? source.headers : (source ?? (await headers()));
+  const authorization = hdrs.get("authorization");
+  let db: SupabaseClient;
+  let userId: string | undefined;
+  if (hasBearer(authorization)) {
+    const token = bearerToken(authorization);
+    if (!token) return null;
+    db = createSupabaseForToken(token);
+    const { data, error } = await db.auth.getClaims(token);
+    if (error || data?.claims?.role !== "authenticated") return null;
+    userId = data.claims.sub;
+  } else {
+    db = await createSupabaseServer();
+    const { data } = await db.auth.getClaims();
+    userId = data?.claims?.sub;
+  }
   if (!userId) return null;
   const { data: profile } = await db.from("profiles").select("timezone").eq("id", userId).maybeSingle();
   return { db, userId, actor: "user", timezone: profile?.timezone ?? "UTC" };
@@ -57,8 +80,8 @@ export async function requireCtx(): Promise<Ctx> {
 }
 
 /** For route handlers and server actions: throw instead of redirecting. */
-export async function requireApiCtx(): Promise<Ctx> {
-  const ctx = await getCtx();
+export async function requireApiCtx(source?: Request | Headers): Promise<Ctx> {
+  const ctx = await getCtx(source);
   if (!ctx) throw new AuthError("Not signed in");
   return ctx;
 }

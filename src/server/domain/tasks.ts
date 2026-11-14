@@ -1,5 +1,6 @@
 import "server-only";
 import { DateTime } from "luxon";
+import { z } from "zod";
 import type { Ctx } from "@/server/context";
 import type { Task } from "@/lib/types";
 import { AlreadyChangedError, createEntity, getEntity, updateEntity, type UpdateResult } from "./entities";
@@ -39,6 +40,25 @@ export async function createTask(ctx: Ctx, input: TaskCreate, opts: { id?: strin
   for (const k of ["due_is_hard", "priority"]) if (values[k] === null) delete values[k];
   return createEntity<Task>(ctx, "tasks", { ...values, source: ctx.actor === "navi" ? "navi" : "user" }, { id: opts.id });
 }
+
+/**
+ * A change the person makes to a task (web task card, phone app). Marking it
+ * done goes through completeTask so a recurring task spawns its next one.
+ */
+export async function changeTask(ctx: Ctx, id: string, input: unknown) {
+  const { status, ...rest } = TaskUpdate.parse(input);
+  const r = await updateTask(ctx, id, status === "done" ? rest : { ...rest, ...(status ? { status } : {}) });
+  if (status === "done") return completeTask(ctx, id);
+  return r;
+}
+
+/** How the person ended a focus session (web and phone app). */
+export const FocusEndInput = z.object({
+  outcome: z.enum(["completed", "progress", "interrupted", "abandoned"]),
+  note: z.string().max(300).nullish(),
+  reason: z.enum(["rest", "missing_info", "estimate"]).nullish(),
+  moreMinutes: z.number().int().min(5).max(480).nullish(),
+});
 
 export async function updateTask(ctx: Ctx, id: string, input: TaskUpdate) {
   const patch: Record<string, unknown> = compact(TaskUpdate.parse(input));

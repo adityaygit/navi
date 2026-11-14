@@ -1,5 +1,6 @@
 import "server-only";
 import { DateTime } from "luxon";
+import { z } from "zod";
 import type { Ctx } from "@/server/context";
 import { getProfile } from "@/server/context";
 import type { CalendarEvent, PlanBlock, Routine, Task } from "@/lib/types";
@@ -10,7 +11,7 @@ import { OUTCOMES, withNote } from "@/lib/outcomes";
 import { refreshStoredReview } from "@/server/jobs/briefings";
 import { plannerV2 } from "@/lib/planner-flag";
 import { planDays, type PlanRun, type PlanTrigger } from "./plan-v2";
-import type { PlanChange } from "@/lib/plan-summary";
+import { planMessage, planView, type PlanChange } from "@/lib/plan-summary";
 import { things } from "@/lib/plain-text";
 
 /** What a recovery did, in one plain message for the person (the summary is for Navi). */
@@ -167,6 +168,12 @@ export async function generateWeekPlan(ctx: Ctx, startDate?: string | null, opts
   }
   return results;
 }
+
+/** How the person says a block went (web and phone app). */
+export const BlockOutcomeInput = z.object({
+  status: z.enum(["done", "partial", "skipped", "missed", "rest", "interrupted", "planned"]),
+  reason: z.string().max(300).nullish(),
+});
 
 /** Mark a block's outcome. Only the user (or an approval) can mark work done. */
 export async function setBlockOutcome(
@@ -358,4 +365,14 @@ async function recoverPlanV2(
   await logActivity(ctx, { action: "plan_recovered", summary: `Plan broke (${input.category}): ${summary}`.slice(0, 1000) });
   await refreshStoredReview(ctx.db, ctx.userId, today);
   return { summary, message: recoveryMessage({ moved, notPlaced, earlier: untouchedEarlier.length }), affected: affected.length, plan, tomorrow: next as PlanResult | null, movedToTomorrow: moved, notPlaced, changes: run.changes };
+}
+
+/** "Plan my day" told in one plain sentence (web and phone app). */
+export function dayPlanMessage(r: PlanResult, zone: string): string {
+  return planMessage(planView([r], zone, { changes: r.run?.changes, unchanged: r.run?.status === "unchanged" }));
+}
+
+/** "Plan next 7 days" told in one plain sentence. */
+export function weekPlanMessage(rs: PlanResult[], zone: string): string {
+  return planMessage(planView(rs, zone, { unchanged: rs[0]?.run?.status === "unchanged" }));
 }

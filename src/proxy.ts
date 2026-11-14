@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { corsHeaders, hasBearer, isCorsPath } from "@/server/cors";
 
 // /pcm-worklet.js: the static, non-personal voice audio worklet; loading it must not depend on the session cookie.
 const PUBLIC_PATHS = ["/login", "/auth", "/early-access", "/api/waitlist", "/landing", "/offline", "/manifest.webmanifest", "/sw.js", "/pcm-worklet.js", "/api/cron", "/icons"];
@@ -37,7 +38,25 @@ function contentSecurityPolicy(nonce: string): string {
 const MARKETING_PATHS = ["/how-it-works", "/features", "/guides", "/privacy-and-control", "/about", "/terms"];
 const isMarketing = (path: string) => MARKETING_PATHS.some((p) => path === p || path.startsWith(p + "/"));
 
+/**
+ * The phone app (src/server/cors.ts): CORS preflights are answered here, and
+ * its bearer-token API calls go straight to the route, which verifies the
+ * token itself (getCtx). No session cookie is involved for them.
+ */
+function mobileApi(request: NextRequest): NextResponse | null {
+  const path = request.nextUrl.pathname;
+  if (!isCorsPath(path)) return null;
+  const origin = request.headers.get("origin");
+  if (request.method === "OPTIONS") return new NextResponse(null, { status: 204, headers: corsHeaders(origin, true) });
+  if (!hasBearer(request.headers.get("authorization"))) return null;
+  const response = NextResponse.next();
+  for (const [k, v] of Object.entries(corsHeaders(origin))) response.headers.set(k, v);
+  return response;
+}
+
 export async function proxy(request: NextRequest) {
+  const mobile = mobileApi(request);
+  if (mobile) return mobile;
   const nonce = btoa(crypto.randomUUID());
   const csp = contentSecurityPolicy(nonce);
   const requestHeaders = new Headers(request.headers);
@@ -88,7 +107,7 @@ export async function proxy(request: NextRequest) {
 
   if (!signedIn && !isPublic) {
     if (path.startsWith("/api/")) {
-      return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+      return NextResponse.json({ error: "Not signed in" }, { status: 401, headers: isCorsPath(path) ? corsHeaders(request.headers.get("origin")) : undefined });
     }
     const url = request.nextUrl.clone();
     url.pathname = "/login";
@@ -96,6 +115,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
   response.headers.set("Content-Security-Policy", csp);
+  if (isCorsPath(path)) for (const [k, v] of Object.entries(corsHeaders(request.headers.get("origin")))) response.headers.set(k, v);
   return response;
 }
 

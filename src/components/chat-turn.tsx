@@ -2,14 +2,14 @@
 import { useId, useState } from "react";
 import Link from "next/link";
 import type { Message, ToolEvent } from "@/lib/types";
-import { readStepsLine, stepDone } from "@/lib/tool-labels";
-import { isPlanStep } from "@/lib/plain-text";
-import { displayOf, planCard, type Step } from "@/lib/plan-card";
+import { readStepsLine } from "@/lib/tool-labels";
+import { planCard, type Step } from "@/lib/plan-card";
 import type { StepView } from "@/lib/tool-events";
 import { Pebble, type PebbleMood } from "./pebble";
 import { Stone } from "./shell/stone";
 import type { ActionView } from "@/lib/actions";
 import { ActionCard, UndoButton, useActions } from "./action-card";
+import { replyView } from "@/lib/reply-view";
 
 // How one turn of the conversation looks: the person's words in a light
 // bubble; Navi's reply under the small Navi stone with its steps as hairline rows
@@ -174,33 +174,22 @@ function StepsBox({ children }: { children: React.ReactNode }) {
 export function NaviMessage({ message }: { message: Message }) {
   const { actions, latest } = useActions();
   const events: ToolEvent[] = message.tool_events ?? [];
-  const cards = events.flatMap((e) => (e.action_id && actions[e.action_id] ? [actions[e.action_id]] : []));
-  const rows = events.filter((e) => !(e.action_id && actions[e.action_id]));
-  // Older messages from before cards were linked: the request is still in Activity.
-  const unlinked = rows.some((e) => !e.action_id && /approv/i.test(e.summary));
-  // One card for every plan change in this reply, where the first one was.
-  const planSteps = rows.filter((e) => e.ok && isPlanStep(e));
-  const firstPlan = rows.findIndex((e) => planSteps.includes(e));
+  // Rows and cards as the phone app gets them too (src/lib/reply-view.ts).
+  const { rows, cardIds, unlinked } = replyView(events, actions);
   return (
     <div className="flex max-w-[720px] flex-col gap-3">
       <NaviHeader mood="idle" voice={message.modality === "voice"} />
       {rows.length > 0 && (
         <StepsBox>
-          {rows.map((e, i) =>
-            planSteps.includes(e) ? (
-              i === firstPlan ? <PlanRow key={i} steps={planSteps} /> : null
-            ) : (
-              <StepRow key={i} ok={e.ok} label={stepDone(e.name, e.ok)} display={displayOf(e)} detail={e.detail} leftover={e.leftover} undo={e.undo} />
-            ),
-          )}
+          {rows.map((r, i) => (
+            <StepRow key={i} ok={r.ok} label={r.label} display={r.display} detail={r.detail} leftover={r.leftover} undo={r.undo} />
+          ))}
         </StepsBox>
       )}
       {message.content && <p className="whitespace-pre-wrap text-[16px] leading-[1.5] text-[#e6e7ea] md:text-[17px]">{withBold(message.content)}</p>}
-      {cards
-        .filter((c, i) => cards.findIndex((x) => x.id === c.id) === i)
-        .map((c) => (
-          <ActionCard key={c.id} view={c} compact={latest.get(c.id) !== message.id} />
-        ))}
+      {cardIds.map((id) => (
+        <ActionCard key={id} view={actions[id]} compact={latest.get(id) !== message.id} />
+      ))}
       {unlinked && (
         <Link href="/activity" className="muted text-[13px] underline underline-offset-2">See approvals in Activity</Link>
       )}
