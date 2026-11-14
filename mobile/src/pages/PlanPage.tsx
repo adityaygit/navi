@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { MLine, MTaskItem, MDayItem } from "@shared/mobile-api-types";
 import { planActions, useDay, useInbox, useTasks, useWeek } from "../data/plan";
 import { addDays, clockAmPm, dayNum, monthDay, weekday, weekdayShort } from "../data/time";
@@ -8,6 +8,7 @@ import { WeekView } from "../plan/WeekView";
 import { TasksView } from "../plan/TasksView";
 import { InboxSheet } from "../plan/InboxSheet";
 import { AskBar, type AskRequest } from "../shell/AskSheet";
+import type { FocusTarget } from "../focus/Focus";
 import { useToast } from "../ui/Toast";
 import { useExit } from "../ui/useExit";
 import { ease, ink, meaning, type Palette } from "../theme/tokens";
@@ -19,7 +20,7 @@ const VIEWS: { v: View; t: string }[] = [
   { v: "tasks", t: "Tasks" },
 ];
 
-type Props = { palette: Palette; active: boolean; onAsk: (r: AskRequest) => void; onVoice: () => void };
+type Props = { palette: Palette; active: boolean; onAsk: (r: AskRequest) => void; onVoice: () => void; onFocus: (f: FocusTarget) => void; version?: number };
 
 function Line({ line }: { line: MLine | undefined }) {
   if (!line?.length) return null;
@@ -32,7 +33,7 @@ function Line({ line }: { line: MLine | undefined }) {
   );
 }
 
-export function PlanPage({ palette: P, active, onAsk, onVoice }: Props) {
+export function PlanPage({ palette: P, active, onAsk, onVoice, onFocus, version = 0 }: Props) {
   const [view, setView] = useState<View>("day");
   const [date, setDate] = useState<string | null>(null);
   const [picker, setPicker] = useState(false);
@@ -42,6 +43,14 @@ export function PlanPage({ palette: P, active, onAsk, onVoice }: Props) {
   const tasks = useTasks(view === "tasks");
   const inbox = useInbox();
   const toast = useToast();
+  // Something outside Plan changed the day (a focus session ended): reload.
+  useEffect(() => {
+    if (version) {
+      void day.refresh();
+      void tasks.refresh();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [version]);
 
   const d = day.data;
   const shownDate = d?.date ?? date ?? new Date().toISOString().slice(0, 10);
@@ -136,7 +145,7 @@ export function PlanPage({ palette: P, active, onAsk, onVoice }: Props) {
           <div style={{ marginTop: 20 }}>
             {loadingFirst && !err ? <Skeleton /> : null}
             {err && loadingFirst ? <p style={{ margin: 0, padding: "0 20px", fontSize: 15, color: meaning.slipping }}>Couldn't load your plan. Pull Navi back up when you're online.</p> : null}
-            {view === "day" && d ? <DayView day={d} P={P} h={{ onPlace, onOutcome, onAsk: (prompt) => ask(prompt, /\.$/.test(prompt)) }} /> : null}
+            {view === "day" && d ? <DayView day={d} P={P} h={{ onPlace, onOutcome, onAsk: (prompt) => ask(prompt, /\.$/.test(prompt)), onFocus: (it) => onFocus({ title: it.title, taskId: it.taskId, blockId: it.kind === "block" ? it.id : null, minutes: it.minutes, space: it.space?.name ?? null }) }} /> : null}
             {view === "week" && week.data ? <WeekView week={week.data} onOpenDay={(dt) => { setDate(dt); setView("day"); }} /> : null}
             {view === "tasks" && tasks.data ? <TasksView groups={tasks.data} onToggle={onToggle} /> : null}
           </div>

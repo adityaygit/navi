@@ -17,6 +17,7 @@ export type DayHandlers = {
   onPlace: (taskId: string, startIso: string, minutes: number, title: string) => void;
   onOutcome: (item: MDayItem, status: "done" | "skipped") => void;
   onAsk: (prompt: string) => void;
+  onFocus: (item: MDayItem) => void;
 };
 
 type Row =
@@ -97,7 +98,7 @@ export function DayView({ day, P, h }: { day: MDay; P: Palette; h: DayHandlers }
     const border = it.look === "routine" ? `1.5px dashed ${hex(c, 0.45)}` : it.look === "flex" ? `1.5px solid ${hex(c, it.key === nextKey ? 0.75 : 0.5)}` : `1px solid ${hex(c, 0.35)}`;
     const due = it.overlaps.length ? "#F8D2B0" : "rgba(255,255,255,0.62)";
     return (
-      <div style={{ flex: 1, minWidth: 0, borderRadius: 16, background: bg, border, boxSizing: "border-box", display: "flex", flexDirection: "column", opacity: it.done ? 0.55 : 1, transition: "background-color 0.25s, opacity 0.25s", height: compact ? "100%" : undefined }}>
+      <div style={{ position: "relative", flex: 1, minWidth: 0, borderRadius: 16, background: bg, border, boxSizing: "border-box", display: "flex", flexDirection: "column", opacity: it.done ? 0.55 : 1, transition: "background-color 0.25s, opacity 0.25s", height: compact ? "100%" : undefined }}>
         <button
           type="button"
           aria-expanded={isSel}
@@ -113,16 +114,24 @@ export function DayView({ day, P, h }: { day: MDay; P: Palette; h: DayHandlers }
             {it.space && !compact ? ` · ${it.space.name}` : ""}
           </span>
         </button>
+        {!compact && !isSel && it.key === nextKey && it.taskId && day.isToday ? (
+          <button type="button" onClick={() => { feel("select"); h.onFocus(it); }} style={{ position: "absolute", right: 11, top: 11, height: 40, padding: "0 18px", borderRadius: 20, background: P.cta, color: "#0B0B0C", fontSize: 15, fontWeight: 600 }}>Start</button>
+        ) : null}
         {isSel && !compact ? (
           <div style={{ display: "flex", gap: 8, padding: "4px 12px 12px", animation: `nRise 0.28s ${ease} both` }}>
+            {it.taskId && !it.done && day.isToday ? (
+              <button type="button" onClick={() => { setSel(null); h.onFocus(it); }} style={{ flex: 1, height: 44, borderRadius: 22, background: P.cta, color: "#0B0B0C", fontSize: 15, fontWeight: 600, textAlign: "center" }}>
+                Start focus
+              </button>
+            ) : null}
             {it.kind === "block" && !it.done ? (
-              <button type="button" onClick={() => { setSel(null); h.onOutcome(it, "done"); }} style={{ flex: 1, height: 44, borderRadius: 22, background: P.cta, color: "#0B0B0C", fontSize: 15, fontWeight: 600, textAlign: "center" }}>
+              <button type="button" onClick={() => { setSel(null); h.onOutcome(it, "done"); }} style={{ flex: 1, height: 44, borderRadius: 22, background: it.taskId && day.isToday ? "rgba(255,255,255,0.10)" : P.cta, color: it.taskId && day.isToday ? "#F5F5F7" : "#0B0B0C", fontSize: 15, fontWeight: it.taskId && day.isToday ? 400 : 600, textAlign: "center" }}>
                 Mark done
               </button>
             ) : null}
-            <button type="button" onClick={() => { setSel(null); h.onAsk(`About “${it.title}” at ${clock(it.start, tz)}: `); }} style={{ flex: 1, height: 44, borderRadius: 22, background: "rgba(255,255,255,0.10)", fontSize: 15, textAlign: "center" }}>
+            {it.taskId && !it.done && day.isToday && it.kind === "block" ? null : <button type="button" onClick={() => { setSel(null); h.onAsk(`About “${it.title}” at ${clock(it.start, tz)}: `); }} style={{ flex: 1, height: 44, borderRadius: 22, background: "rgba(255,255,255,0.10)", fontSize: 15, textAlign: "center" }}>
               Ask Navi
-            </button>
+            </button>}
           </div>
         ) : null}
       </div>
