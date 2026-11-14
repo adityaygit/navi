@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { HoldToTalk } from "./HoldToTalk";
 import { feel } from "../native/haptics";
 import { ink, type Palette } from "../theme/tokens";
 
 // The message bar: type, or hold Talk for voice. Send appears once there's text.
-type Props = { palette: Palette; placeholder?: string; onSend: (text: string) => void; onVoice: () => void; offline?: boolean; onOfflineTalk?: () => void };
+type Props = { palette: Palette; placeholder?: string; initial?: string; autoFocus?: boolean; onSend: (text: string) => void; onVoice: () => void; offline?: boolean; onOfflineTalk?: () => void; bg?: string };
 
-export function Composer({ palette, placeholder = "Tell Navi anything", onSend, onVoice, offline, onOfflineTalk }: Props) {
-  const [draft, setDraft] = useState("");
+export function Composer({ palette, placeholder = "Tell Navi anything", initial = "", autoFocus, onSend, onVoice, offline, onOfflineTalk, bg }: Props) {
+  const [draft, setDraft] = useState(initial);
+  const id = useId();
   const send = () => {
     const t = draft.trim();
     if (!t) return;
@@ -16,10 +17,10 @@ export function Composer({ palette, placeholder = "Tell Navi anything", onSend, 
     onSend(t);
   };
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 56, boxSizing: "border-box", padding: "5px 5px 5px 20px", borderRadius: 28, background: ink.field, border: `1px solid ${ink.edge}` }}>
-      <label htmlFor="composer" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>{placeholder}</label>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 56, boxSizing: "border-box", padding: "5px 5px 5px 20px", borderRadius: 28, background: bg ?? ink.field, border: `1px solid ${ink.edge}` }}>
+      <label htmlFor={id} style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>{placeholder}</label>
       <input
-        id="composer"
+        id={id}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => {
@@ -29,6 +30,7 @@ export function Composer({ palette, placeholder = "Tell Navi anything", onSend, 
           }
         }}
         enterKeyHint="send"
+        autoFocus={autoFocus}
         autoComplete="off"
         placeholder={placeholder}
         style={{ flex: 1, minWidth: 0, height: 44, border: 0, outline: "none", background: "transparent", fontSize: 17 }}
