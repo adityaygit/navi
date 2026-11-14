@@ -12,7 +12,10 @@
 /* Browser preview at phone size: pretend there is a notch and a home bar, so screenshots match the device. */
 :root.sim { --sat: 50px; --sab: 34px; }
 
-html, body, #root { height: 100%; margin: 0; background: #000; overflow: hidden; overscroll-behavior: none; }
+html, body { height: 100%; margin: 0; background: #000; overflow: hidden; overscroll-behavior: none; }
+/* The app's frame. Its bottom edge rides the keyboard (src/native/keyboard.ts): --kb is how far up,
+   animated on the keyboard's own curve, so the composer and the chat move with it, never after it. */
+#root { position: fixed; top: 0; left: 0; right: 0; bottom: var(--kb, 0px); overflow: hidden; background: #000; transition: bottom var(--kb-dur, 280ms) var(--kb-curve, ease); will-change: bottom; }
 body {
   color: #F5F5F7;
   font-family: Figtree, -apple-system, system-ui, sans-serif;
@@ -51,3 +54,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid rgba(255,255,255,
 .ngroup > * + *::before { content: ""; position: absolute; left: 16px; right: 0; top: 0; height: 1px; background: rgba(255,255,255,0.07); pointer-events: none; }
 .npress { transition: background-color 0.15s; -webkit-tap-highlight-color: transparent; }
 .npress:active { background-color: rgba(255,255,255,0.05); }
+
+/* Sign-in with the keyboard up: the stone steps back a little so the words keep their space. */
+.nhero > span:first-child { transition: transform var(--kb-dur, 280ms) var(--kb-curve, ease), margin var(--kb-dur, 280ms) var(--kb-curve, ease); }
+.kb-open .nhero > span:first-child { transform: scale(0.72); margin: -14px 0 -10px; }

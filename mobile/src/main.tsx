@@ -1,6 +1,9 @@
 import { StrictMode, Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles/global.css";
+import { initKeyboard } from "./native/keyboard";
+
+void initKeyboard();
 
 // If anything fails at start-up, show what happened instead of a black screen.
 function Failed({ error }: { error: unknown }) {

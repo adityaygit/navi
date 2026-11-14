@@ -66,7 +66,7 @@ export function SignIn() {
   return (
     <main style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", padding: "calc(var(--sat) + 24px) 24px calc(var(--sab) + 8px)", boxSizing: "border-box" }}>
       <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, top: 0, height: 520, background: P.scene, pointerEvents: "none" }} />
-      <div style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+      <div className="nhero" style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", paddingBottom: 24 }}>
         <Stone w={96} h={88} bg={P.stone} shadow={`0 22px 50px ${P.stoneShadow}`} />
         <h1 style={{ margin: "24px 0 0", fontSize: 30, lineHeight: 1.22, fontWeight: 600, letterSpacing: "-0.02em" }}>
           {step === "code" ? "Check your email." : "Welcome to Navi."}

@@ -60,14 +60,13 @@ const config: CapacitorConfig = {
       overlaysWebView: true,
     },
     Keyboard: {
-      // "native": the web view itself shrinks to the space above the
-      // keyboard, so a composer pinned with position: fixed; bottom: 0
-      // rides the keyboard without any JavaScript measuring. The app can
-      // still listen to keyboardWillShow/Hide for haptics or animation.
-      // On Android, Capacitor 8's SystemBars already pads the web view by
-      // the keyboard height (the activity uses adjustResize), so the old
-      // resizeOnFullScreen workaround stays off to avoid a double resize.
-      resize: KeyboardResize.Native,
+      // "none" on iPhone: the web view keeps its size and the app animates
+      // its own bottom edge with the keyboard (src/native/keyboard.ts), so
+      // nothing jumps. A resizing web view snapped to the new size in one
+      // frame and the chat redrew a beat later. Android ignores this and
+      // keeps adjustResize (the OS animates it); resizeOnFullScreen stays off
+      // because Capacitor 8's SystemBars already pads for the keyboard there.
+      resize: KeyboardResize.None,
       style: KeyboardStyle.Dark,
       resizeOnFullScreen: false,
       // Black behind the keyboard while it animates in (iOS).
