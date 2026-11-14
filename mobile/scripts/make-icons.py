@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Draw Navi's "stone" icon and splash, then place every size the native
+"""Draw Navi's arrowhead icon and splash, then place every size the native
 projects need. Re-run after changing the look:
 
     python3 mobile/scripts/make-icons.py
@@ -112,6 +112,29 @@ def draw_stone(size: int, scale: float) -> Image.Image:
     out.paste(grad, (0, 0), mask)
     return out.resize((size, size), Image.LANCZOS)
 
+MARK = [(11, 1.5), (20, 24.5), (11, 19.2), (2, 24.5)]   # landing/src/icons.jsx Logo
+SHADE = [(11, 1.5), (11, 19.2), (2, 24.5)]              # left facet, black at 28%
+
+
+def mark_points(pts, size, scale):
+    """Map the 22x26 logo box so its height fills `scale` of a `size` square."""
+    big = size * SS
+    k = big * scale / 26
+    ox = (big - 22 * k) / 2
+    oy = (big - 23 * k) / 2 - 1.5 * k  # centre the visible shape (y 1.5..24.5)
+    return [(ox + x * k, oy + y * k) for x, y in pts]
+
+
+def draw_mark(size: int, scale: float) -> Image.Image:
+    """Navi's arrowhead mark, white with a shaded left facet, on transparent."""
+    big = size * SS
+    out = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    d = ImageDraw.Draw(out)
+    d.polygon(mark_points(MARK, size, scale), fill=(255, 255, 255, 255))
+    shade = round(255 * 0.72)
+    d.polygon(mark_points(SHADE, size, scale), fill=(shade, shade, shade, 255))
+    return out.resize((size, size), Image.LANCZOS)
+
 
 def on_black(img: Image.Image) -> Image.Image:
     bg = Image.new("RGB", img.size, BLACK)
@@ -132,9 +155,9 @@ def circle_mask(size: int) -> Image.Image:
 def main() -> None:
     RES.mkdir(parents=True, exist_ok=True)
 
-    icon_stone = draw_stone(1024, 0.62)           # icon: stone fills ~62%
-    fg_stone = draw_stone(1024, 0.62 * 66 / 108)  # adaptive: keep in the 66dp safe zone
-    splash_stone = draw_stone(1024, 0.80)
+    icon_stone = draw_mark(1024, 0.56)           # icon: stone fills ~62%
+    fg_stone = draw_mark(1024, 0.56 * 66 / 108)  # adaptive: keep in the 66dp safe zone
+    splash_stone = draw_mark(1024, 0.80)
 
     icon = on_black(icon_stone)
     icon.save(RES / "icon.png", optimize=True)
@@ -172,7 +195,7 @@ def main() -> None:
             d.mkdir(exist_ok=True)
             big = px * SS
             m = Image.new("L", (big, big), 0)
-            ImageDraw.Draw(m).polygon(stone_outline(big / 2, big / 2, big * 0.42), fill=255)
+            ImageDraw.Draw(m).polygon(mark_points(MARK, px, 0.9), fill=255)
             m = m.resize((px, px), Image.LANCZOS)
             white = Image.new("RGBA", (px, px), (255, 255, 255, 0))
             white.putalpha(m)
