@@ -94,7 +94,7 @@ export function useChat(initialId: string | null) {
     feel("undo");
     setState((s) => ({ ...s, undone: new Set([...s.undone, ...ids]) }));
     try {
-      await api("/api/m/activity/undo", { body: { ids } });
+      await api("/api/m/undo", { body: { activityIds: ids } });
     } catch (e) {
       setState((s) => {
         const u = new Set(s.undone);
@@ -113,7 +113,7 @@ export function useChat(initialId: string | null) {
       return a ? { ...s, actions: { ...s.actions, [actionId]: { ...a, status: decision === "approve" ? "executing" : "declined" } } } : s;
     });
     try {
-      const r = await api<{ action: ActionView }>(`/api/m/approvals/${actionId}`, { body: { decision } });
+      const r = await api<{ action: ActionView }>(`/api/m/approvals/${actionId}/decide`, { body: { decision } });
       setState((s) => ({ ...s, actions: { ...s.actions, [actionId]: r.action } }));
     } catch (e) {
       setState((s) => {

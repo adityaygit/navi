@@ -43,7 +43,10 @@ jobs:
           distribution: temurin
           java-version: 21
           cache: gradle
-      - uses: android-actions/setup-android@v3
+      # GitHub's Ubuntu image already has the Android SDK (ANDROID_HOME); just accept its licences.
+      # (android-actions/setup-android@v3 tries to install the retired "tools" package and fails.)
+      - name: Accept Android SDK licences
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
       - name: Build APK
         working-directory: mobile/android
         env:
