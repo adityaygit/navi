@@ -66,7 +66,9 @@ export function TaskCard({ task, steps, space, spaces, zone, onClose }: { task: 
     });
   };
 
+  const canvas = Boolean(task.external_ref);
   const sub = [
+    canvas ? <span key="c" className="rounded-full bg-white/[0.08] px-2 py-[1px] text-[12.5px] text-text">From Canvas</span> : null,
     space ? (
       <span key="s" className="flex items-center gap-1.5">
         <span className="h-[7px] w-[7px] rounded-full" style={{ background: space.color }} aria-hidden="true" />
@@ -92,6 +94,8 @@ export function TaskCard({ task, steps, space, spaces, zone, onClose }: { task: 
           <input
             id={`title-${task.id}`}
             value={title}
+            readOnly={canvas}
+            title={canvas ? "This title comes from Canvas" : undefined}
             onChange={(e) => setTitle(e.target.value)}
             onBlur={() => title.trim() && title.trim() !== task.title && save({ title: title.trim() })}
             onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
@@ -256,8 +260,9 @@ function MoreDetails({
           <div>
             <div className={row}>
               <label htmlFor={`due-${task.id}`} className="text-[14.5px]">Due</label>
-              <input id={`due-${task.id}`} type="datetime-local" defaultValue={local(task.due_at)} onChange={(e) => save({ due_at: fromLocal(e.target.value), ...(e.target.value ? {} : { due_is_hard: false }) })} className={pill} />
+              <input id={`due-${task.id}`} type="datetime-local" defaultValue={local(task.due_at)} disabled={Boolean(task.external_ref)} aria-describedby={task.external_ref ? `due-src-${task.id}` : undefined} onChange={(e) => save({ due_at: fromLocal(e.target.value), ...(e.target.value ? {} : { due_is_hard: false }) })} className={`${pill} disabled:opacity-70`} />
             </div>
+            {task.external_ref && <p id={`due-src-${task.id}`} className={help}>Set in Canvas. Navi updates it every sync; plan your work time below.</p>}
           </div>
           <div>
             <div className={row}>

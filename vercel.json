@@ -97,6 +97,22 @@
     {
       "path": "/api/cron/tick",
       "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/cron/integrations",
+      "schedule": "23 1 * * *"
+    },
+    {
+      "path": "/api/cron/integrations",
+      "schedule": "23 7 * * *"
+    },
+    {
+      "path": "/api/cron/integrations",
+      "schedule": "23 13 * * *"
+    },
+    {
+      "path": "/api/cron/integrations",
+      "schedule": "23 19 * * *"
     }
   ]
 }

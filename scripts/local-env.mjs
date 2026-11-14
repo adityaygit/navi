@@ -26,6 +26,7 @@ const values = {
   NAVI_AI_PROVIDER: "devsim",
   NAVI_DAILY_BUDGET_USD: "2",
   CRON_SECRET: randomBytes(32).toString("hex"),
+  NAVI_INTEGRATION_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: vapid.publicKey,
   VAPID_PRIVATE_KEY: vapid.privateKey,
   VAPID_SUBJECT: "mailto:dev@navi.test",
