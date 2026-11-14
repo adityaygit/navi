@@ -1,0 +1,997 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi mobile, M4</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+@keyframes nUp{from{transform:translateY(100%)}to{transform:none}}
+@keyframes nLeft{from{transform:translateX(-100%)}to{transform:none}}
+@keyframes nFade{from{opacity:0}to{opacity:1}}
+@keyframes nRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes nGrow{from{opacity:0;transform:scale(0.96)}to{opacity:1;transform:none}}
+@keyframes nDown{from{transform:none}to{transform:translateY(100%)}}
+@keyframes nLeftOut{from{transform:none}to{transform:translateX(-100%)}}
+@keyframes nFadeOut{from{opacity:1}to{opacity:0}}
+@keyframes nShrink{from{opacity:1;transform:none}to{opacity:0;transform:scale(0.96)}}
+@keyframes nSink{from{opacity:1;transform:none}to{opacity:0;transform:translateY(14px)}}
+@keyframes nFadeA{from{opacity:0}to{opacity:1}}
+@keyframes nFadeB{from{opacity:0}to{opacity:1}}
+@keyframes nPulse{0%{box-shadow:0 0 0 0 var(--g)}100%{box-shadow:0 0 0 10px rgba(0,0,0,0)}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:0.01ms !important;transition-duration:0.01ms !important}}
+body{margin:0}
+a{color:#A7EBC0}a:hover{color:#D2F6DF}
+button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer;text-align:left}
+input{font:inherit;color:inherit}
+input::placeholder{color:#8E8E96}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: clip; background: #000000; color: #F5F5F7; font-family: Figtree, -apple-system, sans-serif; font-size: 16px; font-feature-settings: 'tnum'; user-select: none">
+
+
+  <div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 0; height: 120px; z-index: 4; pointer-events: none; background: linear-gradient(to bottom, rgba(0,0,0,0.94) 0, rgba(0,0,0,0.9) 96px, rgba(0,0,0,0) 120px)"></div>
+  <!-- ===== Top: page navigation (three treatments) ===== -->
+  <header style="position: absolute; left: 0; right: 0; top: 50px; height: 48px; z-index: 5">
+    <sc-if value="{{navWords}}" hint-placeholder-val="{{ true }}">
+      <nav aria-label="Pages" style="position: absolute; inset: 0; overflow: hidden; -webkit-mask-image: linear-gradient(to right, transparent 0, #000 70px, #000 320px, transparent 390px); mask-image: linear-gradient(to right, transparent 0, #000 70px, #000 320px, transparent 390px)">
+        <div style="position: absolute; top: 0; height: 48px; left: 0; width: 288px; display: flex; transform: translateX({{navX}}px); transition: {{navT}}">
+          <sc-for list="{{navItems}}" as="n" hint-placeholder-count="3">
+            <button type="button" aria-current="{{n.cur}}" onClick="{{n.go}}" style="width: 96px; height: 48px; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: {{n.size}}px; font-weight: {{n.weight}}; color: {{n.color}}; opacity: {{n.wo}}; text-align: center; transition: all 0.25s">{{n.t}}<sc-if value="{{n.dot}}" hint-placeholder-val="{{ false }}"><span aria-label="something waiting" style="width: 6px; height: 6px; border-radius: 3px; background: {{n.dotColor}}"></span></sc-if></button>
+          </sc-for>
+        </div>
+      </nav>
+    </sc-if>
+    <sc-if value="{{navMarks}}" hint-placeholder-val="{{ false }}">
+      <nav aria-label="Pages" style="position: absolute; left: 0; right: 0; top: 0; height: 48px; display: flex; justify-content: center; align-items: center">
+        <sc-for list="{{navItems}}" as="n" hint-placeholder-count="3">
+          <button type="button" aria-label="{{n.t}}" aria-current="{{n.cur}}" onClick="{{n.go}}" style="width: 40px; height: 44px; display: flex; align-items: center; justify-content: center"><span aria-hidden="true" style="width: {{n.markW}}px; height: {{n.markH}}px; border-radius: {{n.markR}}; background: {{n.markBg}}; opacity: {{n.markO}}"></span></button>
+        </sc-for>
+      </nav>
+      <div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 44px; text-align: center; font-size: 13px; font-weight: 600; color: #C8C8CE; opacity: {{markLabelO}}">{{curName}}</div>
+    </sc-if>
+    <sc-if value="{{navCapsule}}" hint-placeholder-val="{{ false }}">
+      <nav aria-label="Pages" style="position: absolute; left: 0; right: 0; top: 4px; display: flex; justify-content: center">
+        <div style="display: flex; padding: 3px; border-radius: 20px; background: rgba(40,40,44,0.72); border: 1px solid rgba(255,255,255,0.08)">
+          <sc-for list="{{navItems}}" as="n" hint-placeholder-count="3">
+            <button type="button" aria-current="{{n.cur}}" onClick="{{n.go}}" style="height: 34px; min-width: 72px; padding: 0 12px; border-radius: 17px; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 15px; font-weight: {{n.weight}}; color: {{n.capColor}}; background: {{n.capBg}}">{{n.t}}<sc-if value="{{n.dot}}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 3px; background: {{n.dotColor}}"></span></sc-if></button>
+          </sc-for>
+        </div>
+      </nav>
+    </sc-if>
+    <sc-if value="{{showMenu}}" hint-placeholder-val="{{ true }}">
+      <button type="button" aria-label="Chats and account" onClick="{{openDrawer}}" style="opacity: {{menuO}}; position: absolute; left: 6px; top: 2px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #C8C8CE"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 9h16M4 15h10"></path></svg></button>
+    </sc-if>
+  </header>
+
+  <sc-if value="{{offline}}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="animation: nRise 0.36s cubic-bezier(0.2, 0.9, 0.25, 1) both; position: absolute; left: 0; right: 0; top: 100px; z-index: 5; display: flex; justify-content: center"><span style="height: 32px; padding: 0 12px; border-radius: 16px; background: #1F1F22; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #C8C8CE"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 4px; background: #8E8E96"></span>Offline · messages send when you're back</span></div>
+  </sc-if>
+
+  <sc-if value="{{anyPill}}" hint-placeholder-val="{{ false }}">
+    <div style="animation: {{pillAnim}}; position: absolute; left: 16px; right: 16px; bottom: {{pillBottom}}px; height: 52px; z-index: 6; box-shadow: 0 12px 30px rgba(0,0,0,0.5); transition: bottom 0.3s cubic-bezier(0.2, 0.9, 0.25, 1); display: flex; align-items: center; gap: 8px; padding: 0 6px 0 20px; border-radius: 26px; background: {{pillBg}}; border: 1px solid {{pillEdge}}">
+      <button type="button" onClick="{{pillOpen}}" style="flex: 1; min-width: 0; height: 48px; display: flex; align-items: center; gap: 10px"><span aria-hidden="true" style="width: 18px; height: 16px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: {{stoneBg}}"></span><span style="font-size: 15px; color: {{pillText}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{pillLabel}}</span></button>
+      <button type="button" aria-label="{{pillEndLabel}}" onClick="{{pillEnd}}" style="width: 40px; height: 40px; border-radius: 20px; display: flex; align-items: center; justify-content: center; background: #F4A99F; color: #2A0B07"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 14c4.5-4 11.5-4 16 0l-2 2.5-3-1.2v-2.2a9 9 0 0 0-6 0v2.2l-3 1.2z"></path></svg></button>
+    </div>
+  </sc-if>
+
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: #141416; opacity: {{gapO}}"></div>
+  <div onPointerDown="{{down}}" onPointerMove="{{move}}" onPointerUp="{{up}}" onPointerCancel="{{up}}" style="position: absolute; left: 0; top: 0; width: 1170px; height: 844px; display: flex; transform: translateX({{trackX}}px); transition: {{trackT}}; touch-action: pan-y">
+
+    <!-- ===================== PROGRESS ===================== -->
+    <section aria-label="Progress" style="width: 390px; height: 844px; flex: none; position: relative; background: #000; overflow: hidden; border-radius: {{pg0.r}}px; transform: {{pg0.t}}; z-index: {{pg0.z}}; filter: {{pg0.f}}; transition: {{secT}}">
+      <div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 0; height: 460px; background: {{pageScene}}; pointer-events: none"></div>
+      <sc-if value="{{weekHero}}" hint-placeholder-val="{{ true }}">
+        <div aria-hidden="{{heroHidden}}" style="position: absolute; left: 0; right: 0; top: 104px; padding: 0 20px; opacity: {{heroO}}; transform: translateY({{heroY}}px) scale({{heroS}}); transform-origin: 50% 0; pointer-events: none">
+          <div style="display: flex; align-items: baseline; gap: 10px"><h1 style="margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -0.02em">This week</h1><span style="font-size: 17px; color: #8E8E96">Nov 2 – 8</span></div>
+          <div style="margin-top: 26px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px">
+            <sc-for list="{{stones}}" as="p" hint-placeholder-count="7">
+              <div style="display: flex; flex-direction: column; align-items: center; gap: 10px">
+                <span style="width: 44px; height: 40px; position: relative; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: {{p.shell}}; border: {{p.border}}; box-sizing: border-box; overflow: hidden; box-shadow: {{p.glow}}"><span style="position: absolute; left: 0; right: 0; bottom: 0; height: {{p.fill}}%; background: linear-gradient(180deg, #E8FFD6 0%, #9FF0D8 45%, #3E9C86 100%)"></span></span>
+                <span style="font-size: 13px; font-weight: {{p.weight}}; color: {{p.labelColor}}">{{p.d}}</span>
+              </div>
+            </sc-for>
+          </div>
+          <p style="margin: 24px 0 0; font-size: 24px; line-height: 1.3; font-weight: 600; letter-spacing: -0.015em; color: rgba(255,255,255,0.5)">You kept <span style="color: #9FF0D8">every morning run</span>. The <span style="color: #FF9A9A">essay</span> keeps slipping.</p>
+        </div>
+      </sc-if>
+      <div ref="{{progRef}}" onScroll="{{progScroll}}" style="position: relative; height: 844px; box-sizing: border-box; padding: {{progPad}}; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column">
+        <sc-if value="{{weekMode}}" hint-placeholder-val="{{ true }}">
+          <div style="height: 450px; flex: none; position: relative">
+            <div role="group" aria-label="Days of this week" style="position: absolute; left: 0; right: 0; top: 169px; height: 72px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; opacity: {{heroO}}">
+              <sc-for list="{{stones}}" as="p" hint-placeholder-count="7"><button type="button" aria-label="{{p.aria}}" onClick="{{p.open}}" style="height: 72px; border-radius: 16px"></button></sc-for>
+            </div>
+          </div>
+          <div style="flex: none; margin: 0 -20px; min-height: 760px; border-radius: 32px 32px 0 0; background: #0E0E10; border-top: 1px solid rgba(255,255,255,0.09); box-shadow: 0 -20px 50px rgba(0,0,0,0.6); padding: 8px 20px 140px; display: flex; flex-direction: column">
+            <span aria-hidden="true" style="align-self: center; width: 40px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.22)"></span>
+            <div style="margin-top: 20px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+              <div style="padding: 14px 12px 12px; border-radius: 16px; background: rgba(255,255,255,0.05)"><div style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: #8E8E96">KEPT</div><div style="margin-top: 8px; font-size: 20px; letter-spacing: -0.01em; font-weight: 700; color: #9FF0D8">13/16</div><div style="margin-top: 2px; font-size: 12px; color: #8E8E96">+2 vs last</div></div>
+              <div style="padding: 14px 12px 12px; border-radius: 16px; background: rgba(255,255,255,0.05)"><div style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: #8E8E96">FOCUSED</div><div style="margin-top: 8px; font-size: 20px; letter-spacing: -0.01em; font-weight: 700">6h 40m</div><div style="margin-top: 2px; font-size: 12px; color: #8E8E96">mostly after 4</div></div>
+              <div style="padding: 14px 12px 12px; border-radius: 16px; background: rgba(255,255,255,0.05)"><div style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: #8E8E96">SLIPPING</div><div style="margin-top: 8px; font-size: 20px; letter-spacing: -0.01em; font-weight: 700; color: #FF9A9A">1</div><div style="margin-top: 2px; font-size: 12px; color: #8E8E96">the essay</div></div>
+            </div>
+            <div style="margin-top: 32px; margin-bottom: 4px; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: #8E8E96">PATTERNS</div>
+            <sc-for list="{{pats}}" as="pt" hint-placeholder-count="4">
+              <div style="border-bottom: 1px solid rgba(255,255,255,0.06)">
+                <button type="button" aria-expanded="{{pt.open}}" onClick="{{pt.toggle}}" style="width: 100%; min-height: 64px; display: flex; align-items: center; gap: 12px">
+                  <span style="flex: 1; display: flex; flex-direction: column; gap: 8px"><span style="font-size: 17px; font-weight: 600">{{pt.t}}</span><span aria-hidden="true" style="display: flex; gap: 4px"><sc-for list="{{pt.days}}" as="dd" hint-placeholder-count="7"><span style="width: 18px; height: 5px; border-radius: 3px; background: {{dd.c}}"></span></sc-for></span></span>
+                  <span style="font-size: 15px; font-weight: 600; color: {{pt.c}}">{{pt.word}}</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7C7C85" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="{{pt.chev}}"></path></svg>
+                </button>
+                <sc-if value="{{pt.open}}" hint-placeholder-val="{{ false }}">
+                  <div style="animation: nRise 0.32s cubic-bezier(0.2, 0.9, 0.25, 1) both; padding: 0 0 16px; display: flex; flex-direction: column; gap: 8px">
+                    <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #C8C8CE">{{pt.detail}}</p>
+                    <sc-if value="{{pt.showAct}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{pt.doAct}}" style="align-self: flex-start; height: 40px; padding: 0 16px; border-radius: 20px; background: {{pt.actBg}}; color: #0B0B0C; font-size: 15px; font-weight: 600">{{pt.act}}</button></sc-if>
+                    <sc-if value="{{pt.isDone}}" hint-placeholder-val="{{ false }}"><div style="animation: nRise 0.32s cubic-bezier(0.2, 0.9, 0.25, 1) both; display: flex; align-items: center; gap: 10px; min-height: 44px"><span style="flex: 1; font-size: 15px; color: #C8C8CE">{{pt.doneText}}</span><button type="button" onClick="{{pt.undo}}" style="min-height: 44px; padding: 0 4px; color: {{ac}}; font-weight: 600">Undo</button></div></sc-if>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+            <div style="margin-top: 32px; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: #8E8E96">WHERE 31 HOURS WENT</div>
+            <div role="img" aria-label="School 14 hours, Work 9, Friends 5, Health 3" style="margin-top: 12px; height: 10px; display: flex; gap: 3px"><span style="flex: 14; border-radius: 5px; background: #8C9EFF"></span><span style="flex: 9; border-radius: 5px; background: #8CC6EC"></span><span style="flex: 5; border-radius: 5px; background: #F4B37A"></span><span style="flex: 3; border-radius: 5px; background: #F3988C"></span></div>
+            <div style="margin-top: 12px; font-size: 13px; color: #A0A0A8">School 14h · Work 9h · Friends 5h <span style="color: #9FF0D8">+3</span> · Health 3h</div>
+            <button type="button" onClick="{{openWeekStory}}" style="margin-top: 32px; min-height: 72px; display: flex; align-items: center; gap: 12px; padding: 0 16px 0 20px; border-radius: 20px; background: rgba(159,240,216,0.08); text-align: left">
+              <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 17px; font-weight: 600">Your week, told back</span><span style="font-size: 13px; color: #8E8E96">Five cards · full story Sunday</span></span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9FF0D8" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
+            </button>
+            <p style="margin: 16px 0 0; font-size: 13px; color: #8E8E96">Something off? <button type="button" onClick="{{reflectWrong}}" style="display: inline-block; padding: 11px 2px; margin: -11px 0; color: {{ac}}; font-weight: 600">Tell Navi</button></p>
+          </div>
+        </sc-if>
+        <sc-if value="{{eveningMode}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; align-items: baseline; gap: 10px"><h1 style="margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -0.02em">Tonight</h1><span style="font-size: 17px; color: #8E8E96">Friday</span></div>
+          <div style="margin-top: 40px; align-self: center; position: relative; width: 150px; height: 136px">
+            <div aria-hidden="true" style="position: absolute; inset: -44px; border-radius: 50%; background: radial-gradient(circle, {{glowColor}} 0%, rgba(0,0,0,0) 65%)"></div>
+            <div role="img" aria-label="Today: 2 of 4 things kept so far" style="position: absolute; inset: 0; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: rgba(199,193,255,0.14); border: 1px solid rgba(199,193,255,0.3); box-sizing: border-box; overflow: hidden"><div style="position: absolute; left: 0; right: 0; bottom: 0; height: 50%; background: {{stoneBg}}"></div></div>
+          </div>
+          <p style="margin: 32px 0 0; font-size: 24px; line-height: 1.3; font-weight: 600; letter-spacing: -0.015em; color: #6E6E77">Class, the shift and dinner with Maya all happened. <span style="color: #F5F5F7">2 of your 4</span> are done; the <span style="color: #F5F5F7">essay intro</span> and the reply to Sam are still open.</p>
+          <div style="flex: 1; min-height: 24px"></div>
+          <button type="button" onClick="{{openReview}}" style="height: 56px; border-radius: 28px; background: {{cta}}; color: #0B0B0C; font-size: 17px; font-weight: 600; text-align: center">Wrap up today</button>
+          <p style="margin: 12px 0 0; text-align: center; font-size: 13px; color: #8E8E96">A short conversation, about a minute.</p>
+        </sc-if>
+      </div>
+    </section>
+
+    <!-- ===================== NAVI CHAT ===================== -->
+    <section aria-label="Navi" style="width: 390px; height: 844px; flex: none; position: relative; background: #000; overflow: hidden; border-radius: {{pg1.r}}px; transform: {{pg1.t}}; z-index: {{pg1.z}}; filter: {{pg1.f}}; transition: {{secT}}; display: flex; flex-direction: column">
+      <div style="height: 98px; flex: none"></div>
+      <sc-if value="{{fresh}}" hint-placeholder-val="{{ true }}">
+        <div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 0; height: 520px; background: {{scene}}; pointer-events: none"></div>
+        <div style="animation: nFade 0.4s ease both; flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 24px 32px; text-align: center; position: relative">
+          <button type="button" aria-label="Talk to Navi" onClick="{{openVoice}}" style="width: 112px; height: 104px; display: flex; align-items: center; justify-content: center"><span aria-hidden="true" style="width: 96px; height: 88px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: {{stoneBg}}; box-shadow: 0 22px 50px {{stoneShadow}}"></span></button>
+          <p style="margin: 24px 0 0; font-size: 30px; line-height: 1.22; font-weight: 600; letter-spacing: -0.02em; color: rgba(255,255,255,0.5)"><span style="color: #FFFFFF">{{greet}}</span> {{greetA}}<span style="color: {{hiWord}}">{{greetB}}</span>{{greetC}}</p>
+          <sc-if value="{{hasMoment}}" hint-placeholder-val="{{ true }}">
+            <button type="button" onClick="{{momentAct}}" style="margin-top: 32px; height: 56px; padding: 0 32px; border-radius: 28px; background: {{cta}}; color: #0B0B0C; font-size: 17px; font-weight: 600; text-align: center">{{momentTitle}}</button>
+            <span style="margin-top: 12px; font-size: 13px; color: rgba(255,255,255,0.55)">{{momentSub}}</span>
+          </sc-if>
+          <sc-if value="{{giftAskFresh}}" hint-placeholder-val="{{ false }}">
+            <p style="margin: 24px 0 0; font-size: 17px; line-height: 1.45; color: #A0A0A8">Maya's birthday is Sunday, and there's no gift on your list.</p>
+            <div style="display: flex; flex-direction: column; align-items: center; margin-top: 4px">
+              <button type="button" onClick="{{giftAdd}}" style="height: 44px; padding: 0 12px; color: {{ac}}; font-weight: 600; text-align: center">Add “Get Maya a gift” to Saturday</button>
+              <button type="button" onClick="{{giftNo}}" style="height: 40px; padding: 0 12px; color: #7C7C85; font-size: 15px; text-align: center">Not now</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{giftDoneLine}}" hint-placeholder-val="{{ false }}">
+            <p style="margin: 24px 0 0; font-size: 15px; color: #A0A0A8">Added “Get Maya a gift” to Saturday. <button type="button" onClick="{{giftUndo}}" style="display: inline-block; padding: 11px 6px; margin: -11px 0; color: {{ac}}; font-weight: 600">Undo</button></p>
+          </sc-if>
+        </div>
+      </sc-if>
+      <sc-if value="{{urgent}}" hint-placeholder-val="{{ false }}">
+        <div style="animation: nFade 0.4s ease both; flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 16px 20px 24px">
+          <div style="display: flex; align-items: center; gap: 12px">
+            <button type="button" aria-label="Talk to Navi" onClick="{{openVoice}}" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; margin-left: -6px"><span aria-hidden="true" style="width: 36px; height: 33px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: {{stoneBg}}"></span></button>
+            <span style="font-size: 20px; font-weight: 600; letter-spacing: -0.01em">Afternoon, Alex.</span>
+          </div>
+          <div style="margin-top: 16px; border-radius: 24px; padding: 20px 20px 8px; background: linear-gradient(180deg, rgba(244,179,122,0.14) 0%, rgba(244,179,122,0.05) 100%); border: 1px solid rgba(244,179,122,0.30); display: flex; flex-direction: column">
+            <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: #F4B37A">HARD DEADLINE · TODAY 5:00 PM</span>
+            <span style="margin-top: 8px; font-size: 24px; line-height: 1.25; font-weight: 600; letter-spacing: -0.015em">History essay: the intro isn't started.</span>
+            <span style="margin-top: 8px; font-size: 15px; line-height: 1.45; color: #E2D3C6">Your 2:00 block is the last free stretch before the shift at 4.</span>
+            <button type="button" onClick="{{startFocus}}" style="margin-top: 20px; height: 52px; border-radius: 26px; background: #FFD08A; color: #0B0B0C; font-size: 17px; font-weight: 600; text-align: center">Start the essay now · 90 min</button>
+            <button type="button" onClick="{{askReplan}}" style="height: 48px; font-size: 15px; color: #E2D3C6; text-align: center">Ask Navi to replan the afternoon</button>
+          </div>
+          <p style="margin: 24px 0 0; padding: 0 4px; font-size: 15px; line-height: 1.45; color: #8E8E96">Everything else today is on track. Four things, one already done.</p>
+        </div>
+      </sc-if>
+      <sc-if value="{{resume}}" hint-placeholder-val="{{ false }}">
+        <div style="animation: {{chatSwap}}; flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column-reverse; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 40px); mask-image: linear-gradient(to bottom, transparent 0, #000 40px)">
+          <div style="padding: 40px 20px 24px"><dc-import name="M4-Thread" items="{{chatItems}}" hint-size="350px,400px"></dc-import></div>
+        </div>
+      </sc-if>
+      <div style="flex: none; padding: 8px 16px 34px">
+        <div style="display: flex; align-items: center; gap: 8px; min-height: 56px; box-sizing: border-box; padding: 5px 5px 5px 20px; border-radius: 28px; background: #141416; border: 1px solid rgba(255,255,255,0.08)">
+          <label for="m3-main" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Tell Navi anything</label>
+          <input id="m3-main" value="{{draft}}" onChange="{{typeDraft}}" onKeyDown="{{sendOnEnter}}" placeholder="Tell Navi anything" style="flex: 1; min-width: 0; height: 44px; border: 0; outline: none; background: transparent; font-size: 17px">
+          <sc-if value="{{hasDraft}}" hint-placeholder-val="{{ false }}">
+            <button type="button" aria-label="Send" onClick="{{send}}" style="width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; background: #F5F5F7; color: #000"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"></path></svg></button>
+          </sc-if>
+          <sc-if value="{{noDraft}}" hint-placeholder-val="{{ true }}">
+            <button type="button" aria-disabled="{{offline}}" onClick="{{talkTap}}" style="height: 44px; padding: 0 16px; border-radius: 22px; display: flex; align-items: center; gap: 6px; background: {{talkBg}}; color: {{talkColor}}; font-weight: 600; font-size: 15px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>Talk</button>
+          </sc-if>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== PLAN ===================== -->
+    <section aria-label="Plan" style="width: 390px; height: 844px; flex: none; position: relative; background: #000; overflow: hidden; border-radius: {{pg2.r}}px; transform: {{pg2.t}}; z-index: {{pg2.z}}; filter: {{pg2.f}}; transition: {{secT}}">
+      <div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 0; height: 460px; background: {{pageScene}}; pointer-events: none"></div>
+      <div ref="{{planRef}}" style="position: relative; height: 844px; box-sizing: border-box; padding: 104px 0 150px; overflow-y: auto; scrollbar-width: none">
+        <div style="padding: 0 8px 0 20px; display: flex; align-items: center; justify-content: space-between">
+          <button type="button" aria-haspopup="dialog" aria-label="{{titleAria}}" onClick="{{openDays}}" style="min-height: 48px; display: flex; align-items: baseline; gap: 10px">
+            <span style="font-size: 34px; font-weight: 700; letter-spacing: -0.02em">{{planTitle}}</span>
+            <span style="font-size: 17px; color: #8E8E96">{{planSub}}</span>
+          </button>
+          <button type="button" aria-label="{{inboxAria}}" onClick="{{openInbox}}" style="width: 48px; height: 48px; position: relative; display: flex; align-items: center; justify-content: center; color: #C8C8CE">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13h5l1.5 3h5L16 13h5"></path><path d="M5.5 5h13l2.5 8v6H3v-6z"></path></svg>
+            <sc-if value="{{inboxWaiting}}" hint-placeholder-val="{{ true }}"><span aria-hidden="true" style="position: absolute; top: 5px; right: 3px; min-width: 20px; height: 20px; padding: 0 6px; box-sizing: border-box; border-radius: 10px; border: 2px solid #000; background: {{badgeBg}}; color: #00140A; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{badgeText}}</span></sc-if>
+          </button>
+        </div>
+        <div role="group" aria-label="View" style="position: relative; margin: 12px 20px 0; height: 40px; padding: 4px; box-sizing: border-box; border-radius: 20px; background: rgba(255,255,255,0.06); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr))">
+          <span aria-hidden="true" style="position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / 3); border-radius: 16px; background: rgba(255,255,255,0.14); transform: translateX({{segX}}%); transition: transform 0.32s cubic-bezier(0.2, 0.9, 0.25, 1)"></span>
+          <sc-for list="{{viewTabs}}" as="v" hint-placeholder-count="3">
+            <button type="button" aria-pressed="{{v.on}}" onClick="{{v.pick}}" style="position: relative; border-radius: 16px; font-size: 15px; font-weight: {{v.weight}}; color: {{v.color}}; text-align: center; transition: color 0.25s">{{v.t}}</button>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{loading}}" hint-placeholder-val="{{ false }}">
+          <div aria-busy="true" aria-label="Loading your day" style="padding: 20px 20px 0; display: flex; flex-direction: column; gap: 10px">
+            <span style="width: 260px; height: 16px; border-radius: 8px; background: rgba(255,255,255,0.08)"></span>
+            <span style="width: 190px; height: 16px; border-radius: 8px; background: rgba(255,255,255,0.06)"></span>
+            <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 10px">
+              <span style="margin-left: 52px; height: 72px; border-radius: 18px; background: rgba(255,255,255,0.06)"></span>
+              <span style="margin-left: 52px; height: 52px; border-radius: 18px; background: rgba(255,255,255,0.05)"></span>
+              <span style="margin-left: 52px; height: 144px; border-radius: 18px; background: rgba(255,255,255,0.06)"></span>
+              <span style="margin-left: 52px; height: 96px; border-radius: 18px; background: rgba(255,255,255,0.05)"></span>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{notLoading}}" hint-placeholder-val="{{ true }}">
+          <p style="animation: {{viewSwap}}; margin: 20px 0 0; padding: 0 20px; font-size: 17px; line-height: 1.45; color: #8E8E96"><span style="color: #F5F5F7">{{lead}}</span> {{rest}}</p>
+
+          <sc-if value="{{approvalBanner}}" hint-placeholder-val="{{ false }}">
+            <button type="button" onClick="{{openInbox}}" style="margin: 20px 20px 0; width: calc(100% - 40px); min-height: 60px; display: flex; align-items: center; gap: 12px; padding: 0 16px; border-radius: 16px; background: rgba(244,179,122,0.10)">
+              <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 17px; font-weight: 600; color: #F8D2B0">{{approvalCount}} need your OK</span><span style="font-size: 13px; color: #CDB39C">Essay deadline · spin class · reply to Sam</span></span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F4B37A" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
+            </button>
+          </sc-if>
+
+          <!-- Day -->
+          <sc-if value="{{viewDay}}" hint-placeholder-val="{{ true }}">
+            <div style="animation: {{viewSwap}}; margin-top: 20px; padding: 0 20px">
+              <sc-if value="{{showEarlier}}" hint-placeholder-val="{{ true }}">
+                <button type="button" onClick="{{toggleEarlier}}" style="margin-left: 52px; min-height: 44px; display: flex; align-items: center; gap: 6px; font-size: 13px; color: #8E8E96">{{earlierText}}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="{{earlierChev}}"></path></svg></button>
+              </sc-if>
+              <ol aria-label="Timeline" style="list-style: none; margin: 0; padding: 0">
+                <sc-for list="{{rows}}" as="b" hint-placeholder-count="7">
+                  <li style="display: flex; gap: 12px; min-height: {{b.h}}px; transition: min-height 0.28s cubic-bezier(0.2, 0.9, 0.25, 1)">
+                    <span style="width: 40px; flex: none; padding-top: {{b.timePad}}px; text-align: left; font-size: 13px; font-weight: {{b.timeWeight}}; color: {{b.timeColor}}">{{b.t}}</span>
+                    <sc-if value="{{b.isNow}}" hint-placeholder-val="{{ false }}">
+                      <div style="flex: 1; padding-top: 4px">
+                        <div style="display: flex; align-items: center; gap: 8px"><span aria-hidden="true" style="width: 10px; height: 10px; border-radius: 5px; background: #F5F5F7; box-shadow: 0 0 0 4px rgba(255,255,255,0.12)"></span><span aria-hidden="true" style="flex: 1; height: 1.5px; background: rgba(255,255,255,0.55)"></span></div>
+                        <div style="margin: 8px 0 0 18px; font-size: 15px; color: #A0A0A8">{{b.title}}</div>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{b.isGap}}" hint-placeholder-val="{{ false }}">
+                      <div style="flex: 1; display: flex; align-items: center; gap: 8px; padding-left: 16px">
+                        <span style="flex: 1; font-size: 13px; color: #8E8E96">{{b.title}}</span>
+                        <sc-if value="{{b.canFit}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{b.fit}}" style="min-height: 44px; padding: 0 6px; color: {{ac}}; font-weight: 600; font-size: 15px">Add dentist call</button></sc-if>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{b.isBreak}}" hint-placeholder-val="{{ false }}">
+                      <div style="flex: 1; display: flex; align-items: center; gap: 8px; padding-left: 16px">
+                        <span aria-hidden="true" style="width: 18px; height: 34px; border-left: 2px dotted rgba(255,255,255,0.25)"></span>
+                        <span style="font-size: 13px; color: #8E8E96">{{b.title}}</span>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{b.isNote}}" hint-placeholder-val="{{ false }}">
+                      <button type="button" onClick="{{b.tap}}" style="flex: 1; min-height: 44px; display: flex; align-items: center; gap: 8px; padding-left: 6px; font-size: 13px; color: {{b.noteColor}}"><span aria-hidden="true" style="flex: none; width: 8px; height: 8px; border-radius: 4px; background: {{b.noteColor}}"></span><span style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{b.title}}</span><span style="flex: none; font-size: 15px; font-weight: 600">{{b.noteAct}}</span></button>
+                    </sc-if>
+                    <sc-if value="{{b.isGroup}}" hint-placeholder-val="{{ false }}">
+                      <div style="flex: 1; min-width: 0; display: flex; gap: 8px; height: {{b.h}}px">
+                        <button type="button" onClick="{{b.tap}}" style="flex: 1; min-width: 0; border-radius: 16px; background: {{b.lBg}}; border: {{b.lBorder}}; box-sizing: border-box; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; justify-content: flex-start"><span style="font-size: 15px; font-weight: 600">{{b.lTitle}}</span><span style="font-size: 13px; color: rgba(255,255,255,0.65)">{{b.lSub}}</span></button>
+                        <div style="flex: 1; min-width: 0; position: relative">
+                          <button type="button" onClick="{{b.tapR}}" style="position: absolute; left: 0; right: 0; top: {{b.rTop}}px; height: {{b.rH}}px; border-radius: 16px; background: {{b.rBg}}; border: {{b.rBorder}}; box-sizing: border-box; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{b.rTitle}}</span><span style="font-size: 13px; white-space: nowrap; color: {{b.rSubColor}}">{{b.rSub}}</span></button>
+                        </div>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{b.isBlock}}" hint-placeholder-val="{{ true }}">
+                      <div style="flex: 1; min-width: 0; border-radius: 16px; background: {{b.bg}}; border: {{b.border}}; box-sizing: border-box; display: flex; flex-direction: column; box-shadow: {{b.glow}}; animation: {{b.anim}}; transition: background-color 0.25s, border-color 0.25s, box-shadow 0.6s">
+                        <div style="display: flex; align-items: flex-start; gap: 8px">
+                          <button type="button" onClick="{{b.tap}}" aria-expanded="{{b.selected}}" style="flex: 1; min-width: 0; min-height: {{b.innerH}}px; padding: 12px 16px; display: flex; flex-direction: column; gap: 2px">
+                            <span style="font-size: 17px; font-weight: 600; color: {{b.titleColor}}; text-decoration: {{b.strike}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{b.title}}</span>
+                            <span style="font-size: 13px; color: {{b.subColor}}">{{b.sub}}</span>
+                          </button>
+                          <sc-if value="{{b.showStart}}" hint-placeholder-val="{{ false }}">
+                            <button type="button" onClick="{{b.focus}}" style="margin: 11px 11px 0 0; height: 40px; padding: 0 18px; border-radius: 20px; background: {{cta}}; color: #0B0B0C; font-size: 15px; font-weight: 600">Start</button>
+                          </sc-if>
+                        </div>
+                        <sc-if value="{{b.selected}}" hint-placeholder-val="{{ false }}">
+                          <div style="animation: nRise 0.28s cubic-bezier(0.2, 0.9, 0.25, 1) both; display: flex; gap: 8px; padding: 4px 12px 12px">
+                            <button type="button" onClick="{{b.focus}}" style="flex: 1; height: 44px; border-radius: 22px; background: {{cta}}; color: #0B0B0C; font-size: 15px; font-weight: 600; text-align: center">Start focus</button>
+                            <button type="button" onClick="{{b.done}}" style="flex: 1; height: 44px; border-radius: 22px; background: rgba(255,255,255,0.10); font-size: 15px; text-align: center">Mark done</button>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </sc-if>
+                  </li>
+                </sc-for>
+              </ol>
+              <sc-if value="{{showFooter}}" hint-placeholder-val="{{ true }}">
+                <div style="margin: 16px 0 0 52px; display: flex; flex-direction: column">
+                  <span style="font-size: 13px; color: #8E8E96">Bed by 11:30</span>
+                  <button type="button" onClick="{{toggleNeeds}}" style="min-height: 44px; display: flex; align-items: center; gap: 6px; font-size: 15px; color: #C8C8CE">{{needsText}}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="{{needsChev}}"></path></svg></button>
+                  <sc-if value="{{needsOpen}}" hint-placeholder-val="{{ false }}">
+                    <sc-for list="{{needs}}" as="n" hint-placeholder-count="3">
+                      <div style="animation: nRise 0.3s cubic-bezier(0.2, 0.9, 0.25, 1) both; min-height: 56px; display: flex; align-items: center; gap: 8px; border-top: 1px solid rgba(255,255,255,0.07)">
+                        <span style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 17px">{{n.t}}</span><span style="font-size: 13px; color: #8E8E96">{{n.s}}</span></span>
+                        <button type="button" onClick="{{n.go}}" style="min-height: 44px; padding: 0 4px; color: {{ac}}; font-weight: 600; font-size: 15px">{{n.a}}</button>
+                      </div>
+                    </sc-for>
+                  </sc-if>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          <!-- Week -->
+          <sc-if value="{{viewWeek}}" hint-placeholder-val="{{ false }}">
+            <ul aria-label="This week" style="animation: {{viewSwap}}; list-style: none; margin: 20px 0 0; padding: 0 20px; display: flex; flex-direction: column; gap: 4px">
+              <sc-for list="{{weekRows}}" as="w" hint-placeholder-count="7">
+                <li><button type="button" onClick="{{w.open}}" style="width: calc(100% + 24px); min-height: 60px; display: flex; align-items: center; gap: 12px; border-radius: 16px; background: {{w.rowBg}}; padding: 0 12px; margin-left: -12px; box-sizing: border-box">
+                  <span style="width: 40px; flex: none; display: flex; flex-direction: column"><span style="font-size: 13px; color: #8E8E96">{{w.w}}</span><span style="font-size: 20px; font-weight: 600; color: {{w.color}}">{{w.n}}</span></span>
+                  <span aria-hidden="true" style="flex: 1; height: 26px; position: relative; border-radius: 8px; background: rgba(255,255,255,0.04)">
+                    <sc-for list="{{w.segs}}" as="g" hint-placeholder-count="3"><span style="position: absolute; top: {{g.top}}px; height: {{g.ht}}px; left: {{g.l}}%; width: {{g.w}}%; border-radius: 4px; background: {{g.c}}; box-shadow: {{g.ring}}"></span></sc-for>
+                  </span>
+                  <span style="width: 40px; text-align: right; font-size: 13px; color: #A0A0A8">{{w.h}}</span>
+                </button></li>
+              </sc-for>
+            </ul>
+            <p style="margin: 12px 20px 0; font-size: 13px; color: #8E8E96">Each bar is 7 AM to 11 PM. Amber marks an overlap.</p>
+          </sc-if>
+
+          <!-- Tasks -->
+          <sc-if value="{{viewList}}" hint-placeholder-val="{{ false }}">
+            <div style="animation: {{viewSwap}}; padding: 8px 20px 0">
+              <sc-for list="{{taskGroups}}" as="tg" hint-placeholder-count="2">
+                <h2 style="margin: 24px 0 4px; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #8E8E96">{{tg.h}}</h2>
+                <ul style="list-style: none; margin: 0; padding: 0">
+                  <sc-for list="{{tg.items}}" as="tk" hint-placeholder-count="3">
+                    <li style="display: flex; align-items: center; gap: 8px; min-height: 60px">
+                      <button type="button" aria-label="{{tk.label}}" aria-pressed="{{tk.done}}" onClick="{{tk.toggle}}" style="width: 44px; height: 44px; flex: none; margin-left: -10px; display: flex; align-items: center; justify-content: center"><span aria-hidden="true" style="width: 24px; height: 24px; box-sizing: border-box; border-radius: 12px; border: {{tk.ring}}; background: {{tk.fill}}; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s, transform 0.2s; transform: scale({{tk.sc}})"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00140A" stroke-width="3" stroke-linecap="round" aria-hidden="true" style="opacity: {{tk.tick}}"><path d="m5 12 4.5 4.5L19 7"></path></svg></span></button>
+                      <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 17px; color: {{tk.color}}; text-decoration: {{tk.strike}}; transition: color 0.25s">{{tk.t}}</span><sc-if value="{{tk.hasSub}}" hint-placeholder-val="{{ true }}"><span style="font-size: 13px; color: {{tk.subColor}}">{{tk.s}}</span></sc-if></span>
+                      <span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 4px; background: {{tk.dot}}"></span>
+                    </li>
+                  </sc-for>
+                </ul>
+              </sc-for>
+            </div>
+          </sc-if>
+        </sc-if>
+      </div>
+    </section>
+  </div>
+
+
+
+  <!-- Contextual entry to Navi on Plan and Progress -->
+  <sc-if value="{{showAskBar}}" hint-placeholder-val="{{ false }}">
+    <div style="animation: nFade 0.3s ease both; position: absolute; left: 0; right: 0; bottom: 0; height: 130px; z-index: 4; background: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.92) 45%, #000 100%); pointer-events: none"></div>
+    <div style="animation: nRise 0.34s cubic-bezier(0.2, 0.9, 0.25, 1) both; position: absolute; left: 16px; right: 16px; bottom: 34px; z-index: 5; display: flex; align-items: center; gap: 8px; height: 56px; box-sizing: border-box; padding: 0 6px 0 20px; border-radius: 28px; background: rgba(30,30,33,0.94); border: 1px solid rgba(255,255,255,0.09); box-shadow: 0 12px 30px rgba(0,0,0,0.5)">
+      <button type="button" onClick="{{openAsk}}" style="flex: 1; min-width: 0; height: 52px; display: flex; align-items: center; gap: 12px">
+        <span aria-hidden="true" style="flex: none; width: 16px; height: 15px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: {{stoneBg}}"></span>
+        <span style="font-size: 17px; color: #8E8E96; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{askBarText}}</span>
+      </button>
+      <button type="button" aria-label="Talk to Navi" onClick="{{talkTap}}" style="width: 44px; height: 44px; flex: none; border-radius: 22px; display: flex; align-items: center; justify-content: center; color: #C8C8CE"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg></button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{toastOn}}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="animation: {{toastAnim}}; position: absolute; left: 16px; right: 16px; bottom: {{toastBottom}}px; z-index: 13; min-height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 8px 0 20px; border-radius: 16px; background: #1C1C1F; border: 1px solid rgba(255,255,255,0.10); box-shadow: 0 12px 30px rgba(0,0,0,0.5)">
+      <span style="flex: 1; font-size: 15px; color: #E8E8EC">{{toastText}}</span>
+      <sc-if value="{{toastHasUndo}}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{toastUndo}}" style="min-height: 44px; padding: 0 10px; color: {{ac}}; font-weight: 600">Undo</button></sc-if>
+    </div>
+  </sc-if>
+
+  <!-- Contextual sheet: Ask, stone detail, and the evening review -->
+  <sc-if value="{{sheetOpen}}" hint-placeholder-val="{{ false }}">
+    <sc-if value="{{sheetFull}}" hint-placeholder-val="{{ false }}"><div aria-hidden="true" style="animation: {{sheetScrim}}; position: absolute; inset: 0; z-index: 11; background: rgba(0,0,0,0.6)"></div></sc-if>
+    <section aria-label="{{sheetAria}}" style="animation: {{sheetAnim}}; position: absolute; left: 0; right: 0; bottom: 0; height: {{sheetH}}px; z-index: 12; background: #0D0D0F; border-radius: 32px 32px 0 0; border-top: 1px solid rgba(255,255,255,0.10); box-shadow: 0 -24px 60px rgba(0,0,0,0.7); display: flex; flex-direction: column; transition: height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)">
+      <button type="button" aria-label="{{growLabel}}" onClick="{{toggleGrow}}" style="flex: none; height: 26px; display: flex; align-items: center; justify-content: center"><span aria-hidden="true" style="width: 40px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.25)"></span></button>
+      <div style="flex: none; display: flex; align-items: center; gap: 12px; padding: 0 8px 0 20px; min-height: 56px">
+        <span aria-hidden="true" style="flex: none; width: 20px; height: 18px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: {{stoneBg}}"></span>
+        <span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-size: 17px; font-weight: 600">{{sheetTitle}}</span><span style="font-size: 13px; color: #A0A0A8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{sheetCtx}}</span></span>
+        <sc-if value="{{canGrow}}" hint-placeholder-val="{{ true }}"><button type="button" aria-label="{{growLabel}}" onClick="{{toggleGrow}}" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #A0A0A8"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{growIcon}}"></path></svg></button></sc-if>
+        <button type="button" aria-label="{{closeLabel}}" onClick="{{closeSheet}}" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #C8C8CE"><span aria-hidden="true" style="width: 32px; height: 32px; border-radius: 16px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.10)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></span></button>
+      </div>
+      <div style="flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column-reverse; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 40px); mask-image: linear-gradient(to bottom, transparent 0, #000 40px)">
+        <div style="padding: 32px 20px 16px; display: flex; flex-direction: column; gap: 16px">
+          <sc-if value="{{stoneDetail}}" hint-placeholder-val="{{ false }}">
+            <div style="animation: {{stoneSwap}}">
+              <div style="font-size: 24px; font-weight: 600; letter-spacing: -0.01em">{{stoneHead}}</div>
+              <p style="margin: 4px 0 0; font-size: 15px; color: #A0A0A8">{{stoneSub}}</p>
+              <ul style="list-style: none; margin: 16px 0 0; padding: 0">
+                <sc-for list="{{stoneRows}}" as="sr" hint-placeholder-count="3">
+                  <li style="min-height: 52px; display: flex; align-items: center; gap: 12px; border-top: 1px solid rgba(255,255,255,0.07)"><span aria-hidden="true" style="width: 18px; text-align: center; color: {{sr.c}}">{{sr.icon}}</span><span style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 17px; color: {{sr.tc}}">{{sr.t}}</span><sc-if value="{{sr.hasSub}}" hint-placeholder-val="{{ false }}"><span style="font-size: 13px; color: #8E8E96">{{sr.sub}}</span></sc-if></span><span style="font-size: 13px; color: #8E8E96">{{sr.time}}</span></li>
+                </sc-for>
+              </ul>
+              <p style="margin: 16px 0 0; font-size: 13px; color: #8E8E96">{{stoneNote}}</p>
+            </div>
+          </sc-if>
+          <sc-if value="{{askEmpty}}" hint-placeholder-val="{{ true }}">
+            <p style="margin: 0; font-size: 17px; line-height: 1.5; color: #8E8E96">{{askHint}}</p>
+          </sc-if>
+          <dc-import name="M4-Thread" items="{{sheetItems}}" hint-size="350px,200px"></dc-import>
+        </div>
+      </div>
+      <div style="flex: none; padding: 8px 16px 34px">
+        <div style="display: flex; align-items: center; gap: 8px; min-height: 56px; box-sizing: border-box; padding: 5px 5px 5px 20px; border-radius: 28px; background: #19191C; border: 1px solid rgba(255,255,255,0.08)">
+          <label for="m3-ask" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Message Navi</label>
+          <input id="m3-ask" value="{{askDraft}}" onChange="{{typeAsk}}" onKeyDown="{{askOnEnter}}" placeholder="{{askPlaceholder}}" style="flex: 1; min-width: 0; height: 44px; border: 0; outline: none; background: transparent; font-size: 17px">
+          <sc-if value="{{askHasDraft}}" hint-placeholder-val="{{ true }}">
+            <button type="button" aria-label="Send" onClick="{{askSend}}" style="width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; background: #F5F5F7; color: #000"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"></path></svg></button>
+          </sc-if>
+          <sc-if value="{{askNoDraft}}" hint-placeholder-val="{{ false }}">
+            <button type="button" aria-label="Talk" onClick="{{openVoice}}" style="width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; background: {{cta}}; color: #0B0B0C"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg></button>
+          </sc-if>
+        </div>
+      </div>
+    </section>
+  </sc-if>
+
+  <!-- Day picker (from the Plan title) -->
+  <sc-if value="{{daysOpen}}" hint-placeholder-val="{{ false }}">
+    <button type="button" aria-label="Close" onClick="{{closeDays}}" style="animation: {{daysScrim}}; position: absolute; inset: 0; z-index: 10; background: rgba(0,0,0,0.55)"></button>
+    <section aria-label="Pick a day" style="animation: {{daysAnim}}; transform-origin: 30% 0; position: absolute; left: 12px; right: 12px; top: 156px; z-index: 11; border-radius: 24px; background: #151517; border: 1px solid rgba(255,255,255,0.09); box-shadow: 0 30px 60px rgba(0,0,0,0.6); padding: 12px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px">
+      <sc-for list="{{days}}" as="d" hint-placeholder-count="7">
+        <button type="button" aria-pressed="{{d.on}}" onClick="{{d.pick}}" style="height: 64px; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; background: {{d.bg}}; color: {{d.color}}"><span style="font-size: 12px">{{d.w}}</span><span style="font-size: 20px; font-weight: 600">{{d.n}}</span></button>
+      </sc-for>
+    </section>
+  </sc-if>
+
+  <!-- Drawer -->
+  <sc-if value="{{drawer}}" hint-placeholder-val="{{ false }}">
+    <button type="button" aria-label="Close" onClick="{{closeDrawer}}" style="animation: {{drawerScrim}}; position: absolute; inset: 0; z-index: 10; background: rgba(0,0,0,0.6)"></button>
+    <aside aria-label="Chats and account" style="animation: {{drawerAnim}}; position: absolute; left: 0; top: 0; bottom: 0; width: 320px; z-index: 11; background: #0D0D0F; box-sizing: border-box; padding: 60px 12px 34px; display: flex; flex-direction: column">
+      <div style="display: flex; align-items: center; gap: 8px">
+        <label style="flex: 1; height: 48px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: 14px; background: rgba(255,255,255,0.06); color: #8E8E96; font-size: 17px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4 4"></path></svg><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search chats</span><input placeholder="Search" style="flex: 1; min-width: 0; height: 44px; border: 0; outline: none; background: transparent; font-size: 17px"></label>
+        <button type="button" aria-label="New chat" onClick="{{newChat}}" style="width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.06)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h8"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg></button>
+      </div>
+      <div style="flex: 1; margin-top: 8px; display: flex; flex-direction: column">
+        <sc-for list="{{chatGroups}}" as="g" hint-placeholder-count="2">
+          <div style="padding: 20px 12px 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #8E8E96">{{g.h}}</div>
+          <sc-for list="{{g.items}}" as="c" hint-placeholder-count="2">
+            <button type="button" aria-current="{{c.cur}}" onClick="{{c.open}}" style="min-height: 48px; display: flex; align-items: center; padding: 0 12px; border-radius: 12px; font-size: 17px; color: {{c.color}}; background: {{c.bg}}; transition: background-color 0.2s">{{c.t}}</button>
+          </sc-for>
+        </sc-for>
+      </div>
+      <sc-if value="{{acctOpen}}" hint-placeholder-val="{{ false }}">
+        <div style="animation: nRise 0.26s cubic-bezier(0.2, 0.9, 0.25, 1) both; margin-bottom: 8px; padding: 4px; border-radius: 16px; background: #1A1A1D; border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column">
+          <sc-for list="{{acctItems}}" as="a" hint-placeholder-count="5"><button type="button" onClick="{{a.go}}" style="min-height: 48px; display: flex; align-items: center; padding: 0 12px; border-radius: 12px; font-size: 17px; color: {{a.color}}">{{a.t}}</button></sc-for>
+        </div>
+      </sc-if>
+      <button type="button" aria-expanded="{{acctOpen}}" onClick="{{toggleAcct}}" style="height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 8px 0 6px; border-radius: 16px">
+        <span aria-hidden="true" style="width: 36px; height: 36px; border-radius: 18px; display: flex; align-items: center; justify-content: center; background: #2A2A2E; font-weight: 600">A</span>
+        <span style="flex: 1; font-size: 17px; font-weight: 500">Alex</span>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A0A0A8" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"></path></svg>
+      </button>
+    </aside>
+  </sc-if>
+
+  <!-- Inbox: approvals first, explicit actions -->
+  <sc-if value="{{inbox}}" hint-placeholder-val="{{ false }}">
+    <button type="button" aria-label="Close inbox" onClick="{{closeInbox}}" style="animation: {{inboxScrim}}; position: absolute; inset: 0; z-index: 10; background: rgba(0,0,0,0.6)"></button>
+    <section aria-label="Inbox" style="animation: {{inboxAnim}}; position: absolute; left: 0; right: 0; bottom: 0; height: 760px; z-index: 11; background: #0D0D0F; border-radius: 32px 32px 0 0; box-sizing: border-box; padding: 8px 0 34px; display: flex; flex-direction: column">
+      <span aria-hidden="true" style="align-self: center; width: 40px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.25)"></span>
+      <div style="margin-top: 12px; padding: 0 12px 0 20px; display: flex; align-items: center; justify-content: space-between"><h2 style="margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.015em">Inbox</h2><button type="button" onClick="{{closeInbox}}" style="min-height: 44px; padding: 0 8px; font-size: 17px; font-weight: 600; color: {{ac}}">Done</button></div>
+      <div style="flex: 1; overflow-y: auto; scrollbar-width: none; padding: 0 20px">
+        <sc-if value="{{hasApprovals}}" hint-placeholder-val="{{ true }}">
+          <h3 style="margin: 24px 0 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #F4B37A">Needs your OK</h3>
+          <sc-for list="{{approvals}}" as="ap" hint-placeholder-count="3">
+            <div style="padding: 16px 0; border-top: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; gap: 6px">
+              <div style="font-size: 17px; line-height: 1.4; font-weight: 600; color: {{ap.tc}}; transition: color 0.25s">{{ap.t}}</div>
+              <sc-if value="{{ap.pending}}" hint-placeholder-val="{{ true }}">
+                <div style="font-size: 15px; line-height: 1.4; color: #A0A0A8">{{ap.c}}</div>
+                <div style="display: flex; gap: 8px; margin-top: 8px">
+                  <button type="button" onClick="{{ap.yes}}" style="height: 44px; padding: 0 18px; border-radius: 22px; background: #F5F5F7; color: #000; font-size: 15px; font-weight: 600">{{ap.yesT}}</button>
+                  <button type="button" onClick="{{ap.no}}" style="height: 44px; padding: 0 14px; font-size: 15px; color: #A0A0A8">{{ap.noT}}</button>
+                </div>
+              </sc-if>
+              <sc-if value="{{ap.decided}}" hint-placeholder-val="{{ false }}">
+                <div style="animation: nRise 0.3s cubic-bezier(0.2, 0.9, 0.25, 1) both; display: flex; align-items: center; gap: 10px; min-height: 44px"><span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 11px; background: {{ap.dotBg}}; display: flex; align-items: center; justify-content: center; color: {{ap.dot}}; font-size: 12px">{{ap.icon}}</span><span style="flex: 1; font-size: 15px; color: #C8C8CE">{{ap.result}}</span><button type="button" onClick="{{ap.undo}}" style="min-height: 44px; padding: 0 4px; color: {{ac}}; font-weight: 600">Undo</button></div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </sc-if>
+        <h3 style="margin: 24px 0 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #8E8E96">From your 1:40 note</h3>
+        <sc-for list="{{drafts}}" as="dr" hint-placeholder-count="3">
+          <div style="padding: 16px 0; border-top: 1px solid rgba(255,255,255,0.07); display: flex; align-items: center; gap: 12px; min-height: 52px">
+            <span style="flex: 1; display: flex; flex-direction: column; gap: 4px"><span style="font-size: 17px; font-weight: 500; color: {{dr.tc}}; transition: color 0.25s">{{dr.t}}</span><span style="font-size: 13px; line-height: 1.4; color: #8E8E96">{{dr.sub}}<span style="color: #F4B37A">{{dr.tag}}</span></span></span>
+            <sc-if value="{{dr.pending}}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{dr.accept}}" style="height: 44px; padding: 0 16px; border-radius: 22px; background: {{addBg}}; color: {{ac}}; font-size: 15px; font-weight: 600">Add</button></sc-if>
+            <sc-if value="{{dr.added}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{dr.undo}}" style="animation: nFade 0.25s ease both; min-height: 44px; padding: 0 4px; color: {{ac}}; font-weight: 600">Undo</button></sc-if>
+          </div>
+        </sc-for>
+        <sc-if value="{{noInbox}}" hint-placeholder-val="{{ false }}"><p style="margin: 24px 0 0; font-size: 17px; color: #8E8E96">You're all caught up.</p></sc-if>
+      </div>
+    </section>
+  </sc-if>
+
+  <!-- Voice (unchanged, plus an interrupted state) -->
+  <sc-if value="{{voiceFull}}" hint-placeholder-val="{{ false }}">
+    <section aria-label="Talking with Navi" style="animation: {{voiceAnim}}; position: absolute; inset: 0; z-index: 20; background: #000; display: flex; flex-direction: column; align-items: center; padding: 60px 20px 40px; box-sizing: border-box">
+      <div aria-hidden="true" style="position: absolute; left: 50%; top: 150px; width: 520px; height: 520px; margin-left: -260px; border-radius: 50%; background: radial-gradient(circle, {{voiceGlow}} 0%, rgba(0,0,0,0) 70%)"></div>
+      <div style="align-self: stretch; display: flex; justify-content: space-between; align-items: center; position: relative">
+        <button type="button" aria-label="Keep working while you talk" onClick="{{minimizeVoice}}" style="width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.08)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <span style="font-size: 13px; color: #A0A0A8">0:42</span><span style="width: 44px"></span>
+      </div>
+      <span aria-hidden="true" style="margin-top: 70px; width: 150px; height: 136px; border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; background: {{stoneBg}}; box-shadow: 0 0 0 14px {{ring1}}, 0 0 0 30px {{ring2}}; position: relative; filter: {{voiceFilter}}; transition: filter 0.4s"></span>
+      <p role="status" style="margin: 44px 0 0; font-size: 17px; color: {{voiceStatusColor}}; position: relative; transition: color 0.3s">{{voiceStatus}}</p>
+      <div aria-label="Live transcript" style="margin-top: 26px; align-self: stretch; display: flex; flex-direction: column; gap: 12px; font-size: 17px; line-height: 1.45; position: relative">
+        <p style="margin: 0; color: #A0A0A8">You: remind me to text Maya tonight</p>
+        <p style="margin: 0; color: #F5F5F7">Done. I'll remind you at 8:00, after your shift. Earlier?</p>
+      </div>
+      <div style="flex: 1"></div>
+      <sc-if value="{{voicePaused}}" hint-placeholder-val="{{ false }}">
+        <button type="button" onClick="{{resumeVoice}}" style="margin-bottom: 24px; height: 56px; padding: 0 32px; border-radius: 28px; background: #F5F5F7; color: #000; font-size: 17px; font-weight: 600; position: relative">Resume talking</button>
+      </sc-if>
+      <div style="display: flex; gap: 24px; position: relative">
+        <button type="button" aria-pressed="{{muted}}" onClick="{{toggleMute}}" style="width: 64px; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: #C8C8CE; text-align: center"><span style="width: 60px; height: 60px; border-radius: 30px; display: flex; align-items: center; justify-content: center; background: {{muteBg}}; color: {{muteFg}}; transition: background-color 0.2s, color 0.2s"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path><path d="{{muteSlash}}"></path></svg></span>{{muteLabel}}</button>
+        <button type="button" onClick="{{voiceToText}}" style="width: 64px; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: #C8C8CE; text-align: center"><span style="width: 60px; height: 60px; border-radius: 30px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.08)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7V5h16v2M12 5v14M9 19h6"></path></svg></span>Type</button>
+        <button type="button" onClick="{{endVoice}}" style="width: 64px; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: #C8C8CE; text-align: center"><span style="width: 60px; height: 60px; border-radius: 30px; display: flex; align-items: center; justify-content: center; background: #F4A99F; color: #2A0B07"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 14c4.5-4 11.5-4 16 0l-2 2.5-3-1.2v-2.2a9 9 0 0 0-6 0v2.2l-3 1.2z"></path></svg></span>End</button>
+      </div>
+    </section>
+  </sc-if>
+
+  <!-- Focus: the full session flow, coloured by the space -->
+  <sc-if value="{{focusOpen}}" hint-placeholder-val="{{ false }}">
+    <div style="animation: {{focusAnim}}; position: absolute; inset: 0; z-index: 20"><dc-import name="M4-Focus" space="school" step="{{focusStep}}" on-close="{{endFocus}}" on-minimize="{{minFocus}}" hint-size="390px,844px"></dc-import></div>
+  </sc-if>
+  <!-- Stories: morning briefing, weekly story, evening -->
+  <sc-if value="{{storyOpen}}" hint-placeholder-val="{{ false }}">
+    <div style="animation: {{storyAnim}}; position: absolute; inset: 0; z-index: 21"><dc-import name="M4-Story" story="{{storyName}}" step="{{storyStep}}" on-close="{{closeStory}}" on-cta="{{storyCta}}" hint-size="390px,844px"></dc-import></div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"time":{"editor":"enum","options":["morning","afternoon","evening","night"],"default":"afternoon"},"navStyle":{"editor":"enum","options":["words","marks","capsule"],"default":"words"},"startPage":{"editor":"enum","options":["progress","navi","plan"],"default":"navi"},"startSession":{"editor":"enum","options":["fresh","urgent","resume"],"default":"resume"},"startMoment":{"editor":"enum","options":["normal","busy"],"default":"normal"},"startView":{"editor":"enum","options":["day","week","list"],"default":"day"},"startDay":{"editor":"enum","options":["fri","sat"],"default":"fri"},"startOverlay":{"editor":"enum","options":["none","story","weekStory","eveningStory","focusFlow","drawer","inbox","voice","voicePaused","focus","days","ask","askFull","overlap","stone","review","reviewDone","loading","correct"],"default":"none"},"startSelect":{"editor":"enum","options":["none","essay"],"default":"none"},"startAsked":{"editor":"enum","options":["no","answered","moved"],"default":"no"},"startToast":{"editor":"enum","options":["no","yes"],"default":"no"},"startNet":{"editor":"enum","options":["online","offline"],"default":"online"},"startLabel":{"editor":"enum","options":["no","yes"],"default":"no"},"startProgScroll":{"editor":"int","default":0},"startDrag":{"editor":"int","default":0},"startPatOpen":{"editor":"enum","options":["none","runs","essay","wind","focus4"],"default":"none"},"startPlaced":{"editor":"enum","options":["no","yes"],"default":"no"},"startScroll":{"editor":"int","default":0},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const pr = this.props, s = this.state || {};
+    const pick = (k, v) => (s[k] !== undefined ? s[k] : v);
+    const set = (o) => this.setState(o);
+    const EASE = 'cubic-bezier(0.2, 0.9, 0.25, 1)';
+    const closing = s.closing || {};
+    const shut = (key, apply, ms) => {
+      if ((this.state && this.state.closing || {})[key]) return;
+      this.setState({ closing: Object.assign({}, (this.state && this.state.closing) || {}, { [key]: true }) });
+      setTimeout(() => { const c = Object.assign({}, (this.state && this.state.closing) || {}); delete c[key]; this.setState(Object.assign({ closing: c }, apply || {})); }, ms || 260);
+    };
+    const showToast = (text, undo) => {
+      clearTimeout(this._tt);
+      this._toastUndo = undo || null;
+      const c = Object.assign({}, (this.state && this.state.closing) || {}); delete c.toast;
+      this.setState({ toast: true, toastText: text, closing: c, toastN: ((this.state && this.state.toastN) || 0) + 1 });
+      this._tt = setTimeout(() => shut('toast', { toast: false }), 5000);
+    };
+    const hex2 = (hex, a) => { const n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'; };
+    // animate only rows that are new since they were first seen
+    this._seen = this._seen || {};
+    const firstPass = !this._booted; this._booted = true;
+    const stamp = (list, surface) => { const now = Date.now(); return list.map((m, i) => { const k = surface + ':' + i + ':' + (m.text || m.title || m.kind || (m.isChoice ? 'choice' : '')); if (!(k in this._seen)) this._seen[k] = firstPass ? 0 : now; const age = now - this._seen[k]; return Object.assign({}, m, { anim: age < 700 ? 'nRise 0.36s ' + EASE + ' both' : 'none' }); }); };
+    const swap = (key, val, base) => { this._sw = this._sw || {}; const st = this._sw[key] || (this._sw[key] = { v: val, n: 0 }); if (st.v !== val) { st.v = val; st.n++; } return (st.n % 2 ? 'nFadeB' : 'nFadeA') + ' ' + (base || '0.32s ease both'); };
+    const P = { progress: 0, navi: 1, plan: 2 };
+    const ov = pr.startOverlay ?? 'none';
+    const busy = (pr.startMoment ?? 'normal') === 'busy';
+    const navStyle = pr.navStyle ?? 'words';
+    const time = pr.time ?? 'afternoon';
+    const T = {
+      morning: { a1: '#FFC4A3', cta: '#FFC4A3', stone: 'radial-gradient(circle at 34% 28%, #FFF6EE 0%, #FFC4A3 32%, #B65A5A 100%)', sh: 'rgba(255,150,130,0.35)', glow: 'rgba(255,170,150,0.14)', scene: 'radial-gradient(ellipse 120% 70% at 50% 0%, rgba(150,60,70,0.55) 0%, rgba(90,40,60,0.25) 45%, rgba(0,0,0,0) 75%)', greet: 'Morning, Alex.', a: '9½ hours planned. ', b: 'Class first', c: ', then a free stretch at 1.', hi: '#FFC4A3', moment: ['See my morning', 'Four cards, under a minute', ''] },
+      afternoon: { a1: '#A7EBC0', cta: '#B8F0C8', stone: 'radial-gradient(circle at 34% 28%, #F4FFF8 0%, #A7EBC0 30%, #2E7D63 100%)', sh: 'rgba(140,230,190,0.30)', glow: 'rgba(167,235,192,0.11)', scene: 'radial-gradient(ellipse 120% 70% at 50% 0%, rgba(30,100,90,0.50) 0%, rgba(20,60,70,0.22) 45%, rgba(0,0,0,0) 75%)', greet: 'Afternoon, Alex.', a: 'Four things today, ', b: 'one already done', c: '. Your afternoon is the busy part.', hi: '#CFF7A6', moment: null },
+      evening: { a1: '#FFD08A', cta: '#FFD08A', stone: 'radial-gradient(circle at 34% 28%, #FFF8EA 0%, #FFD08A 32%, #A9663A 100%)', sh: 'rgba(255,190,110,0.32)', glow: 'rgba(255,190,120,0.13)', scene: 'radial-gradient(ellipse 120% 70% at 50% 0%, rgba(150,80,40,0.50) 0%, rgba(110,40,70,0.25) 45%, rgba(0,0,0,0) 75%)', greet: 'Evening, Alex.', a: 'Dinner with Maya at 7:30, ', b: '2 of 4 kept', c: ' so far.', hi: '#FFD08A', moment: ['Wrap up today', 'Two questions, about a minute', ''] },
+      night: { a1: '#C7C1FF', cta: '#C7C1FF', stone: 'radial-gradient(circle at 34% 28%, #F4F2FF 0%, #B9B2FF 32%, #4B3F9A 100%)', sh: 'rgba(160,150,255,0.32)', glow: 'rgba(170,160,255,0.13)', scene: 'radial-gradient(ellipse 120% 70% at 50% 0%, rgba(60,50,140,0.55) 0%, rgba(30,30,90,0.25) 45%, rgba(0,0,0,0) 75%)', greet: 'Night, Alex.', a: 'Wind down at 10:30. ', b: 'Tomorrow starts with the essay', c: ' at 9.', hi: '#C7C1FF', moment: null }
+    }[time];
+    const page = pick('page', P[pr.startPage] ?? 1);
+    const session = pick('session', pr.startSession ?? 'resume');
+    const view = pick('view', pr.startView ?? 'day');
+    const day = pick('day', pr.startDay === 'sat' ? 5 : 4);
+    const isPlanStart = pr.startPage === 'plan';
+    const sel = pick('sel', pr.startSelect === 'essay' ? 'essay' : null);
+    const sheet = pick('sheet', ov === 'ask' ? 'ask' : ov === 'askFull' ? 'ask' : ov === 'overlap' ? 'overlap' : ov === 'stone' ? 'stone' : ov === 'review' || ov === 'reviewDone' ? 'review' : ov === 'correct' ? 'correct' : 'off');
+    const full = pick('full', ov === 'askFull' || ov === 'review' || ov === 'reviewDone');
+    const asked = pick('asked', pr.startAsked ?? 'no');
+    const moved = asked === 'moved';
+    const evening = busy && pr.startPage === 'progress';
+    const placed = s.placed !== undefined ? !!s.placed : pr.startPlaced === 'yes', songBack = !!s.songBack, gift = pick('gift', 'ask');
+    const offline = (pr.startNet ?? 'online') === 'offline';
+    const drawer = pick('drawer', ov === 'drawer'), inbox = pick('inbox', ov === 'inbox'), focus = pick('focus', ov === 'focus' || ov === 'focusFlow'), daysOpen = pick('daysOpen', ov === 'days');
+    const voice = pick('voice', ov === 'voice' ? 'full' : ov === 'voicePaused' ? 'paused' : 'off');
+    const loading = ov === 'loading' && !s.loaded;
+    const toast = pick('toast', pr.startToast === 'yes');
+    const samAsked = !!s.samAsked;
+    const review = pick('review', ov === 'reviewDone' ? 2 : 0);
+    const reviewAns = s.reviewAns || (ov === 'reviewDone' ? ['Partly', 'Done'] : []);
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'; };
+    const C = { school: '#8C9EFF', work: '#8CC6EC', friends: '#F4B37A', health: '#F3988C', hobby: '#B79CF2', home: '#EBC66B' };
+
+    // ---------- inbox ----------
+    const apDone = s.apDone || {};
+    const approvalsAll = busy ? [
+      { id: 'a1', t: 'Move the essay’s hard deadline to Monday, 5:00 PM', c: 'Changes a real deadline. Your professor isn’t told.', yesT: 'Move to Monday', noT: 'Keep Friday' },
+      { id: 'a2', t: 'Cancel Saturday’s spin class', c: 'Late cancellation: the studio charges $8.', yesT: 'Cancel the class', noT: 'Keep it' },
+      { id: 'a3', t: 'Send Sam 1:00 PM for Saturday’s flat viewing', c: 'Navi messages Sam from your account.', yesT: 'Send to Sam', noT: 'Not now' }
+    ] : [];
+    const apRes = { a1: ['Deadline moved to Monday, 5:00 PM', 'Deadline stays Friday'], a2: ['Spin class cancelled. $8 charged.', 'Spin class kept'], a3: ['Sent Sam “1:00 PM?”', 'Not sent'] };
+    const approvals = approvalsAll.filter((a) => !apDone[a.id]);
+    const approvalRows = approvalsAll.map((a) => { const d = apDone[a.id]; const setD = (v) => () => { const n = Object.assign({}, (this.state && this.state.apDone) || {}); if (v) n[a.id] = v; else delete n[a.id]; set({ apDone: n }); }; return { t: a.t, c: a.c, yesT: a.yesT, noT: a.noT, pending: !d, decided: !!d, tc: d ? '#8E8E96' : '#F5F5F7', result: d ? apRes[a.id][d === 'yes' ? 0 : 1] : '', icon: d === 'yes' ? '✓' : '–', dot: d === 'yes' ? T.a1 : '#A0A0A8', dotBg: d === 'yes' ? hex2(T.a1, 0.16) : 'rgba(255,255,255,0.08)', yes: setD('yes'), no: setD('no'), undo: setD(null) }; });
+    const removed = s.removed || {};
+    const draftsAll = [
+      { id: 'd1', t: 'Call the café about swapping Saturday', q: 'ask the café if I can swap saturday', tag: '' },
+      { id: 'd2', t: 'Buy new running shoes', q: 'need new running shoes before the season', tag: '' },
+      { id: 'd3', t: 'Run three times a week', q: 'I want to get back into running', tag: ' · Navi’s guess' }
+    ];
+    const draftsPending = draftsAll.filter((d) => !removed[d.id]);
+    const waiting = approvals.length + draftsPending.length;
+
+    // ---------- navigation ----------
+    const names = ['Progress', 'Navi', 'Plan'];
+    const navItems = names.map((t, i) => ({
+      t, cur: i === page ? 'page' : 'false', go: () => goTo(i),
+      size: i === page ? 17 : 15, wo: Math.abs(i - page) > 1 ? 0 : 1, weight: i === page ? 600 : 500, color: i === page ? '#F5F5F7' : '#8E8E96',
+      dot: i === 2 && waiting > 0 && page !== 2, dotColor: approvals.length ? '#F4B37A' : T.a1,
+      markW: i === 1 ? 14 : (i === page ? 18 : 6), markH: i === 1 ? 13 : 6, markR: i === 1 ? '50% 50% 46% 54% / 56% 52% 48% 44%' : '3px',
+      markBg: i === 1 ? T.stone : (i === page ? '#F5F5F7' : (i === 2 && waiting ? T.a1 : '#4A4A50')), markO: i === 1 ? (page === 1 ? 1 : 0.45) : 1,
+      capColor: i === page ? '#000' : '#C8C8CE', capBg: i === page ? '#F5F5F7' : 'transparent'
+    }));
+
+    // ---------- chat thread ----------
+    const R = (o) => Object.assign({ mt: 24 }, o);
+    const thread = [];
+    const chatSel = pick('chatSel', 'dentist');
+    if (session === 'resume' && chatSel === 'week') {
+      thread.push(R({ isStamp: true, text: 'Yesterday · 8:12 PM', stampColor: '#7C7C85', mt: 0 }));
+      thread.push(R({ isMe: true, text: 'plan this week', mt: 18 }));
+      thread.push(R({ isNavi: true, text: 'Done. Sixteen things across five days. Friday is the full one, and Saturday stays mostly open.', mt: 12 }));
+      thread.push(R({ isReceipt: true, ac: T.a1, text: 'Planned the week · 16 items', hasAct: false, mt: 10 }));
+    } else if (session === 'resume' && chatSel === 'essay') {
+      thread.push(R({ isStamp: true, text: 'Tuesday · 4:40 PM', stampColor: '#7C7C85', mt: 0 }));
+      thread.push(R({ isMe: true, text: 'help me outline the history essay', mt: 18 }));
+      thread.push(R({ isNavi: true, text: 'Three parts: the treaty, the economy, then the turning point in 1923. I added them as steps.', mt: 12 }));
+      thread.push(R({ isReceipt: true, ac: T.a1, text: 'Added 3 steps to History essay', hasAct: false, mt: 10 }));
+    } else if (session === 'resume') {
+      thread.push(R({ isStamp: true, text: 'Earlier today · 12:40 PM', stampColor: '#7C7C85', mt: 0 }));
+      thread.push(R({ isMe: true, text: 'move guitar practice to after dinner', mt: 18 }));
+      thread.push(R({ isReceipt: true, ac: T.a1, text: songBack ? 'Practise the new song is back at 1:30 PM' : 'Practise the new song moved to 10:00 PM', hasAct: true, actText: songBack ? 'Redo' : 'Undo', onAct: () => set({ songBack: !songBack }), mt: 10 }));
+      thread.push(R({ isMe: true, text: 'can I fit the dentist call in today?', mt: 24 }));
+      thread.push(R({ isNavi: true, text: 'Yes. 3:30 to 4:00 is free, and the call takes about 10 minutes.', mt: 12 }));
+      if (placed) thread.push(R({ isReceipt: true, ac: T.a1, text: 'Book the dentist added at 3:30 PM', hasAct: true, actText: 'Undo', onAct: () => set({ placed: false }), mt: 10 }));
+      else if (s.altPick) thread.push(R({ isReceipt: true, ac: T.a1, text: 'Book the dentist added ' + s.altPick, hasAct: true, actText: 'Undo', onAct: () => set({ altPick: null, altOpen: false }), mt: 10 }));
+      else if (s.altOpen) { thread.push(R({ isNavi: true, text: 'Other times that fit the call:', mt: 12 })); thread.push(R({ isChoice: true, options: ['Today 1:10 PM', 'Mon 9:30 AM', 'Tue 4:30 PM'].map((t) => ({ t, on: () => set({ altPick: t }) })), mt: 10 })); }
+      else thread.push(R({ isProposal: true, kind: 'ADD TO TODAY', kindColor: T.a1, edge: 'rgba(255,255,255,0.09)', title: 'Book the dentist · 10 min', rows: [
+        { t: '2:00 PM', title: 'Essay: write the intro', bg: 'transparent', border: '1px solid transparent', timeColor: '#7C7C85', color: '#8E8E96', weight: 400, strike: 'none' },
+        { t: '3:30 PM', title: 'Book the dentist', bg: hex2(T.a1, 0.10), border: '1px solid ' + hex2(T.a1, 0.45), timeColor: T.a1, color: '#F5F5F7', weight: 600, strike: 'none' },
+        { t: '4:00 PM', title: 'Shift at the café', bg: 'transparent', border: '1px solid transparent', timeColor: '#7C7C85', color: '#8E8E96', weight: 400, strike: 'none' }
+      ], hasNote: false, pText: 'Add at 3:30 PM', sText: 'Pick another time', pBg: T.cta, pColor: '#0B0B0C', onP: () => set({ placed: true, justPlaced: Date.now() }), onS: () => set({ altOpen: true }), mt: 14 }));
+      thread.push(R({ isStamp: true, text: 'While you were away · 1:05 PM', stampColor: T.a1, mt: 30 }));
+      thread.push(R({ isNavi: true, text: 'Sam wants to move tomorrow’s flat viewing to 11:00. That’s when you’re at brunch with Jo, so I’d suggest 1:00 instead.', mt: 12 }));
+      if (s.samSent === 'no') thread.push(R({ isNavi: true, text: 'Okay, I won’t message Sam. The viewing stays at 11:00 for now.', mt: 12 }));
+      else if (s.samSent) thread.push(R({ isReceipt: true, ac: T.a1, text: 'Sent Sam “1:00 PM?”. I’ll tell you when Sam replies.', hasAct: false, mt: 10 }));
+      else thread.push(R({ isProposal: true, kind: 'NEEDS YOUR OK · MESSAGES SAM', kindColor: '#F4B37A', edge: 'rgba(244,179,122,0.35)', title: 'Suggest 1:00 PM to Sam', rows: [
+        { t: 'Sat 11:00 AM', title: 'Brunch with Jo', bg: 'transparent', border: '1px solid transparent', timeColor: '#7C7C85', color: '#8E8E96', weight: 400, strike: 'none' },
+        { t: 'Sat 1:00 PM', title: 'Flat viewing with Sam', bg: 'rgba(244,179,122,0.10)', border: '1px solid rgba(244,179,122,0.45)', timeColor: '#F8D2B0', color: '#F5F5F7', weight: 600, strike: 'none' }
+      ], hasNote: true, note: 'Navi sends Sam one message from your account. Your plan changes only if Sam agrees.', pText: 'Send Sam “1:00 PM?”', sText: 'Not now', pBg: '#F5F5F7', pColor: '#000', onP: () => set({ samSent: 'yes' }), onS: () => set({ samSent: 'no' }), mt: 14 }));
+    }
+    (s.caps || []).forEach((t) => { thread.push(R({ isMe: true, text: t, pending: offline })); if (!offline) thread.push(R({ isReceipt: true, ac: T.a1, text: 'Saved to your Inbox to look at later', hasAct: true, actText: 'See it', onAct: () => goTo(2, { inbox: true }), mt: 10 })); });
+    if (offline && !(s.caps || []).length && session === 'resume') thread.push(R({ isMe: true, text: 'remind me to buy a card for Maya', pending: true }));
+
+    // ask sheet content
+    const askItems = [];
+    const sheetCtxName = s.ctxOverride || (sheet === 'overlap' ? 'Call with Sam overlaps your shift' : null);
+    if (sheet === 'ask' || sheet === 'off') {
+      if (asked !== 'no') {
+        askItems.push(R({ isStamp: true, text: 'From Plan · Essay: write the intro', stampColor: '#7C7C85', mt: 0 }));
+        askItems.push(R({ isMe: true, text: 'move this to tomorrow morning', mt: 14 }));
+        askItems.push(R({ isNavi: true, text: 'Saturday 9:00 to 10:30 is free, and you’re done before brunch with Jo.', mt: 12 }));
+        if (asked === 'kept') askItems.push(R({ isNavi: true, text: 'Okay, it stays today at 2:00.', mt: 12 }));
+        else if (moved) askItems.push(R({ isReceipt: true, ac: T.a1, text: 'Essay intro moved to Sat 9:00 AM', hasAct: true, actText: 'Undo', onAct: () => set({ asked: 'answered', toast: false }), mt: 10 }));
+        else askItems.push(R({ isProposal: true, kind: 'MOVE', kindColor: T.a1, edge: 'rgba(255,255,255,0.09)', title: 'Essay: write the intro → Saturday', rows: [
+          { t: 'Fri 2:00 PM', title: 'Essay: write the intro', bg: 'transparent', border: '1px solid transparent', timeColor: '#7C7C85', color: '#7C7C85', weight: 400, strike: 'line-through' },
+          { t: 'Sat 9:00 AM', title: 'Essay: write the intro', bg: hex2(T.a1, 0.10), border: '1px solid ' + hex2(T.a1, 0.45), timeColor: T.a1, color: '#F5F5F7', weight: 600, strike: 'none' },
+          { t: 'Sat 11:00 AM', title: 'Brunch with Jo', bg: 'transparent', border: '1px solid transparent', timeColor: '#7C7C85', color: '#8E8E96', weight: 400, strike: 'none' }
+        ], hasNote: false, pText: 'Move to Sat 9:00 AM', sText: 'Keep it today', pBg: T.cta, pColor: '#0B0B0C', onP: () => set({ asked: 'moved', sel: null, movedAt: Date.now() }), onS: () => set({ asked: 'kept' }), mt: 14 }));
+      }
+    }
+    if (sheet === 'overlap') {
+      askItems.push(R({ isNavi: true, text: 'Sam’s call at 4:30 lands in the middle of your shift. You’re free at 7:00, before dinner with Maya.', mt: 0 }));
+      if (samAsked) askItems.push(R({ isReceipt: true, ac: T.a1, text: 'Asked Sam to move the call to 7:00 PM. I’ll tell you when Sam replies.', hasAct: false, mt: 12 }));
+      else askItems.push(R({ isProposal: true, kind: 'NEEDS YOUR OK · MESSAGES SAM', kindColor: '#F4B37A', edge: 'rgba(244,179,122,0.35)', title: 'Ask Sam to move the call to 7:00 PM', rows: [
+        { t: '4:30 PM', title: 'Call with Sam', bg: 'transparent', border: '1px solid transparent', timeColor: '#7C7C85', color: '#7C7C85', weight: 400, strike: 'line-through' },
+        { t: '7:00 PM', title: 'Call with Sam', bg: 'rgba(244,179,122,0.10)', border: '1px solid rgba(244,179,122,0.45)', timeColor: '#F8D2B0', color: '#F5F5F7', weight: 600, strike: 'none' },
+        { t: '7:30 PM', title: 'Dinner with Maya', bg: 'transparent', border: '1px solid transparent', timeColor: '#7C7C85', color: '#8E8E96', weight: 400, strike: 'none' }
+      ], hasNote: true, note: 'Navi sends Sam one message. Your plan changes only if Sam agrees.', pText: 'Ask Sam for 7:00 PM', sText: 'Leave both for now', pBg: '#F5F5F7', pColor: '#000', onP: () => set({ samAsked: true }), onS: () => shut('sheet', { sheet: 'off', full: false }), mt: 16 }));
+    }
+    if (sheet === 'correct') {
+      askItems.push(R({ isNavi: true, text: 'Thanks for checking. What did I get wrong about this week?', mt: 0 }));
+    }
+    // evening review as a conversation
+    const reviewItems = [];
+    if (sheet === 'review') {
+      reviewItems.push(R({ isNavi: true, text: 'Let’s close today. You planned four things for yourself; two are already marked.', mt: 0 }));
+      reviewItems.push(R({ isReceipt: true, ac: T.a1, text: 'Morning run · done at 7:52 AM', hasAct: false, mt: 12 }));
+      reviewItems.push(R({ isReceipt: true, ac: T.a1, text: 'Book the dentist · done at 3:41 PM', hasAct: false, mt: 2 }));
+      reviewItems.push(R({ isNavi: true, text: 'The essay intro: how did it go?', mt: 22 }));
+      const ans = (i, a) => () => { const n = reviewAns.slice(0, i).concat([a]); set({ reviewAns: n, review: i + 1 }); };
+      if (review === 0) reviewItems.push(R({ isChoice: true, options: ['Done', 'Partly', 'Moved', 'Didn’t happen'].map((t) => ({ t, on: ans(0, t) })), mt: 12 }));
+      if (review >= 1) {
+        reviewItems.push(R({ isMe: true, text: reviewAns[0], mt: 12 }));
+        reviewItems.push(R({ isNavi: true, text: reviewAns[0] === 'Done' ? 'Nice. That was the big one.' : 'Okay. It stays first thing tomorrow at 9:00, before brunch. No penalty for moving it with notice.', mt: 12 }));
+        reviewItems.push(R({ isNavi: true, text: 'And the reply to Sam about the flat?', mt: 18 }));
+      }
+      if (review === 1) reviewItems.push(R({ isChoice: true, options: ['Done', 'Tomorrow', 'Drop it'].map((t) => ({ t, on: ans(1, t) })), mt: 12 }));
+      if (review >= 2) {
+        reviewItems.push(R({ isMe: true, text: reviewAns[1], mt: 12 }));
+        const kept = 2 + (reviewAns[0] === 'Done' ? 1 : 0) + (reviewAns[1] === 'Done' ? 1 : 0);
+        reviewItems.push(R({ isSummary: true, sumBg: 'linear-gradient(180deg, ' + hex2(T.a1, 0.18) + ' 0%, ' + hex2(T.a1, 0.05) + ' 100%)', pBg: T.cta, title: kept + ' of 4 kept today.', body: (reviewAns[0] === 'Done' ? '' : 'The essay intro moves to tomorrow at 9:00. ') + 'Tomorrow is light: the essay, then brunch with Jo at 11. Anything I got wrong, just say so.', pText: 'See tomorrow', sText: 'Done for tonight', onP: () => { shut('sheet', { sheet: 'off', full: false }); goTo(2, { day: 5, view: 'day' }); }, onS: () => shut('sheet', { sheet: 'off', full: false }), mt: 22 }));
+      }
+    }
+
+    // ---------- Plan: rows with one consistent scale ----------
+    const PX = 0.8; // 48 px per hour
+    const bh = (min) => Math.max(52, Math.round(min * PX));
+    const gh = (min) => (min < 15 ? 8 : min <= 120 ? Math.max(12, Math.round(min * PX)) : 56);
+    const fmtGap = (m) => (m >= 60 ? (Math.floor(m / 60) + (m % 60 >= 30 ? '½' : '') + ' hours free') : m + ' min free');
+    let items = [];
+    const B = (o) => Object.assign({ kind: 'block' }, o);
+    if (day === 4) {
+      if (s.earlierOpen) { items.push(B({ id: 'run', s: 480, e: 510, t: '8:00', title: 'Morning run', sub: 'Done 7:52 AM', type: 'done' })); items.push(B({ id: 'hist', s: 525, e: 660, t: '8:45', title: 'Modern History', sub: 'Class · done', type: 'done' })); }
+      if (!busy) {
+        items.push({ kind: 'now', s: 790, e: 840, t: '1:10', title: 'Now · free until 2:00' });
+        if (songBack) items.push(B({ id: 'song', s: 810, e: 830, t: '1:30', title: 'Practise the new song', sub: '1:30 – 1:50 PM', type: 'flex', c: C.hobby }));
+        if (!moved) items.push(B({ id: 'essay', s: 840, e: 930, t: '2:00', title: 'Essay: write the intro', sub: '2:00 – 3:30 · History essay', type: 'flex', c: C.school, next: true }));
+        if (placed) items.push(B({ id: 'dent', s: 930, e: 940, t: '3:30', title: 'Book the dentist', sub: '3:30 – 3:40 PM', type: 'flex', c: C.health, fresh: s.justPlaced && Date.now() - s.justPlaced < 1600 }));
+        else items.push({ kind: 'gapFit', s: 930, e: 960, t: '', title: '30 min free' });
+        items.push(B({ id: 'shift', s: 960, e: 1140, t: '4:00', title: 'Shift at the café', sub: '4:00 – 7:00 PM', type: 'fixed', c: C.work }));
+        items.push(B({ id: 'dinner', s: 1170, e: 1290, t: '7:30', title: 'Dinner with Maya', sub: 'Lupa, Elm St · until 9:30', type: 'fixed', c: C.friends }));
+        if (!songBack) items.push(B({ id: 'song', s: 1320, e: 1340, t: '10:00', title: 'Practise the new song', sub: '10:00 – 10:20 PM', type: 'flex', c: C.hobby }));
+        items.push(B({ id: 'wind', s: 1350, e: 1410, t: '10:30', title: 'Wind down', sub: 'No screens · bed by 11:30', type: 'routine' }));
+      } else {
+        items.push({ kind: 'now', s: 790, e: 810, t: '1:10', title: 'Now · next thing at 1:30' });
+        items.push(B({ id: 'mum', s: 810, e: 840, t: '1:30', title: 'Call Mum', sub: '1:30 – 2:00 PM', type: 'flex', c: C.friends }));
+        if (!moved) items.push(B({ id: 'essay', s: 840, e: 930, t: '2:00', title: 'Essay: write the intro', sub: 'Hard deadline today, 5:00 PM', subAmber: true, type: 'flex', c: C.school, next: true }));
+        items.push(B({ id: 'dent', s: 930, e: 945, t: '3:30', title: 'Book the dentist', sub: '3:30 – 3:45 PM', type: 'flex', c: C.health }));
+        items.push({ kind: 'group', s: 960, e: 1140, t: '4:00' });
+        items.push({ kind: 'note', s: 1140, e: 1140 });
+        items.push(B({ id: 'dinner', s: 1170, e: 1290, t: '7:30', title: 'Dinner with Maya', sub: 'Lupa, Elm St · until 9:30', type: 'fixed', c: C.friends }));
+        items.push(B({ id: 'song', s: 1290, e: 1320, t: '9:30', title: 'Practise the new song', sub: '9:30 – 10:00 PM', type: 'flex', c: C.hobby }));
+        items.push(B({ id: 'wind', s: 1350, e: 1410, t: '10:30', title: 'Wind down', sub: 'No screens · bed by 11:30', type: 'routine' }));
+      }
+    } else if (day === 5) {
+      if (moved) items.push(B({ id: 'essaySat', s: 540, e: 630, t: '9:00', title: 'Essay: write the intro', sub: '9:00 – 10:30 · moved from Friday', type: 'flex', c: C.school, fresh: s.movedAt && Date.now() - s.movedAt < 1600 }));
+      items.push(B({ id: 'brunch', s: 660, e: 750, t: '11:00', title: 'Brunch with Jo', sub: '11:00 AM – 12:30 PM', type: 'fixed', c: C.friends }));
+      items.push(B({ id: 'cinema', s: 1140, e: 1260, t: '7:00', title: 'Cinema with Jo and Maya', sub: '7:00 – 9:00 PM', type: 'fixed', c: C.friends }));
+      items.push(B({ id: 'windSat', s: 1350, e: 1410, t: '10:30', title: 'Wind down', sub: 'No screens', type: 'routine' }));
+    }
+    const doneBlocks = s.doneBlocks || {};
+    items.forEach((it) => { if (doneBlocks[it.id] && it.kind === 'block') { it.type = 'done'; it.next = false; } });
+    items.sort((a, b) => a.s - b.s);
+    const rows = [];
+    items.forEach((it, i) => {
+      const nxt = items[i + 1];
+      const selected = sel === it.id;
+      const base = { t: it.t || '', title: it.title || '', sub: it.sub || '', isNow: false, isGap: false, isBreak: false, isNote: false, isGroup: false, isBlock: false, canFit: false, fit: () => {}, timePad: 14, timeWeight: 400, timeColor: '#7C7C85', tap: () => {} };
+      if (it.kind === 'now') rows.push(Object.assign({}, base, { isNow: true, h: 54, timePad: 2, timeWeight: 600, timeColor: '#F5F5F7' }));
+      else if (it.kind === 'gapFit') rows.push(Object.assign({}, base, { isGap: true, h: 44, canFit: true, title: '30 min free', fit: () => { set({ placed: true, justPlaced: Date.now() }); setTimeout(() => this.forceUpdate(), 1700); }, timePad: 13 }));
+      else if (it.kind === 'note') rows.push(Object.assign({}, base, { isNote: true, h: 48, title: samAsked ? 'Waiting for Sam to reply about 7:00' : 'Sam’s call overlaps your shift', noteAct: samAsked ? '' : 'Sort it out', noteColor: samAsked ? '#A0A0A8' : '#F4B37A', tap: () => set({ sheet: 'overlap', full: false }) }));
+      else if (it.kind === 'group') rows.push(Object.assign({}, base, { isGroup: true, h: Math.round(180 * PX),
+        lTitle: 'Shift at the café', lSub: '4:00 – 7:00 PM', lBg: rgba(C.work, 0.22), lBorder: '1.5px solid ' + (samAsked ? rgba(C.work, 0.18) : 'rgba(244,179,122,0.55)'),
+        rTitle: 'Call with Sam', rSub: samAsked ? 'Asked for 7:00' : '4:30 – 5:00 PM', rSubColor: samAsked ? '#A0A0A8' : '#F8D2B0', rTop: Math.round(30 * PX), rH: 62, rBg: rgba(C.home, 0.16), rBorder: '1.5px solid ' + (samAsked ? rgba(C.home, 0.3) : 'rgba(244,179,122,0.75)'),
+        tap: () => {}, tapR: () => set({ sheet: 'overlap', full: false }) }));
+      else {
+        const typ = it.type;
+        let h = bh(it.e - it.s); if (selected) h += 56;
+        rows.push(Object.assign({}, base, { isBlock: true, h, innerH: bh(it.e - it.s), selected, showStart: !!it.next && !selected,
+          bg: typ === 'fixed' ? rgba(it.c, 0.22) : typ === 'flex' ? rgba(it.c, selected ? 0.14 : 0.07) : 'transparent',
+          border: typ === 'fixed' ? '1px solid ' + rgba(it.c, 0.18) : typ === 'flex' ? '1.5px solid ' + rgba(it.c, selected ? 0.9 : 0.55) : typ === 'routine' ? '1.5px dashed rgba(255,255,255,0.22)' : '1px solid rgba(255,255,255,0.06)',
+          glow: it.fresh ? '0 0 0 4px ' + hex2(T.a1, 0.3) : '0 0 0 0 rgba(0,0,0,0)', anim: it.fresh ? 'nRise 0.4s ' + EASE + ' both' : 'none',
+          titleColor: typ === 'done' ? '#7C7C85' : typ === 'routine' ? '#C8C8CE' : '#F5F5F7', strike: typ === 'done' ? 'line-through' : 'none',
+          subColor: it.subAmber ? '#F4B37A' : typ === 'fixed' ? 'rgba(255,255,255,0.65)' : '#8E8E96',
+          tap: typ === 'done' ? () => {} : () => set({ sel: selected ? null : it.id }),
+          focus: () => set({ focus: true, focusTitle: it.title, sel: null, focusMin: false, focusMinStep: null }),
+          done: () => { const before = Object.assign({}, (this.state && this.state.doneBlocks) || {}); set({ sel: null, doneBlocks: Object.assign({}, before, { [it.id]: true }) }); showToast('“' + it.title + '” marked done', () => set({ doneBlocks: before })); } }));
+      }
+      if (nxt && it.kind !== 'now' && it.kind !== 'group' && nxt.kind !== 'note') {
+        const gap = nxt.s - it.e;
+        if (gap > 120) rows.push(Object.assign({}, base, { t: '', isGap: false, isBlock: false, isBreak: true, h: 56, title: fmtGap(gap) }));
+        else if (gap >= 45) rows.push(Object.assign({}, base, { t: '', isGap: true, isBlock: false, h: gh(gap), title: fmtGap(gap) }));
+        else if (gap > 0) rows.push(Object.assign({}, base, { t: '', isGap: true, isBlock: false, h: gh(gap), title: '' }));
+        else rows.push(Object.assign({}, base, { t: '', isGap: true, isBlock: false, h: 6, title: '' }));
+      }
+    });
+
+    const needsList = [];
+    if (!placed && !busy) needsList.push({ t: 'Book the dentist', s: '10 min · before Monday', a: 'Add at 3:30 PM', go: () => { set({ placed: true, justPlaced: Date.now() }); setTimeout(() => this.forceUpdate(), 1700); } });
+    if (gift === 'added') needsList.push({ t: 'Get Maya a gift', s: '45 min · before Sunday', a: 'Ask Navi', go: () => set({ sheet: 'ask', ctxOverride: 'Get Maya a gift' }) });
+    needsList.push({ t: 'Plan the Lisbon trip', s: 'Whenever · 3 steps', a: 'Ask Navi', go: () => set({ sheet: 'ask', ctxOverride: 'Plan the Lisbon trip' }) });
+    needsList.push({ t: 'Return library books', s: '20 min · before Tuesday', a: 'Ask Navi', go: () => set({ sheet: 'ask', ctxOverride: 'Return library books' }) });
+    if (busy) { needsList.push({ t: 'Buy a card for Maya', s: '15 min · before Sunday', a: 'Ask Navi', go: () => set({ sheet: 'ask', ctxOverride: 'Buy a card for Maya' }) }); needsList.push({ t: 'Email the landlord', s: '10 min · this week', a: 'Ask Navi', go: () => set({ sheet: 'ask', ctxOverride: 'Email the landlord' }) }); needsList.push({ t: 'Study for the bio quiz', s: '2 h · before Thursday', a: 'Ask Navi', go: () => set({ sheet: 'ask', ctxOverride: 'Study for the bio quiz' }) }); }
+
+    let planTitle = dayNames[day], planSub = 'Nov ' + (day + 2), lead = '', rest = '';
+    if (view === 'week') { planTitle = 'This week'; planSub = 'Nov 2 – 8'; lead = 'Friday is the full one.'; rest = busy ? 'It also has the week’s one overlap.' : 'Saturday is mostly open.'; }
+    else if (view === 'list') { planTitle = 'Tasks'; planSub = ''; lead = busy ? '6 left today.' : '4 left today.'; rest = 'The essay is the big one.'; }
+    else if (day === 4) { if (busy) { lead = 'A packed afternoon.'; rest = 'Six things after 1:30, one overlap, and the essay is due at 5.'; } else { lead = moved ? 'A full evening.' : 'A full afternoon.'; rest = moved ? 'The essay moved to Saturday morning.' : '3½ hours free, most of it before 2.'; } }
+    else if (day === 5) { lead = 'A slow Saturday.'; rest = moved ? 'The essay first, then brunch. The afternoon is open.' : 'Brunch at 11, the cinema at 7, and an open afternoon.'; }
+
+    // week bars
+    const segsFor = (list) => list.map(([a, b, c, lane, amber]) => ({ l: ((a - 420) / 960 * 100).toFixed(1), w: ((b - a) / 960 * 100).toFixed(1), c, top: lane === 2 ? 14 : 3, ht: lane ? 9 : 20, ring: amber ? '0 0 0 1.5px #F4B37A' : 'none' }));
+    const friSegs = [[480, 510, C.health], [525, 660, C.school]].concat(busy ? [[810, 840, C.friends], [840, 930, C.school], [930, 945, C.health], [960, 1140, C.work, 1, 1], [990, 1020, C.home, 2, 1], [1170, 1290, C.friends], [1290, 1320, C.hobby]] : (moved ? [] : [[840, 930, C.school]]).concat([[960, 1140, C.work], [1170, 1290, C.friends], [1320, 1340, C.hobby]]));
+    const wk = [['Mon', 2, '6 h', [[525, 660, C.school], [960, 1140, C.work], [1260, 1290, C.hobby]]], ['Tue', 3, '5 h', [[480, 510, C.health], [540, 720, C.school], [840, 960, C.school]]], ['Wed', 4, '6½ h', [[480, 510, C.health], [525, 660, C.school], [1020, 1110, C.school], [1200, 1230, C.hobby]]], ['Thu', 5, '5 h', [[540, 720, C.school], [960, 1140, C.work]]], ['Fri', 6, busy ? '10 h' : moved ? '8 h' : '9½ h', friSegs], ['Sat', 7, moved ? '5 h' : '3½ h', (moved ? [[540, 630, C.school]] : []).concat([[660, 750, C.friends], [1140, 1260, C.friends]])], ['Sun', 8, '1 h', [[600, 660, '#C8C8CE']]]];
+    const weekRows = wk.map(([w, n, h, segs], i) => ({ w, n, h, segs: segsFor(segs), color: i === 4 ? '#F5F5F7' : '#C8C8CE', rowBg: i === 4 ? 'rgba(255,255,255,0.05)' : 'transparent', open: () => set({ day: i, view: 'day', sel: null }) }));
+
+    const done = s.done || { run: true };
+    const tk = (id, t, sub, dot, subColor) => { const d = !!done[id]; return { sc: d ? 1 : 1, t, s: sub, hasSub: !!sub, subColor: subColor || '#8E8E96', done: d, label: (d ? 'Mark not done: ' : 'Mark done: ') + t, toggle: () => set({ done: Object.assign({}, done, { [id]: !d }) }), ring: d ? '0' : '2px solid #4A4A50', fill: d ? T.a1 : 'transparent', tick: d ? 1 : 0, color: d ? '#7C7C85' : '#F5F5F7', strike: d ? 'line-through' : 'none', dot }; };
+    const taskGroups = [
+      { h: 'Today', items: [tk('essay', 'History essay — the intro', busy ? 'Hard deadline 5:00 PM · 1 of 3 steps' : 'Due Friday · 1 of 3 steps', C.school, busy ? '#F4B37A' : null), tk('sam', 'Reply to Sam about the flat', '5 min', C.home), tk('song', 'Practise the new song', '20 min', C.hobby), tk('maya', 'Text Maya about Sunday', '', C.friends), tk('run', 'Morning run', '', C.health)] },
+      { h: 'Needs a time', items: [tk('lis', 'Plan the Lisbon trip', '3 steps', C.friends), tk('lib', 'Return library books', 'Before Tuesday', '#C8C8CE')] }
+    ];
+
+    // ---------- Progress ----------
+    const sv = [['M', 100, 'Monday: 3 of 3 kept'], ['T', 80, 'Tuesday: 4 of 5 kept'], ['W', 100, 'Wednesday: 3 of 3 kept, 1 moved with notice'], ['T', 67, 'Thursday: 2 of 3 kept'], ['F', evening ? 50 : 50, 'Today: 2 of 4 so far'], ['S', 0, 'Saturday: not yet'], ['S', 0, 'Sunday: not yet']];
+    const stones = sv.map(([d, f, aria], i) => ({ d, fill: f, aria, open: () => set({ sheet: 'stone', full: false, stoneDay: i }), shell: i > 4 ? 'transparent' : 'rgba(167,235,192,0.13)', border: i > 4 ? '1.5px dashed rgba(255,255,255,0.20)' : '1px solid rgba(167,235,192,0.22)', glow: i === 4 ? '0 0 0 3px ' + T.a1 : 'none', weight: i === 4 ? 700 : 500, labelColor: i === 4 ? '#F5F5F7' : '#8E8E96' }));
+    const ld = s.learned || {};
+    const learnedRaw = [
+      { id: 'l1', t: 'You focus best after 4 PM on days without a shift.', why: 'Your three longest focus sessions this month all started after 4.' },
+      { id: 'l2', t: 'Thursday evenings are for the café, so I won’t plan study then.', why: 'From your shifts since October.' }
+    ];
+    const learned = learnedRaw.map((l) => ({ t: l.t, why: l.why, open: !ld[l.id], decided: !!ld[l.id], decText: ld[l.id] === 'use' ? 'I’ll use this when planning. You can change it in What Navi remembers.' : 'Forgotten. I won’t use it.', decColor: ld[l.id] === 'use' ? '#A7EBC0' : '#A0A0A8', use: () => set({ learned: Object.assign({}, ld, { [l.id]: 'use' }) }), no: () => set({ learned: Object.assign({}, ld, { [l.id]: 'no' }) }) }));
+    const reflect = pick('reflect', 'open');
+    const K1 = (t, time, sub) => ({ icon: '✓', c: '#9FF0D8', t, tc: '#F5F5F7', time, sub: sub || '', hasSub: !!sub });
+    const MV = (t, sub) => ({ icon: '→', c: '#8E8E96', t, tc: '#C8C8CE', time: '', sub, hasSub: true });
+    const MS = (t, sub) => ({ icon: '×', c: '#FF9A9A', t, tc: '#C8C8CE', time: '', sub, hasSub: !!sub });
+    const OP = (t, time) => ({ icon: '○', c: '#8E8E96', t, tc: '#C8C8CE', time, sub: '', hasSub: false });
+    const stoneData = [
+      ['Monday', '3 of 3 kept', [K1('Morning run', '7:40 AM'), K1('Biology reading · 40 min', '4:10 PM'), K1('Practise guitar · 20 min', '9:00 PM')]],
+      ['Tuesday', '4 of 5 kept', [K1('Essay outline · 45 min', '10:15 AM'), K1('Laundry', '6:30 PM'), K1('Call Mum', '7:10 PM'), K1('Wind-down', '10:30 PM'), MS('Bio flashcards', 'Skipped, no note')]],
+      ['Wednesday', '3 of 3 kept', [K1('Morning run', '7:40 AM'), K1('Essay outline · 45 min', '5:00 PM'), K1('Practise guitar · 20 min', '8:10 PM'), MV('Essay intro, moved to Friday', 'With notice. You said “too tired after the shift”.')]],
+      ['Thursday', '2 of 3 kept', [K1('Morning run', '7:35 AM'), K1('Wind-down', '10:30 PM'), MS('Bio review after the shift', 'Didn’t happen')]],
+      ['Friday', '2 of 4 so far', [K1('Morning run', '7:48 AM'), K1('Book the dentist', '3:41 PM'), OP('Essay intro', '2:00 PM'), OP('Reply to Sam', '')]],
+      ['Saturday', 'Not yet', [OP('Essay intro', '9:00 AM'), OP('Brunch with Jo', '11:00 AM')]],
+      ['Sunday', 'Not yet', [OP('Laundry', ''), OP('Maya’s birthday', '')]]
+    ];
+    const sd = stoneData[pick('stoneDay', 2)];
+    const D0 = 'rgba(255,255,255,0.10)';
+    const dd = (cs) => cs.map((c) => ({ c }));
+    const M = '#9FF0D8', K = '#FF9A9A', L = '#C7C1FF', D = 'rgba(255,255,255,0.10)';
+    const signals = [
+      { t: 'Morning runs', v: '4 of 4, all before class', word: 'Strong', c: M, days: dd([M, D, M, M, M, D, D]) },
+      { t: 'Essay intro', v: 'moved twice', word: 'Slipping', c: K, days: dd([D, D, K, D, K, D, D]) },
+      { t: 'Wind-down', v: '5 of 5 nights', word: 'Steady', c: L, days: dd([L, L, L, L, L, D, D]) },
+      { t: 'Focus after 4 PM', v: '3 long sessions', word: 'New', c: T.a1, days: dd([D, T.a1, T.a1, D, T.a1, D, D]) }
+    ].map((x) => Object.assign(x, { open: () => set({ sheet: 'stone', full: false }) }));
+    const focusOpenNow = focus && !s.focusMin;
+    const storyName = pick('storyName', ov === 'story' ? 'morning' : ov === 'weekStory' ? 'week' : ov === 'eveningStory' ? 'evening' : null);
+
+    // ---------- Ask bar / sheet ----------
+    const selRow = items.find((r) => r.id === sel);
+    const ctxName = s.ctxOverride || (selRow ? selRow.title : (asked !== 'no' && sheet !== 'off' ? 'Essay: write the intro' : null));
+    const askBarText = page === 0 ? (evening ? 'Tell Navi how today went…' : 'Reflect with Navi…') : ctxName ? 'Ask about ' + ctxName + '…' : view === 'day' ? 'Ask about ' + dayNames[day] + '…' : view === 'week' ? 'Ask about this week…' : 'Ask about your tasks…';
+    const sheetTitles = { ask: 'Navi', overlap: 'Navi', stone: sd[0], review: 'Tonight’s wrap-up', correct: 'Navi' };
+    const sheetCtx = sheet === 'stone' ? 'What this stone is made of' : sheet === 'review' ? 'A short conversation · Friday' : sheet === 'correct' ? 'About this week’s reflection' : sheet === 'overlap' ? 'About ' + sheetCtxName : page === 0 ? 'About this week' : 'About ' + (ctxName || (view === 'day' ? dayNames[day] + ', ' + planSub : view === 'week' ? 'this week' : 'your tasks'));
+    const askDraft = pick('askDraft', sel === 'essay' && asked === 'no' && sheet === 'ask' ? 'move this to tomorrow morning' : '');
+    const askSend = () => { const t = ((this.state && this.state.askDraft) ?? askDraft).trim(); if (!t) return; if (ctxName && ctxName.indexOf('Essay') === 0 && sheet === 'ask') set({ asked: 'answered', askDraft: '' }); else set({ askDraft: '', sheetMsgs: ((this.state && this.state.sheetMsgs) || []).concat([t]) }); };
+    const draft = pick('draft', '');
+    const sendIt = () => { const t = ((this.state && this.state.draft) || '').trim(); if (!t) return; set({ draft: '', caps: (s.caps || []).concat([t]), session: 'resume' }); };
+    (s.sheetMsgs || []).forEach((t) => { askItems.push(R({ isMe: true, text: t, mt: 14 })); askItems.push(R({ isNavi: true, text: sheet === 'correct' ? 'Thanks. I’ve noted that and won’t count it that way again.' : 'Got it. I’ve saved that to look at with you.', mt: 12 })); });
+    const sheetItems = sheet === 'review' ? reviewItems : (sheet === 'ask' && full ? thread.concat(askItems) : askItems);
+
+    const freshish = session === 'fresh' && !(s.caps || []).length;
+    const urgentish = session === 'urgent' && !(s.caps || []).length;
+    const showLabel = navStyle === 'marks' && (pr.startLabel === 'yes' || (s.lastNav && Date.now() - s.lastNav < 1600));
+    if (navStyle === 'marks' && s.lastNav && !this._t) { this._t = setTimeout(() => { this._t = null; this.forceUpdate(); }, 1700); }
+
+    const dragDx = s.dragDx !== undefined ? s.dragDx : Number(pr.startDrag || 0);
+    const settling = !!s.settling;
+    const dragging = dragDx !== 0 || settling;
+    const target = (s.dragDir !== undefined ? s.dragDir : (dragDx < 0 ? 1 : -1)) + page;
+    const prog = Math.min(1, Math.abs(dragDx) / 390);
+    const goTo = (n, extra) => {
+      if (n === page || s.settling) { if (extra) set(extra); return; }
+      const dir = n > page ? 1 : -1;
+      set({ dragDir: n - page, settling: true, dragDx: 0, sel: null });
+      setTimeout(() => this.setState({ dragDx: dir > 0 ? -390 : 390 }), 20);
+      setTimeout(() => { this.setState(Object.assign({ noAnim: true, page: n, dragDx: 0, settling: false, dragDir: undefined, lastNav: Date.now() }, extra || {})); setTimeout(() => this.setState({ noAnim: false }), 30); }, 440);
+    };
+    const pageLook = (i) => {
+      if (!dragging) return { r: 0, t: 'none', z: 0, f: 'none' };
+      if (i === page) { const k = Math.min(1, prog * 2.2); return { r: Math.round(44 * k), t: 'translateX(' + dragDx + 'px) scale(' + (1 - 0.07 * k).toFixed(3) + ')', z: 2, f: 'brightness(' + (1 - 0.35 * prog).toFixed(2) + ')' }; }
+      if (i === target && target >= 0 && target <= 2) { return { r: Math.round(44 * (1 - prog)), t: 'translateX(' + ((page - target) * 390) + 'px) scale(' + (0.93 + 0.07 * prog).toFixed(3) + ')', z: 1, f: 'blur(' + (14 * (1 - prog)).toFixed(1) + 'px) brightness(' + (0.55 + 0.45 * prog).toFixed(2) + ')' }; }
+      return { r: 0, t: 'none', z: 0, f: 'none' };
+    };
+    return {
+      down: (e) => { if (sheet !== 'off' || daysOpen || inbox || drawer || storyName || focus || voice === 'full' || voice === 'paused' || s.settling) return; this._x = e.clientX; this._y = e.clientY; this._drag = false; },
+      move: (e) => { if (this._x == null) return; const dx = e.clientX - this._x; if (!this._drag) { if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(e.clientY - this._y)) return; this._drag = true; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {} } let d = dx; if ((page === 0 && d > 0) || (page === 2 && d < 0)) d = d * 0.25; set({ dragDx: Math.max(-390, Math.min(390, d)), dragDir: d < 0 ? 1 : -1, settling: false }); },
+      up: (e) => { if (this._x == null) return; const was = this._drag; this._x = null; this._drag = false; if (!was) return; const dx = (this.state && this.state.dragDx) || 0; const n = Math.abs(dx) > 110 ? Math.max(0, Math.min(2, page + (dx < 0 ? 1 : -1))) : page; const fin = n !== page ? (dx < 0 ? -390 : 390) : 0; set({ dragDx: fin, settling: true }); setTimeout(() => { this.setState({ noAnim: true, page: n, dragDx: 0, settling: false, dragDir: undefined, sel: n !== page ? null : this.state.sel, lastNav: Date.now() }); setTimeout(() => this.setState({ noAnim: false }), 30); }, 400); },
+      trackX: -page * 390, segX: { day: 0, week: 100, list: 200 }[view], viewSwap: swap('view', view + ':' + day), chatSwap: swap('chat', session + ':' + chatSel, '0.36s ease both'), stoneSwap: swap('stone', String(pick('stoneDay', 2))),
+      trackT: 'none',
+      secT: s.noAnim || (dragging && !settling) ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0.9, 0.25, 1), border-radius 0.4s, filter 0.4s',
+      gapO: dragging ? 1 : 0, 
+      pg0: pageLook(0), pg1: pageLook(1), pg2: pageLook(2),
+      glowTop: page === 1 && freshish ? 120 : page === 1 && urgentish ? -200 : -260, glowColor: urgentish && page === 1 ? 'rgba(244,179,122,0.10)' : T.glow,
+      navWords: navStyle === 'words', navMarks: navStyle === 'marks', navCapsule: navStyle === 'capsule', navItems, navX: 195 - (page * 96 + 48) + Math.round(dragDx * 96 / 390), navT: s.noAnim || (dragging && !settling) ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0.9, 0.25, 1)',
+      curName: names[page], markLabelO: showLabel ? 1 : 0,
+      showMenu: (page === 1 && !(dragging && target !== 1)) || (dragging && target === 1), menuO: page === 1 ? (1 - prog).toFixed(2) : (dragging && target === 1 ? prog.toFixed(2) : 1), offline,
+      // progress
+      weekMode: !evening, eveningMode: evening, stones, learned, signals,
+      progScroll: (e) => { const y = Math.round(e.target.scrollTop / 10) * 10; if (y !== (this.state && this.state.progY)) set({ progY: y }); },
+      progRef: (el) => { if (el && pr.startProgScroll && !this._ps) { this._ps = true; el.scrollTop = Number(pr.startProgScroll); setTimeout(() => this.setState({ progY: Number(pr.startProgScroll) }), 0); } },
+      progPad: evening ? '104px 20px 140px' : '0 20px 0',
+      weekHero: !evening, heroO: Math.max(0, 1 - (s.progY || 0) / 320).toFixed(2), heroY: -Math.min(60, (s.progY || 0) * 0.2), heroS: (1 - Math.min(0.06, (s.progY || 0) / 5000)).toFixed(3), heroHidden: (s.progY || 0) > 300 ? 'true' : 'false',
+      pats: [
+        ['runs', 'Morning runs', 'Strong', '#9FF0D8', ['#9FF0D8', D0, '#9FF0D8', '#9FF0D8', '#9FF0D8', D0, D0], '4 of 4 planned, all before class: 7:40, 7:52, 7:35, 7:48. Tuesday was a rest day.', ''],
+        ['essay', 'Essay intro', 'Slipping', '#FF9A9A', [D0, D0, '#FF9A9A', D0, '#FF9A9A', D0, D0], 'Moved Wednesday at 6:10 PM (after the shift) and again this morning. It\u2019s now Saturday at 9:00.', 'Give it a fixed slot'],
+        ['wind', 'Wind-down', 'Steady', '#C7C1FF', ['#C7C1FF', '#C7C1FF', '#C7C1FF', '#C7C1FF', '#C7C1FF', D0, D0], '5 of 5 nights. In bed by 11:20 on average.', ''],
+        ['focus4', 'Focus after 4 PM', 'New', T.a1, [D0, T.a1, T.a1, D0, T.a1, D0, D0], 'Your three longest sessions this month started after 4, on days without a shift. Plan with this?', 'Plan with this']
+      ].map(([id, t, word, c, days, detail, act]) => { const open = (s.patOpen ?? pr.startPatOpen) === id; const pd = (s.patDone || {})[id]; const doneTexts = { essay: 'Done. Essay blocks are now fixed at 9:00 on weekday mornings.', focus4: 'I’ll plan deep work after 4 on days without a shift.' }; return { t, word, c, days: days.map((x) => ({ c: x })), detail, act, showAct: !!act && !pd, isDone: !!pd, doneText: doneTexts[id] || '', actBg: c, open, chev: open ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6', toggle: () => set({ patOpen: open ? null : id }), doAct: () => set({ patDone: Object.assign({}, s.patDone || {}, { [id]: true }) }), undo: () => { const n = Object.assign({}, s.patDone || {}); delete n[id]; set({ patDone: n }); } }; }),
+      whyOpen: () => set({ sheet: 'stone', full: false }),
+      runDays: [['M','7:40',1],['T','rest',0],['W','7:52',1],['T','7:35',1],['F','7:48',1],['S','',0],['S','',0]].map(([d, t, k]) => ({ d, t, c: k ? '#9FF0D8' : 'rgba(255,255,255,0.12)' })),
+      pageScene: T.scene.replace('at 50% 0%', 'at 50% 14%'), ac: T.a1, cta: T.cta, stoneBg: T.stone, stoneShadow: T.sh, scene: T.scene, greet: T.greet, greetA: T.a, greetB: T.b, greetC: T.c, hiWord: T.hi,
+      hasMoment: !!T.moment, momentTitle: T.moment ? T.moment[0] : '', momentSub: T.moment ? T.moment[1] : '', momentBtn: T.moment ? T.moment[2] : '',
+      momentAct: () => set({ storyName: time === 'evening' ? 'evening' : 'morning' }),
+      giftAskFresh: gift === 'ask' && time === 'afternoon',
+      storyOpen: !!storyName, storyName: storyName || 'morning', storyStep: 0, closeStory: () => shut('story', { storyName: null }, 300), storyAnim: closing.story ? 'nFadeOut 0.3s ease both' : 'nFade 0.35s ease both',
+      storyCta: () => { if (storyName === 'evening') { set({ sheet: 'review', full: true, review: 0, reviewAns: [] }); shut('story', { storyName: null }, 300); } else { shut('story', { storyName: null }, 300); goTo(2, storyName === 'week' ? { view: 'week' } : {}); } },
+      openWeekStory: () => set({ storyName: 'week' }),
+      reflectOpen: reflect === 'open', reflectThanks: reflect === 'right', reflectRight: () => set({ reflect: 'right' }), reflectWrong: () => set({ sheet: 'correct', full: false }),
+      openReview: () => set({ storyName: 'evening' }),
+      // chat
+      fresh: freshish, urgent: urgentish, resume: !freshish && !urgentish,
+      giftAsk: gift === 'ask', giftDoneLine: gift === 'added', giftAdd: () => set({ gift: 'added' }), giftNo: () => set({ gift: 'no' }), giftUndo: () => set({ gift: 'ask' }),
+      startFocus: () => set({ focus: true, focusTitle: 'Essay: write the intro', focusMin: false }), askReplan: () => goTo(2, { sheet: 'ask', ctxOverride: 'This afternoon' }),
+      chatItems: stamp(thread, 'chat:' + chatSel), draft, hasDraft: draft.trim().length > 0, noDraft: draft.trim().length === 0, typeDraft: (e) => set({ draft: e.target.value }), send: sendIt, sendOnEnter: (e) => { if (e.key === 'Enter') sendIt(); },
+      talkTap: () => { if (offline) showToast('Voice needs a connection. Typing still works.'); else set({ voice: 'full', muted: false }); },
+      talkBg: offline ? 'rgba(255,255,255,0.08)' : T.cta, talkColor: offline ? '#8E8E96' : '#0B0B0C',
+      // plan
+      planTitle, planSub, titleAria: planTitle + ' ' + planSub + ', pick a day', lead, rest, openDays: () => set({ daysOpen: true }), closeDays: () => shut('days', { daysOpen: false }, 200), daysOpen, daysAnim: closing.days ? 'nShrink 0.2s ease both' : 'nGrow 0.28s ' + EASE + ' both', daysScrim: closing.days ? 'nFadeOut 0.2s ease both' : 'nFade 0.2s ease both',
+      days: [['Mon', 2], ['Tue', 3], ['Wed', 4], ['Thu', 5], ['Fri', 6], ['Sat', 7], ['Sun', 8]].map(([w, n], i) => ({ w, n, on: i === day, pick: () => { set({ day: i, view: 'day', sel: null }); shut('days', { daysOpen: false }, 200); }, bg: i === day ? '#F5F5F7' : 'rgba(255,255,255,0.05)', color: i === day ? '#000' : '#C8C8CE' })),
+      viewTabs: [['day', 'Day'], ['week', 'Week'], ['list', 'Tasks']].map(([k, t]) => ({ t, on: view === k, pick: () => set({ view: k, sel: null }), weight: view === k ? 600 : 500, color: view === k ? '#F5F5F7' : '#A0A0A8' })),
+      loading, notLoading: !loading, planRef: (el) => { if (el && pr.startScroll && !this._scrolled) { this._scrolled = true; el.scrollTop = Number(pr.startScroll); } },
+      inboxWaiting: waiting > 0, badgeBg: approvals.length ? '#F4B37A' : T.a1, badgeText: String(waiting), inboxAria: 'Inbox, ' + waiting + ' waiting', openInbox: () => set({ inbox: true }), inboxAnim: closing.inbox ? 'nDown 0.28s cubic-bezier(0.4, 0, 1, 1) both' : 'nUp 0.42s ' + EASE + ' both', inboxScrim: closing.inbox ? 'nFadeOut 0.28s ease both' : 'nFade 0.3s ease both', addBg: hex2(T.a1, 0.12),
+      approvalBanner: approvals.length > 0 && view === 'day' && day === 4, approvalCount: approvals.length,
+      viewDay: view === 'day', viewWeek: view === 'week', viewList: view === 'list', rows,
+      showEarlier: day === 4, earlierText: s.earlierOpen ? 'Hide this morning' : 'This morning · 2 done', earlierChev: s.earlierOpen ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6', toggleEarlier: () => set({ earlierOpen: !s.earlierOpen }),
+      showFooter: day === 4, needsText: needsList.length + ' things still need a time', needsChev: s.needsOpen ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6', toggleNeeds: () => set({ needsOpen: !s.needsOpen }), needsOpen: !!s.needsOpen, needs: needsList,
+      weekRows, taskGroups,
+      // ask & sheets
+      showAskBar: page !== 1 && !dragging && sheet === 'off' && !focusOpenNow && !inbox && !daysOpen, askBarText, openAsk: () => set({ sheet: 'ask', full: false, sheetMsgs: [] }),
+      sheetAnim: closing.sheet ? 'nDown 0.28s cubic-bezier(0.4, 0, 1, 1) both' : 'nUp 0.42s ' + EASE + ' both', sheetScrim: closing.sheet ? 'nFadeOut 0.28s ease both' : 'nFade 0.3s ease both',
+      stoneHead: sd[1], stoneSub: sd[0] === 'Saturday' || sd[0] === 'Sunday' ? 'Planned for yourself so far.' : 'Things you planned for yourself on ' + sd[0] + '.', stoneRows: sd[2], stoneNote: 'Classes and shifts are fixed, so they don’t count. Moving something with notice never counts against you.',
+      sheetOpen: sheet !== 'off', sheetFull: full, sheetH: full ? 796 : (sheet === 'stone' ? 560 : askItems.some((x) => x.isProposal) ? 640 : 500), sheetTitle: sheetTitles[sheet] || 'Navi', sheetCtx, sheetAria: sheetTitles[sheet] || 'Navi',
+      stoneDetail: sheet === 'stone', canGrow: sheet === 'ask' || sheet === 'overlap' || sheet === 'correct',
+      toggleGrow: () => set({ full: !full }), growLabel: full ? 'Back to half height' : 'Open the full conversation', growIcon: full ? 'M9 15H4v5M15 9h5V4M4 20l6-6M20 4l-6 6' : 'M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7',
+      closeSheet: () => { const showMv = moved && !s.toastShown; shut('sheet', { sheet: 'off', full: false, ctxOverride: null, sheetMsgs: [], toastShown: moved ? true : s.toastShown }); if (showMv) setTimeout(() => showToast('Essay intro moved to Sat 9:00 AM', () => set({ asked: 'answered' })), 300); },
+      closeLabel: page === 0 ? 'Back to Progress' : page === 2 ? 'Back to Plan' : 'Close',
+      sheetItems: stamp(sheetItems, 'sheet:' + sheet + ':' + (full ? 'f' : 'h')), askEmpty: (sheet === 'ask' || sheet === 'correct') && !full && askItems.length === 0,
+      askHint: page === 0 ? 'What made this week work, or not? Navi carries it into next week’s plan.' : ctxName ? 'Move it, split it, or find it a better time.' : 'Move things around, fit something in, or ask what’s free.',
+      askPlaceholder: sheet === 'review' ? 'Or say it in your own words…' : sheet === 'correct' ? 'Tell Navi what’s off…' : page === 0 ? 'Reflect…' : 'Ask…',
+      askDraft, askHasDraft: askDraft.trim().length > 0, askNoDraft: askDraft.trim().length === 0, typeAsk: (e) => set({ askDraft: e.target.value }), askSend, askOnEnter: (e) => { if (e.key === 'Enter') askSend(); },
+      toastOn: toast, toastText: s.toastText || 'Essay intro moved to Sat 9:00 AM', toastHasUndo: !!this._toastUndo || pr.startToast === 'yes', toastUndo: () => { clearTimeout(this._tt); const u = this._toastUndo; this._toastUndo = null; if (u) u(); else if (moved) set({ asked: 'answered' }); shut('toast', { toast: false }, 220); }, toastAnim: closing.toast ? 'nSink 0.22s ease both' : (swap('toast', String(s.toastN || 0)), 'nRise 0.34s ' + EASE + ' both'), toastBottom: (sheet !== 'off' ? 108 : (page !== 1 ? 104 : 108)) + ((voice === 'pill' || (focus && s.focusMin)) && sheet === 'off' ? 62 : 0),
+      // drawer, inbox
+      drawer, openDrawer: () => set({ drawer: true, acctOpen: false }), closeDrawer: () => shut('drawer', { drawer: false, acctOpen: false }, 280), newChat: () => { set({ session: 'fresh', caps: [], chatSel: 'dentist' }); shut('drawer', { drawer: false, acctOpen: false }, 280); },
+      drawerAnim: closing.drawer ? 'nLeftOut 0.28s cubic-bezier(0.4, 0, 1, 1) both' : 'nLeft 0.36s ' + EASE + ' both', drawerScrim: closing.drawer ? 'nFadeOut 0.28s ease both' : 'nFade 0.25s ease both',
+      acctOpen: !!s.acctOpen, toggleAcct: () => set({ acctOpen: !s.acctOpen }),
+      acctItems: [['Settings', '#F5F5F7'], ['What Navi remembers', '#F5F5F7'], ['Notes', '#F5F5F7'], ['Activity', '#F5F5F7'], ['Sign out', '#FF9A9A']].map(([t, color]) => ({ t, color, go: () => showToast(t + ' isn’t part of this prototype yet.') })),
+      chatGroups: [{ h: 'Today', items: [['dentist', 'Fitting in the dentist']] }, { h: 'Earlier', items: [['week', 'Plan this week'], ['essay', 'Essay outline']] }].map((g) => ({ h: g.h, items: g.items.map(([id, t]) => { const cur = session === 'resume' && chatSel === id; return { t, cur: cur ? 'page' : 'false', color: cur ? '#F5F5F7' : '#C8C8CE', bg: cur ? 'rgba(255,255,255,0.08)' : 'transparent', open: () => { set({ session: 'resume', chatSel: id }); shut('drawer', { drawer: false, acctOpen: false }, 280); } }; }) })),
+      inbox, closeInbox: () => shut('inbox', { inbox: false }, 280), hasApprovals: approvalsAll.length > 0, approvals: approvalRows,
+      drafts: draftsAll.map((d) => { const added = !!removed[d.id]; return { t: d.t, sub: added ? 'Added to your tasks' : '“' + d.q + '”', tag: added ? '' : d.tag, tc: added ? '#8E8E96' : '#F5F5F7', pending: !added, added, accept: () => set({ removed: Object.assign({}, (this.state && this.state.removed) || {}, { [d.id]: true }) }), undo: () => { const n = Object.assign({}, (this.state && this.state.removed) || {}); delete n[d.id]; set({ removed: n }); } }; }), noInbox: approvalsAll.length + draftsAll.length === 0,
+      // voice + focus
+      voiceFull: voice === 'full' || voice === 'paused', voicePaused: voice === 'paused', voicePill: voice === 'pill', voiceAnim: closing.voice ? 'nShrink 0.26s ease both' : 'nGrow 0.38s ' + EASE + ' both',
+      muted: !!s.muted, toggleMute: () => set({ muted: !s.muted }), muteLabel: s.muted ? 'Unmute' : 'Mute', muteBg: s.muted ? '#F5F5F7' : 'rgba(255,255,255,0.08)', muteFg: s.muted ? '#000' : '#C8C8CE', muteSlash: s.muted ? 'M4 4l16 16' : '', ring1: hex2(T.a1, 0.10), ring2: hex2(T.a1, 0.05),
+      anyPill: (voice === 'pill' || (focus && s.focusMin)) && !(voice === 'full' || voice === 'paused'), pillAnim: 'nRise 0.34s ' + EASE + ' both', pillBg: 'linear-gradient(' + hex2(T.a1, 0.12) + ', ' + hex2(T.a1, 0.12) + '), #141416', pillEdge: hex2(T.a1, 0.28), pillText: '#F0F0F3', pillLabel: voice === 'pill' ? (s.muted ? 'Muted · 0:42' : 'Talking · 0:42') : 'In focus · ' + (s.focusTitle || 'Essay: write the intro'), pillBottom: page === 1 ? 104 : 100, pillEndLabel: voice === 'pill' ? 'End call' : 'End focus', pillOpen: () => { if (voice === 'pill') set({ voice: 'full' }); else set({ focusMin: false }); }, pillEnd: () => { if (voice === 'pill') set({ voice: 'off', muted: false }); else set({ focus: false, focusMin: false }); },
+      voiceStatus: voice === 'paused' ? 'Paused while you’re on a phone call' : s.muted ? 'Muted. Navi can’t hear you.' : 'Listening', voiceStatusColor: voice === 'paused' || s.muted ? '#C8C8CE' : T.a1, voiceFilter: voice === 'paused' || s.muted ? 'saturate(0.2) brightness(0.7)' : 'none', voiceGlow: voice === 'paused' || s.muted ? 'rgba(255,255,255,0.05)' : hex2(T.a1, 0.16),
+      resumeVoice: () => set({ voice: 'full' }), openVoice: () => { if (offline) showToast('Voice needs a connection. Typing still works.'); else set({ voice: 'full', muted: false }); }, minimizeVoice: () => shut('voice', { voice: 'pill' }), endVoice: () => shut('voice', { voice: 'off', muted: false }), voiceToText: () => { shut('voice', { voice: 'pill' }); goTo(1); },
+      focus, focusOpen: focus && !s.focusMin, focusStep: s.focusMinStep || 'setup', focusTitle: s.focusTitle || 'Essay: write the intro', endFocus: () => shut('focus', { focus: false, focusMin: false, focusMinStep: null }, 300), minFocus: () => shut('focus', { focusMin: true, focusMinStep: 'run' }, 300), focusAnim: closing.focus ? 'nFadeOut 0.3s ease both' : 'nFade 0.35s ease both'
+    };
+  }
+}
+</script>
+</body>
+</html>

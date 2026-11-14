@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi mobile structure map</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#A7EBC0}a:hover{color:#D2F6DF}
+</style>
+</helmet>
+<div style="width: 1776px; height: 2120px; box-sizing: border-box; padding: 40px 48px 48px; background: #0B0B0C; color: #F5F5F7; font-family: Figtree, -apple-system, sans-serif; display: flex; flex-direction: column; gap: 36px">
+
+  <div style="display: flex; align-items: flex-end; justify-content: space-between">
+    <div>
+      <h1 style="margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -0.01em">Three pages. Swipe, or tap the labels.</h1>
+      <p style="margin: 8px 0 0; font-size: 17px; color: #A0A0A8">Left looks back, the middle is now, right looks ahead. Everything else covers the pages and closes back to where you were.</p>
+    </div>
+    <div aria-hidden="true" style="display: flex; align-items: center; gap: 10px; font-size: 15px; color: #C8C8CE">
+      <span style="padding: 6px 12px; border-radius: 14px; background: rgba(255,255,255,0.06)">Progress</span>
+      <span style="color: #7C7C85">←</span>
+      <span style="padding: 6px 12px; border-radius: 14px; background: rgba(167,235,192,0.14); color: #D2F6DF">Navi</span>
+      <span style="color: #7C7C85">→</span>
+      <span style="padding: 6px 12px; border-radius: 14px; background: rgba(255,255,255,0.06)">Plan</span>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 40px">
+    <div style="display: flex; flex-direction: column; gap: 14px">
+      <div style="font-size: 13px; font-weight: 600; color: #A0A0A8; letter-spacing: 0.04em">1 · PROGRESS — LOOKING BACK</div>
+      <div style="width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12)"><dc-import name="M1-Proto" start-page="progress" hint-size="390px,844px"></dc-import></div>
+      <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">Today so far, the week planned vs done, one thing Navi noticed, and the reviews. Real numbers only, no scores.</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 14px">
+      <div style="font-size: 13px; font-weight: 600; color: #A7EBC0; letter-spacing: 0.04em">2 · NAVI — HOME, OPENS HERE</div>
+      <div style="width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 1px solid rgba(167,235,192,0.35)"><dc-import name="M1-Proto" start-page="navi" hint-size="390px,844px"></dc-import></div>
+      <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">The chat. A slim now/next line on top; Navi's first line comes from your day. Proposals change nothing until you press them; everything Navi did has Undo.</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 14px">
+      <div style="font-size: 13px; font-weight: 600; color: #A0A0A8; letter-spacing: 0.04em">3 · PLAN — DAY (DEFAULT)</div>
+      <div style="width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12)"><dc-import name="M1-Proto" start-page="plan" hint-size="390px,844px"></dc-import></div>
+      <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">Inbox pinned on top when something waits. Timeline with fixed, flexible and routine marks; free stretches offer a fit. “Need a time” tray bottom-left, stone bottom-right.</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 14px">
+      <div style="font-size: 13px; font-weight: 600; color: #A0A0A8; letter-spacing: 0.04em">3 · PLAN — WEEK AND LIST</div>
+      <div style="width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12)"><dc-import name="M1-Proto" start-page="plan" start-view="list" hint-size="390px,844px"></dc-import></div>
+      <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">Same page, other views: Week is the busy-day overview (tap a day to open it), List is every task. No sideways swipes inside pages; tap the circle to finish.</p>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 40px">
+    <div style="display: flex; flex-direction: column; gap: 14px">
+      <div style="font-size: 13px; font-weight: 600; color: #A0A0A8; letter-spacing: 0.04em">☰ · CHATS AND ACCOUNT</div>
+      <div style="width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12)"><dc-import name="M1-Proto" start-page="navi" start-overlay="drawer" hint-size="390px,844px"></dc-import></div>
+      <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">Only from the ☰ button, so it never fights the swipe to Progress. Your account bottom-left opens Settings, Spaces, Memory, Notes, Activity.</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 14px">
+      <div style="font-size: 13px; font-weight: 600; color: #A0A0A8; letter-spacing: 0.04em">INBOX · SHEET FROM PLAN</div>
+      <div style="width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12)"><dc-import name="M1-Proto" start-page="plan" start-overlay="inbox" hint-size="390px,844px"></dc-import></div>
+      <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">What needs your OK first, then drafts with the words they came from. “You said this” vs “Navi inferred”. Nothing is on your plan until you accept it.</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 14px">
+      <div style="font-size: 13px; font-weight: 600; color: #A0A0A8; letter-spacing: 0.04em">VOICE · COVERS EVERYTHING</div>
+      <div style="width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12)"><dc-import name="M1-Proto" start-page="navi" start-overlay="voice" hint-size="390px,844px"></dc-import></div>
+      <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">Mute, Type, End. The arrow shrinks it to a talking bar so you can keep using the pages; the transcript lands in the same chat.</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 14px">
+      <div style="font-size: 13px; font-weight: 600; color: #A0A0A8; letter-spacing: 0.04em">FOCUS · COVERS EVERYTHING</div>
+      <div style="width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12)"><dc-import name="M1-Proto" start-page="plan" start-overlay="focus" hint-size="390px,844px"></dc-import></div>
+      <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">Started from a block or a task. Navi holds non-urgent things until you're done. The Lock Screen timer comes in a later board.</p>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1776,"height":2120}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

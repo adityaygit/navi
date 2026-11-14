@@ -1,0 +1,113 @@
+name: Mobile app
+
+# Builds the Navi phone app from mobile/ (Capacitor):
+#   - Android: a debug-signed APK (Navi.apk) that installs directly.
+#   - iPhone: an unsigned Navi.ipa, signed on the owner's computer with a
+#     free Apple ID (Sideloadly). See docs/navi-1.5/mobile/INSTALL.md.
+# Build-time settings (server address, Supabase URL and public anon key)
+# come from mobile/.env.production, which Vite reads during `npm run build`.
+on:
+  push:
+    branches: [main, "claude/**"]
+    paths:
+      - "mobile/**"
+      - "src/lib/mobile-api-types.ts"
+      - ".github/workflows/mobile.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx cap sync android
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      # GitHub's Ubuntu image already has the Android SDK (ANDROID_HOME); just accept its licences.
+      # (android-actions/setup-android@v3 tries to install the retired "tools" package and fails.)
+      - name: Accept Android SDK licences
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+      - name: Build APK
+        working-directory: mobile/android
+        env:
+          # Each run gets a higher version so the new APK installs over the old one.
+          NAVI_VERSION_CODE: ${{ github.run_number }}
+          NAVI_VERSION_NAME: 0.1.${{ github.run_number }}
+        run: ./gradlew assembleDebug --no-daemon
+      - name: Name the APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk Navi.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Navi-android
+          path: mobile/Navi.apk
+          if-no-files-found: error
+          retention-days: 30
+
+  ios:
+    # macOS minutes are expensive: one build step, no tests, cancelled when
+    # a newer push arrives (see concurrency above).
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync ios
+      - name: Build unsigned app
+        # Capacitor 8 uses Swift Package Manager (ios/App/CapApp-SPM), so the
+        # project is built directly; there is no CocoaPods workspace.
+        run: |
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ios/build \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            MARKETING_VERSION=0.1.${{ github.run_number }} \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+      - name: Package Navi.ipa
+        run: |
+          mkdir -p ipa/Payload
+          cp -R ios/build/Build/Products/Release-iphoneos/App.app ipa/Payload/
+          cd ipa && zip -qry ../Navi.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Navi-ios
+          path: mobile/Navi.ipa
+          if-no-files-found: error
+          retention-days: 30

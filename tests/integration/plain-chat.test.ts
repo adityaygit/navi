@@ -49,7 +49,9 @@ function expectPlain(m: Message) {
 
 /** Four of Navi's planned items in a row from about now. */
 async function fourBlocks() {
-  const start = now().plus({ minutes: 20 }).startOf("hour").plus({ minutes: 0 });
+  // The next whole hour at least 20 minutes away, so every block is still ahead
+  // whatever minute the test runs at (rounding down put the first one in the past).
+  const start = now().plus({ minutes: 20 }).startOf("hour").plus({ hours: 1 });
   const titles = ["02.03a Heimler Video + Quiz (AP World)", "Finish LEQ paper (AP World)", "Course Check-in (Spanish)", "02.04 Vocabulary (Spanish)"];
   const rows = titles.map((title, i) => ({ user_id: me.userId, title, plan_date: today(), starts_at: start.plus({ minutes: 40 * i }).toISO(), ends_at: start.plus({ minutes: 40 * i + 30 }).toISO(), created_by: "navi", is_flexible: true, status: "planned" }));
   await me.db.from("plan_blocks").insert(rows);

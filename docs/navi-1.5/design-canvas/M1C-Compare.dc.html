@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi mobile, calmer comparison</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#A7EBC0}a:hover{color:#D2F6DF}
+</style>
+</helmet>
+<div style="width: 1386px; height: 3330px; box-sizing: border-box; padding: 40px 48px 48px; background: #0B0B0C; color: #F5F5F7; font-family: Figtree, -apple-system, sans-serif; display: flex; flex-direction: column; gap: 52px">
+  <div><h1 style="margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -0.01em">Calmer: same features, one focal point per screen</h1>
+  <p style="margin: 8px 0 0; font-size: 17px; line-height: 1.45; color: #A0A0A8">Left: M1 as it was. Middle: what you see when you open the app. Right: a busy moment. Only things you act on get a box; everything else is text, with brightness doing the work, like desktop R4.</p></div>
+  <div style="display: flex; flex-direction: column; gap: 18px">
+    <div><h2 style="margin: 0; font-size: 26px; font-weight: 700">Navi chat</h2><p style="margin: 6px 0 0; font-size: 16px; color: #A0A0A8">A fresh session opens on the greeting. Coming back to an active conversation keeps it, and where you were in it.</p></div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 56px">
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="font-size: 13px; font-weight: 600; color: #A0A0A8; letter-spacing: 0.04em">BEFORE · M1</div>
+        <div style="width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12)"><dc-import name="M1-Proto" start-page="navi" hint-size="390px,844px"></dc-import></div>
+        <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">Eight blocks in five styles: pill, sentence, buttons, bubbles, boxed lines, a card.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="font-size: 13px; font-weight: 600; color: #A7EBC0; letter-spacing: 0.04em">CALMER · FRESH SESSION</div>
+        <div style="width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 1px solid rgba(167,235,192,0.35)"><dc-import name="M1C-Proto" start-page="navi" start-session="fresh" hint-size="390px,844px"></dc-import></div>
+        <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">The greeting sentence from your data, and at most one suggestion. Nothing else until you talk.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="font-size: 13px; font-weight: 600; color: #A7EBC0; letter-spacing: 0.04em">CALMER · RESUMING A CONVERSATION</div>
+        <div style="width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 1px solid rgba(167,235,192,0.35)"><dc-import name="M1C-Proto" start-page="navi" start-session="resume" hint-size="390px,844px"></dc-import></div>
+        <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">Same conversation and scroll position as you left it, no greeting added. Done-with-Undo lines are plain; only the proposal is boxed.</p>
+      </div>
+    </div>
+  </div>
+  <div style="display: flex; flex-direction: column; gap: 18px">
+    <div><h2 style="margin: 0; font-size: 26px; font-weight: 700">Plan</h2><p style="margin: 6px 0 0; font-size: 16px; color: #A0A0A8">Week strip, inbox and “needs a time” are still one tap away, but out of the way until they matter.</p></div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 56px">
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="font-size: 13px; font-weight: 600; color: #A0A0A8; letter-spacing: 0.04em">BEFORE · M1</div>
+        <div style="width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12)"><dc-import name="M1-Proto" start-page="plan" hint-size="390px,844px"></dc-import></div>
+        <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">Inbox banner, week strip, switch, sentence, carded timeline, tray and stone all at once.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="font-size: 13px; font-weight: 600; color: #A7EBC0; letter-spacing: 0.04em">CALMER · JUST OPENED</div>
+        <div style="width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 1px solid rgba(167,235,192,0.35)"><dc-import name="M1C-Proto" start-page="plan" hint-size="390px,844px"></dc-import></div>
+        <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">Title and sentence. “3 to review” is one line of text. Earlier items are folded; only the next block offers Start. “Still needs a time” ends the day.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="font-size: 13px; font-weight: 600; color: #A7EBC0; letter-spacing: 0.04em">CALMER · BUSY MOMENT</div>
+        <div style="width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 1px solid rgba(167,235,192,0.35)"><dc-import name="M1C-Proto" start-page="plan" start-moment="busy" hint-size="390px,844px"></dc-import></div>
+        <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">An approval is waiting (amber), the week strip is open from the title, and the essay is selected: its actions appear only on it.</p>
+      </div>
+    </div>
+  </div>
+  <div style="display: flex; flex-direction: column; gap: 18px">
+    <div><h2 style="margin: 0; font-size: 26px; font-weight: 700">Progress</h2><p style="margin: 6px 0 0; font-size: 16px; color: #A0A0A8">One sentence, one chart, one next step.</p></div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 56px">
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="font-size: 13px; font-weight: 600; color: #A0A0A8; letter-spacing: 0.04em">BEFORE · M1</div>
+        <div style="width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12)"><dc-import name="M1-Proto" start-page="progress" hint-size="390px,844px"></dc-import></div>
+        <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">Two charts, a suggestion, three review rows and a floating stone.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="font-size: 13px; font-weight: 600; color: #A7EBC0; letter-spacing: 0.04em">CALMER · AFTERNOON</div>
+        <div style="width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 1px solid rgba(167,235,192,0.35)"><dc-import name="M1C-Proto" start-page="progress" hint-size="390px,844px"></dc-import></div>
+        <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">How today and the week are going, the week’s chart, and tonight’s wrap-up time. Suggestions move into the chat.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="font-size: 13px; font-weight: 600; color: #A7EBC0; letter-spacing: 0.04em">CALMER · EVENING</div>
+        <div style="width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 1px solid rgba(167,235,192,0.35)"><dc-import name="M1C-Proto" start-page="progress" start-moment="busy" hint-size="390px,844px"></dc-import></div>
+        <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">At wrap-up time the one action is the review itself.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1386,"height":3330}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

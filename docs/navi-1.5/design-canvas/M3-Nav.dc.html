@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi mobile M3 navigation</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#A7EBC0}a:hover{color:#D2F6DF}
+</style>
+</helmet>
+<div style="width: 1876px; height: 3420px; box-sizing: border-box; padding: 44px 48px 48px; background: #0A0A0B; color: #F5F5F7; font-family: Figtree, -apple-system, sans-serif; display: flex; flex-direction: column; gap: 60px">
+  <div><h1 style="margin: 0; font-size: 40px; font-weight: 700; letter-spacing: -0.02em">Making the three pages discoverable</h1>
+  <p style="margin: 10px 0 0; font-size: 18px; line-height: 1.5; color: #A0A0A8; max-width: 1700px">All three treatments are switchable in the prototype (navStyle). Swiping always works, and every page name is also a button. My pick is A: the page names are always readable, and the labels move with your finger.</p></div>
+  <div style="display: flex; flex-direction: column; gap: 20px">
+    <div><h2 style="margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -0.01em">A · Sliding page names (recommended)</h2><p style="margin: 6px 0 0; font-size: 17px; line-height: 1.5; color: #A0A0A8; max-width: 1600px">The current page’s name is bright and centred; its neighbour sits beside it, dimmer. The names slide with your swipe, so the gesture and the label move together. Two pages away is hidden.</p></div>
+    <div style="display: flex; gap: 48px">
+      <div style="width: 390px; flex: none; display: flex; flex-direction: column; gap: 14px">
+        <div style="font-size: 13px; font-weight: 600; color: #A7EBC0; letter-spacing: 0.05em">A ON PLAN</div>
+        <div style="width: 390px; height: 844px; border-radius: 48px; overflow: hidden; border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 30px 80px rgba(0,0,0,0.5)"><dc-import name="M3-Proto" start-page="plan" nav-style="words" hint-size="390px,844px"></dc-import></div>
+        <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #C8C8CE">“Navi · Plan”: you can see there is something to the left.</p>
+      </div>
+      <div style="width: 390px; flex: none; display: flex; flex-direction: column; gap: 14px">
+        <div style="font-size: 13px; font-weight: 600; color: #A7EBC0; letter-spacing: 0.05em">A ON NAVI</div>
+        <div style="width: 390px; height: 844px; border-radius: 48px; overflow: hidden; border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 30px 80px rgba(0,0,0,0.5)"><dc-import name="M3-Proto" start-page="navi" nav-style="words" start-session="fresh" hint-size="390px,844px"></dc-import></div>
+        <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #C8C8CE">All three names visible from home: “Progress · Navi · Plan”. The dot says Plan has something waiting.</p>
+      </div>
+    </div>
+  </div>
+  <div style="display: flex; flex-direction: column; gap: 20px">
+    <div><h2 style="margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -0.01em">B · Marks that speak</h2><p style="margin: 6px 0 0; font-size: 17px; line-height: 1.5; color: #A0A0A8; max-width: 1600px">M2’s three marks, with the stone as Navi. The page name appears under the marks for a moment after every change, and always during your first week.</p></div>
+    <div style="display: flex; gap: 48px">
+      <div style="width: 390px; flex: none; display: flex; flex-direction: column; gap: 14px">
+        <div style="font-size: 13px; font-weight: 600; color: #A0A0A8; letter-spacing: 0.05em">B ON PLAN, JUST SWIPED</div>
+        <div style="width: 390px; height: 844px; border-radius: 48px; overflow: hidden; border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 30px 80px rgba(0,0,0,0.5)"><dc-import name="M3-Proto" start-page="plan" nav-style="marks" start-label="yes" hint-size="390px,844px"></dc-import></div>
+        <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #C8C8CE">Calmest option, but the names are only there briefly.</p>
+      </div>
+      <div style="width: 390px; flex: none; display: flex; flex-direction: column; gap: 14px">
+        <div style="font-size: 13px; font-weight: 600; color: #A0A0A8; letter-spacing: 0.05em">B ON NAVI</div>
+        <div style="width: 390px; height: 844px; border-radius: 48px; overflow: hidden; border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 30px 80px rgba(0,0,0,0.5)"><dc-import name="M3-Proto" start-page="navi" nav-style="marks" start-session="fresh" hint-size="390px,844px"></dc-import></div>
+        <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #C8C8CE">After the label fades, only the marks remain.</p>
+      </div>
+    </div>
+  </div>
+  <div style="display: flex; flex-direction: column; gap: 20px">
+    <div><h2 style="margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -0.01em">C · Glass capsule</h2><p style="margin: 6px 0 0; font-size: 17px; line-height: 1.5; color: #A0A0A8; max-width: 1600px">A small translucent switch at the top. The most explicit option, but it’s the closest to a regular tab bar and adds a second “control” next to Plan’s own Day · Week · Tasks switch.</p></div>
+    <div style="display: flex; gap: 48px">
+      <div style="width: 390px; flex: none; display: flex; flex-direction: column; gap: 14px">
+        <div style="font-size: 13px; font-weight: 600; color: #A0A0A8; letter-spacing: 0.05em">C ON PLAN</div>
+        <div style="width: 390px; height: 844px; border-radius: 48px; overflow: hidden; border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 30px 80px rgba(0,0,0,0.5)"><dc-import name="M3-Proto" start-page="plan" nav-style="capsule" hint-size="390px,844px"></dc-import></div>
+        <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #C8C8CE">Two segmented controls stacked: clear, but busier.</p>
+      </div>
+      <div style="width: 390px; flex: none; display: flex; flex-direction: column; gap: 14px">
+        <div style="font-size: 13px; font-weight: 600; color: #A0A0A8; letter-spacing: 0.05em">C ON NAVI</div>
+        <div style="width: 390px; height: 844px; border-radius: 48px; overflow: hidden; border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 30px 80px rgba(0,0,0,0.5)"><dc-import name="M3-Proto" start-page="navi" nav-style="capsule" start-session="fresh" hint-size="390px,844px"></dc-import></div>
+        <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #C8C8CE">Fine on the chat; heavier than A.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1876,"height":3420}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

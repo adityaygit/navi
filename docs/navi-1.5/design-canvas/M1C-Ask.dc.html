@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Asking Navi from Plan</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#A7EBC0}a:hover{color:#D2F6DF}
+</style>
+</helmet>
+<div style="width: 2238px; height: 1190px; box-sizing: border-box; padding: 40px 48px 48px; background: #0B0B0C; color: #F5F5F7; font-family: Figtree, -apple-system, sans-serif; display: flex; flex-direction: column; gap: 32px">
+  <div><h1 style="margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -0.01em">Asking Navi from Plan, without leaving it</h1>
+  <p style="margin: 8px 0 0; font-size: 17px; line-height: 1.45; color: #A0A0A8">A quiet “Ask Navi” handle sits at the bottom of Plan and Progress (no floating button). It opens a sheet that already knows what you’re looking at: the day, the selected block, a task, or the review. The sheet grows into the full chat, and closing it returns you to the same screen.</p></div>
+  <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 48px">
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="font-size: 13px; font-weight: 600; color: #A0A0A8; letter-spacing: 0.04em">1 · SELECT A BLOCK</div>
+        <div style="width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12)"><dc-import name="M1C-Proto" start-page="plan" start-select="essay" hint-size="390px,844px"></dc-import></div>
+        <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">Tap the essay. Its actions appear on it, including Ask Navi. The handle now reads “Ask Navi about this”.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="font-size: 13px; font-weight: 600; color: #A7EBC0; letter-spacing: 0.04em">2 · THE SHEET KNOWS THE CONTEXT</div>
+        <div style="width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 1px solid rgba(167,235,192,0.35)"><dc-import name="M1C-Proto" start-page="plan" start-select="essay" start-overlay="ask" hint-size="390px,844px"></dc-import></div>
+        <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">“About · Essay: write the intro”. Plan stays visible above. Pull the handle up, or tap the arrows, to go full.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="font-size: 13px; font-weight: 600; color: #A7EBC0; letter-spacing: 0.04em">3 · NAVI PROPOSES</div>
+        <div style="width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 1px solid rgba(167,235,192,0.35)"><dc-import name="M1C-Proto" start-page="plan" start-select="essay" start-overlay="ask" start-asked="answered" hint-size="390px,844px"></dc-import></div>
+        <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">Nothing changes until you press Move it. Same proposal card as in the chat.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="font-size: 13px; font-weight: 600; color: #A7EBC0; letter-spacing: 0.04em">4 · GROWN INTO THE FULL CHAT</div>
+        <div style="width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 1px solid rgba(167,235,192,0.35)"><dc-import name="M1C-Proto" start-page="plan" start-overlay="askFull" start-asked="moved" start-session="resume" hint-size="390px,844px"></dc-import></div>
+        <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">The same conversation as the Navi page, with the Plan part marked. Close returns to Plan.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="font-size: 13px; font-weight: 600; color: #A0A0A8; letter-spacing: 0.04em">5 · BACK ON PLAN</div>
+        <div style="width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12)"><dc-import name="M1C-Proto" start-page="plan" start-asked="moved" hint-size="390px,844px"></dc-import></div>
+        <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">Same screen, updated: the essay left Friday, and the sentence says where it went.</p>
+      </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2238,"height":1190}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

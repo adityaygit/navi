@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Base application theme. Dark everywhere so nothing flashes white. -->
+    <style name="AppTheme" parent="Theme.AppCompat.NoActionBar">
+        <item name="colorPrimary">@color/navi_black</item>
+        <item name="colorPrimaryDark">@color/navi_black</item>
+        <item name="colorAccent">@color/navi_lavender</item>
+        <item name="android:windowBackground">@color/navi_black</item>
+        <item name="android:colorBackground">@color/navi_black</item>
+    </style>
+
+    <!-- Theme once the launch screen is gone: black window behind the web
+         view, light (white) status and navigation bar icons. -->
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:background">@null</item>
+        <item name="android:windowBackground">@color/navi_black</item>
+        <item name="android:colorBackground">@color/navi_black</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <!-- Launch screen (Android 12+ SplashScreen API, back-ported to older
+         versions by core-splashscreen): the stone on black. It stays up until
+         the app calls SplashScreen.hide(), because launchAutoHide is off. -->
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/navi_black</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/navi_black</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
+        <item name="android:windowBackground">@color/navi_black</item>
+    </style>
+</resources>

@@ -1,0 +1,46 @@
+@import "@fontsource/figtree/400.css";
+@import "@fontsource/figtree/500.css";
+@import "@fontsource/figtree/600.css";
+@import "@fontsource/figtree/700.css";
+
+:root {
+  /* Safe areas. The status bar overlays the app; the app draws under it. */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: max(env(safe-area-inset-bottom, 0px), 16px);
+  color-scheme: dark;
+}
+/* Browser preview at phone size: pretend there is a notch and a home bar, so screenshots match the device. */
+:root.sim { --sat: 50px; --sab: 34px; }
+
+html, body, #root { height: 100%; margin: 0; background: #000; overflow: hidden; overscroll-behavior: none; }
+body {
+  color: #F5F5F7;
+  font-family: Figtree, -apple-system, system-ui, sans-serif;
+  font-size: 17px;
+  font-feature-settings: "tnum";
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+input, textarea { user-select: text; -webkit-user-select: text; }
+button { font: inherit; color: inherit; border: 0; background: none; padding: 0; margin: 0; cursor: pointer; text-align: left; -webkit-tap-highlight-color: transparent; }
+input, textarea { font: inherit; color: inherit; }
+input::placeholder, textarea::placeholder { color: #8E8E96; }
+button:focus-visible, input:focus-visible { outline: 2px solid rgba(255,255,255,0.6); outline-offset: 2px; }
+.scroll { overflow-y: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.scroll::-webkit-scrollbar { display: none; }
+
+@keyframes nUp { from { transform: translateY(100%) } to { transform: none } }
+@keyframes nDown { from { transform: none } to { transform: translateY(100%) } }
+@keyframes nFade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes nFadeOut { from { opacity: 1 } to { opacity: 0 } }
+@keyframes nRise { from { opacity: 0; transform: translateY(14px) } to { opacity: 1; transform: none } }
+@keyframes nSink { from { opacity: 1; transform: none } to { opacity: 0; transform: translateY(14px) } }
+@keyframes nLeft { from { transform: translateX(-100%) } to { transform: none } }
+@keyframes nLeftOut { from { transform: none } to { transform: translateX(-100%) } }
+@keyframes nGrow { from { opacity: 0; transform: scale(0.96) } to { opacity: 1; transform: none } }
+@keyframes nPulse { 0% { transform: scale(1) } 50% { transform: scale(1.06) } 100% { transform: scale(1) } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }

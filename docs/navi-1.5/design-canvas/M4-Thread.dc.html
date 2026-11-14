@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi conversation, M4</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+@keyframes nRise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:0.01ms !important}}
+body{margin:0}
+button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer;text-align:left}
+</style>
+</helmet>
+<div style="width: 100%; display: flex; flex-direction: column; font-family: Figtree, -apple-system, sans-serif; color: #F5F5F7; background: {{rootBg}}">
+  <sc-for list="{{items}}" as="m" hint-placeholder-count="4">
+    <div style="margin-top: {{m.mt}}px; display: flex; flex-direction: column; animation: {{m.anim}}">
+      <sc-if value="{{m.isStamp}}" hint-placeholder-val="{{ false }}">
+        <div style="align-self: center; font-size: 13px; color: {{m.stampColor}}; padding: 4px 0">{{m.text}}</div>
+      </sc-if>
+      <sc-if value="{{m.isMe}}" hint-placeholder-val="{{ true }}">
+        <div style="align-self: flex-end; max-width: 80%; padding: 10px 16px; border-radius: 20px 20px 6px 20px; background: #1B1B1E; font-size: 17px; line-height: 1.45; color: #ECECF0">{{m.text}}</div>
+        <sc-if value="{{m.pending}}" hint-placeholder-val="{{ false }}">
+          <span style="align-self: flex-end; margin-top: 8px; font-size: 13px; color: #8E8E96; display: flex; align-items: center; gap: 6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v4l3 2"></path></svg>Sends when you're back online</span>
+        </sc-if>
+      </sc-if>
+      <sc-if value="{{m.isNavi}}" hint-placeholder-val="{{ false }}">
+        <p style="margin: 0; font-size: 17px; line-height: 1.5; color: #F0F0F3; letter-spacing: -0.003em">{{m.text}}</p>
+      </sc-if>
+      <sc-if value="{{m.isReceipt}}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; align-items: center; gap: 12px; min-height: 44px">
+          <span aria-hidden="true" style="flex: none; width: 22px; height: 22px; border-radius: 11px; background: rgba(159,240,216,0.16); display: flex; align-items: center; justify-content: center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9FF0D8" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"></path></svg></span>
+          <span style="flex: 1; font-size: 15px; line-height: 1.4; color: #B4B4BC">{{m.text}}</span>
+          <sc-if value="{{m.hasAct}}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{m.onAct}}" style="min-height: 44px; padding: 0 4px; font-size: 15px; color: {{m.ac}}; font-weight: 600">{{m.actText}}</button></sc-if>
+        </div>
+      </sc-if>
+      <sc-if value="{{m.isProposal}}" hint-placeholder-val="{{ false }}">
+        <div style="border-radius: 24px; background: #121214; border: 1px solid {{m.edge}}; padding: 20px 20px 8px; display: flex; flex-direction: column">
+          <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: {{m.kindColor}}">{{m.kind}}</div>
+          <div style="margin-top: 8px; font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: -0.01em">{{m.title}}</div>
+          <ol style="list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px">
+            <sc-for list="{{m.rows}}" as="r" hint-placeholder-count="3">
+              <li style="display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: 12px; background: {{r.bg}}; border: {{r.border}}">
+                <span style="width: 84px; flex: none; white-space: nowrap; font-size: 13px; color: {{r.timeColor}}">{{r.t}}</span>
+                <span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 15px; font-weight: {{r.weight}}; color: {{r.color}}; text-decoration: {{r.strike}}">{{r.title}}</span>
+              </li>
+            </sc-for>
+          </ol>
+          <sc-if value="{{m.hasNote}}" hint-placeholder-val="{{ false }}"><p style="margin: 12px 0 0; font-size: 13px; line-height: 1.45; color: #A0A0A8">{{m.note}}</p></sc-if>
+          <button type="button" onClick="{{m.onP}}" style="margin-top: 20px; height: 52px; border-radius: 26px; background: {{m.pBg}}; color: {{m.pColor}}; font-size: 17px; font-weight: 600; text-align: center">{{m.pText}}</button>
+          <button type="button" onClick="{{m.onS}}" style="height: 48px; font-size: 15px; color: #A0A0A8; text-align: center">{{m.sText}}</button>
+        </div>
+      </sc-if>
+      <sc-if value="{{m.isChoice}}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-wrap: wrap; gap: 8px">
+          <sc-for list="{{m.options}}" as="o" hint-placeholder-count="4">
+            <button type="button" onClick="{{o.on}}" style="height: 44px; padding: 0 18px; border-radius: 22px; background: rgba(255,255,255,0.08); font-size: 15px; font-weight: 500">{{o.t}}</button>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{m.isSummary}}" hint-placeholder-val="{{ false }}">
+        <div style="border-radius: 24px; background: {{m.sumBg}}; border: 1px solid rgba(255,255,255,0.12); padding: 20px 20px 8px; display: flex; flex-direction: column">
+          <div style="font-size: 24px; line-height: 1.25; font-weight: 600; letter-spacing: -0.015em">{{m.title}}</div>
+          <p style="margin: 8px 0 0; font-size: 15px; line-height: 1.45; color: #C8C8CE">{{m.body}}</p>
+          <button type="button" onClick="{{m.onP}}" style="margin-top: 20px; height: 52px; border-radius: 26px; background: {{m.pBg}}; color: #0B0B0C; font-size: 17px; font-weight: 600; text-align: center">{{m.pText}}</button>
+          <button type="button" onClick="{{m.onS}}" style="height: 48px; font-size: 15px; color: #A0A0A8; text-align: center">{{m.sText}}</button>
+        </div>
+      </sc-if>
+    </div>
+  </sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"items":{"editor":null},"$preview":{"width":350,"height":600}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const noop = () => {};
+    const sample = [
+      { isStamp: true, text: 'Earlier today, 12:40', stampColor: '#7C7C85', mt: 0 },
+      { isMe: true, text: 'can I fit the dentist call in today?', mt: 18 },
+      { isNavi: true, text: 'Yes. 3:30 to 4:00 is free, and the call takes about 10 minutes.', mt: 12 },
+      { isProposal: true, kind: 'ADD TO TODAY', kindColor: '#A7EBC0', edge: 'rgba(255,255,255,0.09)', title: 'Book the dentist · 10 min', rows: [
+        { t: '2:00 PM', title: 'Essay: write the intro', bg: 'transparent', border: '1px solid transparent', timeColor: '#7C7C85', color: '#8E8E96', weight: 400, strike: 'none' },
+        { t: '3:30 PM', title: 'Book the dentist', bg: 'rgba(167,235,192,0.10)', border: '1px solid rgba(167,235,192,0.45)', timeColor: '#D2F6DF', color: '#F5F5F7', weight: 600, strike: 'none' },
+        { t: '4:00 PM', title: 'Shift at the café', bg: 'transparent', border: '1px solid transparent', timeColor: '#7C7C85', color: '#8E8E96', weight: 400, strike: 'none' }
+      ], hasNote: false, pText: 'Add at 3:30 PM', sText: 'Pick another time', pBg: '#A7EBC0', pColor: '#00140A', onP: noop, onS: noop, mt: 14 },
+      { isReceipt: true, text: 'Practise the new song moved to 10:00 PM', hasAct: true, actText: 'Undo', ac: '#A7EBC0', onAct: noop, mt: 22 }
+    ];
+    const src = this.props.items ?? sample;
+    // Rhythm: 8 within a thought, 12 between Navi's lines, 24 between turns, 32 before a time stamp
+    const gap = (p, m) => {
+      if (!p) return 0;
+      if (m.isStamp) return 32;
+      if (p.isStamp) return 16;
+      if (m.isMe) return p.isMe ? 8 : 24;
+      if (m.isReceipt) return p.isReceipt ? 0 : 8;
+      if (m.isNavi) return (p.isReceipt || p.isProposal || p.isChoice || p.isSummary) ? 24 : 12;
+      return 12;
+    };
+    const items = src.map((m, i) => Object.assign({ anim: 'none' }, m, { mt: gap(src[i - 1], m) }));
+    return { items, rootBg: this.props.items ? 'transparent' : '#000000' };
+  }
+}
+</script>
+</body>
+</html>
