@@ -31,6 +31,7 @@ import type {
   MUpdateResult,
   MTask,
 } from "@/lib/mobile-api-types";
+import { updateSettings } from "./settings";
 import { chatHistoryView, chatListView, dayView, focusSessionView, focusView, inboxView, meView, proposalView, taskGroupsView, taskView, weekView } from "./views";
 
 // The phone app's JSON API: one table of routes under /api/m, each a thin
@@ -69,6 +70,11 @@ function route(method: Method, path: string, handler: Handler) {
 
 // ---- me & chats -------------------------------------------------------------------------
 route("GET", "me", (ctx) => meView(ctx));
+route("PATCH", "settings", async (ctx, { body }) => {
+  await updateSettings(ctx, body);
+  revalidatePath("/", "layout");
+  return meView(ctx);
+});
 route("GET", "chats", (ctx) => chatListView(ctx));
 route("POST", "chats", async (ctx): Promise<MChatCreated> => ({ id: await createConversation(ctx, "chat") }));
 route("PATCH", "chats/:id", async (ctx, { params, body }): Promise<MOk> => {

@@ -1,7 +1,7 @@
 // Small per-device settings. Kept in localStorage (it persists inside the
 // Capacitor web view) and read synchronously, so a haptic never waits on disk.
-type Settings = { haptics: boolean };
-const defaults: Settings = { haptics: true };
+type Settings = { haptics: boolean; reminders: boolean };
+const defaults: Settings = { haptics: true, reminders: false };
 const KEY = "navi.settings";
 
 function load(): Settings {

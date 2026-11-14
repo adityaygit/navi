@@ -67,6 +67,8 @@ export type MMe = {
   displayName: string | null;
   timezone: string;
   naviColor: { key: MNaviColorKey; name: string; light: string; mid: string; dark: string; ink: string; text: string };
+  /** The app's colour follows the time of day (default) instead of naviColor. App-only. */
+  colourFollowsDay: boolean;
   /** "auto": low-risk changes happen at once (with Undo); "ask": every change waits for an OK. */
   autonomy: "auto" | "ask";
   onboarding: { status: MOnboardingStatus; done: boolean };
@@ -77,6 +79,20 @@ export type MMe = {
   /** Counts for badges. */
   waiting: { proposals: number; approvals: number };
 };
+
+/** PATCH /api/m/settings: any subset; answers with the updated MMe. Unknown keys are a 400. */
+export type MSettingsPatch = Partial<{
+  displayName: string | null;
+  timezone: string;
+  briefingsEnabled: boolean;
+  morning: string;
+  evening: string;
+  quietHours: { start: string; end: string } | null;
+  wakeBed: { wake: string; bed: string } | null;
+  autonomy: "auto" | "ask";
+  naviColor: MNaviColorKey;
+  colourFollowsDay: boolean;
+}>;
 
 // ---- chats -------------------------------------------------------------------------
 

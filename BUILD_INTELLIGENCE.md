@@ -414,3 +414,10 @@ See `landing/PROGRESS.md` (branch `claude/landing-reconstruction`). It does not 
 - Fix: un-ignored the public `.env.production`/`.env.development` in `mobile/.gitignore`; `main.tsx` now shows a "Navi couldn't start" screen on any start-up error; `config.ts` names a missing value.
 - Icon/splash now use the website's arrowhead mark (`landing/src/icons.jsx` Logo) via `mobile/scripts/make-icons.py`. The in-app stone is unchanged (approved M4 design).
 - Verified: production build renders sign-in in Playwright with no page errors; CI run 43557261560 green; downloaded APK contains the Supabase URL in its bundle. Owner device check pending.
+
+### 2026-11-14 — Mobile Settings + choosable colour (M5)
+- Owner approved the plan ("approved but make it look good"). References (Mobbin): timespent, stoic, ClickUp (grouped dark rows), Finch, Tiimo (live preview over swatches).
+- Server: `PATCH /api/m/settings` (`src/server/mobile/settings.ts`, strict zod, web's ProfileUpdate rules, preference merge keeps other keys, activity logged); `MMe.colourFollowsDay` (pref `colour_follows_day`, default true, app-only). Integration test added (13/13 mobile-api).
+- App: `mobile/src/settings/*` (Settings page, ColourPicker, PasswordSheet via supabase.auth.updateUser, reminders = daily local notifications at briefing times skipping quiet hours), `theme/colour.ts` (`usePalette`: follow the day or a palette built from the chosen Navi colour, cached on the phone for the first frame), `data/me.ts` profile store with optimistic save + rollback. Drawer account row opens Settings (vibration/sign out moved there). Edge-swipe back.
+- Verified locally (Next + Vite + local Supabase, demo account, Playwright 390×844): every control saves (PATCH 200), colour persists across reload and applies to Chat/Plan, no console errors; screenshots in 4 moments + fixed colour published as canvas board `M5-Settings` (canvas v50).
+- Not yet: server change needs merge to main (owner OK) before the phone can save settings; reminders/notifications untested on a real device.

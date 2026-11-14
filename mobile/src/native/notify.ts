@@ -43,3 +43,23 @@ export async function cancel(id: number): Promise<void> {
     /* nothing to cancel */
   }
 }
+
+/** A notification every day at hh:mm on this phone (replaces any with the same id). */
+export async function scheduleDaily(id: number, hhmm: string, title: string, body: string): Promise<boolean> {
+  if (!native || !(await ensurePermission())) return false;
+  try {
+    const [hour, minute] = hhmm.split(":").map(Number);
+    const LN = await plugin();
+    await LN.cancel({ notifications: [{ id }] });
+    await LN.schedule({ notifications: [{ id, title, body, schedule: { on: { hour, minute }, allowWhileIdle: true }, smallIcon: "ic_stat_navi" }] });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Whether notifications can show at all (asks if not asked yet). */
+export async function canNotify(): Promise<boolean> {
+  return ensurePermission();
+}
+export const notificationsAvailable = native;

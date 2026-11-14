@@ -2,14 +2,15 @@ import { useRef, useState } from "react";
 import { supabase } from "./supabase";
 import { feel } from "../native/haptics";
 import { Stone } from "../ui/Stone";
-import { ease, ink, momentAt, palettes } from "../theme/tokens";
+import { ease, ink } from "../theme/tokens";
+import { usePalette } from "../theme/colour";
 
 // Same sign-in as the website: a 6-digit code by email, or a password.
 // Navi is invite-only, so no account is created here.
 type Step = "email" | "code" | "password";
 
 export function SignIn() {
-  const P = palettes[momentAt()];
+  const P = usePalette();
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
