@@ -169,10 +169,12 @@ export function DayView({ day, P, h }: { day: MDay; P: Palette; h: DayHandlers }
                 {r.minutes >= 30 ? (
                   <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, paddingLeft: 16 }}>
                     {folded ? <span aria-hidden="true" style={{ width: 18, height: 34, borderLeft: "2px dotted rgba(255,255,255,0.25)" }} /> : null}
-                    <span style={{ flex: 1, fontSize: 13, color: ink.faint }}>{duration(r.minutes)} free</span>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: ink.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {duration(r.minutes)} free{r.fits ? <> · fits <span style={{ color: ink.soft }}>{r.fits.title}</span></> : null}
+                    </span>
                     {r.fits ? (
-                      <button type="button" onClick={() => h.onPlace(r.fits!.taskId, r.start, r.fits!.estimate, r.fits!.title)} style={{ minHeight: 44, padding: "0 6px", color: P.accent, fontWeight: 600, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "62%" }}>
-                        Add {r.fits.title.charAt(0).toLowerCase() + r.fits.title.slice(1)}
+                      <button type="button" aria-label={`Add ${r.fits.title} here`} onClick={() => h.onPlace(r.fits!.taskId, r.start, r.fits!.estimate, r.fits!.title)} style={{ flex: "none", minHeight: 44, padding: "0 6px", color: P.accent, fontWeight: 600, fontSize: 15 }}>
+                        Add
                       </button>
                     ) : null}
                   </div>

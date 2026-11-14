@@ -73,7 +73,18 @@ export function useChat(initialId: string | null) {
     abort.current = ctl;
     const apply = (ev: ChatStreamEvent) => {
       setState((s) => reduce(s, ev, optimistic.id));
-      if (ev.type === "done" && ev.mutated) feel("success");
+      if (ev.type === "done") {
+        if (ev.mutated) feel("success");
+        // The saved reply's receipts and card states come from the history view.
+        void api<ChatPayload>(`/api/m/chats/${ev.conversationId}/messages?limit=2`)
+          .then((h) =>
+            setState((s) => {
+              const byId = new Map(h.messages.map((m) => [m.id, m]));
+              return { ...s, messages: s.messages.map((m) => byId.get(m.id) ?? m), actions: { ...s.actions, ...(h.actions ?? {}) } };
+            }),
+          )
+          .catch(() => {});
+      }
     };
     try {
       const res = await rawSend("/api/chat", { body: { text, conversationId, stream: true, clientMessageId, viewing: viewing ?? null }, signal: ctl.signal });

@@ -40,6 +40,16 @@ export function buildItems(messages: Message[], actions: Record<string, ActionVi
     }
     if (m.role !== "assistant") continue;
     if (m.content.trim()) items.push({ k: "navi", key: m.id, text: m.content.trim() });
+    // History from the server comes with ready-made receipts (plan steps merged, one Undo) and card ids.
+    const rich = m as Message & { receipts?: { ok: boolean; display: string; label: string; undo?: string[] }[]; cardIds?: string[] };
+    if (rich.receipts) {
+      rich.receipts.forEach((r, i) => items.push({ k: "receipt", key: `${m.id}-r${i}`, text: r.display || r.label, ok: r.ok, undo: r.ok ? r.undo : undefined }));
+      (rich.cardIds ?? []).forEach((id) => {
+        const a = actions[id];
+        if (a) items.push({ k: "card", key: `${m.id}-a-${id}`, action: a });
+      });
+      continue;
+    }
     visibleSteps(m.tool_events ?? []).forEach((e, i) => {
       const a = e.action_id ? actions[e.action_id] : undefined;
       if (a) items.push({ k: "card", key: `${m.id}-a${i}`, action: a });

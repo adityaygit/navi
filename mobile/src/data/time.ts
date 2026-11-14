@@ -60,6 +60,11 @@ export function addDays(dateStr: string, n: number): string {
 /** "1 h", "1½ h", "45 min" */
 export function duration(minutes: number): string {
   if (minutes < 60) return `${minutes} min`;
+  if (minutes >= 120) {
+    // Long stretches read better rounded to the half hour: "5½ h", "8 h".
+    const halves = Math.round(minutes / 30);
+    return halves % 2 ? `${(halves - 1) / 2}½ h` : `${halves / 2} h`;
+  }
   const h = Math.floor(minutes / 60);
   const r = minutes % 60;
   return r >= 25 && r <= 35 ? `${h}½ h` : r ? `${h} h ${r} min` : `${h} h`;
