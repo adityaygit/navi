@@ -116,6 +116,10 @@ Every failure is a JSON body `MApiError`: `{ "error": "<message>", "code"?: "…
 | --- | --- | --- | --- |
 | GET | `/api/m/me` | – | `MMe`: id, email, displayName, timezone, naviColor (key, name and its colours), autonomy (`auto`/`ask`), onboarding `{ status, done }`, plannerV2, briefing times, quiet hours, wake/bed, `waiting { proposals, approvals }` for badges. |
 
+| PATCH | `/api/m/settings` | `MSettingsPatch`: any of displayName, timezone, briefingsEnabled, morning, evening, quietHours (`{start,end}` or null), wakeBed (`{wake,bed}` or null), autonomy, naviColor, colourFollowsDay. Unknown keys → 400. | The updated `MMe`. Logged as `settings_updated`. Other preference keys are kept. |
+
+`MMe.colourFollowsDay` (default true) is app-only: the app's colour follows the time of day unless the person fixes one of the eight Navi colours.
+
 ### Chats
 
 | Method | Path | Request | Response |

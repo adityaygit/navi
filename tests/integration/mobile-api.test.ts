@@ -153,6 +153,41 @@ describe("bearer auth", () => {
   });
 });
 
+describe("settings", () => {
+  it("saves any subset, keeps other preferences, answers with the new me, and refuses bad input", async () => {
+    await setPrefs({ planner_v2: true });
+    const before = await get<MMe>("me");
+    expect(before.body.colourFollowsDay).toBe(true);
+    const r = await call<MMe>("PATCH", "settings", {
+      displayName: "Mona", morning: "06:30", evening: "21:15", briefingsEnabled: false,
+      quietHours: { start: "22:00", end: "07:00" }, wakeBed: { wake: "07:00", bed: "23:30" },
+      autonomy: "ask", naviColor: "rose", colourFollowsDay: false, timezone: "Europe/London",
+    });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({
+      displayName: "Mona", timezone: "Europe/London", autonomy: "ask", colourFollowsDay: false,
+      briefings: { enabled: false, morning: "06:30", evening: "21:15" },
+      quietHours: { start: "22:00", end: "07:00" }, wakeBed: { wake: "07:00", bed: "23:30" },
+    });
+    expect(r.body.naviColor.key).toBe("rose");
+    const { data } = await admin().from("profiles").select("preferences").eq("id", me.userId).single();
+    expect((data!.preferences as Record<string, unknown>).planner_v2).toBe(true);
+
+    const cleared = await call<MMe>("PATCH", "settings", { quietHours: null, colourFollowsDay: true });
+    expect(cleared.body.quietHours).toBeNull();
+    expect(cleared.body.colourFollowsDay).toBe(true);
+    expect(cleared.body.naviColor.key).toBe("rose");
+
+    for (const bad of [{}, { naviColor: "neon" }, { morning: "25:00" }, { timezone: "Mars/Base" }, { user_id: me.userId }, { autonomy: "yolo" }]) {
+      expect((await call("PATCH", "settings", bad)).status).toBe(400);
+    }
+    expect((await call("PATCH", "settings", { autonomy: "ask" }, null)).status).toBe(401);
+    // Another person's settings are untouched.
+    const theirs = await get<MMe>("me", otherToken);
+    expect(theirs.body.naviColor.key).not.toBe("rose");
+  });
+});
+
 describe("chats", () => {
   it("creates, lists, renames, reads and deletes; another person can't see it", async () => {
     const made = await post<MChatCreated>("chats");

@@ -70,6 +70,7 @@ export async function meView(ctx: Ctx): Promise<MMe> {
     displayName: profile.display_name,
     timezone: profile.timezone,
     naviColor: { key: color.key as MNaviColorKey, name: color.name, light: color.light, mid: color.mid, dark: color.dark, ink: color.ink, text: color.text },
+    colourFollowsDay: (profile.preferences as Record<string, unknown> | null)?.colour_follows_day !== false,
     autonomy: autonomyFrom(profile.preferences),
     onboarding: { status: profile.onboarding_status, done: !needsOnboarding(profile.onboarding_status) },
     plannerV2: plannerV2(profile.preferences),

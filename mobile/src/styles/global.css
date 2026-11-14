@@ -39,8 +39,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid rgba(255,255,255,
 @keyframes nFadeOut { from { opacity: 1 } to { opacity: 0 } }
 @keyframes nRise { from { opacity: 0; transform: translateY(14px) } to { opacity: 1; transform: none } }
 @keyframes nSink { from { opacity: 1; transform: none } to { opacity: 0; transform: translateY(14px) } }
+@keyframes nRight { from { transform: translateX(100%) } to { transform: none } }
+@keyframes nRightOut { from { transform: none } to { transform: translateX(100%) } }
 @keyframes nLeft { from { transform: translateX(-100%) } to { transform: none } }
 @keyframes nLeftOut { from { transform: none } to { transform: translateX(-100%) } }
 @keyframes nGrow { from { opacity: 0; transform: scale(0.96) } to { opacity: 1; transform: none } }
 @keyframes nPulse { 0% { transform: scale(1) } 50% { transform: scale(1.06) } 100% { transform: scale(1) } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+
+/* Settings: hairlines between grouped rows, inset like iOS; pressed rows dim. */
+.ngroup > * + *::before { content: ""; position: absolute; left: 16px; right: 0; top: 0; height: 1px; background: rgba(255,255,255,0.07); pointer-events: none; }
+.npress { transition: background-color 0.15s; -webkit-tap-highlight-color: transparent; }
+.npress:active { background-color: rgba(255,255,255,0.05); }

@@ -13,3 +13,7 @@ ios/App/build
 android/.gradle
 android/build
 android/app/build
+
+# Public client config (anon key is public) must ship with CI builds.
+!.env.production
+!.env.development

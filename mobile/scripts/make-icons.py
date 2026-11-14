@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Draw Navi's "stone" icon and splash, then place every size the native
+"""Draw Navi's icon and splash from the owner's mark (resources/navi-mark-source.png) and splash, then place every size the native
 projects need. Re-run after changing the look:
 
     python3 mobile/scripts/make-icons.py
@@ -112,6 +112,27 @@ def draw_stone(size: int, scale: float) -> Image.Image:
     out.paste(grad, (0, 0), mask)
     return out.resize((size, size), Image.LANCZOS)
 
+SOURCE = RES / "navi-mark-source.png"  # owner-supplied "N" mark, white on black
+
+
+def _mark_alpha() -> Image.Image:
+    """The mark as an alpha mask (white on black -> opacity), cropped tight."""
+    lum = Image.open(SOURCE).convert("L")
+    box = lum.point(lambda v: 255 if v > 24 else 0).getbbox()
+    return lum.crop(box)
+
+
+def draw_mark(size: int, scale: float) -> Image.Image:
+    """White Navi mark whose longer side fills `scale` of a transparent square."""
+    a = _mark_alpha()
+    k = size * scale / max(a.size)
+    a = a.resize((max(1, round(a.width * k)), max(1, round(a.height * k))), Image.LANCZOS)
+    out = Image.new("RGBA", (size, size), (255, 255, 255, 0))
+    layer = Image.new("RGBA", a.size, (255, 255, 255, 255))
+    layer.putalpha(a)
+    out.paste(layer, ((size - a.width) // 2, (size - a.height) // 2), layer)
+    return out
+
 
 def on_black(img: Image.Image) -> Image.Image:
     bg = Image.new("RGB", img.size, BLACK)
@@ -132,9 +153,9 @@ def circle_mask(size: int) -> Image.Image:
 def main() -> None:
     RES.mkdir(parents=True, exist_ok=True)
 
-    icon_stone = draw_stone(1024, 0.62)           # icon: stone fills ~62%
-    fg_stone = draw_stone(1024, 0.62 * 66 / 108)  # adaptive: keep in the 66dp safe zone
-    splash_stone = draw_stone(1024, 0.80)
+    icon_stone = draw_mark(1024, 0.50)           # icon: stone fills ~62%
+    fg_stone = draw_mark(1024, 0.50 * 66 / 108)  # adaptive: keep in the 66dp safe zone
+    splash_stone = draw_mark(1024, 0.80)
 
     icon = on_black(icon_stone)
     icon.save(RES / "icon.png", optimize=True)
@@ -170,12 +191,8 @@ def main() -> None:
         for dpi, px in notif.items():
             d = ANDROID_RES / f"drawable-{dpi}"
             d.mkdir(exist_ok=True)
-            big = px * SS
-            m = Image.new("L", (big, big), 0)
-            ImageDraw.Draw(m).polygon(stone_outline(big / 2, big / 2, big * 0.42), fill=255)
-            m = m.resize((px, px), Image.LANCZOS)
-            white = Image.new("RGBA", (px, px), (255, 255, 255, 0))
-            white.putalpha(m)
+            white = draw_mark(px, 0.9)
+            white.putalpha(white.getchannel("A").point(lambda v: 255 if v > 110 else 0))
             white.save(d / "ic_stat_navi.png", optimize=True)
 
         # Pre-Android-12 launch background (Android 12+ uses the icon on black).

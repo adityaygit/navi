@@ -13,11 +13,12 @@ import { PlanPage } from "../pages/PlanPage";
 import { ProgressPage } from "../pages/ProgressPage";
 import { chatToResume, rememberChat } from "../data/chats";
 import { ToastHost } from "../ui/Toast";
-import { momentAt, palettes } from "../theme/tokens";
+import { usePalette } from "../theme/colour";
+import { Settings } from "../settings/Settings";
 
 export function Shell() {
   const [page, setPage] = useState(1);
-  const [overlay, setOverlay] = useState<null | "drawer" | "voice">(null);
+  const [overlay, setOverlay] = useState<null | "drawer" | "voice" | "settings">(null);
   const [ask, setAsk] = useState<AskRequest | null>(null);
   const [chatId, setChatId] = useState<string | null>(() => chatToResume());
   const [focus, setFocus] = useState<FocusTarget | null>(null);
@@ -25,7 +26,7 @@ export function Shell() {
   const [planVersion, setPlanVersion] = useState(0);
   const header = useRef<HeaderHandle>(null);
   const pager = useRef<PagerHandle>(null);
-  const P = palettes[momentAt()];
+  const P = usePalette();
 
   const onDrag = useCallback((dx: number, animate: boolean, p: number) => header.current?.follow(dx, animate, p), []);
   const openChat = useCallback((id: string | null) => {
@@ -74,7 +75,8 @@ export function Shell() {
           </button>
         ) : null}
         {overlay === "voice" ? <VoiceSoon palette={P} onClose={() => setOverlay(null)} /> : null}
-        {overlay === "drawer" ? <Drawer currentId={chatId} onOpen={openChat} onClose={() => setOverlay(null)} /> : null}
+        {overlay === "drawer" ? <Drawer currentId={chatId} onOpen={openChat} onClose={() => setOverlay(null)} onSettings={() => setOverlay("settings")} /> : null}
+        {overlay === "settings" ? <Settings onClose={() => setOverlay(null)} /> : null}
       </div>
     </ToastHost>
   );
