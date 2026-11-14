@@ -36,6 +36,7 @@ jobs:
           cache: npm
           cache-dependency-path: mobile/package-lock.json
       - run: npm ci
+      - run: npm test
       - run: npm run build
       - run: npx cap sync android
       - uses: actions/setup-java@v4
