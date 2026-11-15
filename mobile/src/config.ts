@@ -4,6 +4,8 @@ function need(name: string, v: string | undefined): string {
   return v;
 }
 export const config = {
+  /** CI run number, shown in Settings and on sign-in so you can tell builds apart. */
+  build: (import.meta.env.VITE_BUILD as string | undefined) ?? "dev",
   apiBase: (import.meta.env.VITE_API_BASE as string | undefined) ?? "https://www.meetnavi.app",
   supabaseUrl: need("VITE_SUPABASE_URL", import.meta.env.VITE_SUPABASE_URL as string | undefined),
   supabaseAnonKey: need("VITE_SUPABASE_ANON_KEY", import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined),

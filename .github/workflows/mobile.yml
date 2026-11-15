@@ -38,6 +38,8 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+        env:
+          VITE_BUILD: ${{ github.run_number }}
       - run: npx cap sync android
       - uses: actions/setup-java@v4
         with:
@@ -56,11 +58,11 @@ jobs:
           NAVI_VERSION_NAME: 0.1.${{ github.run_number }}
         run: ./gradlew assembleDebug --no-daemon
       - name: Name the APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk Navi.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk Navi-${{ github.run_number }}.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: Navi-android
-          path: mobile/Navi.apk
+          name: Navi-android-${{ github.run_number }}
+          path: mobile/Navi-${{ github.run_number }}.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -83,6 +85,8 @@ jobs:
           xcode-version: latest-stable
       - run: npm ci
       - run: npm run build
+        env:
+          VITE_BUILD: ${{ github.run_number }}
       - run: npx cap sync ios
       - name: Build unsigned app
         # Capacitor 8 uses Swift Package Manager (ios/App/CapApp-SPM), so the
@@ -100,14 +104,14 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             build
-      - name: Package Navi.ipa
+      - name: Package the IPA (named by build number)
         run: |
           mkdir -p ipa/Payload
           cp -R ios/build/Build/Products/Release-iphoneos/App.app ipa/Payload/
-          cd ipa && zip -qry ../Navi.ipa Payload
+          cd ipa && zip -qry ../Navi-${{ github.run_number }}.ipa Payload
       - uses: actions/upload-artifact@v4
         with:
-          name: Navi-ios
-          path: mobile/Navi.ipa
+          name: Navi-ios-${{ github.run_number }}
+          path: mobile/Navi-${{ github.run_number }}.ipa
           if-no-files-found: error
           retention-days: 30

@@ -222,7 +222,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
                 <Row label="Sign out" danger onClick={() => { feel("warning"); forgetMe(); void supabase.auth.signOut(); }} />
               </Group>
 
-              <p style={{ margin: "28px 0 0", textAlign: "center", fontSize: 13, color: ink.dim }}>Navi 1.5</p>
+              <p style={{ margin: "28px 0 0", textAlign: "center", fontSize: 13, color: ink.dim }}>Navi 1.5 · Build {config.build}</p>
             </>
           )}
         </div>

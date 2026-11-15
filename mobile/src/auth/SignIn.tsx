@@ -4,6 +4,7 @@ import { feel } from "../native/haptics";
 import { Stone } from "../ui/Stone";
 import { ease, ink } from "../theme/tokens";
 import { usePalette } from "../theme/colour";
+import { config } from "../config";
 
 // Same sign-in as the website: a 6-digit code by email, or a password.
 // Navi is invite-only, so no account is created here.
@@ -122,6 +123,7 @@ export function SignIn() {
           </form>
         ) : null}
       </div>
+      <p aria-hidden="true" style={{ position: "relative", margin: "4px 0 0", textAlign: "center", fontSize: 12, color: ink.dim }}>Build {config.build}</p>
     </main>
   );
 }
