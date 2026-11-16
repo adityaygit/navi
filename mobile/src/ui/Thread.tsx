@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { ActionView } from "@shared/actions";
 import type { Message } from "@shared/types";
 import { visibleSteps, type Live } from "../data/chat";
@@ -85,12 +86,52 @@ function gap(p: Item | undefined, m: Item): number {
 
 type Handlers = { P: Palette; undone: Set<string>; onUndo: (ids: string[]) => void; onDecide: (id: string, d: "approve" | "decline") => void; isNew: (key: string) => boolean };
 
+const KEEP = 16; // a long chat shows its last 16 parts; the rest fold to "Earlier · N messages"
+
+/** Long chats fold their start; only one suggestion waiting for an answer shows at a time (M6). */
+export function folded(items: Item[], showAll: boolean, showCards: boolean): { list: Item[]; earlier: number; more: { n: number; subject: string } | null } {
+  let list = items;
+  let earlier = 0;
+  if (!showAll && items.length > KEEP + 8) {
+    let from = items.length - KEEP;
+    while (from > 0 && items[from].k !== "stamp" && items[from].k !== "me") from--; // start at a turn
+    earlier = items.slice(0, from).filter((m) => m.k === "me" || m.k === "navi").length;
+    list = items.slice(from);
+  }
+  let more: { n: number; subject: string } | null = null;
+  if (!showCards) {
+    const open = list.filter((m): m is Extract<Item, { k: "card" }> => m.k === "card" && m.action.status === "proposed");
+    if (open.length > 1) {
+      const hidden = new Set(open.slice(1).map((m) => m.key));
+      more = { n: hidden.size, subject: open[1].action.subject };
+      list = list.filter((m) => !hidden.has(m.key));
+    }
+  }
+  return { list, earlier, more };
+}
+
 export function Thread({ items, ...h }: { items: Item[] } & Handlers) {
+  const [showAll, setShowAll] = useState(false);
+  const [showCards, setShowCards] = useState(false);
+  const { list, earlier, more } = folded(items, showAll, showCards);
+  const firstCard = list.find((m) => m.k === "card" && m.action.status === "proposed")?.key;
+  const chip: React.CSSProperties = { ...glass, height: 40, padding: "0 16px", borderRadius: 20, fontSize: 15, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, maxWidth: "100%" };
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
-      {items.map((m, i) => (
-        <div key={m.key} style={{ marginTop: gap(items[i - 1], m), display: "flex", flexDirection: "column", animation: h.isNew(m.key) ? `nRise 0.36s ${ease} both` : undefined }}>
+      {earlier ? (
+        <button type="button" onClick={() => { feel("select"); setShowAll(true); }} style={{ ...chip, alignSelf: "center", marginBottom: 12 }}>
+          Earlier · {earlier} message{earlier === 1 ? "" : "s"}
+        </button>
+      ) : null}
+      {list.map((m, i) => (
+        <div key={m.key} style={{ marginTop: gap(list[i - 1], m), display: "flex", flexDirection: "column", animation: h.isNew(m.key) ? `nRise 0.36s ${ease} both` : undefined }}>
           <Part m={m} {...h} />
+          {more && m.key === firstCard ? (
+            <button type="button" onClick={() => { feel("select"); setShowCards(true); }} style={{ ...chip, alignSelf: "flex-start", marginTop: 10 }}>
+              <span style={{ flex: "none" }}>{more.n} more suggestion{more.n === 1 ? "" : "s"}</span>
+              <span style={{ minWidth: 0, color: ink.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>· {more.subject}</span>
+            </button>
+          ) : null}
         </div>
       ))}
     </div>

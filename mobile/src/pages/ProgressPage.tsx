@@ -57,6 +57,12 @@ export function ProgressPage({ palette: P, active, onAsk, onVoice }: Props) {
 
         {d ? (
           <>
+            {prog.savedAt ? (
+              <span role="status" style={{ ...glass, alignSelf: "flex-start", height: 34, padding: "0 14px", borderRadius: 17, display: "flex", alignItems: "center", gap: 8, fontSize: 15, fontWeight: 600 }}>
+                <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 4, background: "#A3A8BF" }} />
+                Offline · as of {new Date(prog.savedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+              </span>
+            ) : null}
             <h1 style={{ margin: "0 4px", fontSize: 36, lineHeight: 1.05, fontWeight: 700, letterSpacing: "-0.035em", animation: "nFade 0.4s ease both" }}>
               {d.headline.a}
               <span className="em">{d.headline.b}</span>

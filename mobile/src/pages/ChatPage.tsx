@@ -6,6 +6,9 @@ import { rememberChat } from "../data/chats";
 import { useDay } from "../data/plan";
 import { clockAmPm } from "../data/time";
 import { Composer } from "../ui/Composer";
+import { enqueueCapture, useOnline, useQueued } from "../data/offline";
+import { useToast } from "../ui/Toast";
+import { feel } from "../native/haptics";
 import { Thread, buildItems } from "../ui/Thread";
 import { skyProps, useSkyOn } from "../ui/sky";
 import { ease, glass, ink, momentAt, skyFor, type Palette } from "../theme/tokens";
@@ -65,6 +68,29 @@ export function ChatPage({ palette: P, chatId, onChatId, onVoice, onOpenPlan, ty
     if (seen.current) items.forEach((i) => seen.current!.add(i.key));
   });
 
+  const online = useOnline();
+  const queued = useQueued();
+  const toast = useToast();
+  const send = (t: string) => {
+    if (online) return void sendText(t);
+    // Offline: keep it on the phone; it goes to Navi (as something for Inbox) once you're back.
+    try {
+      enqueueCapture(t);
+      feel("send");
+      toast("Saved on your phone. Navi gets it when you're back online.");
+    } catch {
+      feel("warning");
+      toast("Couldn't save that offline.");
+    }
+  };
+  const offlineChip =
+    !online || queued ? (
+      <span role="status" style={{ ...glass, position: "relative", alignSelf: "center", height: 34, padding: "0 14px", borderRadius: 17, display: "flex", alignItems: "center", gap: 8, fontSize: 15, fontWeight: 600, animation: "nFade 0.3s ease both" }}>
+        <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 4, background: online ? "#2B6FFF" : "#A3A8BF" }} />
+        {!online ? (queued ? `Offline · ${queued} waiting to send` : "Offline") : `Sending ${queued} saved…`}
+      </span>
+    ) : null;
+
   const fresh = !state.conversationId && state.messages.length === 0 && !state.live;
   const sky = skyProps(skyFor(moment), skyOn);
   const pill = nowNext(day.data);
@@ -76,6 +102,7 @@ export function ChatPage({ palette: P, chatId, onChatId, onVoice, onOpenPlan, ty
       <div aria-hidden="true" style={{ position: "absolute", inset: 0, background: fresh ? "linear-gradient(180deg, rgba(251,251,253,0.12) 0%, rgba(251,251,253,0.05) 40%, rgba(251,251,253,0.45) 72%, rgba(251,251,253,0.92) 92%, #FBFBFD 100%)" : P.scene, transition: "background 0.6s" }} />
 
       <div style={{ height: "calc(var(--sat) + 60px)", flex: "none" }} />
+      {offlineChip ? <div style={{ position: "relative", flex: "none", display: "flex", justifyContent: "center", paddingTop: 6 }}>{offlineChip}</div> : null}
       {fresh ? (
         <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, padding: "0 24px 24px", textAlign: "center", animation: "nFade 0.5s ease both" }}>
           <div aria-hidden="true" style={{ position: "absolute", left: "50%", top: "50%", width: 420, height: 300, margin: "-170px 0 0 -210px", background: "radial-gradient(closest-side, rgba(255,255,255,0.7), rgba(255,255,255,0))", filter: "blur(10px)" }} />
@@ -108,7 +135,7 @@ export function ChatPage({ palette: P, chatId, onChatId, onVoice, onOpenPlan, ty
         <p role="alert" style={{ position: "relative", margin: "0 20px 4px", fontSize: 15, fontWeight: 500, color: "#B23A17", animation: "nRise 0.3s ease both" }}>{state.error}</p>
       ) : null}
       <div style={{ position: "relative", flex: "none", padding: "8px 12px var(--sab)" }}>
-        <Composer palette={P} autoFocus={typeNow} onSend={(t) => void sendText(t)} onVoice={onVoice} />
+        <Composer palette={P} autoFocus={typeNow} onSend={send} onVoice={onVoice} offline={!online} onOfflineTalk={() => { feel("tapHint"); toast("Voice needs a connection. Type it and Navi gets it later."); }} />
       </div>
     </div>
   );

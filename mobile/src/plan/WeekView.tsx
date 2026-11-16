@@ -33,7 +33,6 @@ export function WeekView({ week, onOpenDay }: { week: MWeek; onOpenDay: (date: s
             <li key={d.date} style={{ borderBottom: i < week.days.length - 1 ? `1px solid ${ink.line}` : "none" }}>
               <button
                 type="button"
-                aria-label={`${weekdayShort(d.date)} ${dayNum(d.date)}: ${n.t}, ${d.plannedMinutes ? duration(d.plannedMinutes) : "nothing"} planned`}
                 onClick={() => {
                   feel("select");
                   onOpenDay(d.date);

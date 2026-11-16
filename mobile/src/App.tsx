@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useSession } from "./auth/useSession";
 import { SignIn } from "./auth/SignIn";
 import { Shell } from "./shell/Shell";
+import { setOfflineOwner } from "./data/offline";
 import { Opening } from "./shell/Opening";
 import { boot } from "./native/boot";
 
@@ -17,7 +18,9 @@ export function App() {
 
   useEffect(() => {
     if (session !== undefined) void boot();
-  }, [session]);
+    // The offline queue and cache belong to whoever is signed in.
+    setOfflineOwner(session?.user.id ?? (preview ? "preview" : null));
+  }, [session, preview]);
 
   const onReveal = useCallback(() => setRevealing(true), []);
   const onDone = useCallback(() => {

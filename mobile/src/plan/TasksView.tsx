@@ -70,7 +70,6 @@ export function TasksView({ groups, tz, onToggle, onAsk }: Props) {
                     <button
                       type="button"
                       aria-pressed={done}
-                      aria-label={`${t.title}${m ? `, ${m}` : ""}. ${done ? "Done. Tap to undo." : "Tap to mark done."}`}
                       onClick={() => {
                         feel(done ? "undo" : "success");
                         setTicked((prev) => {

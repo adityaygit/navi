@@ -2,14 +2,14 @@ import { StrictMode, Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles/global.css";
 
-// If anything fails at start-up, show what happened instead of a black screen.
+// If anything fails at start-up, show what happened instead of a blank screen (M6: light).
 function Failed({ error }: { error: unknown }) {
   const msg = error instanceof Error ? error.message : String(error);
   return (
-    <div style={{ minHeight: "100vh", background: "#000", color: "#fff", padding: "80px 24px", fontFamily: "system-ui, sans-serif" }}>
-      <h1 style={{ fontSize: 22, margin: "0 0 12px" }}>Navi couldn't start</h1>
-      <p style={{ opacity: 0.7, lineHeight: 1.5, margin: 0 }}>Close the app and open it again. If this keeps happening, send this to the developer:</p>
-      <pre style={{ whiteSpace: "pre-wrap", opacity: 0.6, fontSize: 13, marginTop: 16 }}>{msg}</pre>
+    <div style={{ minHeight: "100vh", boxSizing: "border-box", background: "#FBFBFD", color: "#11141A", padding: "96px 24px", fontFamily: "Figtree, -apple-system, system-ui, sans-serif" }}>
+      <h1 style={{ fontSize: 34, lineHeight: 1.05, fontWeight: 700, letterSpacing: "-0.03em", margin: "0 0 14px" }}>Navi couldn't start.</h1>
+      <p style={{ fontSize: 17, fontWeight: 500, lineHeight: 1.45, color: "#2E3442", margin: 0 }}>Close the app and open it again. If this keeps happening, send this to the developer:</p>
+      <pre style={{ whiteSpace: "pre-wrap", fontSize: 14, color: "#3B4252", marginTop: 18, padding: 14, borderRadius: 16, background: "#F3F5F9" }}>{msg}</pre>
     </div>
   );
 }

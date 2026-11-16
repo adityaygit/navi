@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Header, type HeaderHandle } from "./Header";
 import { Pager, type PagerHandle } from "./Pager";
 import { Drawer } from "./Drawer";
@@ -8,6 +8,7 @@ import { Focus, type FocusTarget } from "../focus/Focus";
 import { glassStrong } from "../theme/tokens";
 import { skyUrl } from "../ui/sky";
 import { OverlayLayer } from "../ui/Layer";
+import { startOfflineSync } from "../data/offline";
 import { feel } from "../native/haptics";
 import { ChatPage } from "../pages/ChatPage";
 import { PlanPage } from "../pages/PlanPage";
@@ -49,6 +50,9 @@ export function Shell() {
   }, []);
   const [inboxSignal, setInboxSignal] = useState(0);
   const onWaiting = useCallback((n: number, ok: boolean) => setWaiting((w) => (w.n === n && w.ok === ok ? w : { n, ok })), []);
+
+  // Send what was typed offline once the phone is back online (and when the app comes back to the front).
+  useEffect(() => startOfflineSync(), []);
 
   const onDrag = useCallback((dx: number, animate: boolean, p: number) => header.current?.follow(dx, animate, p), []);
   const openChat = useCallback((id: string | null) => {

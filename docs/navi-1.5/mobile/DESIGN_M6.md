@@ -14,6 +14,8 @@ Assets (`docs/navi-1.5/design-canvas/assets/`; the canvas refers to them by uplo
 | `logo-n.png` | `/_blob/44c459d0…` | Opening: the N |
 | `logo-word.png` | `/_blob/f364765c…` | Opening: the wordmark |
 
+App icon (owner, 2026-11-16): the black N on white, `mobile/resources/navi-icon-source.jpg`; `mobile/scripts/make-icons.py` makes every size from it.
+
 Skies were generated with Nano Banana Pro (`gemini-3-pro-image`) for this design.
 
 ## Look

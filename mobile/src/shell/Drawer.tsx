@@ -108,7 +108,8 @@ export function Drawer({ currentId, onOpen, onClose, onSettings }: Props) {
             </div>
           ))}
         </div>
-        <button type="button" aria-label={`${name}: settings, memory, notes, activity and spaces`} onClick={() => { feel("select"); shut(onSettings); }} style={{ height: 56, display: "flex", alignItems: "center", gap: 12, padding: "0 8px 0 6px", borderRadius: 16 }}>
+        <button type="button" onClick={() => { feel("select"); shut(onSettings); }} style={{ height: 56, display: "flex", alignItems: "center", gap: 12, padding: "0 8px 0 6px", borderRadius: 16 }}>
+          <span style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>Settings, memory, notes, activity and spaces</span>
           <span aria-hidden="true" style={{ width: 36, height: 36, borderRadius: 18, display: "flex", alignItems: "center", justifyContent: "center", background: "#11141A", fontWeight: 600 }}>{name.slice(0, 1).toUpperCase()}</span>
           <span style={{ flex: 1, fontSize: 17, fontWeight: 500 }}>{name}</span>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={ink.muted} strokeWidth="1.7" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" /></svg>

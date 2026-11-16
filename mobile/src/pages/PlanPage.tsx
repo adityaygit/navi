@@ -15,6 +15,7 @@ import { useToast } from "../ui/Toast";
 import { useExit } from "../ui/useExit";
 import { useSheetDrag } from "../ui/Sheet";
 import { Layer } from "../ui/Layer";
+import { useOnline } from "../data/offline";
 import { ease, glass, glassStrong, ink, meaning, type Palette } from "../theme/tokens";
 
 // Plan (M6): the day's name (tap for another day) and one sentence about it,
@@ -95,6 +96,13 @@ export function PlanPage({ palette: P, active, onAsk, onVoice, onFocus, version 
 
   const contextName = view === "tasks" ? "your list" : view === "week" ? "this week" : d?.isToday ? "today" : weekday(shownDate);
   const ask = (prompt?: string, send?: boolean) => onAsk({ context: contextName, viewing: `Plan, ${view === "day" ? weekday(shownDate) : view === "tasks" ? "list" : "week"}`, prompt, send });
+
+  const online = useOnline();
+  const savedAt = view === "day" ? day.savedAt : view === "week" ? week.savedAt : tasks.savedAt;
+  const openItems = d ? d.items.filter((i) => !i.done).length : 0;
+  const clashes = d?.overlaps.length ?? 0;
+  // A packed day: lots on it, or a clash on an already full day.
+  const packed = view === "day" && !!d?.isToday && (openItems >= 9 || (clashes > 0 && openItems >= 7));
 
   const showTip = active && view === "day" && !tipSeen && !!d?.items.some((i) => i.look === "fixed");
   const hideTip = () => {
@@ -207,6 +215,22 @@ export function PlanPage({ palette: P, active, onAsk, onVoice, onFocus, version 
             ) : null}
           </div>
 
+          {!online || savedAt ? (
+            <span role="status" style={{ ...glass, alignSelf: "flex-start", height: 34, padding: "0 14px", borderRadius: 17, display: "flex", alignItems: "center", gap: 8, fontSize: 15, fontWeight: 600 }}>
+              <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 4, background: "#A3A8BF" }} />
+              {savedAt ? `Offline · as of ${new Date(savedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}` : "Offline · changes need a connection"}
+            </span>
+          ) : null}
+          {packed ? (
+            <div style={{ ...glass, borderRadius: 22, padding: "12px 10px 12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ flex: 1, fontSize: 16, fontWeight: 700 }}>
+                Packed day · {openItems} things{clashes ? `, ${clashes === 1 ? "1 clash" : `${clashes} clashes`}` : ""}
+              </span>
+              <button type="button" onClick={() => ask(`My day is packed (${openItems} things${clashes ? `, ${clashes} clash${clashes === 1 ? "" : "es"}` : ""}). Help me lighten it.`, true)} style={{ flex: "none", height: 40, padding: "0 14px", borderRadius: 20, background: ink.text, color: ink.onCta, fontSize: 15, fontWeight: 600 }}>
+                Lighten it
+              </button>
+            </div>
+          ) : null}
           {showTip ? (
             <div style={{ borderRadius: 22, padding: "14px 12px 14px 16px", background: ink.raised, border: `1px solid ${ink.edge}`, display: "flex", alignItems: "center", gap: 12, animation: `nRise 0.35s ${ease} both` }}>
               <LockIcon c={ink.text} size={14} />
