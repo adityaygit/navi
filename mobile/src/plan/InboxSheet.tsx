@@ -56,9 +56,9 @@ export function InboxSheet({ palette: P, inbox, onClose, onChanged }: Props) {
 
   return (
     <>
-      <button type="button" aria-label="Close inbox" onClick={shut} style={{ position: "absolute", inset: 0, zIndex: 10, background: "rgba(0,0,0,0.6)", animation: closing ? "nFadeOut 0.28s ease both" : "nFade 0.3s ease both" }} />
+      <button type="button" aria-label="Close inbox" onClick={shut} style={{ position: "absolute", inset: 0, zIndex: 10, background: "rgba(20,30,52,0.2)", animation: closing ? "nFadeOut 0.28s ease both" : "nFade 0.3s ease both" }} />
       <section aria-label="Inbox" style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "calc(100% - var(--sat) - 34px)", zIndex: 11, background: ink.raised, borderRadius: "32px 32px 0 0", boxSizing: "border-box", padding: "8px 0 var(--sab)", display: "flex", flexDirection: "column", animation: closing ? `nDown 0.28s ${ease} both` : `nUp 0.38s ${ease} both` }}>
-        <span aria-hidden="true" style={{ alignSelf: "center", width: 40, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.25)" }} />
+        <span aria-hidden="true" style={{ alignSelf: "center", width: 40, height: 5, borderRadius: 3, background: "rgba(17,20,26,0.22)" }} />
         <div style={{ marginTop: 12, padding: "0 12px 0 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <h2 style={{ margin: 0, fontSize: 28, fontWeight: 700, letterSpacing: "-0.015em" }}>Inbox</h2>
           <button type="button" onClick={shut} style={{ minHeight: 44, padding: "0 8px", fontSize: 17, fontWeight: 600, color: P.accent }}>Done</button>

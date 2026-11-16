@@ -13,7 +13,8 @@ import { PlanPage } from "../pages/PlanPage";
 import { ProgressPage } from "../pages/ProgressPage";
 import { chatToResume, rememberChat } from "../data/chats";
 import { ToastHost } from "../ui/Toast";
-import { usePalette } from "../theme/colour";
+import { useMoment, usePalette } from "../theme/colour";
+import { skyFor } from "../theme/tokens";
 import { Settings } from "../settings/Settings";
 
 export function Shell() {
@@ -27,6 +28,10 @@ export function Shell() {
   const header = useRef<HeaderHandle>(null);
   const pager = useRef<PagerHandle>(null);
   const P = usePalette();
+  const sky = skyFor(useMoment());
+  const [waiting, setWaiting] = useState({ n: 0, ok: false });
+  const [inboxSignal, setInboxSignal] = useState(0);
+  const onWaiting = useCallback((n: number, ok: boolean) => setWaiting((w) => (w.n === n && w.ok === ok ? w : { n, ok })), []);
 
   const onDrag = useCallback((dx: number, animate: boolean, p: number) => header.current?.follow(dx, animate, p), []);
   const openChat = useCallback((id: string | null) => {
@@ -37,13 +42,13 @@ export function Shell() {
 
   return (
     <ToastHost bottom="calc(var(--sab) + 72px)">
-      <div style={{ position: "absolute", inset: 0, overflow: "hidden", background: "#000" }}>
+      <div style={{ position: "absolute", inset: 0, overflow: "hidden", background: "#E9EEF5" }}>
         <Pager page={page} onPage={setPage} onDrag={onDrag} enabled={overlay === null && ask === null && (!focus || !!pill)} handle={pager}>
           <ProgressPage palette={P} />
           <ChatPage palette={P} chatId={chatId} onChatId={setChatId} onVoice={voice} />
-          <PlanPage palette={P} active={page === 2} onAsk={setAsk} onVoice={voice} onFocus={(f) => { setPill(null); setFocus(f); }} version={planVersion} />
+          <PlanPage palette={P} active={page === 2} onAsk={setAsk} onVoice={voice} onFocus={(f) => { setPill(null); setFocus(f); }} version={planVersion} inboxSignal={inboxSignal} onWaiting={onWaiting} />
         </Pager>
-        <Header ref={header} page={page} onPick={(n) => pager.current?.goTo(n)} onMenu={() => setOverlay("drawer")} planDot={null} />
+        <Header ref={header} page={page} sky={sky} waiting={waiting.n} planDot={waiting.ok} onPick={(n) => pager.current?.goTo(n)} onMenu={() => setOverlay("drawer")} onInbox={() => { if (page !== 2) pager.current?.goTo(2); setInboxSignal((v) => v + 1); }} />
         {ask ? (
           <AskSheet
             key={JSON.stringify(ask)}
@@ -68,7 +73,7 @@ export function Shell() {
           />
         ) : null}
         {focus && pill ? (
-          <button type="button" onClick={() => { feel("select"); setPill(null); }} style={{ position: "absolute", left: 16, right: 16, bottom: "calc(var(--sab) + 68px)", zIndex: 9, height: 52, display: "flex", alignItems: "center", gap: 12, padding: "0 20px", borderRadius: 26, background: "#141416", border: `1px solid ${sceneFor(focus.space).tint}55`, boxShadow: "0 12px 30px rgba(0,0,0,0.5)", animation: "nRise 0.34s ease both" }}>
+          <button type="button" onClick={() => { feel("select"); setPill(null); }} style={{ position: "absolute", left: 16, right: 16, bottom: "calc(var(--sab) + 68px)", zIndex: 9, height: 52, display: "flex", alignItems: "center", gap: 12, padding: "0 20px", borderRadius: 26, background: "#FFFFFF", border: `1px solid ${sceneFor(focus.space).tint}55`, boxShadow: "0 12px 30px rgba(20,30,52,0.2)", animation: "nRise 0.34s ease both" }}>
             <Stone w={18} h={16} bg={sceneFor(focus.space).stone} />
             <span style={{ flex: 1, minWidth: 0, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>In focus · {pill.title}</span>
             <span style={{ fontSize: 15, fontWeight: 600 }}>{Math.floor(pill.left / 60)}:{String(pill.left % 60).padStart(2, "0")}</span>

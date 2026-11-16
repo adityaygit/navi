@@ -95,7 +95,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
 
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 20 }}>
-      <div aria-hidden="true" style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)", animation: closing ? "nFadeOut 0.3s ease both" : "nFade 0.3s ease both" }} />
+      <div aria-hidden="true" style={{ position: "absolute", inset: 0, background: "rgba(20,30,52,0.2)", animation: closing ? "nFadeOut 0.3s ease both" : "nFade 0.3s ease both" }} />
       <div
         ref={panel}
         role="dialog"
@@ -103,11 +103,11 @@ export function Settings({ onClose }: { onClose: () => void }) {
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
-        style={{ position: "absolute", inset: 0, background: ink.bg, display: "flex", flexDirection: "column", animation: closing ? `nRightOut 0.3s ${ease} both` : `nRight 0.38s ${ease} both`, boxShadow: "-20px 0 40px rgba(0,0,0,0.5)" }}
+        style={{ position: "absolute", inset: 0, background: ink.bg, display: "flex", flexDirection: "column", animation: closing ? `nRightOut 0.3s ${ease} both` : `nRight 0.38s ${ease} both`, boxShadow: "-20px 0 40px rgba(20,30,52,0.2)" }}
       >
         <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, top: 0, height: 360, background: P.scene, opacity: 0.7, pointerEvents: "none" }} />
         {/* Top bar */}
-        <div style={{ position: "relative", zIndex: 1, flex: "none", height: "calc(var(--sat) + 52px)", boxSizing: "border-box", display: "flex", alignItems: "center", padding: "var(--sat) 8px 0", background: scrolled ? "rgba(0,0,0,0.72)" : "transparent", backdropFilter: scrolled ? "blur(20px)" : undefined, WebkitBackdropFilter: scrolled ? "blur(20px)" : undefined, transition: "background-color 0.2s" }}>
+        <div style={{ position: "relative", zIndex: 1, flex: "none", height: "calc(var(--sat) + 52px)", boxSizing: "border-box", display: "flex", alignItems: "center", padding: "var(--sat) 8px 0", background: scrolled ? "rgba(20,30,52,0.2)" : "transparent", backdropFilter: scrolled ? "blur(20px)" : undefined, WebkitBackdropFilter: scrolled ? "blur(20px)" : undefined, transition: "background-color 0.2s" }}>
           <button type="button" onClick={() => { feel("select"); shut(); }} style={{ height: 44, display: "flex", alignItems: "center", gap: 4, padding: "0 10px 0 6px", fontSize: 17, color: P.accent }}>
             <svg width="12" height="20" viewBox="0 0 12 20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 2 2 10l8 8" /></svg>
             Back

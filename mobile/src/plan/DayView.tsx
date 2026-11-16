@@ -96,7 +96,7 @@ export function DayView({ day, P, h }: { day: MDay; P: Palette; h: DayHandlers }
     const isSel = sel === it.key;
     const bg = it.look === "fixed" ? hex(c, 0.16) : it.look === "flex" ? hex(c, 0.07) : "transparent";
     const border = it.look === "routine" ? `1.5px dashed ${hex(c, 0.45)}` : it.look === "flex" ? `1.5px solid ${hex(c, it.key === nextKey ? 0.75 : 0.5)}` : `1px solid ${hex(c, 0.35)}`;
-    const due = it.overlaps.length ? "#F8D2B0" : "rgba(255,255,255,0.62)";
+    const due = it.overlaps.length ? "#7A4300" : "rgba(255,255,255,0.62)";
     return (
       <div style={{ position: "relative", flex: 1, minWidth: 0, borderRadius: 16, background: bg, border, boxSizing: "border-box", display: "flex", flexDirection: "column", opacity: it.done ? 0.55 : 1, transition: "background-color 0.25s, opacity 0.25s", height: compact ? "100%" : undefined }}>
         <button
@@ -115,21 +115,21 @@ export function DayView({ day, P, h }: { day: MDay; P: Palette; h: DayHandlers }
           </span>
         </button>
         {!compact && !isSel && it.key === nextKey && it.taskId && day.isToday ? (
-          <button type="button" onClick={() => { feel("select"); h.onFocus(it); }} style={{ position: "absolute", right: 11, top: 11, height: 40, padding: "0 18px", borderRadius: 20, background: P.cta, color: "#0B0B0C", fontSize: 15, fontWeight: 600 }}>Start</button>
+          <button type="button" onClick={() => { feel("select"); h.onFocus(it); }} style={{ position: "absolute", right: 11, top: 11, height: 40, padding: "0 18px", borderRadius: 20, background: P.cta, color: "#FFFFFF", fontSize: 15, fontWeight: 600 }}>Start</button>
         ) : null}
         {isSel && !compact ? (
           <div style={{ display: "flex", gap: 8, padding: "4px 12px 12px", animation: `nRise 0.28s ${ease} both` }}>
             {it.taskId && !it.done && day.isToday ? (
-              <button type="button" onClick={() => { setSel(null); h.onFocus(it); }} style={{ flex: 1, height: 44, borderRadius: 22, background: P.cta, color: "#0B0B0C", fontSize: 15, fontWeight: 600, textAlign: "center" }}>
+              <button type="button" onClick={() => { setSel(null); h.onFocus(it); }} style={{ flex: 1, height: 44, borderRadius: 22, background: P.cta, color: "#FFFFFF", fontSize: 15, fontWeight: 600, textAlign: "center" }}>
                 Start focus
               </button>
             ) : null}
             {it.kind === "block" && !it.done ? (
-              <button type="button" onClick={() => { setSel(null); h.onOutcome(it, "done"); }} style={{ flex: 1, height: 44, borderRadius: 22, background: it.taskId && day.isToday ? "rgba(255,255,255,0.10)" : P.cta, color: it.taskId && day.isToday ? "#F5F5F7" : "#0B0B0C", fontSize: 15, fontWeight: it.taskId && day.isToday ? 400 : 600, textAlign: "center" }}>
+              <button type="button" onClick={() => { setSel(null); h.onOutcome(it, "done"); }} style={{ flex: 1, height: 44, borderRadius: 22, background: it.taskId && day.isToday ? "rgba(17,20,26,0.08)" : P.cta, color: it.taskId && day.isToday ? "#F5F5F7" : "#0B0B0C", fontSize: 15, fontWeight: it.taskId && day.isToday ? 400 : 600, textAlign: "center" }}>
                 Mark done
               </button>
             ) : null}
-            {it.taskId && !it.done && day.isToday && it.kind === "block" ? null : <button type="button" onClick={() => { setSel(null); h.onAsk(`About “${it.title}” at ${clock(it.start, tz)}: `); }} style={{ flex: 1, height: 44, borderRadius: 22, background: "rgba(255,255,255,0.10)", fontSize: 15, textAlign: "center" }}>
+            {it.taskId && !it.done && day.isToday && it.kind === "block" ? null : <button type="button" onClick={() => { setSel(null); h.onAsk(`About “${it.title}” at ${clock(it.start, tz)}: `); }} style={{ flex: 1, height: 44, borderRadius: 22, background: "rgba(17,20,26,0.08)", fontSize: 15, textAlign: "center" }}>
               Ask Navi
             </button>}
           </div>
@@ -154,7 +154,7 @@ export function DayView({ day, P, h }: { day: MDay; P: Palette; h: DayHandlers }
                 <span style={{ width: 40, flex: "none", paddingTop: 2, fontSize: 13, fontWeight: 600 }}>{clock(r.at, tz)}</span>
                 <div style={{ flex: 1, paddingTop: 4 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: 5, background: ink.text, boxShadow: "0 0 0 4px rgba(255,255,255,0.12)" }} />
+                    <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: 5, background: ink.text, boxShadow: "0 0 0 4px rgba(17,20,26,0.08)" }} />
                     <span aria-hidden="true" style={{ flex: 1, height: 1.5, background: "rgba(255,255,255,0.55)" }} />
                   </div>
                   <div style={{ margin: "8px 0 0 18px", fontSize: 15, color: ink.muted }}>{r.label}</div>
@@ -168,7 +168,7 @@ export function DayView({ day, P, h }: { day: MDay; P: Palette; h: DayHandlers }
                 <span style={{ width: 40, flex: "none" }} />
                 {r.minutes >= 30 ? (
                   <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, paddingLeft: 16 }}>
-                    {folded ? <span aria-hidden="true" style={{ width: 18, height: 34, borderLeft: "2px dotted rgba(255,255,255,0.25)" }} /> : null}
+                    {folded ? <span aria-hidden="true" style={{ width: 18, height: 34, borderLeft: "2px dotted rgba(17,20,26,0.22)" }} /> : null}
                     <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: ink.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {duration(r.minutes)} free{r.fits ? <> · fits <span style={{ color: ink.soft }}>{r.fits.title}</span></> : null}
                     </span>

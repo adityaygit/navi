@@ -31,7 +31,7 @@ export function ColourPicker({ me: raw, onPick }: Props) {
             <p style={{ margin: 0, fontSize: 20, fontWeight: 600, lineHeight: 1.3, letterSpacing: "-0.01em" }}>
               You have <span style={{ color: P.hi }}>2 hours free</span> after lunch.
             </p>
-            <span style={{ alignSelf: "flex-start", height: 34, padding: "0 16px", borderRadius: 17, display: "flex", alignItems: "center", background: P.ctaGrad, color: "#0B0B0C", fontSize: 15, fontWeight: 600 }}>Start focus</span>
+            <span style={{ alignSelf: "flex-start", height: 34, padding: "0 16px", borderRadius: 17, display: "flex", alignItems: "center", background: P.ctaGrad, color: "#FFFFFF", fontSize: 15, fontWeight: 600 }}>Start focus</span>
           </div>
         </div>
 
@@ -55,9 +55,9 @@ export function ColourPicker({ me: raw, onPick }: Props) {
 function Swatch({ label, bg, on, onPick }: { label: string; bg: string; on: boolean; onPick: () => void }) {
   return (
     <button type="button" role="radio" aria-checked={on} aria-label={label} onClick={onPick} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7, minHeight: 72 }}>
-      <span aria-hidden="true" style={{ position: "relative", width: 46, height: 46, borderRadius: 23, background: bg, boxShadow: on ? `0 0 0 3px ${card}, 0 0 0 5px #F5F5F7` : "inset 0 0 0 1px rgba(255,255,255,0.08)", transform: on ? "scale(1)" : "scale(0.92)", transition: "transform 0.22s cubic-bezier(0.2,0.9,0.25,1), box-shadow 0.22s" }}>
+      <span aria-hidden="true" style={{ position: "relative", width: 46, height: 46, borderRadius: 23, background: bg, boxShadow: on ? `0 0 0 3px ${card}, 0 0 0 5px #F5F5F7` : "inset 0 0 0 1px rgba(17,20,26,0.05)", transform: on ? "scale(1)" : "scale(0.92)", transition: "transform 0.22s cubic-bezier(0.2,0.9,0.25,1), box-shadow 0.22s" }}>
         {on ? (
-          <svg width="16" height="12" viewBox="0 0 13 10" fill="none" stroke="rgba(0,0,0,0.72)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ position: "absolute", left: 15, top: 17 }}><path d="M1.5 5.2 4.8 8.5 11.5 1.5" /></svg>
+          <svg width="16" height="12" viewBox="0 0 13 10" fill="none" stroke="rgba(20,30,52,0.2)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ position: "absolute", left: 15, top: 17 }}><path d="M1.5 5.2 4.8 8.5 11.5 1.5" /></svg>
         ) : null}
       </span>
       <span style={{ fontSize: 12, fontWeight: on ? 600 : 400, color: on ? ink.text : ink.faint }}>{label}</span>

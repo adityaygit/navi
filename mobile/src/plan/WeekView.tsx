@@ -20,13 +20,13 @@ export function WeekView({ week, onOpenDay }: { week: MWeek; onOpenDay: (date: s
                 feel("select");
                 onOpenDay(d.date);
               }}
-              style={{ width: "calc(100% + 24px)", minHeight: 60, display: "flex", alignItems: "center", gap: 12, borderRadius: 16, background: d.isToday ? "rgba(255,255,255,0.06)" : "transparent", padding: "0 12px", marginLeft: -12, boxSizing: "border-box" }}
+              style={{ width: "calc(100% + 24px)", minHeight: 60, display: "flex", alignItems: "center", gap: 12, borderRadius: 16, background: d.isToday ? "rgba(17,20,26,0.05)" : "transparent", padding: "0 12px", marginLeft: -12, boxSizing: "border-box" }}
             >
               <span style={{ width: 40, flex: "none", display: "flex", flexDirection: "column" }}>
                 <span style={{ fontSize: 13, color: ink.faint }}>{weekdayShort(d.date)}</span>
                 <span style={{ fontSize: 20, fontWeight: 600, color: d.isToday ? ink.text : ink.soft }}>{dayNum(d.date)}</span>
               </span>
-              <span aria-hidden="true" style={{ flex: 1, height: 26, position: "relative", borderRadius: 8, background: "rgba(255,255,255,0.04)" }}>
+              <span aria-hidden="true" style={{ flex: 1, height: 26, position: "relative", borderRadius: 8, background: "rgba(17,20,26,0.05)" }}>
                 {d.items.map((it) => {
                   const a = Math.max(FROM, Math.min(TO, hourOf(it.start, tz)));
                   const b = Math.max(a + 0.25, Math.min(TO, hourOf(it.end, tz) || TO));

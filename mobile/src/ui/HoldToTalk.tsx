@@ -1,20 +1,25 @@
 import { useEffect, useRef, useState } from "react";
 import { feel } from "../native/haptics";
 import { ease } from "../theme/tokens";
+import { useMoment } from "../theme/colour";
+import { skyFor } from "../theme/tokens";
+import { Orb } from "./Orb";
 
-// Press and hold to start voice. A soft tick on touch, rising ticks while
-// held, a firm bump when voice opens (~0.45 s). A quick tap only shows a hint,
-// so voice never starts by accident.
+// Talk (M6): Navi's orb. Press and hold: a tick, rising ticks, and the orb
+// swells; at 0.45 s voice opens with a medium bump. A quick tap only gives a
+// double tick and "Press and hold to talk", so voice never starts by accident.
 const HOLD_MS = 450;
 
-type Props = { bg: string; color: string; disabled?: boolean; onVoice: () => void; onDisabledTap?: () => void; compact?: boolean };
+type Props = { disabled?: boolean; onVoice: () => void; onDisabledTap?: () => void; compact?: boolean; size?: number; bg?: string; color?: string };
 
-export function HoldToTalk({ bg, color, disabled, onVoice, onDisabledTap, compact }: Props) {
+export function HoldToTalk({ disabled, onVoice, onDisabledTap, compact, size }: Props) {
   const [holding, setHolding] = useState(false);
   const [hint, setHint] = useState(false);
   const timers = useRef<number[]>([]);
   const started = useRef(0);
   const fired = useRef(false);
+  const sky = skyFor(useMoment());
+  const d = size ?? (compact ? 40 : 56);
 
   const clear = () => {
     timers.current.forEach((t) => window.clearTimeout(t));
@@ -35,7 +40,7 @@ export function HoldToTalk({ bg, color, disabled, onVoice, onDisabledTap, compac
     setHolding(true);
     setHint(false);
     feel("holdStart");
-    timers.current.push(window.setTimeout(() => feel("holdRamp"), 150), window.setTimeout(() => feel("holdRamp"), 300));
+    timers.current.push(window.setTimeout(() => feel("holdRamp"), HOLD_MS * 0.34), window.setTimeout(() => feel("holdRamp"), HOLD_MS * 0.67));
     timers.current.push(
       window.setTimeout(() => {
         fired.current = true;
@@ -62,13 +67,14 @@ export function HoldToTalk({ bg, color, disabled, onVoice, onDisabledTap, compac
   return (
     <span style={{ position: "relative", flex: "none" }}>
       {hint ? (
-        <span role="status" style={{ position: "absolute", right: 0, bottom: "calc(100% + 12px)", whiteSpace: "nowrap", height: 32, padding: "0 12px", borderRadius: 16, background: "#2A2A2E", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", animation: `nRise 0.26s ${ease} both` }}>
-          Hold to talk
+        <span role="status" style={{ position: "absolute", right: 0, bottom: "calc(100% + 12px)", whiteSpace: "nowrap", height: 34, padding: "0 14px", borderRadius: 17, background: "rgba(17,20,26,0.86)", color: "#fff", fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", animation: `nRise 0.26s ${ease} both` }}>
+          Press and hold to talk
         </span>
       ) : null}
       <button
         type="button"
-        aria-label="Hold to talk"
+        className="hold"
+        aria-label="Hold to talk to Navi"
         aria-disabled={disabled || undefined}
         onPointerDown={down}
         onPointerUp={up}
@@ -80,17 +86,13 @@ export function HoldToTalk({ bg, color, disabled, onVoice, onDisabledTap, compac
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
+            feel("voiceOn");
             onVoice();
           }
         }}
-        style={{ position: "relative", overflow: "hidden", height: 44, width: compact ? 44 : undefined, padding: compact ? 0 : "0 16px", borderRadius: 22, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: bg, color, fontWeight: 600, fontSize: 15, transform: holding ? "scale(1.06)" : "none", transition: `transform 0.2s ${ease}`, touchAction: "none" }}
+        style={{ width: d, height: d, borderRadius: d / 2, display: "block", opacity: disabled ? 0.5 : 1, filter: disabled ? "grayscale(1)" : undefined, transform: holding ? "scale(1.16)" : "none", transition: holding ? `transform ${HOLD_MS}ms cubic-bezier(0.3, 0, 0.2, 1)` : `transform 0.3s ${ease}`, boxShadow: compact ? undefined : "0 10px 24px -10px rgba(60,100,170,0.55)" }}
       >
-        <span aria-hidden="true" style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.45)", transformOrigin: "0 50%", transform: holding ? "scaleX(1)" : "scaleX(0)", transition: holding ? `transform ${HOLD_MS}ms linear` : "transform 0.15s" }} />
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" style={{ position: "relative" }}>
-          <rect x="9" y="3" width="6" height="11" rx="3" />
-          <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
-        </svg>
-        {compact ? null : <span style={{ position: "relative" }}>Talk</span>}
+        <Orb size={d} sky={sky} mode={holding ? "talk" : "idle"} />
       </button>
     </span>
   );

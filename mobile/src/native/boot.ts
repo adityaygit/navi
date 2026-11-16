@@ -9,7 +9,7 @@ export async function boot(): Promise<void> {
   }
   try {
     const { StatusBar, Style } = await import("@capacitor/status-bar");
-    await StatusBar.setStyle({ style: Style.Dark });
+    await StatusBar.setStyle({ style: Style.Light });
     if (Capacitor.getPlatform() === "android") await StatusBar.setOverlaysWebView({ overlay: true });
   } catch {
     /* status bar plugin missing: keep defaults */

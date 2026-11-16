@@ -52,12 +52,12 @@ export function TasksView({ groups, onToggle }: Props) {
                       style={{ width: 44, height: 44, flex: "none", marginLeft: -10, display: "flex", alignItems: "center", justifyContent: "center" }}
                     >
                       <span aria-hidden="true" style={{ width: 24, height: 24, boxSizing: "border-box", borderRadius: 12, border: done ? "none" : "1.5px solid rgba(255,255,255,0.35)", background: done ? "#9FF0D8" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", transition: `background-color 0.2s, transform 0.2s ${ease}`, transform: done ? "scale(1.08)" : "none" }}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00140A" strokeWidth="3" strokeLinecap="round" style={{ opacity: done ? 1 : 0, transition: "opacity 0.2s" }}><path d="m5 12 4.5 4.5L19 7" /></svg>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" style={{ opacity: done ? 1 : 0, transition: "opacity 0.2s" }}><path d="m5 12 4.5 4.5L19 7" /></svg>
                       </span>
                     </button>
                     <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
                       <span style={{ fontSize: 17, color: done ? ink.dim : ink.text, textDecoration: done ? "line-through" : "none", transition: "color 0.25s", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.title}</span>
-                      {s ? <span style={{ fontSize: 13, color: t.due_is_hard && !done ? "#F8D2B0" : ink.faint }}>{s}</span> : null}
+                      {s ? <span style={{ fontSize: 13, color: t.due_is_hard && !done ? "#7A4300" : ink.faint }}>{s}</span> : null}
                     </span>
                     {t.space ? <span aria-hidden="true" style={{ flex: "none", width: 8, height: 8, borderRadius: 4, background: t.space.color }} /> : null}
                   </li>

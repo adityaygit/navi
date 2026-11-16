@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { inQuiet, skippedByQuiet } from "../settings/reminders";
 import { paletteFor } from "../theme/colour";
-import { palettes } from "../theme/tokens";
+import { palettes, skyFor } from "../theme/tokens";
 
 describe("quiet hours", () => {
   it("handles windows that cross midnight and ones that don't", () => {
@@ -20,10 +20,12 @@ describe("quiet hours", () => {
 
 describe("colour", () => {
   const rose = { key: "rose" as const, light: "#FFD3E1", mid: "#F27BA0", dark: "#B9406A", text: "#FFB8CE" };
-  it("follows the moment by default and builds a palette from a fixed colour", () => {
+  it("M6 uses one light palette whatever colour was chosen, and the moment only picks the sky", () => {
     expect(paletteFor({ followsDay: true, color: rose }, "night")).toBe(palettes.night);
-    const p = paletteFor({ followsDay: false, color: rose }, "night");
-    expect(p.accent).toBe("#FFB8CE");
-    expect(p.stone).toContain("#F27BA0");
+    expect(paletteFor({ followsDay: false, color: rose }, "morning")).toBe(palettes.morning);
+    expect(palettes.morning.cta).toBe("#11141A");
+    expect(skyFor("morning")).toBe("day");
+    expect(skyFor("evening")).toBe("dusk");
+    expect(skyFor("night")).toBe("dusk");
   });
 });

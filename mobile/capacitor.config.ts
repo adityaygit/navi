@@ -11,12 +11,12 @@ const config: CapacitorConfig = {
   appId: "app.meetnavi.navi",
   appName: "Navi",
   webDir: "dist",
-  // Pure black behind the web view on both platforms: no white flash on
-  // launch, rotation or keyboard animation.
-  backgroundColor: "#000000",
+  // M6 is light: white behind the web view on both platforms, so launch,
+  // rotation and the keyboard never flash a different colour.
+  backgroundColor: "#FBFBFD",
   ...(devServer ? { server: { url: devServer, cleartext: devServer.startsWith("http://") } } : {}),
   ios: {
-    backgroundColor: "#000000",
+    backgroundColor: "#FBFBFD",
     // The web app pads itself with env(safe-area-inset-*), so the web view
     // must run edge to edge with no automatic content insets.
     contentInset: "never",
@@ -25,7 +25,7 @@ const config: CapacitorConfig = {
     preferredContentMode: "mobile",
   },
   android: {
-    backgroundColor: "#000000",
+    backgroundColor: "#FBFBFD",
     // Release builds never accept http:// content.
     allowMixedContent: false,
     captureInput: true,
@@ -33,11 +33,11 @@ const config: CapacitorConfig = {
   },
   plugins: {
     SplashScreen: {
-      // The app calls SplashScreen.hide({ fadeOutDuration }) once its first
-      // screen has rendered, so the stone is never replaced by a blank page.
+      // Plain white launch screen; the app hides it on its first frame and
+      // plays the opening (the N, then the name) on the same white.
       launchAutoHide: false,
-      launchFadeOutDuration: 200,
-      backgroundColor: "#000000",
+      launchFadeOutDuration: 0,
+      backgroundColor: "#FFFFFF",
       showSpinner: false,
       androidScaleType: "CENTER_CROP",
       splashFullScreen: false,
@@ -47,15 +47,15 @@ const config: CapacitorConfig = {
       // Built into Capacitor 8 (Android). Edge-to-edge web view: with
       // viewport-fit=cover in index.html the env(safe-area-inset-*) values
       // are correct, and --safe-area-inset-* CSS variables are injected as a
-      // fallback for older Android WebViews. Light icons on black.
+      // fallback for older Android WebViews. Dark icons on the light app.
       insetsHandling: "css",
       initialViewportFitValueHint: "cover",
-      style: "DARK",
+      style: "LIGHT",
     },
     StatusBar: {
-      // Light text and icons on the black app background, drawn over the
-      // web view (the web app leaves room with env(safe-area-inset-top)).
-      style: "DARK",
+      // Dark text and icons on the light app, drawn over the web view
+      // (the web app leaves room with env(safe-area-inset-top)).
+      style: "LIGHT",
       backgroundColor: "#00000000",
       overlaysWebView: true,
     },
@@ -68,9 +68,9 @@ const config: CapacitorConfig = {
       // the keyboard height (the activity uses adjustResize), so the old
       // resizeOnFullScreen workaround stays off to avoid a double resize.
       resize: KeyboardResize.Native,
-      style: KeyboardStyle.Dark,
+      style: KeyboardStyle.Light,
       resizeOnFullScreen: false,
-      // Black behind the keyboard while it animates in (iOS).
+      // Matches the app behind the keyboard while it animates in (iOS).
       autoBackdropColor: "auto",
     },
     LocalNotifications: {

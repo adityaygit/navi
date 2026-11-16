@@ -7,7 +7,7 @@ projects need. Re-run after changing the look:
 Needs Python 3 with Pillow (pip install pillow). Writes:
   mobile/resources/icon.png            1024x1024, opaque (iOS rejects alpha)
   mobile/resources/icon-foreground.png 1024x1024, transparent (Android adaptive)
-  mobile/resources/splash.png          2732x2732, black with a small stone
+  mobile/resources/splash.png          2732x2732, plain white (M6: the app plays the opening on it)
   ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
   ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732*.png
   android/app/src/main/res/mipmap-*/ic_launcher*.png
@@ -26,6 +26,7 @@ IOS_ASSETS = ROOT / "ios/App/App/Assets.xcassets"
 ANDROID_RES = ROOT / "android/app/src/main/res"
 
 BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
 # Light lavender centre -> mid lavender -> deep violet edge.
 STOPS = [
     (0.00, (0xF4, 0xF2, 0xFF)),
@@ -161,9 +162,8 @@ def main() -> None:
     icon.save(RES / "icon.png", optimize=True)
     fg_stone.save(RES / "icon-foreground.png", optimize=True)
 
-    splash = Image.new("RGB", (2732, 2732), BLACK)
-    s = 360  # small stone in the middle of a big canvas (aspect-fill crops edges)
-    splash.paste(fit(splash_stone, s), ((2732 - s) // 2, (2732 - s) // 2), fit(splash_stone, s))
+    # M6: the launch screen is plain white; the app's opening animation draws the N on it.
+    splash = Image.new("RGB", (2732, 2732), WHITE)
     splash.save(RES / "splash.png", optimize=True)
 
     # ---- iOS ----
@@ -202,14 +202,8 @@ def main() -> None:
             for orient, (W, H) in (("port", (w, h)), ("land", (h, w))):
                 d = ANDROID_RES / f"drawable-{orient}-{dpi}"
                 d.mkdir(exist_ok=True)
-                img = Image.new("RGB", (W, H), BLACK)
-                st = fit(splash_stone, round(min(W, H) * 0.28))
-                img.paste(st, ((W - st.width) // 2, (H - st.height) // 2), st)
-                img.save(d / "splash.png", optimize=True)
-        base = Image.new("RGB", (480, 800), BLACK)
-        st = fit(splash_stone, 134)
-        base.paste(st, ((480 - 134) // 2, (800 - 134) // 2), st)
-        base.save(ANDROID_RES / "drawable/splash.png", optimize=True)
+                Image.new("RGB", (W, H), WHITE).save(d / "splash.png", optimize=True)
+        Image.new("RGB", (480, 800), WHITE).save(ANDROID_RES / "drawable/splash.png", optimize=True)
 
     print("icons and splash written")
 

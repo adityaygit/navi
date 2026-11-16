@@ -60,7 +60,7 @@ export function SignIn() {
   }
 
   const field: React.CSSProperties = { height: 56, boxSizing: "border-box", width: "100%", padding: "0 20px", borderRadius: 28, background: ink.field, border: `1px solid ${ink.edge}`, outline: "none", fontSize: 17 };
-  const primary: React.CSSProperties = { height: 56, width: "100%", borderRadius: 28, background: P.cta, color: "#0B0B0C", fontSize: 17, fontWeight: 600, textAlign: "center", opacity: busy ? 0.6 : 1 };
+  const primary: React.CSSProperties = { height: 56, width: "100%", borderRadius: 28, background: P.cta, color: "#FFFFFF", fontSize: 17, fontWeight: 600, textAlign: "center", opacity: busy ? 0.6 : 1 };
   const quiet: React.CSSProperties = { height: 44, width: "100%", fontSize: 15, color: ink.muted, textAlign: "center" };
 
   return (
@@ -78,7 +78,7 @@ export function SignIn() {
 
       <div key={step} style={{ position: "relative", display: "flex", flexDirection: "column", gap: 12, animation: `nRise 0.32s ${ease} both` }}>
         {error ? (
-          <p role="alert" style={{ margin: "0 0 4px", fontSize: 15, color: "#FF9A9A", textAlign: "center" }}>
+          <p role="alert" style={{ margin: "0 0 4px", fontSize: 15, color: "#B23A17", textAlign: "center" }}>
             {error}
           </p>
         ) : null}
