@@ -5,9 +5,9 @@ import type { MDay, MInbox, MTaskGroups, MWeek, MOk, MTaskChange, MBlockOutcome 
 // Plan data: one small hook per view. Each keeps the last good answer while it
 // refreshes, so switching views never flashes an empty screen.
 
-type Res<T> = { data: T | null; error: string | null; loading: boolean; refresh: () => Promise<void> };
+export type Res<T> = { data: T | null; error: string | null; loading: boolean; refresh: () => Promise<void> };
 
-function useResource<T>(path: string | null): Res<T> {
+export function useResource<T>(path: string | null): Res<T> {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(!!path);

@@ -32,6 +32,7 @@ import type {
   MTask,
 } from "@/lib/mobile-api-types";
 import { updateSettings } from "./settings";
+import { registerYouRoutes } from "./you";
 import { chatHistoryView, chatListView, dayView, focusSessionView, focusView, inboxView, meView, proposalView, taskGroupsView, taskView, weekView } from "./views";
 
 // The phone app's JSON API: one table of routes under /api/m, each a thin
@@ -186,6 +187,9 @@ route("POST", "briefings/:id/read", async (ctx, { params }): Promise<MOk> => {
   await markBriefingRead(ctx, params.id);
   return { ok: true };
 });
+
+// ---- progress and You (src/server/mobile/you.ts) --------------------------------------------
+registerYouRoutes(route);
 
 // ---- dispatch -------------------------------------------------------------------------------
 

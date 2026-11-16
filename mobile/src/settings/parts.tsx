@@ -9,15 +9,15 @@ export const card = "#FFFFFF";
 
 export function Group({ label, foot, children }: { label: string; foot?: ReactNode; children: ReactNode }) {
   return (
-    <section style={{ marginTop: 28 }} aria-label={label}>
-      <h2 style={{ margin: "0 0 8px 16px", fontSize: 13, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: ink.faint }}>{label}</h2>
-      <div className="ngroup" style={{ borderRadius: 16, background: card, overflow: "hidden" }}>{children}</div>
-      {foot ? <p style={{ margin: "8px 16px 0", fontSize: 13, lineHeight: 1.45, color: ink.dim }}>{foot}</p> : null}
+    <section style={{ marginTop: 24 }} aria-label={label}>
+      <h2 style={{ margin: "0 0 8px 6px", fontSize: 15, fontWeight: 700, color: ink.muted }}>{label}</h2>
+      <div className="ngroup" style={{ borderRadius: 22, background: card, overflow: "hidden" }}>{children}</div>
+      {foot ? <p style={{ margin: "8px 6px 0", fontSize: 14, lineHeight: 1.45, fontWeight: 500, color: ink.dim }}>{foot}</p> : null}
     </section>
   );
 }
 
-const rowBase: React.CSSProperties = { position: "relative", minHeight: 52, boxSizing: "border-box", width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", textAlign: "left", fontSize: 17, color: ink.text };
+const rowBase: React.CSSProperties = { position: "relative", minHeight: 56, boxSizing: "border-box", width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", textAlign: "left", fontSize: 17, color: ink.text };
 
 export function Chevron() {
   return (
@@ -30,8 +30,8 @@ export function Chevron() {
 function Label({ label, sub }: { label: ReactNode; sub?: ReactNode }) {
   return (
     <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-      <span>{label}</span>
-      {sub ? <span style={{ fontSize: 13, lineHeight: 1.4, color: ink.faint }}>{sub}</span> : null}
+      <span style={{ fontWeight: 600 }}>{label}</span>
+      {sub ? <span style={{ fontSize: 15, lineHeight: 1.4, fontWeight: 500, color: ink.faint }}>{sub}</span> : null}
     </span>
   );
 }

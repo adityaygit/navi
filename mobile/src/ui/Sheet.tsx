@@ -2,6 +2,7 @@ import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { feel } from "../native/haptics";
 import { ease, easeOut, glassStrong } from "../theme/tokens";
 import { useExit } from "./useExit";
+import { Layer } from "./Layer";
 
 // M6 sheets leave the way they came. A bottom sheet closes by dragging down
 // from its top bar (past ~110 px); the day picker closes by pushing it up.
@@ -125,7 +126,7 @@ export function Sheet({ label, onClose, children, floating, height, z = 10, styl
     : { left: 0, right: 0, bottom: 0, borderRadius: "38px 38px 0 0", height: height ?? "auto", maxHeight: "calc(100% - var(--sat) - 24px)", paddingBottom: "var(--sab)" };
 
   return (
-    <>
+    <Layer>
       <button
         ref={drag.scrim}
         type="button"
@@ -157,6 +158,6 @@ export function Sheet({ label, onClose, children, floating, height, z = 10, styl
           {children(shut)}
         </section>
       </div>
-    </>
+    </Layer>
   );
 }

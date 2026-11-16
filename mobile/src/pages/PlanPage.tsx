@@ -14,6 +14,7 @@ import type { FocusTarget } from "../focus/Focus";
 import { useToast } from "../ui/Toast";
 import { useExit } from "../ui/useExit";
 import { useSheetDrag } from "../ui/Sheet";
+import { Layer } from "../ui/Layer";
 import { ease, glass, glassStrong, ink, meaning, type Palette } from "../theme/tokens";
 
 // Plan (M6): the day's name (tap for another day) and one sentence about it,
@@ -263,7 +264,7 @@ function DayPicker({ selected, today, onPick, onClose }: { selected: string; tod
   const drag = useSheetDrag(onClose, "up");
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, i - 1));
   return (
-    <>
+    <Layer>
       <button ref={drag.scrim} type="button" aria-label="Close" tabIndex={-1} onClick={() => close(onClose)} style={{ position: "absolute", inset: 0, zIndex: 10, background: "rgba(20,30,52,0.18)", animation: closing ? "nFadeOut 0.22s ease both" : "nFade 0.25s ease backwards" }} />
       <div ref={drag.wrap} style={{ position: "absolute", inset: 0, zIndex: 11, pointerEvents: "none" }}>
         <section
@@ -287,6 +288,6 @@ function DayPicker({ selected, today, onPick, onClose }: { selected: string; tod
           <span aria-hidden="true" style={{ alignSelf: "center", width: 40, height: 5, borderRadius: 3, background: "rgba(17,20,26,0.22)" }} />
         </section>
       </div>
-    </>
+    </Layer>
   );
 }

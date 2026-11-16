@@ -215,6 +215,25 @@ tasks due that day).
 | POST | `/api/m/briefings/generate` | `MBriefingGenerate` `{ kind: "morning" \| "evening" \| "weekly" }` | `MBriefingGenerated` `{ title, body }` (replaces today's of that kind; `GET /api/m/day` then shows it) |
 | POST | `/api/m/briefings/:id/read` | – | `MOk` |
 
+### Progress and You (M6; types in `src/lib/mobile-api-you.ts`, routes in `src/server/mobile/you.ts`)
+
+| Method | Path | Request | Response |
+| --- | --- | --- | --- |
+| GET | `/api/m/progress` | – | `MProgress`: the 7 days ending today from the same code as Insights: `headline`, `kept { done, of }` (plan blocks done out of those that count; rest, interruptions, missing info and overruns don't count; null when nothing was planned), `focusedMinutes`, `slipping` (skipped 3+ times in 3 weeks, or a hard deadline within 2 days), `hours` by space (blocks done; partly done counts half), `question` (the first finding), `week` and `today` story cards `{ a, b, c }` (`b` italic). |
+| GET | `/api/m/memory` | – | `MMemoryList` `{ guesses, known }`; each `{ id, kind, content, guess, source }` |
+| POST | `/api/m/memory` | `MMemoryWrite` `{ content }` | `MMemoryList` (remembered as something you said) |
+| PATCH | `/api/m/memory/:id` | `MMemoryWrite` `{ content }` | `MMemoryList` (a correction replaces it; the old one is kept as superseded) |
+| POST | `/api/m/memory/:id/confirm` | – | `MMemoryList` ("That's right") |
+| POST | `/api/m/memory/:id/reject` | – | `MMemoryList` ("That's wrong": Navi stops using it) |
+| DELETE | `/api/m/memory/:id` | – | `MMemoryList` |
+| GET | `/api/m/notes` | – | `MNoteList` `{ notes }`; each `{ id, title, body, source }` |
+| POST | `/api/m/notes` | `MNoteWrite` `{ id?, title?, body }` | `MNote` (idempotent on `id`) |
+| PATCH | `/api/m/notes/:id` | `MNoteWrite` `{ title?, body }` | `MOk` |
+| DELETE | `/api/m/notes/:id` | – | `MOk` (for good; logged in Activity without Undo. Edits can be undone there.) |
+| GET | `/api/m/activity` | – | `MActivityList` `{ days: [{ label, entries }] }`; each `{ id, who, summary, at, canUndo, undone }`. Undo: `POST /api/m/activity/:id/revert`. |
+| GET | `/api/m/spaces` | – | `MSpaceList` `{ spaces }`; each `{ id, name, color, openTasks, projects }` |
+| PATCH | `/api/m/spaces/:id` | `MSpaceWrite` `{ name?, color? }` | `MOk` |
+
 ### Existing routes the app uses
 
 | Method | Path | Notes |

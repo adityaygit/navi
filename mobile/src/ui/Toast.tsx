@@ -43,7 +43,7 @@ export function ToastHost({ children, bottom }: { children: ReactNode; bottom: s
       <HideCtx.Provider value={hide}>
       {children}
       {t ? (
-        <div key={t.id} role="status" style={{ ...glassStrong, position: "absolute", left: 0, right: 0, margin: "0 auto", width: "fit-content", maxWidth: "calc(100% - 32px)", boxSizing: "border-box", bottom, zIndex: 30, minHeight: 48, display: "flex", alignItems: "center", gap: 6, padding: t.undo ? "0 6px 0 18px" : "0 18px", borderRadius: 24, animation: closing ? `nSink 0.22s ${ease} both` : `nRise 0.3s ${ease} both` }}>
+        <div key={t.id} role="status" style={{ ...glassStrong, position: "absolute", left: 0, right: 0, margin: "0 auto", width: "fit-content", maxWidth: "calc(100% - 32px)", boxSizing: "border-box", bottom, zIndex: 40, minHeight: 48, display: "flex", alignItems: "center", gap: 6, padding: t.undo ? "0 6px 0 18px" : "0 18px", borderRadius: 24, animation: closing ? `nSink 0.22s ${ease} both` : `nRise 0.3s ${ease} both` }}>
           <span style={{ fontSize: 16, fontWeight: 600, color: ink.text, padding: "12px 0" }}>{t.text}</span>
           {t.undo ? (
             <button

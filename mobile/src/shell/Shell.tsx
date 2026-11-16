@@ -7,6 +7,7 @@ import { AskSheet, type AskRequest } from "./AskSheet";
 import { Focus, type FocusTarget } from "../focus/Focus";
 import { glassStrong } from "../theme/tokens";
 import { skyUrl } from "../ui/sky";
+import { OverlayLayer } from "../ui/Layer";
 import { feel } from "../native/haptics";
 import { ChatPage } from "../pages/ChatPage";
 import { PlanPage } from "../pages/PlanPage";
@@ -48,7 +49,7 @@ export function Shell() {
     <ToastHost bottom="calc(var(--sab) + 72px)">
       <div style={{ position: "absolute", inset: 0, overflow: "hidden", background: "#E9EEF5" }}>
         <Pager page={page} onPage={setPage} onDrag={onDrag} enabled={overlay === null && ask === null && (!focus || !!pill)} handle={pager}>
-          <ProgressPage palette={P} />
+          <ProgressPage palette={P} active={page === 0} onAsk={setAsk} onVoice={voice} />
           <ChatPage key={chatVersion} palette={P} chatId={chatId} onChatId={setChatId} onVoice={voice} typeNow={typeNow} />
           <PlanPage palette={P} active={page === 2} onAsk={setAsk} onVoice={voice} onFocus={(f) => { setPill(null); setFocus(f); }} version={planVersion} inboxSignal={inboxSignal} onWaiting={onWaiting} />
         </Pager>
@@ -107,6 +108,7 @@ export function Shell() {
         ) : null}
         {overlay === "drawer" ? <Drawer currentId={chatId} onOpen={openChat} onClose={() => setOverlay(null)} onSettings={() => setOverlay("settings")} /> : null}
         {overlay === "settings" ? <Settings onClose={() => setOverlay(null)} /> : null}
+        <OverlayLayer />
       </div>
     </ToastHost>
   );
