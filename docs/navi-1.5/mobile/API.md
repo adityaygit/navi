@@ -234,6 +234,19 @@ tasks due that day).
 | GET | `/api/m/spaces` | – | `MSpaceList` `{ spaces }`; each `{ id, name, color, openTasks, projects }` |
 | PATCH | `/api/m/spaces/:id` | `MSpaceWrite` `{ name?, color? }` | `MOk` |
 
+### Setup (M6 step 5; types in `src/lib/mobile-api-welcome.ts`, routes in `src/server/mobile/welcome.ts`, logic shared with the web's /welcome in `src/server/domain/welcome.ts`)
+
+| Method | Path | Request | Response |
+| --- | --- | --- | --- |
+| GET | `/api/m/welcome` | – | `MWelcome` `{ step, status, firstName, basics, picked, checkIn }`. `step` is the screen to resume on (hello, basics, talk, review, notify, plan), or null when setup is done. |
+| GET | `/api/m/welcome/talk` | – | `MWelcomeTalk`: the setup conversation (same shape as a chat's history) plus `proposals` it has picked up so far. Send turns with `POST /api/chat` `{ kind: "onboarding" }`; voice with `/api/voice/session` `{ kind: "onboarding" }`. |
+| POST | `/api/m/welcome/step` | `MWelcomeStepSave` `{ step }` | `MWelcome` (step "talk" also marks setup under way; "done" leaves setup) |
+| POST | `/api/m/welcome/basics` | `MWelcomeBasics` `{ name, timezone, wake, bed }` | `MWelcome` (sets quiet hours bedtime→wake-up, the morning briefing at wake-up and when Navi may plan; goes on to talk) |
+| POST | `/api/m/welcome/talk-done` | – | `MWelcome` (to the review; 400 when nothing was picked up yet) |
+| POST | `/api/m/welcome/restart` | – | `MWelcome` (back to talking) |
+| POST | `/api/m/welcome/skip` | `{ step }` | `MOk` ("Later": setup is skipped and can be picked up again) |
+| POST | `/api/m/welcome/complete` | `MWelcomeComplete` `{ acceptIds }` (none for quick setup) | `MWelcomeCompleted` `{ accepted, failed, plannedBlocks }`; the rest stay in Inbox; the first week is planned; next step "notify" |
+
 ### Existing routes the app uses
 
 | Method | Path | Notes |

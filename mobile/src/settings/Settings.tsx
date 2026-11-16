@@ -30,7 +30,7 @@ function zoneLabel(z: string) {
   return z.replace(/_/g, " ").replace(/^.*\//, "");
 }
 
-export function Settings({ onClose }: { onClose: () => void }) {
+export function Settings({ onClose, onSetup }: { onClose: () => void; onSetup?: () => void }) {
   const P = usePalette();
   const me = useProfile();
   const toast = useToast();
@@ -82,6 +82,13 @@ export function Settings({ onClose }: { onClose: () => void }) {
                   <p style={{ margin: "2px 0 0", fontSize: 15, fontWeight: 500, color: ink.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{me.email}</p>
                 </div>
               </div>
+
+              {me.onboarding.status === "skipped" && onSetup ? (
+                <button type="button" onClick={() => { feel("select"); onSetup(); }} style={{ marginTop: 16, width: "100%", minHeight: 64, borderRadius: 22, background: ink.text, color: "#fff", padding: "0 20px", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 17, fontWeight: 700 }}>
+                  Finish setting up Navi
+                  <svg width="8" height="14" viewBox="0 0 8 14" aria-hidden="true"><path d="M1.5 1.5L6.5 7l-5 5.5" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </button>
+              ) : null}
 
               <Group label="What Navi keeps" foot={<>You can also change any of this by telling Navi, like “move my morning briefing to 7”.</>}>
                 <Row label="Memory" sub="What Navi knows about you" chevron onClick={() => { feel("select"); setSub("memory"); }} />

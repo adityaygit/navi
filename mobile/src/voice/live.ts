@@ -105,7 +105,7 @@ export class LiveVoice {
   private ended = false;
   private peak = 0;
 
-  constructor(conversationId: string | null, private on: VoiceEvents) {
+  constructor(conversationId: string | null, private on: VoiceEvents, private kind: "chat" | "onboarding" = "chat") {
     this.conv = conversationId;
   }
 
@@ -142,7 +142,7 @@ export class LiveVoice {
     this.setStatus("connecting");
     let grant: SessionGrant;
     try {
-      grant = await api<SessionGrant>("/api/voice/session", { body: { kind: "chat", conversationId: this.conv, resumeHandle: this.handle } });
+      grant = await api<SessionGrant>("/api/voice/session", { body: { kind: this.kind, conversationId: this.conv, resumeHandle: this.handle } });
     } catch (e) {
       this.setStatus("error");
       if (e instanceof ApiError) this.on.error(e.status === 503 ? "Voice isn't switched on for Navi yet. You can type instead." : e.message);

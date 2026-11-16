@@ -12,6 +12,8 @@ import { LiveVoice, type VoiceLine, type VoiceStatus } from "./live";
 
 type Props = {
   conversationId: string | null;
+  /** "onboarding": the setup conversation. */
+  kind?: "chat" | "onboarding";
   /** The conversation the voice turns go into (a new chat gets one). */
   onConversation: (id: string) => void;
   /** Something changed (a turn saved, a tool ran). */
@@ -30,7 +32,7 @@ const STATUS: Record<VoiceStatus, string> = {
   error: "Voice stopped",
 };
 
-export function VoiceScreen({ conversationId, onConversation, onSaved, onClose }: Props) {
+export function VoiceScreen({ conversationId, kind = "chat", onConversation, onSaved, onClose }: Props) {
   const sky = skyFor(useMoment());
   const { closing, close } = useExit(280);
   const [status, setStatus] = useState<VoiceStatus>("connecting");
@@ -53,7 +55,7 @@ export function VoiceScreen({ conversationId, onConversation, onSaved, onClose }
       },
       conversation: (id) => cb.current.onConversation(id),
       saved: () => cb.current.onSaved(),
-    });
+    }, kind);
     engine.current = v;
     // A tick later, so a mount that's undone at once (React's dev double-mount) never opens a session.
     const t = window.setTimeout(() => void v.connect(), 0);

@@ -99,7 +99,7 @@ export async function chatHistoryView(ctx: Ctx, id: string, limit?: number): Pro
   };
 }
 
-function messageView(m: Message, actions: MChatHistory["actions"]): MMessage {
+export function messageView(m: Message, actions: MChatHistory["actions"]): MMessage {
   if (m.role !== "assistant") return { ...m, tool_events: m.tool_events ?? [], receipts: [], cardIds: [] };
   const { rows, cardIds } = replyView(m.tool_events ?? [], actions);
   return { ...m, tool_events: m.tool_events ?? [], receipts: rows, cardIds };

@@ -17,6 +17,8 @@ import { ToastHost } from "../ui/Toast";
 import { useMoment, usePalette } from "../theme/colour";
 import { skyFor } from "../theme/tokens";
 import { Settings } from "../settings/Settings";
+import { Setup } from "../onboarding/Setup";
+import { refreshMe, useProfile } from "../data/me";
 
 export function Shell() {
   const [page, setPage] = useState(1);
@@ -35,6 +37,16 @@ export function Shell() {
   const P = usePalette();
   const sky = skyFor(useMoment());
   const [waiting, setWaiting] = useState({ n: 0, ok: false });
+  // Setup: an unfinished account starts there; a skipped one can pick it up from Settings.
+  const profile = useProfile();
+  const [setup, setSetup] = useState<null | boolean>(null);
+  const inSetup = setup ?? (!!profile && !profile.onboarding.done);
+  const setupDone = useCallback(() => {
+    setSetup(false);
+    setPlanVersion((v) => v + 1);
+    setChatVersion((v) => v + 1);
+    void refreshMe();
+  }, []);
   const [inboxSignal, setInboxSignal] = useState(0);
   const onWaiting = useCallback((n: number, ok: boolean) => setWaiting((w) => (w.n === n && w.ok === ok ? w : { n, ok })), []);
 
@@ -107,7 +119,8 @@ export function Shell() {
           />
         ) : null}
         {overlay === "drawer" ? <Drawer currentId={chatId} onOpen={openChat} onClose={() => setOverlay(null)} onSettings={() => setOverlay("settings")} /> : null}
-        {overlay === "settings" ? <Settings onClose={() => setOverlay(null)} /> : null}
+        {overlay === "settings" ? <Settings onClose={() => setOverlay(null)} onSetup={() => { setOverlay(null); setSetup(true); }} /> : null}
+        {inSetup ? <Setup onDone={setupDone} /> : null}
         <OverlayLayer />
       </div>
     </ToastHost>

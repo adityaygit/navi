@@ -29,7 +29,10 @@ type ChatPayload = { id: string; title: string | null; messages: Message[]; acti
 
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`);
 
-export function useChat(initialId: string | null) {
+/** `opts.kind` "onboarding": the setup conversation (sent with that kind, history from /api/m/welcome/talk). */
+export function useChat(initialId: string | null, opts: { kind?: "chat" | "onboarding" } = {}) {
+  const kind = opts.kind ?? "chat";
+  const historyPath = (id: string, limit?: number) => (kind === "onboarding" ? "/api/m/welcome/talk" : `/api/m/chats/${id}/messages${limit ? `?limit=${limit}` : ""}`);
   const [state, setState] = useState<ChatState>({ conversationId: initialId, title: null, messages: [], actions: {}, undone: new Set(), live: null, sending: false, error: null, loading: !!initialId });
   const abort = useRef<AbortController | null>(null);
 
@@ -42,7 +45,7 @@ export function useChat(initialId: string | null) {
     // Switching chats: clear the old one at once, so nothing from it lingers.
     setState((s) => (s.conversationId === id ? { ...s, loading: true, error: null } : { ...s, conversationId: id, title: null, messages: [], actions: {}, undone: new Set(), live: null, loading: true, error: null }));
     try {
-      const c = await api<ChatPayload>(`/api/m/chats/${id}/messages`);
+      const c = await api<ChatPayload>(historyPath(id));
       setState((s) => (s.conversationId !== id ? s : { ...s, title: c.title, messages: c.messages, actions: c.actions ?? {}, undone: new Set(c.undone ?? []), loading: false }));
     } catch (e) {
       setState((s) => ({ ...s, loading: false, error: "Couldn't open that chat. Check your connection and try again." }));
@@ -76,7 +79,7 @@ export function useChat(initialId: string | null) {
       if (ev.type === "done") {
         if (ev.mutated) feel("success");
         // The saved reply's receipts and card states come from the history view.
-        void api<ChatPayload>(`/api/m/chats/${ev.conversationId}/messages?limit=2`)
+        void api<ChatPayload>(historyPath(ev.conversationId, 2))
           .then((h) =>
             setState((s) => {
               const byId = new Map(h.messages.map((m) => [m.id, m]));
@@ -87,7 +90,7 @@ export function useChat(initialId: string | null) {
       }
     };
     try {
-      const res = await rawSend("/api/chat", { body: { text, conversationId, stream: true, clientMessageId, viewing: viewing ?? null }, signal: ctl.signal });
+      const res = await rawSend("/api/chat", { body: { text, conversationId: kind === "onboarding" ? null : conversationId, stream: true, clientMessageId, viewing: viewing ?? null, ...(kind === "onboarding" ? { kind } : {}) }, signal: ctl.signal });
       if (!res.ok || !res.body) {
         const msg = await res.json().then((j: { error?: string }) => j.error).catch(() => undefined);
         throw new Error(msg || `Navi couldn't answer (${res.status}).`);

@@ -25,8 +25,8 @@ export function App() {
     setOpening(false);
   }, []);
 
-  // Dev-only: look at the signed-in screens in a browser without an account.
-  const content = preview ? <Shell /> : session === undefined ? null : session ? <Shell key={session.user.id} /> : <SignIn />;
+  // Dev-only: look at the signed-in screens (or, with ?preview=signin, sign in) in a browser without an account.
+  const content = preview ? (new URLSearchParams(location.search).get("preview") === "signin" ? <SignIn /> : <Shell />) : session === undefined ? null : session ? <Shell key={session.user.id} /> : <SignIn />;
   const ready = preview || session !== undefined;
 
   return (
