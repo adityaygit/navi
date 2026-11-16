@@ -43,7 +43,7 @@ function model(over: Partial<DayModelInput> = {}) {
 }
 function plan(tasks: Task[], over: Partial<SchedulerV2Input> = {}) {
   const m = model();
-  return scheduleDayV2({ date: MON, zone, now: morning, model: m, events: [], overrides: [], routines: [], tasks, keptBlocks: [], loadCap: 1, ...over });
+  return scheduleDayV2({ date: MON, zone, now: morning, model: m, events: [], overrides: [], routines: [], tasks, keptBlocks: [], loadCap: 1, policy: "commands", ...over });
 }
 
 const mine = [
@@ -52,8 +52,8 @@ const mine = [
   task({ id: "chem", title: "Chemistry pamphlet", estimate_minutes: 45 }),
 ];
 
-describe("R3 (current failure): old Canvas work crowds out the work the person chose", () => {
-  it.fails("the person's focus and must-do tasks are placed before overdue imported backlog", () => {
+describe("R3: old Canvas work no longer crowds out the work the person chose", () => {
+  it("the person's focus and must-do tasks are placed before overdue imported backlog", () => {
     const out = plan([...canvasBacklog(morning), ...mine], { focusTaskIds: ["ela", "chem"] });
     const placed = new Set(out.blocks.map((b) => b.task_id));
     expect(placed.has("navi-work")).toBe(true);
@@ -62,8 +62,8 @@ describe("R3 (current failure): old Canvas work crowds out the work the person c
   });
 });
 
-describe("R7 (current failure): the 'didn't fit' count is the whole backlog", () => {
-  it.fails("what didn't fit today counts today's work, not every open imported assignment", () => {
+describe("R7: what didn't fit counts today's work, not the whole backlog", () => {
+  it("what didn't fit today counts today's work, not every open imported assignment", () => {
     const out = plan([...canvasBacklog(morning), ...mine], { focusTaskIds: ["ela", "chem"] });
     const view = planView([{ ...out, date: MON, moved: 0 }], zone, { now: morning });
     // At most the person's own three tasks can be "didn't fit today"; 57 imported items are not.
@@ -71,18 +71,80 @@ describe("R7 (current failure): the 'didn't fit' count is the whole backlog", ()
   });
 });
 
-describe("R11 (current failure): a duration the person stated is scaled by the learned ratio", () => {
-  it.fails("30 minutes the person said stays 30 minutes", () => {
+describe("R11: a duration the person stated isn't scaled by the learned ratio", () => {
+  it("30 minutes the person said stays 30 minutes", () => {
     const ela = task({ id: "ela", title: "ELA presentation", estimate_minutes: 30, estimate_source: "user" } as Partial<Task>);
     const out = plan([ela], { estimateRatio: 1.5 });
     expect(out.blocks.filter((b) => b.task_id === "ela").reduce((s, b) => s + mins(b), 0)).toBe(30);
   });
 });
 
-describe("R2 / no false success (current failure)", () => {
-  it.fails("a run that changed nothing while work still doesn't fit never says the plan already works", () => {
+describe("R2 / no false success", () => {
+  it("a run that changed nothing while work still doesn't fit never says the plan already works", () => {
     const out = plan([task({ id: "big", title: "Navi work block", estimate_minutes: 600, commitment: "must" })]);
     const view = planView([{ ...out, date: MON, moved: 0 }], zone, { now: morning, unchanged: true });
     expect(view.display).not.toMatch(/already works/i);
+  });
+});
+
+describe("planner commands policy (pure)", () => {
+  it("before the fix (policy v2) the overdue backlog still wins: the switch keeps old accounts unchanged", () => {
+    const out = plan([...canvasBacklog(morning), ...mine], { focusTaskIds: ["ela", "chem"], policy: "v2" });
+    expect(out.blocks.some((b) => b.task_id === "ela")).toBe(false);
+    expect(out.triage).toEqual([]);
+  });
+
+  it("overdue imported work waits for a decision (triage), keeping its deadline and identity; nothing is dropped", () => {
+    const backlog = canvasBacklog(morning);
+    const out = plan([...backlog, ...mine]);
+    expect(out.triage).toHaveLength(40);
+    expect(out.triage[0]).toEqual(expect.objectContaining({ task_id: "canvas-old-0", due_at: backlog[0].due_at }));
+    expect(out.blocks.some((b) => b.task_id?.startsWith("canvas-old"))).toBe(false);
+    // Future imported work isn't "didn't fit": it waits for later days.
+    expect(out.unscheduled.filter((u) => u.task_id.startsWith("canvas-new")).every((u) => u.bucket === "later")).toBe(true);
+  });
+
+  it("work the person chose keeps its priority even when it's overdue (imported or not)", () => {
+    const late = task({ id: "late-canvas", title: "Late Canvas essay", source: "external", due_is_hard: true, due_at: morning.minus({ days: 3 }).toISO()!, estimate_minutes: 60 });
+    const out = plan([...canvasBacklog(morning), late, ...mine], { scope: { only: [], include: ["late-canvas"], exclude: [] } });
+    expect(out.blocks.some((b) => b.task_id === "late-canvas")).toBe(true);
+    expect(out.blocks[0].task_id).toBe("late-canvas");
+    expect(out.triage.some((t) => t.task_id === "late-canvas")).toBe(false);
+  });
+
+  it("focus and chosen work go first, then must-do, then upcoming hard deadlines", () => {
+    const hard = task({ id: "hard", title: "Lab report", due_is_hard: true, due_at: morning.plus({ days: 2 }).toISO()!, estimate_minutes: 30 });
+    const out = plan([hard, ...mine], { focusTaskIds: ["chem"] });
+    const order = out.blocks.map((b) => b.task_id);
+    expect(order.indexOf("chem")).toBeLessThan(order.indexOf("navi-work"));
+    expect(order.indexOf("navi-work")).toBeLessThan(order.indexOf("hard"));
+  });
+
+  it("scope 'only': nothing else is planned automatically; 'exclude' keeps a task off the day", () => {
+    const algebra = task({ id: "algebra", title: "Algebra Unit 4 Quiz", due_is_hard: true, due_at: morning.plus({ days: 1 }).toISO()! });
+    const only = plan([...mine, algebra], { scope: { only: ["ela", "chem"], include: [], exclude: [] } });
+    expect(new Set(only.blocks.map((b) => b.task_id))).toEqual(new Set(["ela", "chem"]));
+    expect(only.outOfScope.map((o) => o.task_id).sort()).toEqual(["algebra", "navi-work"]);
+    const excl = plan([...mine, algebra], { scope: { only: [], include: [], exclude: ["algebra"] } });
+    expect(excl.blocks.some((b) => b.task_id === "algebra")).toBe(false);
+    expect(excl.unscheduled.some((u) => u.task_id === "algebra")).toBe(false);
+  });
+
+  it("R12: a real shortfall is reported, durations are never shrunk, must-do work is placed first", () => {
+    const tasks = [
+      task({ id: "m1", title: "Must A", commitment: "must", estimate_minutes: 150, estimate_source: "user" } as Partial<Task>),
+      task({ id: "m2", title: "Must B", commitment: "must", estimate_minutes: 150, estimate_source: "user" } as Partial<Task>),
+      task({ id: "n1", title: "Other", estimate_minutes: 300, estimate_source: "user" } as Partial<Task>),
+    ];
+    const out = plan(tasks); // 6 hours free (3–9 PM), 10 hours of work
+    const placed = (id: string) => out.blocks.filter((b) => b.task_id === id).reduce((s, b) => s + mins(b), 0);
+    expect(placed("m1")).toBe(150);
+    expect(placed("m2")).toBe(150);
+    const short = out.unscheduled.find((u) => u.task_id === "n1")!;
+    expect(placed("n1") + short.remaining_minutes).toBe(300);
+    const view = planView([{ ...out, date: MON, moved: 0 }], zone, { now: morning });
+    // "Other" has no deadline and wasn't chosen: it waits for another day; it isn't a failure to fit.
+    expect(short.bucket).toBe("later");
+    expect(view.leftover?.line).toMatch(/1 thing waits for another day/);
   });
 });

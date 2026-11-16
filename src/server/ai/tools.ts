@@ -752,7 +752,7 @@ export const TOOLS = [
       const days = Array.from({ length: input.days ?? 1 }, (_, i) => DateTime.fromISO(first, { zone }).plus({ days: i }).toISODate()!);
       const run = await planDays(ctx, days, { trigger: "chat", mode: input.mode ?? undefined, from, focusTaskIds: input.focus_task_ids ?? undefined });
       const lead = facts.length ? `Saved for ${DateTime.fromISO(first, { zone }).toFormat("cccc")} only: ${facts.join("; ")}. ` : "";
-      const summary = run.status === "unchanged" ? `${lead}The plan already fits: nothing to change. ${run.summary}` : `${lead}${run.summary}${run.status === "applied" ? " (The user can undo this.)" : run.status === "proposed" ? ` ${WAITING}` : ""}`;
+      const summary = run.status === "unchanged" ? `${lead}Nothing changed: the planner found no better arrangement (this is not a success if what the user asked for isn't placed; check the result). ${run.summary}` : `${lead}${run.summary}${run.status === "applied" ? " (The user can undo this.)" : run.status === "proposed" ? ` ${WAITING}` : ""}`;
       const view = runView(run.results, zone, run);
       return { ok: true, mutated: true, summary, ...view, ...(facts.length && view.detail ? { detail: [...facts.map((f) => `Just ${dayName(first, zone)}: ${f}`), ...view.detail] } : {}), data: run.results.map((r) => ({ date: r.date, blocks: r.blocks.map((b) => ({ title: b.title, start: b.starts_at, end: b.ends_at, assumed: b.basis === "inferred" })), ...v2Data(r) })) };
     },

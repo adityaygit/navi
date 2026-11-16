@@ -270,6 +270,15 @@ async function executeApproved(ctx: Ctx, approval: Approval): Promise<{ summary:
           if (err instanceof StalePlanError) throw new StaleActionError(`${err.message}, so nothing was changed. Ask Navi for a fresh plan.`);
           throw err;
         }
+        // Planner commands: read back what was saved and say only what's true.
+        const { data: cs } = await ctx.db.from("plan_changesets").select("ops,postconditions,dates,base_version").eq("id", String(d.changeset_id)).maybeSingle();
+        if (cs?.base_version) {
+          const { verifyChangeset } = await import("@/server/planner/commands/verify");
+          const v = await verifyChangeset(ctx, String(d.changeset_id), cs.ops ?? [], cs.postconditions ?? [], cs.dates ?? []);
+          const failed = v.checks.filter((c) => !c.ok && !c.soft);
+          if (failed.length) return { summary: `Applied, but not everything is as asked: ${failed.map((f) => `${f.label} (${f.actual ?? "no"})`).join("; ")}. You can undo it.` };
+          return { summary: `Applied and checked: ${approval.summary}` };
+        }
         return { summary: `Applied: ${approval.summary}` };
       }
       case "create": {

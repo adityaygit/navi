@@ -27,6 +27,10 @@ export type Ctx = {
    * model wrote.
    */
   userMessage?: string;
+  /** When the current turn started (its user message was saved): offers made before it may be confirmed in words. */
+  turnStartedAt?: string;
+  /** The current turn's user message id (makes a tool call idempotent within the turn). */
+  turnId?: string;
   /**
    * Navi's autonomy setting for this turn. "ask": every change Navi would make
    * becomes an inline card first. Unset is treated as "auto".
