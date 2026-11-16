@@ -4,8 +4,9 @@ import { getProfile } from "@/server/context";
 import type { Message, ToolEvent } from "@/lib/types";
 import { relevantMemories } from "@/server/domain/memory";
 import { runAgent, type AgentMode } from "./agent";
-import { CHAT_SYSTEM, CHAT_SYSTEM_V2, ONBOARDING_SYSTEM } from "./prompts";
-import { plannerV2 } from "@/lib/planner-flag";
+import { CHAT_SYSTEM, CHAT_SYSTEM_COMMANDS, CHAT_SYSTEM_V2, ONBOARDING_SYSTEM } from "./prompts";
+import { plannerV2, plannerCommands } from "@/lib/planner-flag";
+import { isAffirmative } from "@/server/planner/commands/authorize";
 import { runTool } from "./tools";
 import { nowIn } from "@/lib/time";
 import { nowLine } from "@/lib/time-words";
@@ -369,14 +370,20 @@ export async function handleTurn(
   let result: Awaited<ReturnType<typeof runAgent>>;
   try {
     const profile = await getProfile(ctx);
-    const turnCtx: Ctx = { ...ctx, conversationId, autonomy: autonomyFrom(profile.preferences), plannerV2: plannerV2(profile.preferences) };
+    const turnCtx: Ctx = {
+      ...ctx, conversationId, autonomy: autonomyFrom(profile.preferences), plannerV2: plannerV2(profile.preferences), plannerCommands: plannerCommands(profile.preferences),
+      turnId: userMessage.id, turnStartedAt: userMessage.created_at,
+    };
+    // A short "yes" to a waiting plan change is a planning decision: the planner model resolves it.
+    const answersOffer = turnCtx.plannerCommands && input.text.length <= 60 && isAffirmative(input.text)
+      && !!(await ctx.db.from("plan_changesets").select("id").eq("conversation_id", conversationId).eq("status", "proposed").limit(1).maybeSingle()).data;
     const mode: AgentMode = input.kind === "onboarding" ? "onboarding" : "chat";
     const context = await buildContext(turnCtx, input.text, mode);
     result = await runAgent({
       ctx: turnCtx,
       mode,
-      role: mode === "onboarding" || PLANNER_CUES.test(input.text) ? "planner" : "fast",
-      system: mode === "onboarding" ? ONBOARDING_SYSTEM : turnCtx.plannerV2 ? CHAT_SYSTEM_V2 : CHAT_SYSTEM,
+      role: mode === "onboarding" || PLANNER_CUES.test(input.text) || answersOffer ? "planner" : "fast",
+      system: mode === "onboarding" ? ONBOARDING_SYSTEM : turnCtx.plannerCommands ? CHAT_SYSTEM_COMMANDS : turnCtx.plannerV2 ? CHAT_SYSTEM_V2 : CHAT_SYSTEM,
       context: `${context}\nUser's local time (same clock as the top): ${nowIn(profile.timezone).toFormat("cccc yyyy-LL-dd HH:mm ZZ")}${viewingLine(input.viewing)}`,
       history,
       userText: input.text,

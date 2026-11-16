@@ -288,8 +288,13 @@ export type PlanOptions = {
    * pipeline is on. The pipeline itself uses it to compute and save.
    */
   direct?: boolean;
-  /** Re-fit the rest of the dates around the change (default true). "Clear my day" doesn't refill it. */
-  refit?: boolean;
+  /**
+   * Re-fit the rest of the dates around the change (default true: a full
+   * re-plan). "existing": only work already planned there moves to make
+   * room; nothing new is added (explicit commands). false: nothing else
+   * changes ("clear my day" doesn't refill it).
+   */
+  refit?: boolean | "existing";
 };
 
 /** Explicit changes a command makes, planned around before the rest of the day is re-fitted. */
@@ -425,7 +430,8 @@ export async function computeRun(ctx: Ctx, dates: string[], opts: PlanOptions, o
             ? `${opts.reasonPrefix}: ${b.reason}`
             : b.reason,
     }));
-    const dayOps = opts.refit === false ? [] : diffDay(date, replaceable, desired);
+    const wanted = opts.refit === "existing" ? desired.filter((d) => replaceable.some((r) => keyOf(r) === keyOf(d))) : desired;
+    const dayOps = opts.refit === false ? [] : diffDay(date, replaceable, wanted);
     ops.push(...dayOps);
     for (const b of kept) if (["planned", "in_progress"].includes(b.status)) count(b);
     for (const b of desired) count(b);
@@ -483,8 +489,13 @@ export async function persistRun(ctx: Ctx, c: ComputedRun, p: PersistOptions & {
   };
   if (!ops.length) return { results, changesetId: null, status: "unchanged", actionId: null, summary: summaryOf(false), undo: [], changes: [] };
 
-  // Older proposals for these days are replaced by this one.
-  await ctx.db.from("plan_changesets").update({ status: "superseded" }).eq("user_id", ctx.userId).eq("status", "proposed").overlaps("dates", runDates);
+  // Older proposals for these days are replaced by this one (their cards say so).
+  const { data: replaced } = await ctx.db.from("plan_changesets").update({ status: "superseded" }).eq("user_id", ctx.userId).eq("status", "proposed").overlaps("dates", runDates).select("approval_id");
+  const oldCards = ((replaced ?? []) as { approval_id: string | null }[]).map((r) => r.approval_id).filter((x): x is string => !!x);
+  if (oldCards.length && c.baseVersion) {
+    const { expireApprovals } = await import("@/server/domain/approvals");
+    await expireApprovals(ctx, oldCards, "Replaced by a newer plan suggestion.");
+  }
   const explanation = results.map((r) => ({
     date: r.date, assumptions: r.assumptions, tradeoffs: r.tradeoffs, clarification: r.clarification, conflicts: r.conflicts,
     unscheduled: r.unscheduled.map((u) => ({ title: u.title, minutes: u.remaining_minutes, why: u.why, bucket: u.bucket ?? null })),

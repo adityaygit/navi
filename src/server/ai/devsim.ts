@@ -3,7 +3,7 @@ import { DateTime } from "luxon";
 import type { ToolEvent } from "@/lib/types";
 import { getProfile } from "@/server/context";
 import { recordUsage } from "./budget";
-import { plannerV2For, runTool, type ToolResult } from "./tools";
+import { plannerCommandsFor, plannerV2For, runTool, type ToolResult } from "./tools";
 import type { Ctx } from "@/server/context";
 import { parseDue, areaFor, detectAreas, extractAvailability, extractGoals, extractItems, extractName, extractProjects, extractRoutines, extractWeeklyCommitments } from "./heuristics";
 import type { AgentRequest, AgentResult } from "./agent";
@@ -164,6 +164,102 @@ export async function planningIntent(text: string, ctx: Ctx, call: Call, step: C
   return null;
 }
 
+/** "4", "4pm", "4:30", "16:00" → "HH:MM" (school-day hours without am/pm: 1–8 are afternoon). */
+function clockWords(t: string): string | null {
+  const m = t.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
+  return m ? clock(m[1], m[2], m[3]) : null;
+}
+const TIME = "(\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)?)";
+
+/** A short reply from a scheduling command's result: only what its checks confirm. */
+function commandReply(r: ToolResult, done: string): string {
+  const d = (r.data ?? {}) as { status?: string; alternatives?: string[] };
+  if (d.status === "applied") return r.ok ? `${done}.` : `${r.display}. You can undo it.`;
+  if (d.status === "proposed" || r.actionId) return "That has consequences you should see first, so it's on the card below; nothing changes until you approve.";
+  if (d.status === "challenged") return r.summary.replace(/^.*?: (Before I do that)/, "$1");
+  if (d.status === "unchanged" || d.status === "duplicate") return "Nothing needed to change.";
+  return r.display || r.summary;
+}
+
+/** Scheduling-command phrases (planner commands on), deterministically. */
+async function commandIntent(text: string, ctx: Ctx, call: Call): Promise<string | null> {
+  const t = text.trim();
+  // "yes" to a change waiting in this chat.
+  if (/^(yes|yeah|yep|sure|ok(ay)?|go ahead|do it|sounds good)\b/i.test(t) && ctx.conversationId) {
+    const { data } = await ctx.db.from("plan_changesets").select("id").eq("conversation_id", ctx.conversationId).eq("status", "proposed").limit(1);
+    if (data?.length) {
+      const r = await call("confirm_change", {});
+      return r.ok ? `Done: ${r.display}.` : r.summary;
+    }
+  }
+  // Reaffirming after the one challenge: "I know, move it anyway".
+  if (/\b(anyway|anyways|i know|still want)\b/i.test(t)) {
+    const { data: ch } = await ctx.db.from("accountability_checks").select("task_id,decision").eq("status", "challenged").order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (ch?.task_id) {
+      const r = await call("remove_work", { task_ids: [ch.task_id], reaffirmed: true });
+      return commandReply(r, "Okay, it's off today's plan and still on your list");
+    }
+  }
+  const swap = t.match(new RegExp(`\\bput (.+?)(?: at ${TIME})?\\s*(?:,|and)\\s*take (.+?) off\\b`, "i"));
+  if (swap) {
+    const [put] = await tasksLike(ctx, swap[1]);
+    const [off] = await tasksLike(ctx, swap[3]);
+    if (!put || !off) return `I couldn't find ${!put ? `“${swap[1].trim()}”` : `“${swap[3].trim()}”`} on your list. Which task is it?`;
+    const r = await call("swap_work", { put_task_id: put.id, take_off_task_id: off.id, ...(swap[2] ? { start: clockWords(swap[2]) } : {}) });
+    return commandReply(r, `${r.display}`);
+  }
+  const offer = t.match(new RegExp(`\\bwhat if (?:i |we )?(?:put|do|did) (.+?) at ${TIME}`, "i"));
+  if (offer) {
+    const [task] = await tasksLike(ctx, offer[1]);
+    if (!task) return `I couldn't find “${offer[1].trim()}” on your list.`;
+    const r = await call("schedule_task", { task_id: task.id, start: clockWords(offer[2]), mode: "preview" });
+    return r.actionId ? `Here's what that would do; it's on the card. Say yes and I'll do it.` : commandReply(r, "Done");
+  }
+  const place = t.match(new RegExp(`\\b(?:put|schedule|do|plan) (.+?) at ${TIME}(?:\\s+(today|tomorrow))?\\b`, "i"));
+  if (place && !/\bonly\b/i.test(t)) {
+    const [task] = await tasksLike(ctx, place[1]);
+    if (!task) return `I couldn't find “${place[1].trim()}” on your list. Want me to add it?`;
+    const r = await call("schedule_task", { task_id: task.id, start: clockWords(place[2]), ...(place[3] ? { date: place[3].toLowerCase() } : {}) });
+    return commandReply(r, `${r.display}`);
+  }
+  if (/\bclear (?:my |the )?(?:full |whole |entire )?(?:schedule|plan|day)\b/i.test(t)) {
+    const r = await call("remove_work", { whole_day: true, ...(/\btomorrow\b/i.test(t) ? { date: "tomorrow" } : {}) });
+    return commandReply(r, `${r.display}`);
+  }
+  const only = t.match(/\b(?:only (?:plan|schedule|do)|recovery day[^:]*:)\s*(.+?)(?:\s+today)?(?:[.;!]|$)/i);
+  if (only) {
+    const names = only[1].split(/,|\band\b/).map((x) => x.trim()).filter(Boolean);
+    const found = (await Promise.all(names.map((n) => tasksLike(ctx, n)))).map((x) => x[0]).filter(Boolean);
+    if (!found.length) return "Which tasks should today be about?";
+    const r = await call("set_day_scope", { scope_mode: "only", task_ids: [...new Set(found.map((f) => f.id))] });
+    return commandReply(r, `Today is only ${found.map((f) => q(f.title)).join(", ")}; the rest waits, and nothing was dropped`);
+  }
+  const off = t.match(/\b(?:take|leave) (.+?) off (?:my |the )?(?:plan|schedule|today)|\bskip (.+?) today\b/i);
+  if (off) {
+    const found = await tasksLike(ctx, off[1] ?? off[2]);
+    if (!found.length) return `I couldn't find “${(off[1] ?? off[2]).trim()}” on today's plan.`;
+    const r = await call("remove_work", { task_ids: found.map((f) => f.id) });
+    return commandReply(r, `${r.display}`);
+  }
+  const group = t.match(new RegExp(`\\b(?:group|do) (.+?) (?:as|into) one (?:work )?session(?: at ${TIME})?`, "i"));
+  if (group) {
+    const names = group[1].split(/,|\band\b/).map((x) => x.trim()).filter(Boolean);
+    const found = [...new Map((await Promise.all(names.map((n) => tasksLike(ctx, n)))).flat().map((f) => [f.id, f])).values()];
+    if (found.length < 2) return "Which tasks go in the session?";
+    const r = await call("group_session", { task_ids: found.map((f) => f.id), start: group[2] ? clockWords(group[2]) : "now" });
+    return commandReply(r, `${r.display}`);
+  }
+  const dur = t.match(/\b(?:for )?(?:the |my |this )?(.+?),? (\d{1,3}) ?(min|mins|minutes|hours?|hrs?) is (?:enough|plenty|fine)/i);
+  if (dur) {
+    const [task] = await tasksLike(ctx, dur[1]);
+    if (!task) return `Which task is that for?`;
+    const minutes = /^h/i.test(dur[3]) ? Number(dur[2]) * 60 : Number(dur[2]);
+    const r = await call("update_task", { id: task.id, estimate_minutes: minutes });
+    return r.ok ? `Got it: ${q(task.title)} is ${minutes} minutes now.` : r.summary;
+  }
+  return null;
+}
+
 /** "Now"-relative plan changes and "keep it off until Monday", for both planners. Times are worked out by the tools. */
 async function relativeIntent(text: string, ctx: Ctx, call: Call): Promise<string | null> {
   const keep = text.match(/\b(?:keep|leave)\s+(.+?)\s+off(?:\s+(?:my|the)\s+plan)?\s+(?:until|till|before)\s+(\w+)/i) ?? text.match(/\bdon'?t plan\s+(.+?)\s+(?:until|till|before)\s+(\w+)/i);
@@ -234,7 +330,8 @@ export async function runDevSim(req: AgentRequest): Promise<AgentResult> {
   const dropTask = req.mode === "chat" ? text.match(/^(?:please\s+)?(cancel|delete|remove)\s+(?:the\s+|my\s+)?(?:task\s+)?["“]?(.+?)["”]?[.!]?$/i) : null;
 
   // Planner v2: the six planning phrases from the brief, deterministically.
-  const relative = req.mode === "chat" ? await relativeIntent(text, ctx, call) : null;
+  const commandReplyText = req.mode === "chat" && (await plannerCommandsFor(ctx)) ? await commandIntent(text, { ...ctx, plannerCommands: true }, call) : null;
+  const relative = commandReplyText ?? (req.mode === "chat" ? await relativeIntent(text, ctx, call) : null);
   const v2Reply = relative ?? (req.mode === "chat" && (await plannerV2For(ctx)) ? await planningIntent(text, { ...ctx, plannerV2: true }, call, step) : null);
 
   if (v2Reply !== null) {

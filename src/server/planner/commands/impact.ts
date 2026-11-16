@@ -85,12 +85,15 @@ export function analyzeImpact(i: ImpactInput): Impact {
     if (awake && (iv.start! < awake.start || iv.end! > awake.end)) notes.push(`“${p.title}” is outside your usual waking hours.`);
   }
 
-  // 2. Blocks the command acts on directly.
+  // 2. Blocks the command acts on directly. Re-planning never touches locked or
+  //    hand-placed blocks as a side effect; changing one the person placed by
+  //    hand (or a fixed block) on Navi's say-so needs their informed OK.
   for (const b of i.before.filter((x) => targetBlocks.has(x.id))) {
     if (i.actor === "navi" && (b.created_by === "user" || b.placement === "manual")) {
       add({ key: `override_manual:${b.id}`, level: "high", text: `Changes “${b.title}”, which you placed yourself.` });
     } else if (i.actor === "navi" && b.pinned) {
-      add({ key: `override_lock:${b.id}`, level: "high", text: `Changes “${b.title}”, which is locked in place.` });
+      // The person named this block in their request: noted, not a side effect.
+      notes.push(`“${b.title}” was locked in place; it moves as you asked and stays locked.`);
     }
     if (i.actor === "navi" && !b.is_flexible) add({ key: `override_fixed:${b.id}`, level: "high", text: `Changes “${b.title}”, a fixed block.` });
   }

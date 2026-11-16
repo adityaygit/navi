@@ -102,6 +102,15 @@ async function expire(ctx: Ctx, admin: SupabaseClient, a: Approval, why: string)
   return done ?? ((await load(admin, a.user_id, a.id)) as Approval);
 }
 
+/** Expire waiting actions that something newer replaced (e.g. an older plan suggestion). */
+export async function expireApprovals(ctx: Ctx, ids: string[], why: string): Promise<void> {
+  const admin = createSupabaseAdmin();
+  for (const id of ids) {
+    const a = await load(admin, ctx.userId, id);
+    if (a?.status === "proposed") await expire(ctx, admin, a, why);
+  }
+}
+
 /**
  * Propose an action. The same open action proposed again (a retried tool
  * call, a reconnect, the same thing said twice) returns the existing one: the
@@ -226,10 +235,12 @@ async function execute(ctx: Ctx, admin: SupabaseClient, approval: Approval): Pro
 /** A stored patch, validated again now (the rules may be stricter than when it was proposed). */
 function validPatch(table: EntityTable, patch: Record<string, unknown>): Record<string, unknown> {
   if (table === "tasks") {
-    const { completed_at: _derived, ...rest } = patch;
+    const { completed_at: _derived, estimate_source: source, ...rest } = patch;
     void _derived;
-    const parsed = compact(TaskUpdate.strict().parse(rest));
+    const parsed: Record<string, unknown> = compact(TaskUpdate.strict().parse(rest));
     if (parsed.status === "done") throw new Error("Only you can mark a task done.");
+    // Recorded by the server (never chosen by the model): who set the estimate.
+    if (typeof source === "string" && ["user", "ai", "import", "default"].includes(source)) parsed.estimate_source = source;
     return parsed;
   }
   const schema = ENTITY_PATCHES[table as keyof typeof ENTITY_PATCHES];

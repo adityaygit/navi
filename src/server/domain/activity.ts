@@ -21,6 +21,9 @@ const REVERTIBLE_TABLES = new Set([
   "task_dependencies",
   "profiles",
   "plan_changesets",
+  // Planner commands: learned / stated planning rules and a day's scope.
+  "planning_rules",
+  "day_plan_scope",
 ]);
 
 export type ActivityInput = {

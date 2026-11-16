@@ -5,7 +5,6 @@ import { getProfile } from "@/server/context";
 import { planningPrefs } from "@/lib/planner-flag";
 import { awakeSpan } from "@/server/day";
 import { planView, changeLine } from "@/lib/plan-summary";
-import { nowIn } from "@/lib/time";
 import type { StepView } from "@/lib/tool-events";
 import { computeRun, persistRun, StalePlanError, type PlanOptions, type PlanRun } from "../plan-v2";
 import { analyzeImpact, impactLines, type Impact } from "./impact";
@@ -103,14 +102,17 @@ export async function executeCommand(ctx: Ctx, input: Command, opts: CommandOpti
       return fail("infeasible", `Not done, nothing changed: ${impact.infeasible}${alt}`, `Couldn't do that: ${impact.infeasible}${alt}`, alternatives);
     }
 
-    // 4. Accountability: at most one challenge per decision, never a block.
-    const challenge = await challengeFor(ctx, interp.defers, { reaffirmed: opts.reaffirmed, reason: opts.reason, riskHours: prefs.riskHours });
-    if (challenge) {
-      return fail("challenged", `Not done yet, nothing changed. Say this to the user (once; if they still want it, call again with reaffirmed true and it will run): ${challenge.text}`, challenge.text);
-    }
-
-    // 5. Authorize.
+    // 4. Authorize.
     const decision = decide({ actor: ctx.actor, autonomy: ctx.autonomy, mode: opts.mode ?? extra.mode, impact, authorize: opts.authorize, userQuote: opts.userQuote, userMessage: ctx.userMessage });
+
+    // 5. Accountability: at most one challenge per decision, never a block. A
+    //    change that already waits on a card with its consequences isn't challenged too.
+    if (decision.action === "apply") {
+      const challenge = await challengeFor(ctx, interp.defers, { reaffirmed: opts.reaffirmed, reason: opts.reason, riskHours: prefs.riskHours });
+      if (challenge) {
+        return fail("challenged", `Not done yet, nothing changed. Say this to the user (once; if they still want it, call again with reaffirmed true and it will run): ${challenge.text}`, challenge.text);
+      }
+    }
     if (!preview.ops.length) {
       const run: PlanRun = { results: preview.results, changesetId: null, status: "unchanged", actionId: null, summary: "", undo: [], changes: [] };
       const v = planView(preview.results, zone, { unchanged: true });
@@ -155,7 +157,6 @@ function runSummary(results: PlanRun["results"], zone: string): string {
 function report(cmd: Command, what: string, impact: Impact, v: Verification, run: PlanRun, zone: string): CommandResult {
   const failed = v.checks.filter((c) => !c.ok && !c.soft);
   const softMissed = v.checks.filter((c) => !c.ok && c.soft);
-  const today = nowIn(zone).toISODate()!;
   const base = planView(run.results, zone, { changes: run.changes });
   const moreLines = [
     ...impact.displaced.filter((d) => d.kind !== "moved").map((d) => (d.kind === "pushed" ? `${d.title} → ${DateTime.fromISO(d.to!).setZone(zone).toFormat("ccc h:mm a")}` : `${d.title}: off the plan for now (still on your list)`)),
@@ -209,7 +210,9 @@ export async function confirmChange(ctx: Ctx, changesetId?: string | null): Prom
     .order("created_at", { ascending: false })
     .limit(5);
   const started = ctx.turnStartedAt ? Date.parse(ctx.turnStartedAt) : Date.now();
-  const open = ((data ?? []) as { id: string; summary: string; approval_id: string; created_at: string }[]).filter((c) => Date.parse(c.created_at) < started);
+  const shown = ((data ?? []) as { id: string; summary: string; approval_id: string; created_at: string }[]).filter((c) => Date.parse(c.created_at) < started);
+  const { data: live } = shown.length ? await ctx.db.from("approvals").select("id").in("id", shown.map((c) => c.approval_id)).eq("status", "proposed") : { data: [] };
+  const open = shown.filter((c) => (live ?? []).some((a) => a.id === c.approval_id));
   if (!open.length) return { ok: false, summary: "There's no pending plan change in this chat that the user has already seen, so nothing was approved.", display: "" };
   const pick = changesetId ? open.find((c) => c.id === changesetId) : open.length === 1 ? open[0] : null;
   if (!pick) {

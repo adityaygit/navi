@@ -156,7 +156,7 @@ export async function interpret(ctx: Ctx, cmd: Command, profile: Profile): Promi
       return out({
         dates: [date], ops: [...scope, { op: "insert", block: b }],
         post: [{ kind: "task_at", task_id: t.id, title: t.title, starts_at: b.starts_at, ends_at: b.ends_at }, { kind: "task_open", task_id: t.id, title: t.title }],
-        targets: { blockIds: [], taskIds: [t.id], removes: false }, placed: [b.id], plan: {},
+        targets: { blockIds: [], taskIds: [t.id], removes: false }, placed: [b.id], plan: { refit: "existing" },
         what: `Put ${q(t.title)} at ${start.toFormat("h:mm a")}`, defers: [],
       });
     }
@@ -174,9 +174,36 @@ export async function interpret(ctx: Ctx, cmd: Command, profile: Profile): Promi
       const moved = ops as Extract<Op, { op: "move" }>[];
       return out({
         dates, ops, post: moved.map((o) => ({ kind: "block_at" as const, block_id: o.id, title: o.title, starts_at: o.after.starts_at, ends_at: o.after.ends_at })),
-        targets: { blockIds: blocks.map((x) => x.id), taskIds: [], removes: false }, placed: blocks.map((x) => x.id), fixedExcept: blocks.map((x) => x.id), plan: {},
+        targets: { blockIds: blocks.map((x) => x.id), taskIds: [], removes: false }, placed: blocks.map((x) => x.id), fixedExcept: blocks.map((x) => x.id), plan: { refit: "existing" },
         what: `Moved ${b.session_title ? q(b.session_title) : q(b.title)} to ${start.toFormat("h:mm a")}`,
         defers: start.toISODate()! > b.plan_date && b.task_id ? [{ task_id: b.task_id, title: b.title, decision: "postpone" }] : [],
+      });
+    }
+    case "move_many": {
+      const ops: Extract<Op, { op: "move" }>[] = [];
+      const seen = new Set<string>();
+      const dates = new Set<string>();
+      const names: string[] = [];
+      for (const m of cmd.moves) {
+        const b = await block(ctx, m.block_id);
+        needOpenBlock(b);
+        const start = resolveStart(m.start, m.date ?? b.plan_date, zone);
+        const delta = start.toMillis() - Date.parse(b.starts_at);
+        for (const x of await sessionOf(ctx, b)) {
+          if (seen.has(x.id)) continue;
+          seen.add(x.id);
+          const s0 = DateTime.fromMillis(Date.parse(x.starts_at) + delta).setZone(zone);
+          const len = x.id === b.id && m.minutes ? m.minutes : minutesOf(x);
+          ops.push(moveOp(x, { starts_at: s0.toUTC().toISO()!, ends_at: s0.plus({ minutes: len }).toUTC().toISO()!, plan_date: s0.toISODate()!, pinned: true }, ctx) as Extract<Op, { op: "move" }>);
+          dates.add(x.plan_date);
+          dates.add(s0.toISODate()!);
+        }
+        names.push(q(b.session_title ?? b.title));
+      }
+      return out({
+        dates: [...dates], ops, post: ops.map((o) => ({ kind: "block_at" as const, block_id: o.id, title: o.title, starts_at: o.after.starts_at, ends_at: o.after.ends_at })),
+        targets: { blockIds: [...seen], taskIds: [], removes: false }, placed: [...seen], fixedExcept: [...seen], plan: { refit: "existing" },
+        what: names.length === 1 ? `Moved ${names[0]}` : `Moved ${names.length} things`, defers: [],
       });
     }
     case "resize_block": {
@@ -195,7 +222,7 @@ export async function interpret(ctx: Ctx, cmd: Command, profile: Profile): Promi
       return out({
         dates: [...new Set(blocks.map((x) => x.plan_date))], ops,
         post: ops.map((o) => ({ kind: "block_at" as const, block_id: o.id, title: o.title, starts_at: o.after.starts_at, ends_at: o.after.ends_at })),
-        targets: { blockIds: blocks.map((x) => x.id), taskIds: [], removes: false }, placed: blocks.map((x) => x.id), fixedExcept: blocks.map((x) => x.id), plan: {},
+        targets: { blockIds: blocks.map((x) => x.id), taskIds: [], removes: false }, placed: blocks.map((x) => x.id), fixedExcept: blocks.map((x) => x.id), plan: { refit: "existing" },
         what: `Made ${b.session_title ? q(b.session_title) : q(b.title)} ${cmd.minutes} min`, defers: [],
       });
     }
@@ -240,7 +267,7 @@ export async function interpret(ctx: Ctx, cmd: Command, profile: Profile): Promi
       return out({
         dates: [...new Set([date, at.toISODate()!])], ops, post,
         targets: { blockIds: [...removing.map((r) => r.id), ...(cmd.place_block_id ? [cmd.place_block_id] : [])], taskIds: [...(removeTask ? [removeTask.id] : []), ...(cmd.place_task_id ? [cmd.place_task_id] : [])], removes: true },
-        placed: placedIds, fixedExcept: [...removing.map((r) => r.id), ...placedIds], plan: {},
+        placed: placedIds, fixedExcept: [...removing.map((r) => r.id), ...placedIds], plan: { refit: "existing" },
         what: `Put ${q(placedTitle)} at ${at.toFormat("h:mm a")}${removeTask ? ` and took ${q(removeTask.title)} off ${DateTime.fromISO(date).toFormat("cccc")}'s plan` : ""}`,
         defers: removeTask ? [{ task_id: removeTask.id, title: removeTask.title, decision: "unschedule" }] : [],
       });
@@ -253,7 +280,7 @@ export async function interpret(ctx: Ctx, cmd: Command, profile: Profile): Promi
       return out({
         dates: [...new Set(blocks.map((b) => b.plan_date))], ops: blocks.map((b) => ({ op: "insert" as const, block: b })),
         post: [...blocks.map((b) => ({ kind: "task_at" as const, task_id: t.id, title: t.title, starts_at: b.starts_at, ends_at: b.ends_at })), { kind: "task_open", task_id: t.id, title: t.title }],
-        targets: { blockIds: [], taskIds: [t.id], removes: false }, placed: blocks.map((b) => b.id), plan: {},
+        targets: { blockIds: [], taskIds: [t.id], removes: false }, placed: blocks.map((b) => b.id), plan: { refit: "existing" },
         what: `Split ${q(t.title)} into ${blocks.length} session${blocks.length === 1 ? "" : "s"}`, defers: [],
       });
     }
@@ -272,7 +299,7 @@ export async function interpret(ctx: Ctx, cmd: Command, profile: Profile): Promi
       return out({
         dates: [...new Set([date, ...[...removing.values()].map((b) => b.plan_date)])], ops,
         post: [...tasks.flatMap((t) => [{ kind: "task_not_on" as const, task_id: t.id, title: t.title, date }, { kind: "task_open" as const, task_id: t.id, title: t.title }])],
-        targets: { blockIds: [...removing.keys()], taskIds: tasks.map((t) => t.id), removes: true }, placed: [], fixedExcept: [...removing.keys()], plan: {},
+        targets: { blockIds: [...removing.keys()], taskIds: tasks.map((t) => t.id), removes: true }, placed: [], fixedExcept: [...removing.keys()], plan: { refit: "existing" },
         what: `Took ${tasks.length === 1 ? q(tasks[0].title) : sessions.length === 1 ? q(String(sessions[0])) : `${tasks.length || removing.size} things`} off ${DateTime.fromISO(date).toFormat("cccc")}'s plan (still on your list)`,
         defers: tasks.map((t) => ({ task_id: t.id, title: t.title, decision: "unschedule" as const })),
       });
@@ -309,7 +336,7 @@ export async function interpret(ctx: Ctx, cmd: Command, profile: Profile): Promi
       return out({
         dates: [...new Set(uniq.map((b) => b.plan_date))], ops,
         post: uniq.map((b) => ({ kind: "pinned" as const, block_id: b.id, title: b.title, value: cmd.locked })),
-        targets: { blockIds: uniq.map((b) => b.id), taskIds: [], removes: false }, placed: [], plan: {},
+        targets: { blockIds: uniq.map((b) => b.id), taskIds: [], removes: false }, placed: [], plan: { refit: "existing" },
         what: `${cmd.locked ? "Locked" : "Unlocked"} ${uniq.length === 1 ? q(uniq[0].title) : `${uniq.length} blocks`}`, defers: [],
       });
     }
@@ -360,7 +387,7 @@ export async function interpret(ctx: Ctx, cmd: Command, profile: Profile): Promi
       return out({
         dates: [...new Set(blocks.map((b) => b.plan_date))], ops: blocks.map((b) => ({ op: "insert" as const, block: b })),
         post: [...blocks.map((b) => ({ kind: "task_at" as const, task_id: b.task_id!, title: b.title, starts_at: b.starts_at, ends_at: b.ends_at })), ...tasks.map((t) => ({ kind: "task_open" as const, task_id: t.id, title: t.title }))],
-        targets: { blockIds: [], taskIds: tasks.map((t) => t.id), removes: false }, placed: blocks.map((b) => b.id), plan: {},
+        targets: { blockIds: [], taskIds: tasks.map((t) => t.id), removes: false }, placed: blocks.map((b) => b.id), plan: { refit: "existing" },
         what: `Grouped ${tasks.length} tasks into one work session at ${startAt.toFormat("h:mm a")}`, defers: [],
       });
     }

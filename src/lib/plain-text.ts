@@ -19,6 +19,15 @@ export const PLAN_TOOLS: readonly string[] = [
   "keep_off_until",
   "skip_occurrence",
   "set_day_exception",
+  "schedule_task",
+  "swap_work",
+  "change_block",
+  "remove_work",
+  "lock_block",
+  "set_day_scope",
+  "group_session",
+  "split_task",
+  "confirm_change",
 ];
 
 /**

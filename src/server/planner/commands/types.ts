@@ -13,6 +13,8 @@ export const CommandSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("schedule_task"), task_id: id, start, date: day.nullish(), minutes: mins.nullish() }),
   z.object({ kind: z.literal("move_block"), block_id: id, start, date: day.nullish() }),
   z.object({ kind: z.literal("resize_block"), block_id: id, minutes: mins }),
+  /** Several blocks moved in one change (sessions move as a unit). */
+  z.object({ kind: z.literal("move_many"), moves: z.array(z.object({ block_id: id, start, date: day.nullish(), minutes: mins.nullish() })).min(1).max(30) }),
   z.object({
     kind: z.literal("swap"),
     place_task_id: id.nullish(), place_block_id: id.nullish(), start: start.nullish(), minutes: mins.nullish(),

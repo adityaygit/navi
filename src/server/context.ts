@@ -38,6 +38,8 @@ export type Ctx = {
   autonomy?: "auto" | "ask";
   /** The constraint-first planner (profiles.preferences.planner_v2) is on for this person. Unset = look it up. */
   plannerV2?: boolean;
+  /** The scheduling-command layer (preferences.planner_commands, with planner v2) is on. Unset = look it up. */
+  plannerCommands?: boolean;
   /** Told about each activity-log entry written (so a tool call can offer Undo). */
   onActivity?: (entry: { id: string; reversible: boolean }) => void;
   /** Told about each action a step proposed (so its reply can show the card). */
