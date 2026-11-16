@@ -1,50 +1,67 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { MLine, MTaskItem, MDayItem } from "@shared/mobile-api-types";
 import { planActions, useDay, useInbox, useTasks, useWeek } from "../data/plan";
-import { addDays, clockAmPm, dayNum, monthDay, weekday, weekdayShort } from "../data/time";
+import { addDays, clockAmPm, dayNum, weekday, weekdayShort } from "../data/time";
 import { feel } from "../native/haptics";
-import { DayView } from "../plan/DayView";
+import { getSetting, setSetting, subscribeSettings } from "../native/settings";
+import { DayView, LockIcon, type DueMap } from "../plan/DayView";
+import { BlockSheet } from "../plan/BlockSheet";
 import { WeekView } from "../plan/WeekView";
 import { TasksView } from "../plan/TasksView";
-import { InboxSheet } from "../plan/InboxSheet";
+import { InboxSheet, type DoneRow } from "../plan/InboxSheet";
 import { AskBar, type AskRequest } from "../shell/AskSheet";
 import type { FocusTarget } from "../focus/Focus";
 import { useToast } from "../ui/Toast";
 import { useExit } from "../ui/useExit";
-import { ease, ink, meaning, type Palette } from "../theme/tokens";
+import { useSheetDrag } from "../ui/Sheet";
+import { ease, glass, glassStrong, ink, meaning, type Palette } from "../theme/tokens";
+
+// Plan (M6): the day's name (tap for another day) and one sentence about it,
+// Day · Week · List in a glass switch, "N need OK" when something waits for
+// you, then the day itself. Plain page: no sky here.
 
 type View = "day" | "week" | "tasks";
 const VIEWS: { v: View; t: string }[] = [
   { v: "day", t: "Day" },
   { v: "week", t: "Week" },
-  { v: "tasks", t: "Tasks" },
+  { v: "tasks", t: "List" },
 ];
+const SEG = 70;
 
-type Props = { palette: Palette; active: boolean; onAsk: (r: AskRequest) => void; onVoice: () => void; onFocus: (f: FocusTarget) => void; version?: number;
-  /** Bumped by the header's Inbox button. */ inboxSignal?: number;
-  /** Tells the header how much waits in Inbox, and whether anything needs your OK. */ onWaiting?: (n: number, needsOk: boolean) => void };
+type Props = {
+  palette: Palette;
+  active: boolean;
+  onAsk: (r: AskRequest) => void;
+  onVoice: () => void;
+  onFocus: (f: FocusTarget) => void;
+  version?: number;
+  /** Bumped by the header's Inbox button. */
+  inboxSignal?: number;
+  /** Tells the header how much waits in Inbox, and whether anything needs your OK. */
+  onWaiting?: (n: number, needsOk: boolean) => void;
+};
 
 function Line({ line }: { line: MLine | undefined }) {
   if (!line?.length) return null;
-  return (
-    <>
-      {line.map((s, i) => (
-        <span key={i} style={{ color: s.strong ? ink.text : ink.faint }}>{s.text}</span>
-      ))}
-    </>
-  );
+  return <>{line.map((s, i) => (s.strong ? <span key={i} className="em" style={{ color: ink.text }}>{s.text}</span> : <span key={i}>{s.text}</span>))}</>;
 }
+
+const useLockTipSeen = () => useSyncExternalStore(subscribeSettings, () => getSetting("lockTipSeen"));
 
 export function PlanPage({ palette: P, active, onAsk, onVoice, onFocus, version = 0, inboxSignal = 0, onWaiting }: Props) {
   const [view, setView] = useState<View>("day");
   const [date, setDate] = useState<string | null>(null);
   const [picker, setPicker] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
+  const [inboxDone, setInboxDone] = useState<DoneRow[]>([]);
+  const [opened, setOpened] = useState<MDayItem | null>(null);
   const day = useDay(date);
   const week = useWeek(date);
   const tasks = useTasks(view === "tasks");
   const inbox = useInbox();
   const toast = useToast();
+  const tipSeen = useLockTipSeen();
+
   // Something outside Plan changed the day (a focus session ended): reload.
   useEffect(() => {
     if (version) {
@@ -55,40 +72,57 @@ export function PlanPage({ palette: P, active, onAsk, onVoice, onFocus, version 
   }, [version]);
 
   const d = day.data;
-  const shownDate = d?.date ?? date ?? new Date().toISOString().slice(0, 10);
-  const title = view === "tasks" ? "Tasks" : view === "week" ? "This week" : d?.isToday ? weekday(shownDate) : weekday(shownDate);
-  const sub = view === "tasks" ? "" : view === "week" && week.data ? `${monthDay(week.data.start)} – ${dayNum(week.data.end)}` : monthDay(shownDate);
-  const waiting = (inbox.data?.counts.approvals ?? 0) + (inbox.data?.counts.proposals ?? 0);
+  const tz = d?.timezone ?? week.data?.timezone ?? "UTC";
+  const today = d?.isToday ? d.date : new Date().toISOString().slice(0, 10);
+  const shownDate = d?.date ?? date ?? today;
+  const title = view === "tasks" ? "Your list" : view === "week" ? "This week" : d?.isToday ? "Today" : shownDate === addDays(today, 1) ? "Tomorrow" : weekday(shownDate);
+  const approvals = inbox.data?.counts.approvals ?? 0;
+  const waiting = approvals + (inbox.data?.counts.proposals ?? 0);
   useEffect(() => {
-    onWaiting?.(waiting, !!inbox.data?.counts.approvals);
-  }, [waiting, inbox.data?.counts.approvals, onWaiting]);
+    onWaiting?.(waiting, !!approvals);
+  }, [waiting, approvals, onWaiting]);
   useEffect(() => {
     if (inboxSignal) setInboxOpen(true);
   }, [inboxSignal]);
-  const contextName = view === "tasks" ? "your tasks" : view === "week" ? "this week" : weekday(shownDate);
 
-  const ask = (prompt?: string, send?: boolean) => onAsk({ context: contextName, viewing: `Plan, ${view === "day" ? weekday(shownDate) : view}`, prompt, send });
+  // Hard deadlines by task, from the week (the day view doesn't carry them).
+  const due: DueMap = useMemo(() => {
+    const m: DueMap = new Map();
+    week.data?.days.find((x) => x.date === shownDate)?.due.forEach((x) => m.set(x.id, { at: x.due_at, hard: x.due_is_hard }));
+    return m;
+  }, [week.data, shownDate]);
+
+  const contextName = view === "tasks" ? "your list" : view === "week" ? "this week" : d?.isToday ? "today" : weekday(shownDate);
+  const ask = (prompt?: string, send?: boolean) => onAsk({ context: contextName, viewing: `Plan, ${view === "day" ? weekday(shownDate) : view === "tasks" ? "list" : "week"}`, prompt, send });
+
+  const showTip = active && view === "day" && !tipSeen && !!d?.items.some((i) => i.look === "fixed");
+  const hideTip = () => {
+    feel("select");
+    setSetting("lockTipSeen", true);
+  };
 
   const onPlace = async (taskId: string, start: string, minutes: number, t: string) => {
     feel("success");
     try {
       await planActions.placeTask(taskId, start, minutes);
-      toast(`${t} added at ${clockAmPm(start, d?.timezone ?? "UTC")}`);
+      toast(`${t} added at ${clockAmPm(start, tz)}`);
       void day.refresh();
+      void week.refresh();
     } catch (e) {
       feel("warning");
       toast(`Couldn't add it: ${(e as Error).message}`);
     }
   };
-  const onOutcome = async (it: MDayItem, status: "done" | "skipped") => {
-    feel("success");
+  const onOutcome = async (it: MDayItem, status: "done" | "planned") => {
+    feel(status === "done" ? "success" : "undo");
     try {
       await planActions.blockOutcome(it.id, { status });
       void day.refresh();
-      toast(`${it.title} marked done`, {
-        accent: P.accent,
-        undo: () => void planActions.blockOutcome(it.id, { status: "planned" }).then(() => day.refresh()),
-      });
+      if (status === "done")
+        toast(`${it.title} done`, {
+          accent: P.accent,
+          undo: () => void planActions.blockOutcome(it.id, { status: "planned" }).then(() => day.refresh()),
+        });
     } catch (e) {
       feel("warning");
       toast(`Couldn't save that: ${(e as Error).message}`);
@@ -109,87 +143,150 @@ export function PlanPage({ palette: P, active, onAsk, onVoice, onFocus, version 
       void tasks.refresh();
     }
   };
+  const focusOn = (it: MDayItem) => onFocus({ title: it.title, taskId: it.taskId, blockId: it.kind === "block" ? it.id : null, minutes: it.minutes, space: it.space?.name ?? null });
 
   const err = view === "day" ? day.error : view === "week" ? week.error : tasks.error;
   const loadingFirst = view === "day" ? !day.data : view === "week" ? !week.data : !tasks.data;
+  const vi = VIEWS.findIndex((x) => x.v === view);
+
+  const summary =
+    view === "day" ? (
+      <Line line={d?.headline} />
+    ) : view === "week" ? (
+      <Line line={week.data?.headline} />
+    ) : tasks.data ? (
+      <>
+        <span className="em" style={{ color: ink.text }}>{tasks.data.today.length} left today.</span>
+        {tasks.data.needsTime.length ? ` ${tasks.data.needsTime.length} still need a time.` : ""}
+      </>
+    ) : null;
 
   return (
-    <div style={{ position: "absolute", inset: 0 }}>
-      <div className="scroll" style={{ position: "absolute", inset: 0, padding: "calc(var(--sat) + 68px) 0 150px", boxSizing: "border-box" }}>
-        <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, top: 0, height: 460, background: P.scene, pointerEvents: "none" }} />
-        <div style={{ position: "relative", padding: "0 8px 0 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <button type="button" aria-haspopup="dialog" aria-label={`${title}${sub ? ", " + sub : ""}. Pick a day`} disabled={view === "tasks"} onClick={() => { feel("select"); setPicker(true); }} style={{ minHeight: 48, display: "flex", alignItems: "baseline", gap: 10 }}>
-            <span style={{ fontSize: 34, fontWeight: 700, letterSpacing: "-0.02em" }}>{title}</span>
-            {sub ? <span style={{ fontSize: 17, color: ink.faint }}>{sub}</span> : null}
-          </button>
-        </div>
-
-        <div role="group" aria-label="View" style={{ position: "relative", margin: "12px 20px 0", height: 40, padding: 4, boxSizing: "border-box", borderRadius: 20, background: "rgba(17,20,26,0.05)", display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
-          <span aria-hidden="true" style={{ position: "absolute", top: 4, bottom: 4, left: 4, width: "calc((100% - 8px) / 3)", borderRadius: 16, background: "rgba(17,20,26,0.08)", transform: `translateX(${VIEWS.findIndex((x) => x.v === view) * 100}%)`, transition: `transform 0.32s ${ease}` }} />
-          {VIEWS.map((x) => (
-            <button key={x.v} type="button" aria-pressed={view === x.v} onClick={() => { if (view !== x.v) { feel("select"); setView(x.v); } }} style={{ position: "relative", borderRadius: 16, fontSize: 15, fontWeight: view === x.v ? 600 : 500, color: view === x.v ? ink.text : ink.faint, textAlign: "center", transition: "color 0.25s" }}>
-              {x.t}
+    <div style={{ position: "absolute", inset: 0, background: ink.bg }}>
+      <div className="scroll" style={{ position: "absolute", inset: 0, padding: "calc(var(--sat) + 72px) 0 150px", boxSizing: "border-box" }}>
+        <div style={{ padding: "0 16px", display: "flex", flexDirection: "column", gap: 18 }}>
+          <div style={{ margin: "0 4px", display: "flex", flexDirection: "column", gap: 6 }}>
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              aria-label={`${title}. Pick a day`}
+              disabled={view !== "day"}
+              onClick={() => {
+                feel("select");
+                setPicker(true);
+              }}
+              style={{ alignSelf: "flex-start", minHeight: 44, display: "flex", alignItems: "center", gap: 8 }}
+            >
+              <h1 style={{ margin: 0, fontSize: 36, lineHeight: 1.05, fontWeight: 700, letterSpacing: "-0.035em" }}>{title}</h1>
+              {view === "day" ? (
+                <svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" style={{ marginTop: 4 }}>
+                  <path d="M5 8l5 5 5-5" fill="none" stroke={ink.text} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ) : null}
             </button>
-          ))}
-        </div>
-
-        <div key={view + (date ?? "")} style={{ position: "relative", animation: "nFade 0.3s ease both" }}>
-          <p style={{ margin: "20px 0 0", padding: "0 20px", fontSize: 17, lineHeight: 1.45, color: ink.faint, minHeight: 25 }}>
-            {view === "day" ? <Line line={d?.headline} /> : view === "week" ? <Line line={week.data?.headline} /> : tasks.data ? <><span style={{ color: ink.text }}>{tasks.data.today.length} left today.</span> {tasks.data.needsTime.length ? `${tasks.data.needsTime.length} still need a time.` : ""}</> : null}
-          </p>
-          {inbox.data?.counts.approvals && view === "day" ? (
-            <button type="button" onClick={() => setInboxOpen(true)} style={{ margin: "20px 20px 0", width: "calc(100% - 40px)", minHeight: 60, display: "flex", alignItems: "center", gap: 12, padding: "0 16px", borderRadius: 16, background: "rgba(244,179,122,0.10)" }}>
-              <span style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
-                <span style={{ fontSize: 17, fontWeight: 600, color: "#7A4300" }}>{inbox.data.counts.approvals} need{inbox.data.counts.approvals === 1 ? "s" : ""} your OK</span>
-                <span style={{ fontSize: 13, color: "#3B4252", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{inbox.data.approvals.map((a) => a.subject).join(" · ")}</span>
-              </span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={meaning.needsOk} strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
-            </button>
-          ) : null}
-          <div style={{ marginTop: 20 }}>
-            {loadingFirst && !err ? <Skeleton /> : null}
-            {err && loadingFirst ? <p style={{ margin: 0, padding: "0 20px", fontSize: 15, color: meaning.slipping }}>Couldn't load your plan. Pull Navi back up when you're online.</p> : null}
-            {view === "day" && d ? <DayView day={d} P={P} h={{ onPlace, onOutcome, onAsk: (prompt) => ask(prompt, /\.$/.test(prompt)), onFocus: (it) => onFocus({ title: it.title, taskId: it.taskId, blockId: it.kind === "block" ? it.id : null, minutes: it.minutes, space: it.space?.name ?? null }) }} /> : null}
-            {view === "week" && week.data ? <WeekView week={week.data} onOpenDay={(dt) => { setDate(dt); setView("day"); }} /> : null}
-            {view === "tasks" && tasks.data ? <TasksView groups={tasks.data} onToggle={onToggle} /> : null}
+            <p key={view + shownDate} style={{ margin: 0, minHeight: 24, fontSize: 17, lineHeight: 1.4, fontWeight: 500, color: "#1F2430", animation: "nFade 0.3s ease both" }}>{summary}</p>
           </div>
+
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <div role="tablist" aria-label="Plan view" style={{ ...glass, position: "relative", height: 46, padding: 4, borderRadius: 23, display: "flex", boxSizing: "border-box" }}>
+              <span aria-hidden="true" style={{ position: "absolute", top: 4, left: 4, width: SEG, height: 36, borderRadius: 18, background: "#FFFFFF", boxShadow: "0 2px 8px rgba(36,62,110,0.16)", transform: `translateX(${vi * SEG}px)`, transition: `transform 0.35s ${ease}` }} />
+              {VIEWS.map((x) => {
+                const sel = view === x.v;
+                return (
+                  <button key={x.v} type="button" role="tab" aria-selected={sel} onClick={() => { if (!sel) { feel("select"); setView(x.v); } }} style={{ position: "relative", width: SEG, height: 36, borderRadius: 18, fontSize: 15, fontWeight: sel ? 700 : 600, color: sel ? ink.text : ink.muted, textAlign: "center", transition: "color 0.25s" }}>
+                    {x.t}
+                  </button>
+                );
+              })}
+            </div>
+            {approvals ? (
+              <button type="button" onClick={() => { feel("select"); setInboxOpen(true); }} style={{ height: 46, padding: "0 16px", borderRadius: 23, background: ink.text, color: ink.onCta, fontSize: 15, fontWeight: 600, whiteSpace: "nowrap", animation: "nFade 0.3s ease both" }}>
+                {approvals} need{approvals === 1 ? "s" : ""} OK
+              </button>
+            ) : null}
+          </div>
+
+          {showTip ? (
+            <div style={{ borderRadius: 22, padding: "14px 12px 14px 16px", background: ink.raised, border: `1px solid ${ink.edge}`, display: "flex", alignItems: "center", gap: 12, animation: `nRise 0.35s ${ease} both` }}>
+              <LockIcon c={ink.text} size={14} />
+              <span style={{ flex: 1, fontSize: 16, fontWeight: 600, lineHeight: 1.3 }}>Locked means fixed. Navi plans around it, never moves it.</span>
+              <button type="button" onClick={hideTip} style={{ ...glass, flex: "none", height: 40, padding: "0 14px", borderRadius: 20, fontSize: 15, fontWeight: 600 }}>Got it</button>
+            </div>
+          ) : null}
+        </div>
+
+        <div key={view + (date ?? "")} style={{ marginTop: 18, animation: "nFade 0.3s ease both" }}>
+          {loadingFirst && !err ? <Skeleton /> : null}
+          {err && loadingFirst ? <p style={{ margin: 0, padding: "0 20px", fontSize: 16, fontWeight: 500, color: meaning.slipping }}>Couldn't load your plan. It'll come back when you're online.</p> : null}
+          {view === "day" && d ? <DayView day={d} due={due} h={{ onPlace, onOpen: setOpened, onAsk: (prompt, send) => ask(prompt, send), onFocus: focusOn }} /> : null}
+          {view === "week" && week.data ? <WeekView week={week.data} onOpenDay={(dt) => { setDate(dt); setView("day"); }} /> : null}
+          {view === "tasks" && tasks.data ? <TasksView groups={tasks.data} tz={tz} onToggle={onToggle} onAsk={(p) => ask(p)} /> : null}
         </div>
       </div>
 
-      {active ? <AskBar palette={P} text={`Ask about ${contextName}…`} onOpen={() => ask()} onVoice={onVoice} /> : null}
-      {picker ? <DayPicker selected={shownDate} today={d?.isToday ? d.date : new Date().toISOString().slice(0, 10)} onPick={(dt) => { setDate(dt); setView("day"); }} onClose={() => setPicker(false)} /> : null}
-      {inboxOpen ? <InboxSheet palette={P} inbox={inbox.data} onClose={() => setInboxOpen(false)} onChanged={() => { void inbox.refresh(); void day.refresh(); }} /> : null}
+      <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, top: 0, height: "calc(var(--sat) + 78px)", background: "linear-gradient(180deg, #FBFBFD 0%, #FBFBFD 62%, rgba(251,251,253,0) 100%)", pointerEvents: "none" }} />
+      {active ? <AskBar palette={P} text={`Ask about ${contextName}`} onOpen={() => ask()} onVoice={onVoice} /> : null}
+      {picker ? <DayPicker selected={shownDate} today={today} onPick={(dt) => { setDate(dt === today ? null : dt); setView("day"); }} onClose={() => setPicker(false)} /> : null}
+      {opened && d ? (
+        <BlockSheet item={opened} date={d.date} tz={tz} isToday={d.isToday} due={opened.taskId ? due.get(opened.taskId) : undefined} onClose={() => setOpened(null)} onFocus={focusOn} onOutcome={(it, s) => void onOutcome(it, s)} onAsk={(p, s) => ask(p, s)} />
+      ) : null}
+      {inboxOpen ? (
+        <InboxSheet
+          inbox={inbox.data}
+          done={inboxDone}
+          onDone={setInboxDone}
+          onClose={() => setInboxOpen(false)}
+          onChanged={() => {
+            void inbox.refresh();
+            void day.refresh();
+            void week.refresh();
+          }}
+        />
+      ) : null}
     </div>
   );
 }
 
 function Skeleton() {
   return (
-    <div aria-busy="true" aria-label="Loading" style={{ padding: "0 20px", display: "flex", flexDirection: "column", gap: 10 }}>
-      {[72, 52, 144, 96].map((h, i) => (
-        <span key={i} style={{ marginLeft: 52, height: h, borderRadius: 16, background: `rgba(255,255,255,${i % 2 ? 0.05 : 0.07})` }} />
+    <div aria-busy="true" aria-label="Loading" style={{ padding: "0 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+      {[72, 64, 120, 88].map((h, i) => (
+        <span key={i} style={{ marginLeft: 58, height: h, borderRadius: 20, background: i % 2 ? "rgba(17,20,26,0.04)" : "rgba(17,20,26,0.06)" }} />
       ))}
     </div>
   );
 }
 
+/** Seven days from yesterday. Pushing it back up closes it. */
 function DayPicker({ selected, today, onPick, onClose }: { selected: string; today: string; onPick: (d: string) => void; onClose: () => void }) {
   const { closing, close } = useExit(220);
+  const drag = useSheetDrag(onClose, "up");
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, i - 1));
   return (
     <>
-      <button type="button" aria-label="Close" onClick={() => close(onClose)} style={{ position: "absolute", inset: 0, zIndex: 10, background: "rgba(20,30,52,0.2)", animation: closing ? "nFadeOut 0.22s ease both" : "nFade 0.25s ease both" }} />
-      <section aria-label="Pick a day" style={{ position: "absolute", left: 12, right: 12, top: "calc(var(--sat) + 106px)", zIndex: 11, borderRadius: 24, background: "#FFFFFF", border: "1px solid rgba(17,20,26,0.08)", boxShadow: "0 30px 60px rgba(20,30,52,0.2)", padding: 12, display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 4, transformOrigin: "30% 0", animation: closing ? `nFadeOut 0.22s ease both` : `nGrow 0.26s ${ease} both` }}>
-        {days.map((dt) => {
-          const on = dt === selected;
-          return (
-            <button key={dt} type="button" aria-pressed={on} onClick={() => { feel("select"); close(() => { onClose(); onPick(dt); }); }} style={{ height: 64, borderRadius: 16, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, background: on ? ink.text : "transparent", color: on ? "#fff" : dt === today ? ink.text : ink.soft }}>
-              <span style={{ fontSize: 12 }}>{dt === today ? "Today" : weekdayShort(dt)}</span>
-              <span style={{ fontSize: 20, fontWeight: 600 }}>{dayNum(dt)}</span>
-            </button>
-          );
-        })}
-      </section>
+      <button ref={drag.scrim} type="button" aria-label="Close" tabIndex={-1} onClick={() => close(onClose)} style={{ position: "absolute", inset: 0, zIndex: 10, background: "rgba(20,30,52,0.18)", animation: closing ? "nFadeOut 0.22s ease both" : "nFade 0.25s ease backwards" }} />
+      <div ref={drag.wrap} style={{ position: "absolute", inset: 0, zIndex: 11, pointerEvents: "none" }}>
+        <section
+          role="dialog"
+          aria-label="Pick a day"
+          {...drag.handlers}
+          style={{ ...glassStrong, pointerEvents: "auto", position: "absolute", left: 8, right: 8, top: "calc(var(--sat) + 62px)", borderRadius: 30, padding: "18px 14px", display: "flex", flexDirection: "column", gap: 14, boxShadow: "0 30px 60px rgba(20,30,52,0.2)", transformOrigin: "30% 0", animation: closing ? "nFadeOut 0.22s ease both" : `nGrow 0.28s ${ease} both`, touchAction: "none" }}
+        >
+          <h2 style={{ margin: "0 6px", fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em" }}>Pick a day</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 4 }}>
+            {days.map((dt) => {
+              const on = dt === selected;
+              return (
+                <button key={dt} type="button" aria-pressed={on} onClick={() => { feel("select"); close(() => { onClose(); onPick(dt); }); }} style={{ height: 72, borderRadius: 18, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, background: on ? ink.text : "transparent", color: on ? ink.onCta : ink.text, transition: "background-color 0.2s" }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: on ? ink.onCta : ink.faint }}>{dt === today ? "Today" : weekdayShort(dt)}</span>
+                  <span style={{ fontSize: 20, fontWeight: 700 }}>{dayNum(dt)}</span>
+                </button>
+              );
+            })}
+          </div>
+          <span aria-hidden="true" style={{ alignSelf: "center", width: 40, height: 5, borderRadius: 3, background: "rgba(17,20,26,0.22)" }} />
+        </section>
+      </div>
     </>
   );
 }

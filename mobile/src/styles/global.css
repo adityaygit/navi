@@ -97,3 +97,6 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 
 /* Hold to confirm: nothing selects or pops a menu while held. */
 .hold { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: none; }
+
+/* A grid of paired buttons: an odd one out takes the whole row. */
+.pairs > :last-child:nth-child(odd) { grid-column: 1 / -1; }

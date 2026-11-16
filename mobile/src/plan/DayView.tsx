@@ -1,22 +1,25 @@
 import { useState } from "react";
 import type { MDay, MDayItem } from "@shared/mobile-api-types";
-import { clock, duration, range } from "../data/time";
+import { clock, clockAmPm, duration, range } from "../data/time";
 import { feel } from "../native/haptics";
-import { ease, ink, meaning, type Palette } from "../theme/tokens";
+import { ease, glass, ink, meaning } from "../theme/tokens";
 
-// The day as a timeline to scale (M4): 48 px an hour, nothing shorter than
-// 52 px, long free stretches folded. Time column 40 + 12, so every block
-// starts on the same line as "This morning" and the footer.
+// The day (M6): two-line blocks to scale, fixed ones white with a lock,
+// time you set aside pale blue, hard deadlines with a coral "Due" tag,
+// clashes side by side in amber, free time as a dashed slot you can fill.
 
 const PX = 0.8;
-const bh = (min: number) => Math.max(52, Math.round(min * PX));
-const gh = (min: number) => (min < 15 ? 8 : min <= 120 ? Math.max(12, Math.round(min * PX)) : 56);
-const LEFT = 52;
+const bh = (min: number) => Math.max(64, Math.round(min * PX));
+const TIME_W = 48;
+const LEFT = TIME_W + 10;
+
+/** Open tasks due this day, by task id (from the week view). */
+export type DueMap = Map<string, { at: string; hard: boolean }>;
 
 export type DayHandlers = {
   onPlace: (taskId: string, startIso: string, minutes: number, title: string) => void;
-  onOutcome: (item: MDayItem, status: "done" | "skipped") => void;
-  onAsk: (prompt: string) => void;
+  onOpen: (item: MDayItem) => void;
+  onAsk: (prompt: string, send?: boolean) => void;
   onFocus: (item: MDayItem) => void;
 };
 
@@ -24,14 +27,7 @@ type Row =
   | { k: "now"; key: string; at: string; label: string }
   | { k: "gap"; key: string; minutes: number; start: string; fits: MDay["free"][number]["fits"] }
   | { k: "item"; key: string; item: MDayItem }
-  | { k: "pair"; key: string; a: MDayItem; b: MDayItem; note: string };
-
-function hex(c: string, a: number): string {
-  const m = /^#?([0-9a-f]{6})$/i.exec(c.trim());
-  if (!m) return `rgba(200,200,210,${a})`;
-  const n = parseInt(m[1], 16);
-  return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`;
-}
+  | { k: "pair"; key: string; a: MDayItem; b: MDayItem };
 
 function buildRows(day: MDay, showEarlier: boolean): Row[] {
   const earlier = new Set(day.earlier?.keys ?? []);
@@ -42,13 +38,13 @@ function buildRows(day: MDay, showEarlier: boolean): Row[] {
   let cursor = null as string | null;
   let nowPlaced = !day.isToday;
   const nowIso = day.now;
+  const tz = day.timezone;
 
   const placeNow = () => {
     if (nowPlaced) return;
     nowPlaced = true;
     const next = items.find((i) => i.start > nowIso && !i.now);
-    const free = day.free.find((f) => f.start <= nowIso && f.end > nowIso) ?? day.free.find((f) => f.start >= nowIso);
-    const label = items.some((i) => i.now) ? "Now" : next && free && free.start <= nowIso ? `Now · free until ${clock(next.start, day.timezone)}` : next ? `Now · next thing at ${clock(next.start, day.timezone)}` : "Now · nothing else today";
+    const label = next ? `Free till ${clockAmPm(next.start, tz)}` : "Nothing else today";
     rows.push({ k: "now", key: "now", at: nowIso, label });
     cursor = nowIso;
   };
@@ -67,141 +63,159 @@ function buildRows(day: MDay, showEarlier: boolean): Row[] {
     if (other) {
       paired.add(it.key);
       paired.add(other.key);
-      const [a, b] = it.minutes >= other.minutes ? [it, other] : [other, it];
-      rows.push({ k: "pair", key: `pair-${a.key}`, a, b, note: `${b.title} overlaps ${a.title.toLowerCase().startsWith("your") ? a.title : `your ${a.title.charAt(0).toLowerCase()}${a.title.slice(1)}`}` });
+      const [a, b] = it.start <= other.start ? [it, other] : [other, it];
+      rows.push({ k: "pair", key: `pair-${a.key}`, a, b });
       const end = a.end > b.end ? a.end : b.end;
       cursor = cursor && cursor > end ? cursor : end;
     } else {
       rows.push({ k: "item", key: it.key, item: it });
       cursor = cursor && cursor > it.end ? cursor : it.end;
     }
-    if (!nowPlaced && it.now) {
-      nowPlaced = true; // "now" sits inside a running block: the block itself is marked
-    }
+    if (!nowPlaced && it.now) nowPlaced = true; // "now" is inside a running block: the block itself is marked
   }
   placeNow();
   return rows;
 }
 
-export function DayView({ day, P, h }: { day: MDay; P: Palette; h: DayHandlers }) {
+/** "Due 5" or "Due 5:30" — short enough to sit beside a title. */
+export function dueLabel(iso: string, tz: string): string {
+  return `Due ${clock(iso, tz).replace(/:00$/, "")}`;
+}
+
+/** The second line: when, then where or why. */
+function subLine(it: MDayItem, tz: string): string {
+  const why = it.assumed ? "Navi assumed you're free" : it.reason?.replace(/\.$/, "") || it.space?.name || null;
+  return why && why.length <= 34 ? `${range(it.start, it.end, tz)} · ${why}` : range(it.start, it.end, tz);
+}
+
+export function LockIcon({ c = ink.dim, size = 12 }: { c?: string; size?: number }) {
+  return (
+    <svg width={size} height={size * 1.17} viewBox="0 0 10 12" aria-hidden="true" style={{ flex: "none" }}>
+      <rect x="1" y="5" width="8" height="6" rx="1.5" fill={c} />
+      <path d="M3 5V3.5a2 2 0 014 0V5" fill="none" stroke={c} strokeWidth="1.3" />
+    </svg>
+  );
+}
+
+export function blockLook(it: MDayItem): React.CSSProperties {
+  if (it.look === "fixed") return { background: ink.raised, border: `1px solid ${ink.line}`, boxShadow: "0 1px 2px rgba(20,32,64,0.05), 0 10px 30px -16px rgba(20,32,64,0.2)" };
+  if (it.look === "flex") return { background: ink.flexible, border: `1px solid ${ink.flexibleEdge}` };
+  return { background: "transparent", border: "1.5px dashed rgba(17,20,26,0.18)" };
+}
+
+export function DayView({ day, h, due }: { day: MDay; h: DayHandlers; due: DueMap }) {
   const [showEarlier, setShowEarlier] = useState(false);
-  const [sel, setSel] = useState<string | null>(null);
   const [needsOpen, setNeedsOpen] = useState(false);
   const tz = day.timezone;
   const rows = buildRows(day, showEarlier);
-  const nextKey = day.items.find((i) => i.start > day.now && i.open && i.look === "flex")?.key;
+  const empty = !day.items.length;
 
-  const block = (it: MDayItem, compact = false) => {
-    const c = it.color || "#8E8E96";
-    const isSel = sel === it.key;
-    const bg = it.look === "fixed" ? hex(c, 0.16) : it.look === "flex" ? hex(c, 0.07) : "transparent";
-    const border = it.look === "routine" ? `1.5px dashed ${hex(c, 0.45)}` : it.look === "flex" ? `1.5px solid ${hex(c, it.key === nextKey ? 0.75 : 0.5)}` : `1px solid ${hex(c, 0.35)}`;
-    const due = it.overlaps.length ? "#7A4300" : "rgba(255,255,255,0.62)";
-    return (
-      <div style={{ position: "relative", flex: 1, minWidth: 0, borderRadius: 16, background: bg, border, boxSizing: "border-box", display: "flex", flexDirection: "column", opacity: it.done ? 0.55 : 1, transition: "background-color 0.25s, opacity 0.25s", height: compact ? "100%" : undefined }}>
-        <button
-          type="button"
-          aria-expanded={isSel}
-          onClick={() => {
-            feel("select");
-            setSel(isSel ? null : it.key);
-          }}
-          style={{ minHeight: compact ? undefined : bh(it.minutes) - 3, padding: compact ? "12px 14px" : "12px 16px", display: "flex", flexDirection: "column", gap: 2, flex: compact ? 1 : undefined }}
-        >
-          <span style={{ fontSize: compact ? 15 : 17, fontWeight: 600, textDecoration: it.done ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>{it.title}</span>
-          <span style={{ fontSize: 13, color: compact ? due : "rgba(255,255,255,0.62)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
-            {range(it.start, it.end, tz)}
-            {it.space && !compact ? ` · ${it.space.name}` : ""}
-          </span>
-        </button>
-        {!compact && !isSel && it.key === nextKey && it.taskId && day.isToday ? (
-          <button type="button" onClick={() => { feel("select"); h.onFocus(it); }} style={{ position: "absolute", right: 11, top: 11, height: 40, padding: "0 18px", borderRadius: 20, background: P.cta, color: "#FFFFFF", fontSize: 15, fontWeight: 600 }}>Start</button>
-        ) : null}
-        {isSel && !compact ? (
-          <div style={{ display: "flex", gap: 8, padding: "4px 12px 12px", animation: `nRise 0.28s ${ease} both` }}>
-            {it.taskId && !it.done && day.isToday ? (
-              <button type="button" onClick={() => { setSel(null); h.onFocus(it); }} style={{ flex: 1, height: 44, borderRadius: 22, background: P.cta, color: "#FFFFFF", fontSize: 15, fontWeight: 600, textAlign: "center" }}>
-                Start focus
-              </button>
-            ) : null}
-            {it.kind === "block" && !it.done ? (
-              <button type="button" onClick={() => { setSel(null); h.onOutcome(it, "done"); }} style={{ flex: 1, height: 44, borderRadius: 22, background: it.taskId && day.isToday ? "rgba(17,20,26,0.08)" : P.cta, color: it.taskId && day.isToday ? "#F5F5F7" : "#0B0B0C", fontSize: 15, fontWeight: it.taskId && day.isToday ? 400 : 600, textAlign: "center" }}>
-                Mark done
-              </button>
-            ) : null}
-            {it.taskId && !it.done && day.isToday && it.kind === "block" ? null : <button type="button" onClick={() => { setSel(null); h.onAsk(`About “${it.title}” at ${clock(it.start, tz)}: `); }} style={{ flex: 1, height: 44, borderRadius: 22, background: "rgba(17,20,26,0.08)", fontSize: 15, textAlign: "center" }}>
-              Ask Navi
-            </button>}
-          </div>
-        ) : null}
-      </div>
-    );
+  const time = (iso: string, strong: boolean) => (
+    <span style={{ flex: "none", width: TIME_W, paddingTop: 17, textAlign: "right", fontSize: 15, fontWeight: 600, color: strong ? ink.text : ink.dim }}>{clock(iso, tz)}</span>
+  );
+
+  const tag = (it: MDayItem) => {
+    const d = it.taskId ? due.get(it.taskId) : undefined;
+    if (!d?.hard || it.done) return null;
+    return <span style={{ flex: "none", height: 28, padding: "0 10px", borderRadius: 14, background: meaning.deadlineBg, color: meaning.deadline, fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>{dueLabel(d.at, tz)}</span>;
   };
 
+  const block = (it: MDayItem) => (
+    <div style={{ position: "relative", flex: 1, minWidth: 0, display: "flex" }}>
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        onClick={() => {
+          feel("select");
+          h.onOpen(it);
+        }}
+        className="npress"
+        style={{ ...blockLook(it), flex: 1, minWidth: 0, minHeight: bh(it.minutes), boxSizing: "border-box", borderRadius: 20, padding: "10px 16px", display: "flex", gap: 12, alignItems: "center", opacity: it.done ? 0.55 : 1, transition: "opacity 0.3s ease" }}
+      >
+        <span aria-hidden="true" style={{ flex: "none", alignSelf: "flex-start", marginTop: 7, width: 10, height: 10, borderRadius: 5, background: it.space?.color || it.color || "#A3A8BF" }} />
+        <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
+          <span style={{ fontSize: 17, fontWeight: 600, lineHeight: 1.3, textDecoration: it.done ? "line-through" : "none", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.title}</span>
+          <span style={{ fontSize: 15, fontWeight: 500, lineHeight: 1.3, color: it.now ? ink.text : ink.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.now ? `Now · until ${clockAmPm(it.end, tz)}` : subLine(it, tz)}</span>
+        </span>
+        {tag(it)}
+        {it.look === "fixed" ? <LockIcon /> : null}
+      </button>
+    </div>
+  );
+
+  if (empty)
+    return (
+      <div style={{ padding: "56px 24px 0", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 18, animation: "nFade 0.3s ease both" }}>
+        <p style={{ margin: 0, fontSize: 30, lineHeight: 1.1, fontWeight: 700, letterSpacing: "-0.03em" }}>
+          Your day is <span className="em">open</span>.
+        </p>
+        <button type="button" onClick={() => h.onAsk(`Help me plan ${day.isToday ? "today" : "this day"}.`, true)} style={{ height: 50, padding: "0 22px", borderRadius: 25, background: ink.text, color: ink.onCta, fontSize: 16, fontWeight: 600 }}>
+          Plan it with Navi
+        </button>
+      </div>
+    );
+
   return (
-    <div style={{ padding: "0 20px" }}>
+    <div style={{ padding: "0 16px" }}>
       {day.earlier && day.earlier.keys.length ? (
-        <button type="button" onClick={() => { feel("select"); setShowEarlier((v) => !v); }} style={{ marginLeft: LEFT, minHeight: 44, display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: ink.faint }}>
-          {showEarlier ? "Hide this morning" : `This morning · ${day.earlier.done} done`}
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d={showEarlier ? "m6 15 6-6 6 6" : "m6 9 6 6 6-6"} /></svg>
+        <button type="button" onClick={() => { feel("select"); setShowEarlier((v) => !v); }} style={{ ...glass, marginLeft: LEFT, marginBottom: 10, height: 40, padding: "0 14px", borderRadius: 20, display: "flex", alignItems: "center", gap: 8, fontSize: 15, fontWeight: 600 }}>
+          {showEarlier ? "Hide earlier" : `Earlier · ${day.earlier.done} done`}
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d={showEarlier ? "m6 15 6-6 6 6" : "m6 9 6 6 6-6"} /></svg>
         </button>
       ) : null}
-      <ol aria-label="Timeline" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+      <ol aria-label="Timeline" style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 10 }}>
         {rows.map((r) => {
           if (r.k === "now")
             return (
-              <li key={r.key} style={{ display: "flex", gap: 12, minHeight: 54 }}>
-                <span style={{ width: 40, flex: "none", paddingTop: 2, fontSize: 13, fontWeight: 600 }}>{clock(r.at, tz)}</span>
-                <div style={{ flex: 1, paddingTop: 4 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: 5, background: ink.text, boxShadow: "0 0 0 4px rgba(17,20,26,0.08)" }} />
-                    <span aria-hidden="true" style={{ flex: 1, height: 1.5, background: "rgba(255,255,255,0.55)" }} />
-                  </div>
-                  <div style={{ margin: "8px 0 0 18px", fontSize: 15, color: ink.muted }}>{r.label}</div>
-                </div>
+              <li key={r.key} style={{ display: "flex", gap: 10, alignItems: "center", minHeight: 30 }}>
+                <span style={{ flex: "none", width: TIME_W, textAlign: "right", fontSize: 15, fontWeight: 700, color: "#2B6FFF" }}>{clock(r.at, tz)}</span>
+                <span aria-hidden="true" style={{ flex: "none", width: 10, height: 10, borderRadius: 5, background: "#2B6FFF", boxShadow: "0 0 0 4px rgba(43,111,255,0.14)" }} />
+                <span style={{ flex: "none", fontSize: 15, fontWeight: 600, color: ink.soft }}>{r.label}</span>
+                <span aria-hidden="true" style={{ flex: 1, height: 2, borderRadius: 1, background: "linear-gradient(90deg, rgba(43,111,255,0.7), rgba(43,111,255,0))" }} />
               </li>
             );
           if (r.k === "gap") {
-            const folded = r.minutes > 120;
+            const future = !day.isToday || r.start >= day.now;
+            const slot = r.minutes >= 45 && future;
+            if (!slot) return <li key={r.key} aria-hidden="true" style={{ height: r.minutes > 120 ? 18 : 4 }} />;
             return (
-              <li key={r.key} style={{ display: "flex", gap: 12, minHeight: r.fits ? 44 : gh(r.minutes) }}>
-                <span style={{ width: 40, flex: "none" }} />
-                {r.minutes >= 30 ? (
-                  <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, paddingLeft: 16 }}>
-                    {folded ? <span aria-hidden="true" style={{ width: 18, height: 34, borderLeft: "2px dotted rgba(17,20,26,0.22)" }} /> : null}
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: ink.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {duration(r.minutes)} free{r.fits ? <> · fits <span style={{ color: ink.soft }}>{r.fits.title}</span></> : null}
-                    </span>
-                    {r.fits ? (
-                      <button type="button" aria-label={`Add ${r.fits.title} here`} onClick={() => h.onPlace(r.fits!.taskId, r.start, r.fits!.estimate, r.fits!.title)} style={{ flex: "none", minHeight: 44, padding: "0 6px", color: P.accent, fontWeight: 600, fontSize: 15 }}>
-                        Add
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
+              <li key={r.key} style={{ display: "flex", gap: 10 }}>
+                {time(r.start, false)}
+                <div style={{ flex: 1, minWidth: 0, minHeight: 64, boxSizing: "border-box", borderRadius: 20, border: "2px dashed rgba(17,20,26,0.14)", padding: "8px 8px 8px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span style={{ fontSize: 17, fontWeight: 600 }}>{duration(r.minutes)} free</span>
+                    <span style={{ fontSize: 15, fontWeight: 500, color: ink.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.fits ? `Fits ${r.fits.title}` : "Nothing planned"}</span>
+                  </span>
+                  {r.fits ? (
+                    <button type="button" aria-label={`Add ${r.fits.title} here`} onClick={() => h.onPlace(r.fits!.taskId, r.start, r.fits!.estimate, r.fits!.title)} style={{ ...glass, flex: "none", height: 44, padding: "0 16px", borderRadius: 22, fontSize: 15, fontWeight: 600 }}>
+                      Add
+                    </button>
+                  ) : (
+                    <button type="button" onClick={() => h.onAsk(`I have ${duration(r.minutes)} free from ${clockAmPm(r.start, tz)}. What should go there?`, true)} style={{ ...glass, flex: "none", height: 44, padding: "0 16px", borderRadius: 22, fontSize: 15, fontWeight: 600 }}>
+                      Fill it
+                    </button>
+                  )}
+                </div>
               </li>
             );
           }
           if (r.k === "pair") {
-            const ha = bh(r.a.minutes);
-            const off = Math.max(0, Math.round(((Date.parse(r.b.start) - Date.parse(r.a.start)) / 60000) * PX));
+            const card = (it: MDayItem) => (
+              <button key={it.key} type="button" onClick={() => { feel("select"); h.onOpen(it); }} style={{ flex: 1, minWidth: 0, minHeight: 64, boxSizing: "border-box", borderRadius: 18, padding: "10px 12px", background: "#FFF7EC", border: "1.5px solid rgba(233,169,58,0.55)", display: "flex", flexDirection: "column", gap: 2 }}>
+                <span style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.25, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.title}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: meaning.needsOk, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{range(it.start, it.end, tz)}</span>
+              </button>
+            );
             return (
-              <li key={r.key} style={{ display: "flex", flexDirection: "column" }}>
-                <div style={{ display: "flex", gap: 12, minHeight: Math.max(ha, off + 62) }}>
-                  <span style={{ width: 40, flex: "none", paddingTop: 14, fontSize: 13, color: ink.faint }}>{clock(r.a.start, tz)}</span>
-                  <div style={{ flex: 1, minWidth: 0, display: "flex", gap: 8, height: Math.max(ha, off + 62) }}>
-                    <div style={{ flex: 1, minWidth: 0, height: ha }}>{block(r.a, true)}</div>
-                    <div style={{ flex: 1, minWidth: 0, position: "relative" }}>
-                      <div style={{ position: "absolute", left: 0, right: 0, top: off, height: 62 }}>{block(r.b, true)}</div>
-                    </div>
+              <li key={r.key} style={{ display: "flex", gap: 10 }}>
+                {time(r.a.start, false)}
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {card(r.a)}
+                    {card(r.b)}
                   </div>
-                </div>
-                <div style={{ display: "flex", gap: 12 }}>
-                  <span style={{ width: 40, flex: "none" }} />
-                  <button type="button" onClick={() => h.onAsk(`${r.b.title} overlaps ${r.a.title}. Help me sort it out.`)} style={{ flex: 1, minWidth: 0, minHeight: 44, display: "flex", alignItems: "center", gap: 8, paddingLeft: 6, fontSize: 13, color: meaning.needsOk }}>
-                    <span aria-hidden="true" style={{ flex: "none", width: 8, height: 8, borderRadius: 4, background: meaning.needsOk }} />
-                    <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.note}</span>
-                    <span style={{ flex: "none", fontSize: 15, fontWeight: 600 }}>Sort it out</span>
+                  <button type="button" onClick={() => h.onAsk(`“${r.b.title}” clashes with “${r.a.title}”. Help me sort it out.`, true)} style={{ alignSelf: "flex-start", height: 40, padding: "0 14px", borderRadius: 20, background: ink.text, color: ink.onCta, fontSize: 15, fontWeight: 600 }}>
+                    These clash · sort it out
                   </button>
                 </div>
               </li>
@@ -209,33 +223,38 @@ export function DayView({ day, P, h }: { day: MDay; P: Palette; h: DayHandlers }
           }
           const it = r.item;
           return (
-            <li key={r.key} style={{ display: "flex", gap: 12, minHeight: bh(it.minutes), marginBottom: 12, animation: `nFade 0.3s ease both` }}>
-              <span style={{ width: 40, flex: "none", paddingTop: 14, fontSize: 13, fontWeight: it.now ? 600 : 400, color: it.now ? ink.text : ink.faint }}>{clock(it.start, tz)}</span>
+            <li key={r.key} style={{ display: "flex", gap: 10, animation: "nFade 0.3s ease both" }}>
+              {time(it.start, it.now)}
               {block(it)}
             </li>
           );
         })}
       </ol>
-      <div style={{ margin: `16px 0 0 ${LEFT}px`, display: "flex", flexDirection: "column" }}>
-        {day.untimed.length ? <span style={{ fontSize: 13, color: ink.faint }}>{day.untimed.map((u) => u.title).join(" · ")}</span> : null}
-        {day.needsTimeTotal ? (
-          <button type="button" onClick={() => { feel("select"); setNeedsOpen((v) => !v); }} style={{ minHeight: 44, display: "flex", alignItems: "center", gap: 6, fontSize: 15, color: ink.soft }}>
-            {day.needsTimeTotal === 1 ? "1 thing still needs a time" : `${day.needsTimeTotal} things still need a time`}
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d={needsOpen ? "m6 15 6-6 6 6" : "m6 9 6 6 6-6"} /></svg>
-          </button>
-        ) : null}
-        {needsOpen
-          ? day.needsTime.map((n) => (
-              <div key={n.id} style={{ minHeight: 56, display: "flex", alignItems: "center", gap: 8, borderTop: `1px solid ${ink.line}`, animation: `nRise 0.3s ${ease} both` }}>
-                <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-                  <span style={{ fontSize: 17, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{n.title}</span>
-                  <span style={{ fontSize: 13, color: ink.faint }}>{[n.estimate_minutes ? duration(n.estimate_minutes) : null, n.steps ? `${n.steps} steps` : null, n.due_at ? `due ${new Date(n.due_at).toLocaleDateString(undefined, { weekday: "short" })}` : null].filter(Boolean).join(" · ") || "No estimate"}</span>
-                </span>
-                <button type="button" onClick={() => h.onAsk(`Find a time for “${n.title}”.`)} style={{ minHeight: 44, padding: "0 4px", color: P.accent, fontWeight: 600, fontSize: 15 }}>Find a time</button>
-              </div>
-            ))
-          : null}
-      </div>
+
+      {day.untimed.length || day.needsTimeTotal ? (
+        <div style={{ margin: `18px 0 0 ${LEFT}px`, display: "flex", flexDirection: "column", gap: 8 }}>
+          {day.untimed.length ? <span style={{ fontSize: 15, fontWeight: 500, color: ink.faint }}>Also today · {day.untimed.map((u) => u.title).join(" · ")}</span> : null}
+          {day.needsTimeTotal ? (
+            <div style={{ background: ink.raised, borderRadius: 22, border: `1px solid ${ink.line}`, overflow: "hidden" }}>
+              <button type="button" aria-expanded={needsOpen} onClick={() => { feel("select"); setNeedsOpen((v) => !v); }} style={{ width: "100%", minHeight: 56, padding: "0 16px", display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 700 }}>
+                <span style={{ flex: 1 }}>{day.needsTimeTotal === 1 ? "1 thing needs a time" : `${day.needsTimeTotal} things need a time`}</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true" style={{ transform: needsOpen ? "rotate(180deg)" : "none", transition: `transform 0.3s ${ease}` }}><path d="m6 9 6 6 6-6" /></svg>
+              </button>
+              {needsOpen
+                ? day.needsTime.map((n) => (
+                    <div key={n.id} style={{ minHeight: 60, padding: "6px 8px 6px 16px", display: "flex", alignItems: "center", gap: 8, borderTop: `1px solid ${ink.line}`, animation: `nRise 0.3s ${ease} both` }}>
+                      <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                        <span style={{ fontSize: 16, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{n.title}</span>
+                        <span style={{ fontSize: 14, fontWeight: 500, color: n.due_is_hard ? meaning.deadline : ink.faint }}>{[n.estimate_minutes ? duration(n.estimate_minutes) : null, n.due_at ? `${n.due_is_hard ? "Due" : "Aim for"} ${new Date(n.due_at).toLocaleDateString(undefined, { weekday: "short", timeZone: tz })}` : null].filter(Boolean).join(" · ") || "No estimate yet"}</span>
+                      </span>
+                      <button type="button" onClick={() => h.onAsk(`Find a time for “${n.title}”.`, true)} style={{ ...glass, flex: "none", height: 40, padding: "0 14px", borderRadius: 20, fontSize: 15, fontWeight: 600 }}>Find a time</button>
+                    </div>
+                  ))
+                : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

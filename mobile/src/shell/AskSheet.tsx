@@ -3,6 +3,7 @@ import { useChat } from "../data/chat";
 import { Composer } from "../ui/Composer";
 import { Thread, buildItems } from "../ui/Thread";
 import { useExit } from "../ui/useExit";
+import { useSheetDrag } from "../ui/Sheet";
 import { useHideToast } from "../ui/Toast";
 import { feel } from "../native/haptics";
 import { Orb } from "../ui/Orb";
@@ -42,13 +43,15 @@ export function AskSheet({ palette: P, req, onClose, onExpand, onVoice }: Props)
 
   const empty = !items.length;
   const shut = () => close(onClose);
+  const drag = useSheetDrag(onClose);
   const hasCard = items.some((i) => i.k === "card");
   const height = full ? "calc(100% - var(--sat) - 12px)" : hasCard ? "min(640px, 78%)" : empty ? "min(420px, 60%)" : "min(540px, 70%)";
 
   return (
     <>
-      <button type="button" aria-label="Close" onClick={shut} style={{ position: "absolute", inset: 0, zIndex: 11, background: full ? "rgba(20,30,52,0.2)" : "rgba(0,0,0,0.25)", animation: closing ? "nFadeOut 0.28s ease both" : "nFade 0.3s ease both", transition: "background-color 0.3s" }} />
-      <section aria-label={`Navi, about ${req.context}`} style={{ position: "absolute", left: 0, right: 0, bottom: 0, height, zIndex: 12, ...glassStrong, borderRadius: "38px 38px 0 0", borderTop: "1px solid rgba(17,20,26,0.08)", boxShadow: "0 -24px 60px rgba(20,30,52,0.2)", display: "flex", flexDirection: "column", transition: `height 0.32s ${ease}`, animation: closing ? `nDown 0.28s ${ease} both` : `nUp 0.36s ${ease} both` }}>
+      <button ref={drag.scrim} type="button" aria-label="Close" tabIndex={-1} onClick={shut} style={{ position: "absolute", inset: 0, zIndex: 11, background: full ? "rgba(20,30,52,0.2)" : "rgba(20,30,52,0.14)", animation: closing ? "nFadeOut 0.28s ease both" : "nFade 0.3s ease backwards", transition: "background-color 0.3s" }} />
+      <div ref={drag.wrap} style={{ position: "absolute", inset: 0, zIndex: 12, pointerEvents: "none" }}>
+      <section role="dialog" aria-label={`Navi, about ${req.context}`} {...drag.handlers} style={{ pointerEvents: "auto", position: "absolute", left: 0, right: 0, bottom: 0, height, zIndex: 12, ...glassStrong, borderRadius: "38px 38px 0 0", borderTop: "1px solid rgba(17,20,26,0.08)", boxShadow: "0 -24px 60px rgba(20,30,52,0.2)", display: "flex", flexDirection: "column", transition: `height 0.32s ${ease}`, animation: closing ? `nDown 0.28s ${ease} both` : `nUp 0.36s ${ease} both` }}>
         <button type="button" aria-label={full ? "Make smaller" : "Make bigger"} onClick={() => { feel("select"); setFull((f) => !f); }} style={{ flex: "none", height: 26, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <span aria-hidden="true" style={{ width: 40, height: 5, borderRadius: 3, background: "rgba(17,20,26,0.22)" }} />
         </button>
@@ -78,6 +81,7 @@ export function AskSheet({ palette: P, req, onClose, onExpand, onVoice }: Props)
           <Composer palette={P} bg="#FFFFFF" placeholder="Ask…" initial={req.send ? "" : req.prompt ?? ""} autoFocus={!req.send && !!req.prompt} onSend={(t) => void sendText(t, req.viewing)} onVoice={onVoice} />
         </div>
       </section>
+      </div>
     </>
   );
 }
