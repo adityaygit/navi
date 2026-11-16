@@ -100,3 +100,7 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 
 /* A grid of paired buttons: an odd one out takes the whole row. */
 .pairs > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+/* Focus: the sky drifts slowly; the glow behind the ring breathes. */
+@keyframes fDrift { 0%, 100% { transform: translate3d(0, 0, 0) scale(1.06) } 50% { transform: translate3d(0, -22px, 0) scale(1.1) } }
+@keyframes fGlow { 0%, 100% { opacity: 0.55 } 50% { opacity: 0.9 } }

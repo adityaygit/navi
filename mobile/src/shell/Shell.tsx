@@ -2,11 +2,11 @@ import { useCallback, useRef, useState } from "react";
 import { Header, type HeaderHandle } from "./Header";
 import { Pager, type PagerHandle } from "./Pager";
 import { Drawer } from "./Drawer";
-import { VoiceSoon } from "./VoiceSoon";
+import { VoiceScreen } from "../voice/VoiceScreen";
 import { AskSheet, type AskRequest } from "./AskSheet";
 import { Focus, type FocusTarget } from "../focus/Focus";
-import { sceneFor } from "../focus/scenes";
-import { Stone } from "../ui/Stone";
+import { glassStrong } from "../theme/tokens";
+import { skyUrl } from "../ui/sky";
 import { feel } from "../native/haptics";
 import { ChatPage } from "../pages/ChatPage";
 import { PlanPage } from "../pages/PlanPage";
@@ -25,6 +25,10 @@ export function Shell() {
   const [focus, setFocus] = useState<FocusTarget | null>(null);
   const [pill, setPill] = useState<{ left: number; title: string } | null>(null);
   const [planVersion, setPlanVersion] = useState(0);
+  // Voice saves its turns into the chat: the chat reloads when voice closes.
+  const [chatVersion, setChatVersion] = useState(0);
+  const [typeNow, setTypeNow] = useState(false);
+  const voiceChanged = useRef(false);
   const header = useRef<HeaderHandle>(null);
   const pager = useRef<PagerHandle>(null);
   const P = usePalette();
@@ -45,7 +49,7 @@ export function Shell() {
       <div style={{ position: "absolute", inset: 0, overflow: "hidden", background: "#E9EEF5" }}>
         <Pager page={page} onPage={setPage} onDrag={onDrag} enabled={overlay === null && ask === null && (!focus || !!pill)} handle={pager}>
           <ProgressPage palette={P} />
-          <ChatPage palette={P} chatId={chatId} onChatId={setChatId} onVoice={voice} />
+          <ChatPage key={chatVersion} palette={P} chatId={chatId} onChatId={setChatId} onVoice={voice} typeNow={typeNow} />
           <PlanPage palette={P} active={page === 2} onAsk={setAsk} onVoice={voice} onFocus={(f) => { setPill(null); setFocus(f); }} version={planVersion} inboxSignal={inboxSignal} onWaiting={onWaiting} />
         </Pager>
         <Header ref={header} page={page} sky={sky} waiting={waiting.n} planDot={waiting.ok} onPick={(n) => pager.current?.goTo(n)} onMenu={() => setOverlay("drawer")} onInbox={() => { if (page !== 2) pager.current?.goTo(2); setInboxSignal((v) => v + 1); }} />
@@ -73,13 +77,34 @@ export function Shell() {
           />
         ) : null}
         {focus && pill ? (
-          <button type="button" onClick={() => { feel("select"); setPill(null); }} style={{ position: "absolute", left: 16, right: 16, bottom: "calc(var(--sab) + 68px)", zIndex: 9, height: 52, display: "flex", alignItems: "center", gap: 12, padding: "0 20px", borderRadius: 26, background: "#FFFFFF", border: `1px solid ${sceneFor(focus.space).tint}55`, boxShadow: "0 12px 30px rgba(20,30,52,0.2)", animation: "nRise 0.34s ease both" }}>
-            <Stone w={18} h={16} bg={sceneFor(focus.space).stone} />
-            <span style={{ flex: 1, minWidth: 0, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>In focus · {pill.title}</span>
-            <span style={{ fontSize: 15, fontWeight: 600 }}>{Math.floor(pill.left / 60)}:{String(pill.left % 60).padStart(2, "0")}</span>
+          <button type="button" aria-label={`Back to focus on ${pill.title}`} onClick={() => { feel("select"); setPill(null); }} style={{ ...glassStrong, position: "absolute", left: 16, right: 16, bottom: "calc(var(--sab) + 68px)", zIndex: 9, height: 56, display: "flex", alignItems: "center", gap: 12, padding: "0 20px 0 10px", borderRadius: 28, boxShadow: "0 12px 30px rgba(20,30,52,0.2)", animation: "nRise 0.34s ease both" }}>
+            <span aria-hidden="true" className="sky sky-focus" style={{ width: 36, height: 36, borderRadius: 18, flex: "none", backgroundImage: `url(${skyUrl("focus")})` }} />
+            <span style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>In focus · {pill.title}</span>
+            <span style={{ fontSize: 16, fontWeight: 700 }}>{Math.floor(pill.left / 60)}:{String(pill.left % 60).padStart(2, "0")}</span>
           </button>
         ) : null}
-        {overlay === "voice" ? <VoiceSoon palette={P} onClose={() => setOverlay(null)} /> : null}
+        {overlay === "voice" ? (
+          <VoiceScreen
+            conversationId={chatId}
+            onConversation={(id) => {
+              if (id !== chatId) openChat(id);
+            }}
+            onSaved={() => {
+              voiceChanged.current = true;
+            }}
+            onClose={(typeInstead) => {
+              setOverlay(null);
+              setAsk(null);
+              if (voiceChanged.current) {
+                voiceChanged.current = false;
+                setChatVersion((v) => v + 1);
+                setPlanVersion((v) => v + 1);
+              }
+              setTypeNow(typeInstead);
+              if (page !== 1 || typeInstead) pager.current?.goTo(1);
+            }}
+          />
+        ) : null}
         {overlay === "drawer" ? <Drawer currentId={chatId} onOpen={openChat} onClose={() => setOverlay(null)} onSettings={() => setOverlay("settings")} /> : null}
         {overlay === "settings" ? <Settings onClose={() => setOverlay(null)} /> : null}
       </div>

@@ -16,7 +16,7 @@ import { ease, glass, ink, momentAt, skyFor, type Palette } from "../theme/token
 
 const greetWord = { morning: "Good morning,", afternoon: "Good afternoon,", evening: "Good evening,", night: "Good evening," } as const;
 
-type Props = { palette: Palette; chatId: string | null; onChatId: (id: string | null) => void; onVoice: () => void; onOpenPlan?: () => void };
+type Props = { palette: Palette; chatId: string | null; onChatId: (id: string | null) => void; onVoice: () => void; onOpenPlan?: () => void; /** Open with the keyboard up (after "Type instead" in voice). */ typeNow?: boolean };
 
 /** The day's sentence, with the words that matter in italic. */
 function Headline({ line }: { line: MLine | undefined }) {
@@ -42,7 +42,7 @@ export function nowNext(d: MDay | null): string | null {
   return `Next · ${next.title} at ${clockAmPm(next.start, tz)}`;
 }
 
-export function ChatPage({ palette: P, chatId, onChatId, onVoice, onOpenPlan }: Props) {
+export function ChatPage({ palette: P, chatId, onChatId, onVoice, onOpenPlan, typeNow }: Props) {
   const me = useMe();
   const { state, sendText, undo, decide } = useChat(chatId);
   const day = useDay(null);
@@ -108,7 +108,7 @@ export function ChatPage({ palette: P, chatId, onChatId, onVoice, onOpenPlan }: 
         <p role="alert" style={{ position: "relative", margin: "0 20px 4px", fontSize: 15, fontWeight: 500, color: "#B23A17", animation: "nRise 0.3s ease both" }}>{state.error}</p>
       ) : null}
       <div style={{ position: "relative", flex: "none", padding: "8px 12px var(--sab)" }}>
-        <Composer palette={P} onSend={(t) => void sendText(t)} onVoice={onVoice} />
+        <Composer palette={P} autoFocus={typeNow} onSend={(t) => void sendText(t)} onVoice={onVoice} />
       </div>
     </div>
   );

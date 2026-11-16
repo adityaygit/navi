@@ -4,6 +4,7 @@ import { ease } from "../theme/tokens";
 import { useMoment } from "../theme/colour";
 import { skyFor } from "../theme/tokens";
 import { Orb } from "./Orb";
+import { discardPrimedAudio, primeVoiceAudio } from "../voice/live";
 
 // Talk (M6): Navi's orb. Press and hold: a tick, rising ticks, and the orb
 // swells; at 0.45 s voice opens with a medium bump. A quick tap only gives a
@@ -37,6 +38,8 @@ export function HoldToTalk({ disabled, onVoice, onDisabledTap, compact, size }: 
     }
     started.current = performance.now();
     fired.current = false;
+    // Audio may only start inside a touch: get it ready now, in case this becomes voice.
+    primeVoiceAudio();
     setHolding(true);
     setHint(false);
     feel("holdStart");
@@ -57,6 +60,7 @@ export function HoldToTalk({ disabled, onVoice, onDisabledTap, compact, size }: 
     }
     clear();
     setHolding(false);
+    if (!fired.current) discardPrimedAudio();
     if (!fired.current && performance.now() - started.current < HOLD_MS) {
       feel("tapHint");
       setHint(true);
@@ -81,11 +85,13 @@ export function HoldToTalk({ disabled, onVoice, onDisabledTap, compact, size }: 
         onPointerCancel={() => {
           clear();
           setHolding(false);
+          if (!fired.current) discardPrimedAudio();
         }}
         onContextMenu={(e) => e.preventDefault()}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
+            primeVoiceAudio();
             feel("voiceOn");
             onVoice();
           }
