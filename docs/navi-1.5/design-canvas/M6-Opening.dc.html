@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi opening · replay</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,400..800;1,400..800&amp;display=swap">
+<style>
+body{margin:0}
+.op button{font:inherit;color:inherit;border:0;margin:0;cursor:pointer}
+.op button:focus-visible{outline:2px solid #2B6FFF;outline-offset:3px}
+@keyframes spMarkIn{from{opacity:0;transform:scale(0.82)}to{opacity:1;transform:none}}
+@keyframes spSlide{from{transform:translateX(86.5px)}to{transform:none}}
+@keyframes spWord{from{opacity:0;clip-path:inset(0 100% 0 0);transform:translateX(-18px)}to{opacity:1;clip-path:inset(0 0 0 0);transform:none}}
+@keyframes spOut{from{opacity:1}to{opacity:0}}
+@keyframes spLockOut{from{opacity:1;transform:none;filter:blur(0)}to{opacity:0;transform:scale(0.94);filter:blur(6px)}}
+@keyframes homeUp{from{opacity:0;transform:translateY(90px) scale(0.97)}to{opacity:1;transform:none}}
+</style>
+</helmet>
+<div class="op" style="width: 560px; height: 1060px; box-sizing: border-box; padding: 40px 0; background: #EEF1F6; font-family: 'Figtree', system-ui, sans-serif; color: #11141A; display: flex; flex-direction: column; align-items: center; gap: 28px">
+  <div style="position: relative; width: 390px; height: 844px; border-radius: 48px; overflow: hidden; border: 1px solid rgba(17,20,26,0.1); box-shadow: 0 30px 60px -30px rgba(20,32,64,0.35); background: #FFFFFF">
+    <sc-for list="{{runs}}" as="r" hint-placeholder-count="1">
+      <sc-if value="{{r.on}}" hint-placeholder-val="{{true}}">
+        <div style="position: absolute; inset: 0">
+          <div style="position: absolute; inset: 0; animation: {{a.home}}">
+            <dc-import name="M6-Sky-Proto" intro="off" hint-size="390px,844px"></dc-import>
+          </div>
+          <div aria-hidden="true" style="position: absolute; inset: 0; z-index: 100; background: #FFFFFF; animation: {{a.out}}">
+            <div style="position: absolute; inset: 0; animation: {{a.lock}}">
+              <div style="position: absolute; left: 174px; top: 394px; width: 156px; height: 57px; animation: {{a.word}}">
+                <img src="/_blob/f364765c63a1af62319cb11929e58669" alt="" style="display: block; width: 156px; height: 57px">
+              </div>
+              <div style="position: absolute; left: 50px; top: 380px; width: 117px; height: 84px; background: #FFFFFF; border-radius: 30px; animation: {{a.slide}}"></div>
+              <div style="position: absolute; left: 60px; top: 386px; width: 97px; height: 72px; animation: {{a.slide}}">
+                <img src="/_blob/44c459d0278a1f3812bfe3fbc351f048" alt="" style="display: block; width: 97px; height: 72px; animation: {{a.mark}}">
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+    </sc-for>
+  </div>
+  <div style="display: flex; gap: 10px">
+    <button type="button" onClick="{{replay}}" style="height: 54px; padding: 0 28px; border-radius: 999px; background: #11141A; color: #FFFFFF; font-size: 17px; font-weight: 700">Replay</button>
+    <button type="button" onClick="{{toggleSlow}}" aria-pressed="{{slowP}}" style="height: 54px; padding: 0 22px; border-radius: 999px; background: {{slowBg}}; color: {{slowC}}; border: 1px solid rgba(17,20,26,0.12); font-size: 17px; font-weight: 700">Slow motion {{slowT}}</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":560,"height":1060}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { run: 0, slow: false }; }
+  renderVals() {
+    const s = this.state;
+    const k = s.slow ? 3 : 1;
+    const t = (d) => (d * k).toFixed(2) + 's';
+    const a = {
+      mark: 'spMarkIn ' + t(0.65) + ' cubic-bezier(0.2, 0.9, 0.25, 1) ' + t(0.1) + ' both',
+      slide: 'spSlide ' + t(0.75) + ' cubic-bezier(0.65, 0, 0.2, 1) ' + t(0.95) + ' both',
+      word: 'spWord ' + t(0.7) + ' cubic-bezier(0.2, 0.9, 0.25, 1) ' + t(1.4) + ' both',
+      lock: 'spLockOut ' + t(0.42) + ' cubic-bezier(0.4, 0, 1, 1) ' + t(2.0) + ' both',
+      out: 'spOut ' + t(0.6) + ' cubic-bezier(0.4, 0, 0.2, 1) ' + t(2.3) + ' both',
+      home: 'homeUp ' + t(1.0) + ' cubic-bezier(0.2, 0.9, 0.25, 1) ' + t(2.2) + ' both'
+    };
+    return {
+      a,
+      runs: [{ on: s.run % 2 === 0 }, { on: s.run % 2 === 1 }],
+      replay: () => this.setState({ run: this.state.run + 1 }),
+      toggleSlow: () => this.setState({ slow: !this.state.slow, run: this.state.run + 1 }),
+      slowP: s.slow ? 'true' : 'false', slowT: s.slow ? 'on' : 'off',
+      slowBg: s.slow ? '#11141A' : '#FFFFFF', slowC: s.slow ? '#FFFFFF' : '#11141A'
+    };
+  }
+}
+</script>
+</body>
+</html>

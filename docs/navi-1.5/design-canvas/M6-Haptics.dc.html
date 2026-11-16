@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi haptics and holds</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,400..800;1,400..800&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1480px; height: 1240px; box-sizing: border-box; padding: 56px 60px; background: #EEF1F6; font-family: 'Figtree', system-ui, sans-serif; color: #11141A; display: flex; flex-direction: column; gap: 32px">
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <h1 style="margin: 0; font-size: 46px; font-weight: 800; letter-spacing: -0.035em">Every vibration has a <span style="font-style: italic">reason</span>.</h1>
+    <p style="margin: 0; font-size: 20px; font-weight: 500; color: #2E3442">Feel is for commitment, not for getting around. The less you can take something back, the heavier it feels.</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px">
+    <div style="background: #FFFFFF; border-radius: 24px; padding: 20px; display: flex; flex-direction: column; gap: 8px"><span style="font-size: 18px; font-weight: 800">1 · Moving around is silent</span><span style="font-size: 16px; font-weight: 500; line-height: 1.45; color: #2E3442">Opening, closing, scrolling, typing and “Not now” never vibrate.</span></div>
+    <div style="background: #FFFFFF; border-radius: 24px; padding: 20px; display: flex; flex-direction: column; gap: 8px"><span style="font-size: 18px; font-weight: 800">2 · Weight follows cost</span><span style="font-size: 16px; font-weight: 500; line-height: 1.45; color: #2E3442">Undoable things are light. Heavy is kept for focus starting and anything that leaves Navi.</span></div>
+    <div style="background: #FFFFFF; border-radius: 24px; padding: 20px; display: flex; flex-direction: column; gap: 8px"><span style="font-size: 18px; font-weight: 800">3 · You feel the line</span><span style="font-size: 16px; font-weight: 500; line-height: 1.45; color: #2E3442">Pulling a page or a sheet ticks once when it passes the point of no return, and again if you pull back.</span></div>
+    <div style="background: #FFFFFF; border-radius: 24px; padding: 20px; display: flex; flex-direction: column; gap: 8px"><span style="font-size: 18px; font-weight: 800">4 · Hold when a slip costs</span><span style="font-size: 16px; font-weight: 500; line-height: 1.45; color: #2E3442">Time, money, other people or your account. Everything with Undo stays a tap.</span></div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 1.25fr 1fr; gap: 24px">
+    <div style="background: #FFFFFF; border-radius: 28px; padding: 8px 24px">
+      <div style="display: grid; grid-template-columns: 150px 1fr; padding: 16px 0; border-bottom: 1px solid rgba(17,20,26,0.08); font-size: 15px; font-weight: 800; color: #2E3442"><span>Feel</span><span>When</span></div>
+      <div style="display: grid; grid-template-columns: 150px 1fr; padding: 14px 0; border-bottom: 1px solid rgba(17,20,26,0.06); font-size: 17px"><span style="font-weight: 800">Tick</span><span style="font-weight: 500">Page or sheet passes the line · Day/Week/List, Inbox piles, focus length, day, switches · a hold starts and rises</span></div>
+      <div style="display: grid; grid-template-columns: 150px 1fr; padding: 14px 0; border-bottom: 1px solid rgba(17,20,26,0.06); font-size: 17px"><span style="font-weight: 800">Light</span><span style="font-weight: 500">A page lands · message sent · Undo · countdown 3, 2, 1 · voice ends</span></div>
+      <div style="display: grid; grid-template-columns: 150px 1fr; padding: 14px 0; border-bottom: 1px solid rgba(17,20,26,0.06); font-size: 17px"><span style="font-weight: 800">Medium</span><span style="font-weight: 500">A hold completes inside Navi · voice turns on</span></div>
+      <div style="display: grid; grid-template-columns: 150px 1fr; padding: 14px 0; border-bottom: 1px solid rgba(17,20,26,0.06); font-size: 17px"><span style="font-weight: 800">Heavy</span><span style="font-weight: 500">Focus begins · a held approval leaves Navi (a text is sent, a class is cancelled)</span></div>
+      <div style="display: grid; grid-template-columns: 150px 1fr; padding: 14px 0; border-bottom: 1px solid rgba(17,20,26,0.06); font-size: 17px"><span style="font-weight: 800; color: #1E7A53">Success</span><span style="font-weight: 500">Task done · approved inside your plan · added from Inbox · focus marked done · Navi’s guess confirmed</span></div>
+      <div style="display: grid; grid-template-columns: 150px 1fr; padding: 14px 0; border-bottom: 1px solid rgba(17,20,26,0.06); font-size: 17px"><span style="font-weight: 800; color: #B23A17">Warning</span><span style="font-weight: 500">Delete a memory · sign out · a fixed event breaks through focus</span></div>
+      <div style="display: grid; grid-template-columns: 150px 1fr; padding: 14px 0; font-size: 17px"><span style="font-weight: 800; color: #5B6272">Double tick</span><span style="font-weight: 500">You tapped something that needs a hold, with a “Press and hold” hint</span></div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 16px">
+      <div style="background: #11141A; color: #FFFFFF; border-radius: 28px; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px">
+        <span style="font-size: 22px; font-weight: 800; letter-spacing: -0.02em">Hold to confirm</span>
+        <div style="display: grid; grid-template-columns: 1fr auto; row-gap: 12px; font-size: 17px; font-weight: 600">
+          <span>Begin focus</span><span>1.0 s</span>
+          <span>Finish focus early</span><span>0.8 s</span>
+          <span>Send or cancel anything outside Navi</span><span>0.8 s</span>
+          <span>Talk to Navi</span><span>0.45 s</span>
+          <span>Sign out</span><span>1.2 s</span>
+        </div>
+      </div>
+      <div style="background: #FFFFFF; border-radius: 28px; padding: 22px 24px; display: flex; flex-direction: column; gap: 10px">
+        <span style="font-size: 18px; font-weight: 800">How a hold feels</span>
+        <span style="font-size: 16px; font-weight: 500; line-height: 1.5; color: #2E3442">Press: the button sinks a little and a lighter fill sweeps across, with a tick. Two more ticks at a third and two thirds. At the end: the button pops back and the commit feel fires. Let go early and the fill drains away, silently. Keyboard: hold Enter or Space. In the app, screen readers get a confirm step instead of a hold.</span>
+      </div>
+      <div style="background: #FFFFFF; border-radius: 28px; padding: 22px 24px; display: flex; flex-direction: column; gap: 10px">
+        <span style="font-size: 18px; font-weight: 800">Rules in code</span>
+        <span style="font-size: 16px; font-weight: 500; line-height: 1.5; color: #2E3442">One feel per action. Ticks closer than 40 ms are dropped. A Haptics switch in Settings turns all of it off and the phone’s own setting is respected. The prototype shows a small label at the top each time a feel fires (Tweaks → Show haptics).</span>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1480,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

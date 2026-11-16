@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi Sky · Onboarding</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,400..800;1,400..800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#2457D6}a:hover{color:#163E9E}
+.ob{font-family:'Figtree',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;color:#11141A;-webkit-font-smoothing:antialiased}
+.ob button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer}
+.ob input{font:inherit;color:inherit}
+.ob button:focus-visible,.ob input:focus-visible,.ob a:focus-visible{outline:2px solid #2B6FFF;outline-offset:2px}
+.ob *{scrollbar-width:none}.ob *::-webkit-scrollbar{display:none}
+.ob .em{font-style:italic}
+.sky-day{background-image:url(/_blob/7a0c579c9502e42857130705bd805255)}
+.glass{background:rgba(255,255,255,0.6);-webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);border:1px solid rgba(17,20,26,0.06);box-shadow:inset 0 1px 0 rgba(255,255,255,0.9),0 6px 20px -12px rgba(36,62,110,0.3)}
+.glass-strong{background:rgba(255,255,255,0.88);-webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%);border:1px solid rgba(17,20,26,0.05);box-shadow:inset 0 1px 0 #fff,0 24px 50px -20px rgba(36,62,110,0.28)}
+.c-school{background:#EE7A5C}.c-work{background:#4D86FF}.c-friends{background:#E9A93A}.c-health{background:#36B386}
+.vorb{position:relative;display:block;border-radius:50%;overflow:hidden;isolation:isolate;background:#CADCFC;flex:none}
+.vorb-sky{position:absolute;inset:-55%;background-size:cover;background-position:50% 50%;background-image:url(/_blob/7a0c579c9502e42857130705bd805255);animation:vSpin 26s linear infinite}
+.vorb-petal{position:absolute;inset:-20%;border-radius:50%;background:conic-gradient(from 0deg,rgba(255,255,255,0) 0deg,rgba(255,255,255,0.6) 45deg,rgba(255,255,255,0) 95deg,rgba(160,185,209,0.45) 150deg,rgba(255,255,255,0) 205deg,rgba(255,255,255,0.55) 265deg,rgba(255,255,255,0) 320deg);filter:blur(16px);animation:vSpin 15s linear infinite reverse}
+.vorb-ring{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,0) 56%,rgba(255,255,255,0.5) 69%,rgba(255,255,255,0) 80%);animation:vRing 4.5s ease-in-out infinite}
+.vorb.talk .vorb-sky{animation-duration:9s}.vorb.talk .vorb-petal{animation-duration:5s}.vorb.talk .vorb-ring{animation-duration:1.6s}
+@keyframes vSpin{to{transform:rotate(360deg)}}
+@keyframes vRing{0%,100%{transform:scale(0.97);opacity:0.75}50%{transform:scale(1.03);opacity:1}}
+@keyframes obIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes obFwd{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
+@keyframes obBack{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
+@keyframes obOut{from{transform:none}to{transform:translateY(100%)}}
+@keyframes obUp{from{transform:translateY(100%)}to{transform:none}}
+@media (prefers-reduced-motion: reduce){.ob *{animation-duration:0.01ms !important;animation-iteration-count:1 !important}}
+</style>
+</helmet>
+
+<div class="ob" style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #FBFBFD">
+
+  <!-- ===== 1 · Sign in: the one onboarding screen with sky ===== -->
+  <sc-if value="{{isSignin}}" hint-placeholder-val="{{true}}">
+    <div style="position: absolute; inset: 0; animation: obIn 0.4s ease both">
+      <div class="sky-day" aria-hidden="true" style="position: absolute; left: 0; top: 0; width: 390px; height: 560px; background-size: cover; background-position: 50% 20%"></div>
+      <div aria-hidden="true" style="position: absolute; left: 0; top: 0; width: 390px; height: 560px; background: linear-gradient(180deg, rgba(251,251,253,0) 40%, rgba(251,251,253,0.85) 82%, #FBFBFD 100%)"></div>
+      <div style="position: absolute; left: 24px; right: 24px; top: 300px; display: flex; flex-direction: column; gap: 10px">
+        <h1 style="margin: 0; font-size: 60px; line-height: 0.95; font-weight: 800; letter-spacing: -0.05em">Navi</h1>
+        <p style="margin: 0; font-size: 24px; line-height: 1.2; font-weight: 600; letter-spacing: -0.015em">Your week, <span class="em">planned with you</span>.</p>
+      </div>
+      <div style="position: absolute; left: 20px; right: 20px; bottom: 40px; display: flex; flex-direction: column; gap: 10px">
+        <button type="button" onClick="{{toEmail}}" style="height: 58px; border-radius: 999px; background: #11141A; color: #fff; font-size: 17px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px">
+          <svg width="16" height="19" viewBox="0 0 16 19" aria-hidden="true"><path d="M13.2 10.1c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.8-3-.8C3.7 4.9 2.2 5.8 1.4 7.2c-1.7 2.9-.4 7.1 1.2 9.4.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.3 0 2.1-1.1 2.8-2.3.9-1.3 1.3-2.6 1.3-2.6s-2.4-1-2.4-3.9zM10.9 3.3c.6-.8 1.1-1.8 1-2.9-.9 0-2.1.6-2.7 1.4-.6.7-1.1 1.8-1 2.8 1 .1 2.1-.5 2.7-1.3z" fill="#fff"/></svg>
+          Continue with Apple</button>
+        <button type="button" onClick="{{toEmail}}" style="height: 58px; border-radius: 999px; background: #FFFFFF; border: 1px solid rgba(17,20,26,0.12); font-size: 17px; font-weight: 600">Continue with Google</button>
+        <button type="button" onClick="{{toEmail}}" style="height: 48px; font-size: 17px; font-weight: 600; color: #2457D6">Use email</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- Shared top bar for every step after sign in -->
+  <sc-if value="{{hasBar}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; left: 12px; right: 16px; top: 52px; height: 48px; display: flex; align-items: center; gap: 12px; z-index: 5">
+      <button type="button" aria-label="Back" onClick="{{back}}" class="glass" style="flex: none; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center"><svg width="12" height="18" viewBox="0 0 12 18" aria-hidden="true"><path d="M10 2L3 9l7 7" fill="none" stroke="#11141A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div style="flex: 1; display: flex; gap: 5px" role="img" aria-label="Step {{stepNum}} of {{stepTotal}}">
+        <sc-for list="{{dots}}" as="d" hint-placeholder-count="6"><span style="flex: 1; height: 4px; border-radius: 2px; background: {{d.bg}}"></span></sc-for>
+      </div>
+      <sc-if value="{{canLater}}" hint-placeholder-val="{{true}}">
+        <a href="M6-Sky-Proto.dc.html" style="flex: none; font-size: 16px; font-weight: 600; color: #2457D6; text-decoration: none">Later</a>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <!-- ===== Email ===== -->
+  <sc-if value="{{isEmail}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; padding: 140px 20px 34px; display: flex; flex-direction: column; gap: 22px; animation: {{obAnim}}">
+      <h1 style="margin: 0; font-size: 40px; line-height: 1.02; font-weight: 700; letter-spacing: -0.035em">What's your <span class="em">email</span>?</h1>
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 15px; font-weight: 700; color: #2E3442">Email<input type="email" value="you@example.com" readonly style="height: 58px; border-radius: 20px; border: 1px solid rgba(17,20,26,0.12); background: #fff; padding: 0 18px; font-size: 18px; font-weight: 500"></label>
+      <div style="flex: 1"></div>
+      <button type="button" onClick="{{toCode}}" style="height: 58px; border-radius: 999px; background: #11141A; color: #fff; font-size: 17px; font-weight: 600">Send me a code</button>
+      <button type="button" onClick="{{toPassword}}" style="height: 44px; font-size: 17px; font-weight: 600; color: #2457D6">Use a password instead</button>
+    </div>
+  </sc-if>
+
+  <!-- ===== Password ===== -->
+  <sc-if value="{{isPassword}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; padding: 140px 20px 34px; display: flex; flex-direction: column; gap: 16px; animation: {{obAnim}}">
+      <h1 style="margin: 0 0 6px; font-size: 40px; line-height: 1.02; font-weight: 700; letter-spacing: -0.035em">Sign in</h1>
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 15px; font-weight: 700; color: #2E3442">Email<input type="email" value="you@example.com" readonly style="height: 58px; border-radius: 20px; border: 1px solid rgba(17,20,26,0.12); background: #fff; padding: 0 18px; font-size: 18px; font-weight: 500"></label>
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 15px; font-weight: 700; color: #2E3442">Password<input type="password" value="password12" readonly style="height: 58px; border-radius: 20px; border: 1px solid rgba(17,20,26,0.12); background: #fff; padding: 0 18px; font-size: 18px"></label>
+      <div style="flex: 1"></div>
+      <button type="button" onClick="{{toHello}}" style="height: 58px; border-radius: 999px; background: #11141A; color: #fff; font-size: 17px; font-weight: 600">Sign in</button>
+      <button type="button" onClick="{{toCode}}" style="height: 44px; font-size: 17px; font-weight: 600; color: #2457D6">Email me a code instead</button>
+    </div>
+  </sc-if>
+
+  <!-- ===== Code ===== -->
+  <sc-if value="{{isCode}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; padding: 140px 20px 34px; display: flex; flex-direction: column; gap: 22px; animation: {{obAnim}}">
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <h1 style="margin: 0; font-size: 40px; line-height: 1.02; font-weight: 700; letter-spacing: -0.035em">Check your <span class="em">email</span>.</h1>
+        <p style="margin: 0; font-size: 18px; font-weight: 500; color: #2E3442">6 digits, sent to you@example.com</p>
+      </div>
+      <div role="group" aria-label="Six-digit code" style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px">
+        <sc-for list="{{codeBoxes}}" as="cb" hint-placeholder-count="6">
+          <span style="height: 64px; border-radius: 18px; background: #fff; border: {{cb.border}}; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 700">{{cb.d}}</span>
+        </sc-for>
+      </div>
+      <button type="button" style="align-self: flex-start; height: 44px; font-size: 17px; font-weight: 600; color: #2457D6">Send a new code</button>
+      <div style="flex: 1"></div>
+      <button type="button" onClick="{{toHello}}" style="height: 58px; border-radius: 999px; background: #11141A; color: #fff; font-size: 17px; font-weight: 600">Continue</button>
+    </div>
+  </sc-if>
+
+  <!-- ===== Welcome back: resume where you stopped ===== -->
+  <sc-if value="{{isResume}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; padding: 140px 20px 34px; display: flex; flex-direction: column; animation: {{obAnim}}">
+      <span class="vorb" aria-hidden="true" style="width: 96px; height: 96px; margin-top: 20px"><span class="vorb-sky"></span><span class="vorb-petal"></span><span class="vorb-ring"></span></span>
+      <h1 style="margin: 34px 0 0; font-size: 44px; line-height: 1; font-weight: 700; letter-spacing: -0.035em">Welcome back, <span class="em">Aditya</span>.</h1>
+      <p style="margin: 14px 0 0; font-size: 20px; line-height: 1.35; font-weight: 500; color: #1A1F2A">You stopped at Talk it through. 3 things picked up so far.</p>
+      <div style="flex: 1"></div>
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <button type="button" onClick="{{toTalk}}" style="height: 58px; border-radius: 999px; background: #11141A; color: #fff; font-size: 17px; font-weight: 600">Pick up where I left off</button>
+        <button type="button" onClick="{{startQuick}}" style="height: 58px; border-radius: 999px; background: #FFFFFF; border: 1px solid rgba(17,20,26,0.12); font-size: 17px; font-weight: 600">Finish with quick setup</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ===== Hello ===== -->
+  <sc-if value="{{isHello}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; padding: 140px 20px 34px; display: flex; flex-direction: column; animation: {{obAnim}}">
+      <span class="vorb" aria-hidden="true" style="width: 120px; height: 120px; margin-top: 30px"><span class="vorb-sky"></span><span class="vorb-petal"></span><span class="vorb-ring"></span></span>
+      <h1 style="margin: 36px 0 0; font-size: 46px; line-height: 1; font-weight: 700; letter-spacing: -0.035em">Hi, I'm <span class="em">Navi</span>.</h1>
+      <p style="margin: 14px 0 0; font-size: 20px; line-height: 1.35; font-weight: 500; color: #1A1F2A">Tell me about your week. I'll plan it with you.</p>
+      <div style="flex: 1"></div>
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <button type="button" onClick="{{startQuick}}" style="height: 64px; border-radius: 999px; background: #11141A; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center"><span style="font-size: 17px; font-weight: 700">Quick setup</span><span style="font-size: 14px; font-weight: 500; opacity: 0.85">About a minute</span></button>
+        <button type="button" onClick="{{startTalk}}" style="height: 64px; border-radius: 999px; background: #FFFFFF; border: 1px solid rgba(17,20,26,0.12); display: flex; flex-direction: column; align-items: center; justify-content: center"><span style="font-size: 17px; font-weight: 700">Talk it through</span><span style="font-size: 14px; font-weight: 500; color: #2E3442">About 5 minutes · better first plan</span></button>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ===== The basics ===== -->
+  <sc-if value="{{isBasics}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; padding: 140px 20px 34px; display: flex; flex-direction: column; gap: 22px; animation: {{obAnim}}">
+      <h1 style="margin: 0; font-size: 40px; line-height: 1.02; font-weight: 700; letter-spacing: -0.035em">The <span class="em">basics</span>.</h1>
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 15px; font-weight: 700; color: #2E3442">Your name<input value="Aditya" readonly style="height: 58px; border-radius: 20px; border: 1px solid rgba(17,20,26,0.12); background: #fff; padding: 0 18px; font-size: 18px; font-weight: 600"></label>
+      <div style="background: #fff; border-radius: 22px; border: 1px solid rgba(17,20,26,0.08); overflow: hidden">
+        <sc-for list="{{basics}}" as="br" hint-placeholder-count="3">
+          <button type="button" style="width: 100%; min-height: 58px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: {{br.line}}"><span style="font-size: 17px; font-weight: 600">{{br.t}}</span><span style="font-size: 17px; font-weight: 600; color: #2457D6">{{br.v}}</span></button>
+        </sc-for>
+      </div>
+      <div style="flex: 1"></div>
+      <button type="button" onClick="{{toTalk}}" style="height: 58px; border-radius: 999px; background: #11141A; color: #fff; font-size: 17px; font-weight: 600">Continue</button>
+    </div>
+  </sc-if>
+
+  <!-- ===== Talk it through ===== -->
+  <sc-if value="{{isTalk}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; padding: 140px 20px 34px; display: flex; flex-direction: column; animation: {{obAnim}}">
+      <h1 style="margin: 0; font-size: 40px; line-height: 1.02; font-weight: 700; letter-spacing: -0.035em">What does your <span class="em">week</span> look like?</h1>
+      <div style="margin-top: 18px; display: flex; gap: 8px; flex-wrap: wrap">
+        <sc-for list="{{topics}}" as="tp" hint-placeholder-count="4">
+          <span style="height: 38px; padding: 0 14px; border-radius: 999px; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; background: {{tp.bg}}; color: {{tp.c}}; border: 1px solid rgba(17,20,26,0.08)">{{tp.t}}</span>
+        </sc-for>
+      </div>
+      <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px">
+        <span class="vorb {{orbTalk}}" aria-hidden="true" style="width: 150px; height: 150px"><span class="vorb-sky"></span><span class="vorb-petal"></span><span class="vorb-ring"></span></span>
+        <p aria-live="polite" style="margin: 0; text-align: center; font-size: 18px; font-weight: 600; color: #2E3442; max-width: 300px">{{talkLine}}</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <button type="button" onClick="{{holdTalk}}" style="height: 58px; border-radius: 999px; background: #11141A; color: #fff; font-size: 17px; font-weight: 600">{{talkBtn}}</button>
+        <button type="button" onClick="{{openTray}}" class="glass" style="height: 54px; border-radius: 999px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; font-weight: 700">{{picked}} picked up <svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 12l5-5 5 5" fill="none" stroke="#11141A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- Picked-up tray over Talk -->
+  <sc-if value="{{trayOn}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; z-index: 10">
+      <button type="button" aria-label="Close" onClick="{{closeTray}}" style="position: absolute; inset: 0; background: rgba(20,30,52,0.18)"></button>
+      <div style="position: absolute; inset: 0; pointer-events: none; transform: {{tf.tray}}; transition: {{dragT}}"><div onPointerDown="{{dg.tray.down}}" onPointerMove="{{dg.tray.move}}" onPointerUp="{{dg.tray.up}}" onPointerCancel="{{dg.tray.up}}" role="dialog" aria-label="What Navi picked up" class="glass-strong" style="pointer-events: auto; position: absolute; left: 0; right: 0; bottom: 0; height: 640px; border-radius: 38px 38px 0 0; display: flex; flex-direction: column; animation: obUp 0.42s cubic-bezier(0.2, 0.9, 0.25, 1) both">
+        <span aria-hidden="true" style="align-self: center; display: flex; align-items: center; justify-content: center; width: 120px; height: 28px; touch-action: none; cursor: grab"><span style="width: 40px; height: 5px; border-radius: 3px; background: rgba(17,20,26,0.22)"></span></span>
+        <h2 style="margin: 14px 20px 6px; font-size: 30px; font-weight: 700; letter-spacing: -0.03em">Picked up</h2>
+        <div style="flex: 1; overflow-y: auto; padding: 6px 16px 30px; display: flex; flex-direction: column; gap: 14px">
+          <sc-for list="{{pickedGroups}}" as="pg" hint-placeholder-count="3">
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <span style="margin: 0 6px; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: #2E3442"><span class="{{pg.c}}" aria-hidden="true" style="width: 10px; height: 10px; border-radius: 50%"></span>{{pg.h}}</span>
+              <div style="background: #fff; border-radius: 20px; overflow: hidden">
+                <sc-for list="{{pg.items}}" as="pi" hint-placeholder-count="2">
+                  <div style="padding: 12px 16px; display: flex; flex-direction: column; gap: 3px; border-bottom: {{pi.line}}"><span style="font-size: 17px; font-weight: 600">{{pi.t}}</span><span style="font-size: 15px; font-weight: 500; color: #3B4252">“{{pi.q}}”</span></div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="padding: 0 16px 30px"><button type="button" onClick="{{toReview}}" style="width: 100%; height: 58px; border-radius: 999px; background: #11141A; color: #fff; font-size: 17px; font-weight: 600">That's it for now</button></div>
+      </div></div>
+    </div>
+  </sc-if>
+
+  <!-- Mic permission priming -->
+  <sc-if value="{{micOn}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; z-index: 12">
+      <div style="position: absolute; inset: 0; background: rgba(20,30,52,0.22)"></div>
+      <div role="dialog" aria-label="Microphone" class="glass-strong" style="position: absolute; left: 8px; right: 8px; bottom: 8px; border-radius: 36px; padding: 28px 20px 20px; display: flex; flex-direction: column; gap: 14px; animation: obUp 0.42s cubic-bezier(0.2, 0.9, 0.25, 1) both">
+        <span class="vorb" aria-hidden="true" style="width: 64px; height: 64px"><span class="vorb-sky"></span><span class="vorb-petal"></span><span class="vorb-ring"></span></span>
+        <h2 style="margin: 4px 0 0; font-size: 28px; line-height: 1.05; font-weight: 700; letter-spacing: -0.03em">Navi needs your <span class="em">microphone</span>.</h2>
+        <p style="margin: 0; font-size: 17px; font-weight: 500; color: #2E3442">Only while you hold to talk. Words are saved, audio isn't.</p>
+        <div style="display: flex; gap: 8px; margin-top: 6px">
+          <button type="button" onClick="{{micNo}}" class="glass" style="flex: 1; height: 56px; border-radius: 999px; font-size: 17px; font-weight: 600">Not now</button>
+          <button type="button" onClick="{{micYes}}" style="flex: 1; height: 56px; border-radius: 999px; background: #11141A; color: #fff; font-size: 17px; font-weight: 600">Allow</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ===== Review ===== -->
+  <sc-if value="{{isReview}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; display: flex; flex-direction: column; animation: {{obAnim}}">
+      <div style="flex: 1; overflow-y: auto; padding: 140px 16px 20px; display: flex; flex-direction: column; gap: 16px">
+        <h1 style="margin: 0 4px; font-size: 40px; line-height: 1.02; font-weight: 700; letter-spacing: -0.035em">Turn on what's <span class="em">right</span>.</h1>
+        <sc-for list="{{reviewGroups}}" as="rg" hint-placeholder-count="3">
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <span style="margin: 0 6px; font-size: 15px; font-weight: 700; color: #2E3442">{{rg.h}}</span>
+            <div style="background: #fff; border-radius: 20px; overflow: hidden; border: 1px solid rgba(17,20,26,0.06)">
+              <sc-for list="{{rg.items}}" as="ri" hint-placeholder-count="2">
+                <button type="button" onClick="{{ri.go}}" aria-pressed="{{ri.on}}" style="width: 100%; min-height: 58px; padding: 0 16px; display: flex; align-items: center; gap: 12px; text-align: left; border-bottom: {{ri.line}}">
+                  <span style="flex: 1; font-size: 17px; font-weight: 600">{{ri.t}}</span>
+                  <span aria-hidden="true" style="width: 50px; height: 30px; border-radius: 15px; background: {{ri.tb}}; position: relative"><span style="position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transform: translateX({{ri.tx}}px); transition: transform 0.2s"></span></span>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="padding: 10px 16px 34px; background: linear-gradient(180deg, rgba(251,251,253,0), #FBFBFD 30%)">
+        <button type="button" onClick="{{toNotify}}" style="width: 100%; height: 58px; border-radius: 999px; background: #11141A; color: #fff; font-size: 17px; font-weight: 600">Turn on {{onCount}}</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ===== Stay in touch ===== -->
+  <sc-if value="{{isNotify}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; padding: 140px 20px 34px; display: flex; flex-direction: column; gap: 22px; animation: {{obAnim}}">
+      <h1 style="margin: 0; font-size: 40px; line-height: 1.02; font-weight: 700; letter-spacing: -0.035em">When should I <span class="em">check in</span>?</h1>
+      <div style="background: #fff; border-radius: 22px; border: 1px solid rgba(17,20,26,0.08); overflow: hidden">
+        <sc-for list="{{notifyRows}}" as="nr" hint-placeholder-count="3">
+          <button type="button" style="width: 100%; min-height: 58px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: {{nr.line}}"><span style="font-size: 17px; font-weight: 600">{{nr.t}}</span><span style="font-size: 17px; font-weight: 600; color: #2457D6">{{nr.v}}</span></button>
+        </sc-for>
+      </div>
+      <div style="flex: 1"></div>
+      <button type="button" onClick="{{toFirst}}" style="height: 58px; border-radius: 999px; background: #11141A; color: #fff; font-size: 17px; font-weight: 600">Allow notifications</button>
+      <button type="button" onClick="{{toFirst}}" style="height: 44px; font-size: 17px; font-weight: 600; color: #2457D6">Not now</button>
+    </div>
+  </sc-if>
+
+  <!-- ===== First plan ===== -->
+  <sc-if value="{{isFirst}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; padding: 140px 16px 34px; display: flex; flex-direction: column; gap: 18px; animation: {{obAnim}}">
+      <h1 style="margin: 0 4px; font-size: 40px; line-height: 1.02; font-weight: 700; letter-spacing: -0.035em">Your Friday is <span class="em">ready</span>.</h1>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <sc-for list="{{firstBlocks}}" as="fb" hint-placeholder-count="4">
+          <div style="min-height: 58px; border-radius: 20px; padding: 0 16px; display: flex; align-items: center; gap: 12px; background: {{fb.bg}}; border: {{fb.border}}">
+            <span style="width: 46px; font-size: 15px; font-weight: 600; color: #2E3442">{{fb.time}}</span>
+            <span class="{{fb.c}}" aria-hidden="true" style="width: 10px; height: 10px; border-radius: 50%"></span>
+            <span style="flex: 1; font-size: 17px; font-weight: 600">{{fb.t}}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="flex: 1"></div>
+      <a href="M6-Sky-Proto.dc.html" style="height: 58px; border-radius: 999px; background: #11141A; color: #fff; font-size: 17px; font-weight: 600; display: flex; align-items: center; justify-content: center; text-decoration: none">Open Navi</a>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"startStep":{"editor":null,"default":"signin"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const s0 = props.startStep || 'signin';
+    this.state = { step: s0 === 'tray' ? 'talk' : (s0 === 'mic' ? 'talk' : s0), tray: s0 === 'tray', mic: s0 === 'mic', micOk: false, talking: false, picked: s0 === 'signin' || s0 === 'talk' || s0 === 'mic' ? 0 : 7, off: { r3: true } };
+  }
+  renderVals() {
+    const s = this.state;
+    const set = (o) => this.setState(o);
+    const go = (step) => () => set({ step, tray: false, mic: false, dir: 'fwd' });
+    const quick = !!s.quick;
+    const order = quick ? ['hello', 'basics', 'notify', 'first'] : ['hello', 'basics', 'talk', 'review', 'notify', 'first'];
+    const idx = order.indexOf(s.step);
+    const prevOf = { email: 'signin', password: 'email', code: 'email', hello: 'code', basics: 'hello', talk: 'basics', review: 'talk', notify: quick ? 'basics' : 'review', first: 'notify', resume: 'signin' };
+    const lines = (arr) => arr.map((r, i) => Object.assign(r, { line: i < arr.length - 1 ? '1px solid rgba(17,20,26,0.06)' : 'none' }));
+    const reviewData = [
+      { h: 'Fixed every week', items: [['r1', 'Econ lecture · Mon Wed Fri 9:00'], ['r2', 'Café shift · Fri 4:00']] },
+      { h: 'Routines', items: [['r3', 'Run · 7 AM, three times a week'], ['r4', 'Bed by 11:30']] },
+      { h: 'Goals', items: [['r5', 'Finish the essay by Friday'], ['r6', 'Call home on Sundays']] }
+    ];
+    const reviewGroups = reviewData.map((g) => ({ h: g.h, items: lines(g.items.map(([id, t]) => { const on = !s.off[id]; return { t, on: on ? 'true' : 'false', tb: on ? '#11141A' : 'rgba(17,20,26,0.16)', tx: on ? 20 : 0, go: () => set({ off: Object.assign({}, this.state.off, { [id]: on }) }) }; })) }));
+    const onCount = reviewData.reduce((a, g) => a + g.items.filter(([id]) => !s.off[id]).length, 0);
+    const pickedGroups = [
+      { h: 'School', c: 'c-school', items: lines([{ t: 'Econ lecture, Mon Wed Fri at 9', q: 'econ is monday wednesday friday at nine' }, { t: 'Essay due Friday', q: 'I have an essay due friday' }]) },
+      { h: 'Work', c: 'c-work', items: lines([{ t: 'Café shift, Fridays 4 to 7', q: 'I work at the cafe friday evenings' }]) },
+      { h: 'Health', c: 'c-health', items: lines([{ t: 'Run three times a week', q: 'I want to get back to running' }]) }
+    ];
+    const mkDrag = (key, axis, dir, zone, close) => ({
+      down: (e) => { const r = e.currentTarget.getBoundingClientRect(); if (!zone(e, r)) return; this._dg = { key, x: e.clientX, y: e.clientY, on: false }; },
+      move: (e) => {
+        const g = this._dg; if (!g || g.key !== key) return;
+        const raw = (axis === 'y' ? e.clientY - g.y : e.clientX - g.x) * dir;
+        if (!g.on) { if (Math.abs(raw) < 6) return; const cross = axis === 'y' ? Math.abs(e.clientX - g.x) : Math.abs(e.clientY - g.y); if (cross > Math.abs(raw)) { this._dg = null; return; } g.on = true; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {} }
+        this.setState({ dk: key, dv: raw > 0 ? raw : raw * 0.15, dDrag: true });
+      },
+      up: () => {
+        const g = this._dg; if (!g || g.key !== key) return; this._dg = null;
+        if (!g.on) return;
+        if ((this.state.dv || 0) > 100) { this.setState({ dv: 900, dDrag: false }); setTimeout(() => { close(); this.setState({ dk: null, dv: 0 }); }, 280); }
+        else this.setState({ dv: 0, dDrag: false });
+      }
+    });
+    const topZone = (e, r) => e.clientY - r.top < 110;
+    const anyZone = () => true;
+    const edgeZone = (e, r) => e.clientX - r.left < 44;
+    const tfOf = (key, axis, dir) => (s.dk === key && s.dv ? (axis === 'y' ? 'translateY(' + (s.dv * dir) + 'px)' : 'translateX(' + (s.dv * dir) + 'px)') : 'none');
+    const dg = { tray: mkDrag('tray', 'y', 1, topZone, () => this.setState({ tray: false })) };
+    const tf = { tray: tfOf('tray', 'y', 1) };
+    const holdTalk = () => {
+      if (!s.micOk) { set({ mic: true }); return; }
+      if (!s.talking) { set({ talking: true }); this._t = setTimeout(() => this.setState({ talking: false, picked: Math.max(this.state.picked, 7) }), 2200); }
+    };
+    return {
+      dg, tf, dragT: s.dDrag ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.9, 0.25, 1)',
+      isSignin: s.step === 'signin', isResume: s.step === 'resume', startQuick: () => set({ quick: true, step: 'basics' }), startTalk: () => set({ quick: false, step: 'basics' }), isEmail: s.step === 'email', isPassword: s.step === 'password', isCode: s.step === 'code', isHello: s.step === 'hello', isBasics: s.step === 'basics', isTalk: s.step === 'talk', isReview: s.step === 'review', isNotify: s.step === 'notify', isFirst: s.step === 'first',
+      hasBar: s.step !== 'signin' && s.step !== 'resume', canLater: idx >= 0, stepNum: idx + 1, stepTotal: order.length,
+      dots: order.map((_, i) => ({ bg: idx >= 0 && i <= idx ? '#11141A' : 'rgba(17,20,26,0.12)' })),
+      back: () => set({ step: prevOf[s.step] || 'signin', tray: false, mic: false, dir: 'back' }),
+      obAnim: s.dir === 'back' ? 'obBack 0.4s cubic-bezier(0.2, 0.9, 0.25, 1) both' : 'obFwd 0.4s cubic-bezier(0.2, 0.9, 0.25, 1) both',
+      toEmail: go('email'), toPassword: go('password'), toCode: go('code'), toHello: go('hello'), toBasics: go('basics'), toTalk: () => set({ step: quick ? 'notify' : 'talk', quick: this.state.step === 'resume' ? false : quick, tray: false, mic: false }), toReview: go('review'), toNotify: go('notify'), toFirst: go('first'),
+      codeBoxes: ['4', '8', '2', '9', '', ''].map((d, i) => ({ d, border: i === 4 ? '2px solid #11141A' : '1px solid rgba(17,20,26,0.12)' })),
+      basics: lines([{ t: 'Time zone', v: 'New York' }, { t: 'Wake up', v: '7:00' }, { t: 'Bed', v: '11:30' }]),
+      topics: [['School', 'c-school'], ['Work', 'c-work'], ['Health', 'c-health'], ['People', 'c-friends']].map(([t], i) => ({ t, bg: s.picked && i < 3 ? '#11141A' : '#fff', c: s.picked && i < 3 ? '#fff' : '#11141A' })),
+      orbTalk: s.talking ? 'talk' : '', talkLine: s.talking ? 'Listening…' : (s.picked ? 'Got it. Anything else?' : 'Talk, or type. Start with this week.'),
+      talkBtn: s.talking ? 'Listening' : 'Hold to talk', holdTalk, picked: s.picked,
+      openTray: () => set({ tray: true }), closeTray: () => set({ tray: false }), trayOn: !!s.tray, pickedGroups,
+      micOn: !!s.mic, micYes: () => { set({ mic: false, micOk: true }); }, micNo: () => set({ mic: false }),
+      reviewGroups, onCount,
+      notifyRows: lines([{ t: 'Morning briefing', v: '7:00' }, { t: 'Evening wrap-up', v: '9:00' }, { t: 'Quiet hours', v: '11:30 – 7:00' }]),
+      firstBlocks: [['9:00', 'Econ lecture', 'c-school', true], ['11:00', 'Essay intro', 'c-school', false], ['4:00', 'Café shift', 'c-work', true], ['11:30', 'Bed', 'c-health', false]].map(([time, t, c, fixed]) => ({ time, t, c, bg: fixed ? '#FFFFFF' : '#EEF3FC', border: fixed ? '1px solid rgba(17,20,26,0.08)' : '1px solid rgba(77,134,255,0.18)' }))
+    };
+  }
+}
+</script>
+</body>
+</html>

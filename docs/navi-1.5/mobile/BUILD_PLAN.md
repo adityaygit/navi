@@ -2,6 +2,17 @@
 
 Status: designs approved by the owner on 2026-11-13 (M4 after the spacing pass). This is the plan for turning them into an app on the owner's phones. Nothing here is built yet.
 
+**Update 2026-11-16: the design is now M6 "Sky" (light), locked by the owner. Spec: `DESIGN_M6.md`.** The architecture, distribution and server work below are unchanged; only the look, motion, haptics and a few behaviours change. Wherever this plan says "M4", read "M6".
+
+### M6 rebuild order (each step ends installable)
+
+1. **Foundation + Navi home:** light tokens and glass, Figtree weights, sky assets with colour fallbacks, flat orb, hold-to-confirm button, haptics vocabulary (M6 table), opening animation, glass header with the orb on the Navi tab, page swipe; chat home centred when there's nothing to talk about, thread restyle, composer with hold-to-talk orb.
+2. **Plan + Inbox:** day summary, two-line blocks, fixed/flexible/clash/deadline styles, lock tip, day picker, Week/List text; Inbox with Needs OK · To add · Done, "Leaves Navi" tags, hold to send, honest Undo; swipe-to-close sheets.
+3. **Focus + voice:** Focus above the clouds (hold to begin, 3·2·1, held vs breaks-through, hold to finish early, done in dusk); voice screen with the flat orb, minimised talking bar.
+4. **Progress, stories, You:** metrics explainer, weekly/morning/evening stories in the sky, Settings (Sky backgrounds, Haptics, what Navi does on its own), Memory with guesses, Notes, Activity, Spaces.
+5. **Onboarding:** quick setup or talk it through, welcome back.
+6. **Polish:** stress states (packed day, big inbox, long chat, offline), device pass for haptics and holds.
+
 ## Decisions (owner, 2026-11-13)
 
 - **Native app, not a PWA.** Capacitor app named **Navi**, for **iPhone and Android**. The installable PWA is retired as the mobile target; the web app stays for desktop.

@@ -1,0 +1,1381 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navi Sky · Clickable prototype</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,400..800;1,400..800&amp;family=Instrument+Serif:ital@0;1&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#2457D6}a:hover{color:#163E9E}
+.nv{font-family:'Figtree',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;color:#11141A;-webkit-font-smoothing:antialiased}
+.nv button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer}
+.nv input{font:inherit;color:inherit}
+.nv button:focus-visible,.nv input:focus-visible,.nv a:focus-visible{outline:2px solid #2B6FFF;outline-offset:2px}
+.nv *{scrollbar-width:none}
+.nv *::-webkit-scrollbar{display:none;width:0;height:0}
+.nv .em{font-style:italic}
+.nv.serif .em{font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:1.1em;letter-spacing:-0.005em}
+.sky-day{background-color:#C9DDF0;background-image:url(/_blob/7a0c579c9502e42857130705bd805255)}
+.sky-dusk{background-color:#D9C7E3;background-image:url(/_blob/58ffe9a3893e7f5e3691d5d95cd6ba2f)}
+.sky-off{background-color:#E6EDF6;background-image:linear-gradient(180deg,#DCE6F3 0%,#EEF2F8 55%,#FBFBFD 100%)}
+.sky{background-size:100% auto;background-repeat:no-repeat;background-position:50% 0}
+.sky-focus{background-color:#F1E7DD;background-image:url(/_blob/b72492580a6683deff7c923781b30ffb)}
+.clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+@keyframes fDrift{0%,100%{transform:translate3d(0,0,0) scale(1.06)}50%{transform:translate3d(0,-22px,0) scale(1.1)}}
+@keyframes fGlow{0%,100%{opacity:0.55}50%{opacity:0.9}}
+.glass{background:rgba(255,255,255,0.6);-webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);border:1px solid rgba(17,20,26,0.06);box-shadow:inset 0 1px 0 rgba(255,255,255,0.9),0 6px 20px -12px rgba(36,62,110,0.3)}
+.glass-strong{background:rgba(255,255,255,0.86);-webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%);border:1px solid rgba(17,20,26,0.05);box-shadow:inset 0 1px 0 #fff,0 24px 50px -20px rgba(36,62,110,0.28)}
+.float{box-shadow:0 1px 2px rgba(20,32,64,0.05),0 10px 30px -14px rgba(20,32,64,0.18)}
+.c-school{background:#EE7A5C}.c-work{background:#4D86FF}.c-friends{background:#E9A93A}.c-health{background:#36B386}.c-rest{background:#A3A8BF}.c-ink{background:#11141A}.c-ring{box-shadow:inset 0 0 0 2px rgba(17,20,26,0.3)}
+/* Flat voice orb: a disc of sky turning slowly, soft petals, a breathing white ring. No lighting. */
+.vorb{position:relative;display:block;border-radius:50%;overflow:hidden;isolation:isolate;background:#CADCFC;flex:none}
+.vorb-sky{position:absolute;inset:-55%;background-size:cover;background-position:50% 50%;animation:vSpin 26s linear infinite}
+.vorb.day .vorb-sky{background-image:url(/_blob/7a0c579c9502e42857130705bd805255)}
+.vorb.dusk .vorb-sky{background-image:url(/_blob/58ffe9a3893e7f5e3691d5d95cd6ba2f)}
+.vorb-petal{position:absolute;inset:-20%;border-radius:50%;background:conic-gradient(from 0deg,rgba(255,255,255,0) 0deg,rgba(255,255,255,0.6) 45deg,rgba(255,255,255,0) 95deg,rgba(160,185,209,0.45) 150deg,rgba(255,255,255,0) 205deg,rgba(255,255,255,0.55) 265deg,rgba(255,255,255,0) 320deg);filter:blur(16px);animation:vSpin 15s linear infinite reverse}
+.vorb-ring{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,0) 56%,rgba(255,255,255,0.5) 69%,rgba(255,255,255,0) 80%);animation:vRing 4.5s ease-in-out infinite}
+.vorb.sm .vorb-petal{filter:blur(5px)}
+.vorb.talk .vorb-sky{animation-duration:9s}.vorb.talk .vorb-petal{animation-duration:5s}.vorb.talk .vorb-ring{animation-duration:1.6s}
+.vorb.mute{filter:grayscale(1) brightness(1.08)}.vorb.mute .vorb-sky,.vorb.mute .vorb-petal,.vorb.mute .vorb-ring{animation-play-state:paused}
+@keyframes vSpin{to{transform:rotate(360deg)}}
+@keyframes vRing{0%,100%{transform:scale(0.97);opacity:0.75}50%{transform:scale(1.03);opacity:1}}
+@keyframes nvIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes nvFade{from{opacity:0}to{opacity:1}}
+@keyframes nvUp{from{transform:translateY(100%)}to{transform:none}}
+@keyframes nvLeft{from{transform:translateX(-100%)}to{transform:none}}
+@keyframes nvRight{from{transform:translateX(100%)}to{transform:none}}
+@keyframes nvDown{from{transform:translateY(-120%)}to{transform:none}}
+@keyframes nvPop{from{opacity:0;transform:scale(1.4)}to{opacity:1;transform:none}}
+@keyframes nvUpOut{from{transform:none}to{transform:translateY(100%)}}
+@keyframes nvLeftOut{from{transform:none}to{transform:translateX(-105%)}}
+@keyframes nvRightOut{from{transform:none}to{transform:translateX(100%)}}
+@keyframes nvFadeOut{from{opacity:1}to{opacity:0}}
+@keyframes nvDim{from{opacity:1;transform:none}to{opacity:0;transform:scale(0.98)}}
+@keyframes nvOrbIn{from{opacity:0;transform:scale(0.7)}to{opacity:1;transform:none}}
+@keyframes nvToastOut{from{opacity:1;transform:none}to{opacity:0;transform:translateY(10px)}}
+@keyframes spMarkIn{from{opacity:0;transform:scale(0.82)}to{opacity:1;transform:none}}
+@keyframes spSlide{from{transform:translateX(86.5px)}to{transform:none}}
+@keyframes spWord{from{opacity:0;clip-path:inset(0 100% 0 0);transform:translateX(-18px)}to{opacity:1;clip-path:inset(0 0 0 0);transform:none}}
+@keyframes spOut{from{opacity:1}to{opacity:0}}
+@keyframes spLockOut{from{opacity:1;transform:none;filter:blur(0)}to{opacity:0;transform:scale(0.94);filter:blur(6px)}}
+@keyframes homeUp{from{opacity:0;transform:translateY(90px) scale(0.97)}to{opacity:1;transform:none}}
+.closing .x-up{animation:nvUpOut 0.26s cubic-bezier(0.4,0,1,1) both !important}
+.closing .x-left{animation:nvLeftOut 0.26s cubic-bezier(0.4,0,1,1) both !important}
+.closing .x-right{animation:nvRightOut 0.26s cubic-bezier(0.4,0,1,1) both !important}
+.closing .x-fade{animation:nvDim 0.26s ease both !important}
+.closing .x-scrim{animation:nvFadeOut 0.26s ease both !important}
+@keyframes hapPing{0%{opacity:0;transform:translateY(-6px) scale(0.9)}12%{opacity:1;transform:none}75%{opacity:1}100%{opacity:0}}
+@keyframes nvDots{0%,80%,100%{opacity:0.25}40%{opacity:1}}
+@media (prefers-reduced-motion: reduce){.nv *{animation-duration:0.01ms !important;animation-iteration-count:1 !important}}
+</style>
+</helmet>
+
+<div class="nv {{emClass}} {{closingCls}}" style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #E9EEF5">
+
+  <div style="position: absolute; inset: 0; animation: {{homeAnim}}">
+  <!-- ================= PAGES: Progress ← Navi → Plan ================= -->
+  <div onPointerDown="{{down}}" onPointerMove="{{move}}" onPointerUp="{{up}}" onPointerCancel="{{up}}" style="position: absolute; left: 0; top: 0; width: 1170px; height: 844px; display: flex; transform: translateX({{trackX}}px); touch-action: pan-y">
+
+    <!-- ===================== PROGRESS ===================== -->
+    <section aria-label="Progress" style="width: 390px; height: 844px; flex: none; position: relative; overflow: hidden; background: #FBFBFD; border-radius: {{pg0.r}}px; transform: {{pg0.t}}; z-index: {{pg0.z}}; filter: {{pg0.f}}; box-shadow: {{pg0.sh}}; transition: {{secT}}">
+      <div onScroll="{{onProgScroll}}" style="position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden">
+        <div style="padding: 124px 20px 120px; display: flex; flex-direction: column; gap: 22px">
+          <h1 style="margin: 0; font-size: 36px; line-height: 1.05; font-weight: 700; letter-spacing: -0.035em">{{progA}}<span class="em">{{progB}}</span>{{progC}}</h1>
+
+          <sc-if value="{{isEvening}}" hint-placeholder-val="{{false}}">
+            <div class="float" style="background: #11141A; color: #FFFFFF; border-radius: 24px; padding: 20px; display: flex; align-items: center; gap: 14px">
+              <span style="flex: 1; font-size: 19px; font-weight: 700; letter-spacing: -0.015em">Wrap up today</span>
+              <button type="button" onClick="{{openStory}}" style="height: 46px; padding: 0 20px; border-radius: 999px; background: #FFFFFF; color: #11141A; font-size: 16px; font-weight: 700">Start · 1 min</button>
+            </div>
+          </sc-if>
+
+          <button type="button" onClick="{{openMetrics}}" class="float" style="background: #FFFFFF; border-radius: 24px; padding: 18px 8px 10px; display: flex; flex-direction: column; gap: 10px; text-align: center">
+          <span style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%">
+            <span style="display: flex; flex-direction: column; align-items: center; gap: 2px"><span style="font-size: 30px; font-weight: 700; letter-spacing: -0.03em">13/16</span><span style="font-size: 15px; font-weight: 500; color: #2E3442">kept</span></span>
+            <span style="display: flex; flex-direction: column; align-items: center; gap: 2px; border-left: 1px solid rgba(17,20,26,0.08); border-right: 1px solid rgba(17,20,26,0.08)"><span style="font-size: 30px; font-weight: 700; letter-spacing: -0.03em">6h 40</span><span style="font-size: 15px; font-weight: 500; color: #2E3442">focused</span></span>
+            <span style="display: flex; flex-direction: column; align-items: center; gap: 2px"><span style="font-size: 30px; font-weight: 700; letter-spacing: -0.03em; color: #B23A17">1</span><span style="font-size: 15px; font-weight: 500; color: #2E3442">slipping</span></span>
+          </span>
+          <span style="align-self: center; height: 32px; display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; color: #2457D6">How these are counted <svg width="8" height="12" viewBox="0 0 8 14" aria-hidden="true"><path d="M1.5 1.5L6.5 7l-5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </button>
+
+          <div class="float" style="background: #FFFFFF; border-radius: 24px; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+            <h2 style="margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -0.015em">Where 31 hours went</h2>
+            <div role="img" aria-label="School 14 hours, Work 9 hours, Friends 5 hours, Health 3 hours" style="display: flex; gap: 4px; height: 14px">
+              <span class="c-school" style="flex: 14 1 0; border-radius: 7px"></span>
+              <span class="c-work" style="flex: 9 1 0; border-radius: 7px"></span>
+              <span class="c-friends" style="flex: 5 1 0; border-radius: 7px"></span>
+              <span class="c-health" style="flex: 3 1 0; border-radius: 7px"></span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; font-size: 15px; font-weight: 500; color: #2E3442">
+              <span style="display: flex; align-items: center; gap: 8px"><span class="c-school" aria-hidden="true" style="width: 10px; height: 10px; border-radius: 50%"></span>School 14h</span>
+              <span style="display: flex; align-items: center; gap: 8px"><span class="c-work" aria-hidden="true" style="width: 10px; height: 10px; border-radius: 50%"></span>Work 9h</span>
+              <span style="display: flex; align-items: center; gap: 8px"><span class="c-friends" aria-hidden="true" style="width: 10px; height: 10px; border-radius: 50%"></span>Friends 5h</span>
+              <span style="display: flex; align-items: center; gap: 8px"><span class="c-health" aria-hidden="true" style="width: 10px; height: 10px; border-radius: 50%"></span>Health 3h</span>
+            </div>
+          </div>
+
+          <div class="float" style="background: #FFFFFF; border-radius: 24px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+            <sc-if value="{{patOpen}}" hint-placeholder-val="{{true}}">
+              <h2 style="margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -0.015em">Keep the 7 AM run next week?</h2>
+              <div style="display: flex; gap: 8px">
+                <button type="button" onClick="{{patYes}}" style="height: 46px; padding: 0 20px; border-radius: 999px; background: #11141A; color: #FFFFFF; font-size: 16px; font-weight: 600">Keep it</button>
+                <button type="button" onClick="{{patNo}}" class="glass" style="height: 46px; padding: 0 20px; border-radius: 999px; font-size: 16px; font-weight: 600">Not now</button>
+              </div>
+            </sc-if>
+            <sc-if value="{{patClosed}}" hint-placeholder-val="{{false}}">
+              <p style="margin: 0; font-size: 17px; font-weight: 600">{{patText}}</p>
+            </sc-if>
+          </div>
+
+          <button type="button" onClick="{{openWeekStory}}" class="float" style="height: 72px; border-radius: 24px; background: #FFFFFF; padding: 0 12px 0 20px; display: flex; align-items: center; gap: 12px; text-align: left">
+            <span style="flex: 1; font-size: 19px; font-weight: 700; letter-spacing: -0.015em">Your week, <span class="em">told back</span></span>
+            <span aria-hidden="true" style="width: 46px; height: 46px; border-radius: 50%; background: #11141A; display: flex; align-items: center; justify-content: center"><svg width="14" height="16" viewBox="0 0 14 16" aria-hidden="true"><path d="M2 1.5v13l11-6.5z" fill="#fff"/></svg></span>
+          </button>
+        </div>
+      </div>
+      <button type="button" onClick="{{openAsk}}" class="glass" style="position: absolute; left: 16px; right: 16px; bottom: 26px; height: 56px; border-radius: 28px; display: flex; align-items: center; gap: 12px; padding: 0 10px">
+        <span class="vorb sm {{orbSky}}" aria-hidden="true" style="width: 38px; height: 38px"><span class="vorb-sky"></span><span class="vorb-petal"></span><span class="vorb-ring"></span></span>
+        <span style="flex: 1; text-align: left; font-size: 17px; font-weight: 600; color: #2E3442">Ask about this week</span>
+      </button>
+    </section>
+
+    <!-- ===================== NAVI CHAT ===================== -->
+    <section aria-label="Navi" style="width: 390px; height: 844px; flex: none; position: relative; overflow: hidden; background: #FBFBFD; border-radius: {{pg1.r}}px; transform: {{pg1.t}}; z-index: {{pg1.z}}; filter: {{pg1.f}}; box-shadow: {{pg1.sh}}; transition: {{secT}}">
+      <div class="sky {{skyCls}}" aria-hidden="true" style="position: absolute; left: -10px; top: {{skyTop}}px; width: 410px; height: {{skyH}}px; background-size: cover; background-position: 50% 20%; transform: translateY({{skyY}}px); transition: transform 0.12s linear, top 0.6s cubic-bezier(0.2, 0.9, 0.25, 1), height 0.6s cubic-bezier(0.2, 0.9, 0.25, 1)"></div>
+      <div aria-hidden="true" style="position: absolute; left: 0; top: 0; width: 390px; height: 844px; background: {{chatVeil}}; transition: background 0.6s"></div>
+
+      <sc-if value="{{fresh}}" hint-placeholder-val="{{true}}">
+        <div style="position: absolute; left: 0; right: 0; top: 0; bottom: 110px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 0 24px; text-align: center; animation: nvFade 0.5s ease both">
+          <div aria-hidden="true" style="position: absolute; left: 50%; top: 50%; width: 420px; height: 300px; margin: -170px 0 0 -210px; background: radial-gradient(closest-side, rgba(255,255,255,0.7), rgba(255,255,255,0)); filter: blur(10px)"></div>
+          <h1 style="position: relative; margin: 0; font-size: 50px; line-height: 1; font-weight: 700; letter-spacing: -0.04em; color: #0E1116">{{greetA}}<br><span class="em">{{greetB}}</span></h1>
+          <p style="position: relative; margin: 0; font-size: 20px; line-height: 1.35; font-weight: 500; color: #1A1F2A">{{subA}}<span class="em">{{subB}}</span></p>
+          <div style="position: relative; margin-top: 8px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap">
+            <button type="button" onClick="{{goPlan}}" class="glass" style="height: 44px; padding: 0 16px 0 14px; border-radius: 999px; display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600">
+              <span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #1E9E6A"></span>{{nowT}}
+            </button>
+            <button type="button" onClick="{{openStory}}" class="glass" style="height: 44px; padding: 0 16px; border-radius: 999px; display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600">
+              {{momentT}}
+              <svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true"><path d="M7 4l6 6-6 6" fill="none" stroke="#11141A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </div>
+      </sc-if>
+
+      <div ref="{{chatRef}}" onScroll="{{onChatScroll}}" style="position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden">
+        <div style="padding: 136px 20px 136px; display: flex; flex-direction: column; gap: 14px">
+          <sc-if value="{{notFresh}}" hint-placeholder-val="{{false}}">
+          <sc-if value="{{offline}}" hint-placeholder-val="{{false}}">
+            <span class="glass" style="align-self: flex-start; height: 34px; padding: 0 14px; border-radius: 999px; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #A3A8BF"></span>Offline · 2 waiting to send</span>
+          </sc-if>
+          <div style="position: relative; display: flex; flex-direction: column; gap: 10px; padding-bottom: 4px; animation: nvIn 0.5s cubic-bezier(0.2, 0.9, 0.25, 1) both">
+            <div aria-hidden="true" style="position: absolute; left: -40px; top: -40px; width: 400px; height: 210px; background: radial-gradient(closest-side, rgba(255,255,255,0.6), rgba(255,255,255,0)); filter: blur(8px)"></div>
+            <h1 style="position: relative; margin: 0; font-size: 46px; line-height: 1; font-weight: 700; letter-spacing: -0.035em; color: #0E1116">{{greetA}}<br><span class="em">{{greetB}}</span></h1>
+            <p style="position: relative; margin: 0; font-size: 20px; line-height: 1.35; font-weight: 500; color: #1A1F2A">{{subA}}<span class="em">{{subB}}</span></p>
+          </div>
+
+          <sc-if value="{{setupLeft}}" hint-placeholder-val="{{false}}">
+            <a href="M6-Onboarding.dc.html" class="glass" style="height: 56px; border-radius: 20px; padding: 0 14px 0 18px; display: flex; align-items: center; gap: 12px; text-decoration: none; color: #11141A">
+              <span style="flex: 1; font-size: 17px; font-weight: 700">Finish setting up Navi</span>
+              <span style="font-size: 15px; font-weight: 600; color: #2E3442">2 steps</span>
+              <svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true"><path d="M7 4l6 6-6 6" fill="none" stroke="#11141A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </a>
+          </sc-if>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap">
+            <button type="button" onClick="{{goPlan}}" class="glass" style="height: 44px; padding: 0 16px 0 14px; border-radius: 999px; display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600">
+              <span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #1E9E6A"></span>{{nowT}}
+            </button>
+            <button type="button" onClick="{{openStory}}" class="glass" style="height: 44px; padding: 0 16px; border-radius: 999px; display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600">
+              {{momentT}}
+              <svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true"><path d="M7 4l6 6-6 6" fill="none" stroke="#11141A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+
+          <div style="height: 14px"></div>
+          </sc-if>
+          <sc-if value="{{showScript}}" hint-placeholder-val="{{false}}">
+          <sc-if value="{{longChat}}" hint-placeholder-val="{{false}}">
+            <button type="button" class="glass" style="align-self: center; height: 38px; padding: 0 16px; border-radius: 999px; font-size: 15px; font-weight: 600">Earlier today · 14 messages</button>
+          </sc-if>
+
+          <div class="glass-strong" style="align-self: flex-start; max-width: 300px; border-radius: 22px 22px 22px 8px; padding: 13px 16px; font-size: 17px; line-height: 1.4">{{naviFirst}}</div>
+
+          <sc-if value="{{giftMini}}" hint-placeholder-val="{{false}}">
+            <button type="button" onClick="{{giftExpand}}" class="glass" style="align-self: flex-start; height: 44px; padding: 0 16px; border-radius: 999px; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600">1 more suggestion <span style="color: #2E3442">· Maya's gift</span></button>
+          </sc-if>
+          <sc-if value="{{giftFull}}" hint-placeholder-val="{{true}}">
+            <div class="glass-strong" style="align-self: stretch; border-radius: 24px; padding: 16px; display: flex; flex-direction: column; gap: 12px; animation: nvIn 0.4s ease both">
+              <span style="font-size: 17px; line-height: 1.4">Maya's birthday is Sunday. No gift yet.</span>
+              <div style="display: flex; gap: 8px">
+                <button type="button" onClick="{{giftYes}}" style="height: 46px; padding: 0 20px; border-radius: 999px; background: #11141A; color: #FFFFFF; font-size: 16px; font-weight: 600">Add to Saturday</button>
+                <button type="button" onClick="{{giftNo}}" class="glass" style="height: 46px; padding: 0 20px; border-radius: 999px; font-size: 16px; font-weight: 600">Not now</button>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{giftDone}}" hint-placeholder-val="{{false}}">
+            <div style="align-self: flex-start; display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 500; color: #2E3442; animation: nvIn 0.3s ease both">
+              <span>{{giftText}}</span>
+              <button type="button" onClick="{{giftUndo}}" style="height: 44px; padding: 0 8px; font-weight: 600; color: #2457D6">Undo</button>
+            </div>
+          </sc-if>
+
+          <div style="align-self: flex-end; max-width: 280px; border-radius: 22px 22px 8px 22px; padding: 13px 16px; font-size: 17px; line-height: 1.4; background: #11141A; color: #FFFFFF">move the dentist call to after class</div>
+          <div class="glass-strong" style="align-self: flex-start; border-radius: 22px 22px 22px 8px; padding: 13px 16px; display: flex; align-items: center; gap: 12px">
+            <span style="font-size: 17px">Done.</span>
+            <button type="button" onClick="{{goPlan}}" class="glass" style="height: 40px; padding: 0 14px; border-radius: 999px; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600">
+              <span class="c-health" aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%"></span>10:40 · Dentist
+            </button>
+          </div>
+
+          <sc-if value="{{busy}}" hint-placeholder-val="{{false}}">
+            <div style="align-self: flex-end; max-width: 280px; border-radius: 22px 22px 8px 22px; padding: 13px 16px; font-size: 17px; line-height: 1.4; background: #11141A; color: #FFFFFF">tell Sam 1pm works for saturday</div>
+            <div class="glass-strong" style="align-self: stretch; border-radius: 24px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+              <span style="align-self: flex-start; height: 28px; padding: 0 10px; border-radius: 999px; background: rgba(233,169,58,0.18); color: #7A4300; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 6px"><svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2h6v6M10 2L2 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Leaves Navi · needs your OK</span>
+              <span style="font-size: 17px; font-weight: 600; line-height: 1.35">Text Sam: “1 PM works for Saturday.”</span>
+              <span style="font-size: 15px; font-weight: 500; color: #3B4252">Sent from your account. Can't be undone.</span>
+              <sc-if value="{{samOpen}}" hint-placeholder-val="{{true}}">
+                <div style="display: flex; gap: 8px">
+                  <button type="button" onPointerDown="{{hSam.down}}" onPointerUp="{{hSam.up}}" onPointerLeave="{{hSam.up}}" onPointerCancel="{{hSam.up}}" onKeyDown="{{hSam.kd}}" onKeyUp="{{hSam.ku}}" onClick="{{hSam.tap}}" onContextMenu="{{noCtx}}" style="position: relative; overflow: hidden; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: none; transform: {{hSam.sc}}; transition: transform 0.18s ease; height: 46px; padding: 0 22px; border-radius: 999px; background: #11141A; color: #FFFFFF; font-size: 16px; font-weight: 600"><span aria-hidden="true" style="position: absolute; left: 0; top: 0; bottom: 0; width: {{hSam.fw}}; background: rgba(255,255,255,0.24); transition: {{hSam.ft}}"></span><span style="position: relative">{{hSam.label}}</span></button>
+                  <button type="button" onClick="{{samNo}}" class="glass" style="height: 46px; padding: 0 20px; border-radius: 999px; font-size: 16px; font-weight: 600">Not now</button>
+                </div>
+              </sc-if>
+              <sc-if value="{{samClosed}}" hint-placeholder-val="{{false}}">
+                <span style="font-size: 16px; font-weight: 600; color: #1E7A53">{{samText}}</span>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          </sc-if>
+          <sc-for list="{{msgs}}" as="m" hint-placeholder-count="0">
+            <sc-if value="{{m.me}}" hint-placeholder-val="{{true}}">
+              <div style="align-self: flex-end; max-width: 280px; border-radius: 22px 22px 8px 22px; padding: 13px 16px; font-size: 17px; line-height: 1.4; background: #11141A; color: #FFFFFF; animation: nvIn 0.3s ease both">{{m.t}}</div>
+            </sc-if>
+            <sc-if value="{{m.navi}}" hint-placeholder-val="{{false}}">
+              <div class="glass-strong" style="align-self: flex-start; border-radius: 22px 22px 22px 8px; padding: 13px 16px; display: flex; align-items: center; gap: 12px; animation: nvIn 0.35s ease both">
+                <span style="font-size: 17px">Added to Inbox.</span>
+                <button type="button" onClick="{{openInbox}}" class="glass" style="height: 40px; padding: 0 14px; border-radius: 999px; font-size: 15px; font-weight: 600">Review</button>
+              </div>
+            </sc-if>
+          </sc-for>
+          <sc-if value="{{typing}}" hint-placeholder-val="{{false}}">
+            <div class="glass-strong" aria-label="Navi is typing" style="align-self: flex-start; border-radius: 22px 22px 22px 8px; padding: 17px 18px; display: flex; gap: 6px">
+              <span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 50%; background: #11141A; animation: nvDots 1.2s infinite"></span>
+              <span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 50%; background: #11141A; animation: nvDots 1.2s 0.15s infinite"></span>
+              <span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 50%; background: #11141A; animation: nvDots 1.2s 0.3s infinite"></span>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+
+      <div style="position: absolute; left: 12px; right: 12px; bottom: 26px; display: flex; align-items: center; gap: 8px">
+        <label class="glass" style="flex: 1; min-width: 0; height: 56px; border-radius: 28px; display: flex; align-items: center; padding: 0 6px 0 20px; gap: 8px">
+          <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Message Navi</span>
+          <input value="{{draft}}" onChange="{{onDraft}}" onKeyDown="{{onKey}}" placeholder="Ask Navi anything" style="flex: 1; min-width: 0; height: 44px; border: 0; background: transparent; outline: none; font-size: 17px; font-weight: 500">
+          <sc-if value="{{hasDraft}}" hint-placeholder-val="{{false}}">
+            <button type="button" aria-label="Send" onClick="{{send}}" style="flex: none; width: 44px; height: 44px; border-radius: 50%; background: #11141A; display: flex; align-items: center; justify-content: center; animation: nvFade 0.2s ease both">
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </sc-if>
+        </label>
+        <button type="button" aria-label="Hold to talk to Navi" onPointerDown="{{hTalk.down}}" onPointerUp="{{hTalk.up}}" onPointerLeave="{{hTalk.up}}" onPointerCancel="{{hTalk.up}}" onKeyDown="{{hTalk.kd}}" onKeyUp="{{hTalk.ku}}" onClick="{{hTalk.tap}}" onContextMenu="{{noCtx}}" class="vorb sm {{orbSky}}" style="width: 56px; height: 56px; box-shadow: 0 10px 24px -10px rgba(60,100,170,0.55); -webkit-touch-callout: none; user-select: none; touch-action: none; transform: {{hTalk.grow}}; transition: {{hTalk.gt}}">
+          <span class="vorb-sky" aria-hidden="true"></span><span class="vorb-petal" aria-hidden="true"></span><span class="vorb-ring" aria-hidden="true"></span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ===================== PLAN ===================== -->
+    <section aria-label="Plan" style="width: 390px; height: 844px; flex: none; position: relative; overflow: hidden; background: #FBFBFD; border-radius: {{pg2.r}}px; transform: {{pg2.t}}; z-index: {{pg2.z}}; filter: {{pg2.f}}; box-shadow: {{pg2.sh}}; transition: {{secT}}">
+      <div onScroll="{{onPlanScroll}}" style="position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden">
+        <div style="padding: 124px 16px 120px; display: flex; flex-direction: column; gap: 18px">
+          <button type="button" onClick="{{openDayPick}}" style="align-self: flex-start; margin: 0 4px; display: flex; align-items: baseline; gap: 8px; text-align: left">
+            <h1 style="margin: 0; font-size: 36px; line-height: 1.05; font-weight: 700; letter-spacing: -0.035em">{{dayName}}</h1>
+            <svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 8l5 5 5-5" fill="none" stroke="#11141A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <p style="margin: -8px 4px 0; font-size: 17px; line-height: 1.4; font-weight: 500; color: #1F2430">{{planSummary}}</p>
+
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+            <div class="glass" role="tablist" aria-label="Plan view" style="position: relative; height: 46px; padding: 4px; border-radius: 999px; display: flex; box-sizing: border-box">
+              <span aria-hidden="true" style="position: absolute; top: 4px; left: 4px; width: 70px; height: 36px; border-radius: 999px; background: #FFFFFF; box-shadow: 0 2px 8px rgba(36,62,110,0.16); transform: translateX({{segX}}px); transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.25, 1)"></span>
+              <sc-for list="{{views}}" as="v" hint-placeholder-count="3">
+                <button type="button" role="tab" aria-selected="{{v.sel}}" onClick="{{v.go}}" style="position: relative; width: 70px; height: 36px; border-radius: 999px; font-size: 15px; font-weight: 600; color: {{v.c}}">{{v.t}}</button>
+              </sc-for>
+            </div>
+            <sc-if value="{{hasApprovals}}" hint-placeholder-val="{{true}}">
+              <button type="button" onClick="{{openInbox}}" style="height: 46px; padding: 0 16px; border-radius: 999px; background: #11141A; color: #fff; font-size: 15px; font-weight: 600; white-space: nowrap">{{apPending}} need OK</button>
+            </sc-if>
+          </div>
+
+          <sc-if value="{{planOffline}}" hint-placeholder-val="{{false}}">
+            <span class="glass" style="align-self: flex-start; height: 34px; padding: 0 14px; border-radius: 999px; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #A3A8BF"></span>Offline · 2 changes will sync</span>
+          </sc-if>
+          <sc-if value="{{packed}}" hint-placeholder-val="{{false}}">
+            <div class="glass" style="border-radius: 22px; padding: 12px 10px 12px 16px; display: flex; align-items: center; gap: 12px">
+              <span style="flex: 1; font-size: 16px; font-weight: 700">Packed day · 12 things, 1 clash</span>
+              <button type="button" onClick="{{openAsk}}" style="height: 40px; padding: 0 14px; border-radius: 999px; background: #11141A; color: #fff; font-size: 15px; font-weight: 600">Lighten it</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{lockTip}}" hint-placeholder-val="{{false}}">
+            <div style="border-radius: 22px; padding: 14px 12px 14px 16px; background: #FFFFFF; border: 1px solid rgba(17,20,26,0.08); display: flex; align-items: center; gap: 12px; animation: nvIn 0.35s ease both">
+              <svg width="14" height="16" viewBox="0 0 10 12" aria-hidden="true"><rect x="1" y="5" width="8" height="6" rx="1.5" fill="#11141A"/><path d="M3 5V3.5a2 2 0 014 0V5" fill="none" stroke="#11141A" stroke-width="1.3"/></svg>
+              <span style="flex: 1; font-size: 16px; font-weight: 600; line-height: 1.3">Locked means fixed. Navi plans around it, never moves it.</span>
+              <button type="button" onClick="{{hideLockTip}}" class="glass" style="flex: none; height: 40px; padding: 0 14px; border-radius: 999px; font-size: 15px; font-weight: 600">Got it</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{dayEmpty}}" hint-placeholder-val="{{false}}">
+            <div style="padding: 70px 8px 0; display: flex; flex-direction: column; align-items: flex-start; gap: 18px; animation: nvFade 0.3s ease both">
+              <p style="margin: 0; font-size: 30px; line-height: 1.1; font-weight: 700; letter-spacing: -0.03em">Your day is <span class="em">open</span>.</p>
+              <button type="button" onClick="{{openAsk}}" style="height: 50px; padding: 0 22px; border-radius: 999px; background: #11141A; color: #fff; font-size: 16px; font-weight: 600">Plan it with Navi</button>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{isDay}}" hint-placeholder-val="{{true}}">
+            <div style="display: flex; flex-direction: column; gap: 10px; animation: nvFade 0.3s ease both">
+              <sc-for list="{{blocks}}" as="b" hint-placeholder-count="6">
+                <div style="display: flex; gap: 10px; align-items: stretch">
+                  <span style="flex: none; width: 48px; padding-top: 17px; font-size: 15px; font-weight: 600; color: {{b.tc}}; text-align: right">{{b.time}}</span>
+                  <sc-if value="{{b.isNow}}" hint-placeholder-val="{{false}}">
+                    <div style="flex: 1; display: flex; align-items: center; gap: 8px; height: 30px; margin-top: 10px">
+                      <span aria-hidden="true" style="width: 10px; height: 10px; border-radius: 50%; background: #2B6FFF"></span>
+                      <span aria-hidden="true" style="flex: 1; height: 2px; background: linear-gradient(90deg, #2B6FFF, rgba(43,111,255,0))"></span>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{b.isFree}}" hint-placeholder-val="{{false}}">
+                    <div style="flex: 1; min-height: 68px; border-radius: 20px; border: 2px dashed rgba(17,20,26,0.16); padding: 0 8px 0 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px">
+                      <span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 17px; font-weight: 600">{{b.title}}</span><span style="font-size: 15px; font-weight: 500; color: #3B4252">{{b.sub}}</span></span>
+                      <button type="button" onClick="{{openAsk}}" class="glass" style="height: 44px; padding: 0 16px; border-radius: 999px; font-size: 15px; font-weight: 600">Fill it</button>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{b.isClash}}" hint-placeholder-val="{{false}}">
+                    <div style="flex: 1; display: flex; flex-direction: column; gap: 8px">
+                      <div style="display: flex; gap: 6px">
+                        <sc-for list="{{b.pair}}" as="pp" hint-placeholder-count="2">
+                          <div style="flex: 1; min-width: 0; min-height: 60px; border-radius: 18px; padding: 10px 12px; background: #FFF7EC; border: 1.5px solid rgba(233,169,58,0.55); display: flex; flex-direction: column; gap: 2px">
+                            <span class="clamp2" style="font-size: 15px; font-weight: 700; line-height: 1.25">{{pp.t}}</span>
+                            <span style="font-size: 13px; font-weight: 600; color: #7A4300">{{pp.w}}</span>
+                          </div>
+                        </sc-for>
+                      </div>
+                      <button type="button" onClick="{{openAsk}}" style="align-self: flex-start; height: 40px; padding: 0 14px; border-radius: 999px; background: #11141A; color: #fff; font-size: 15px; font-weight: 600">These clash · sort it out</button>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{b.isBlock}}" hint-placeholder-val="{{true}}">
+                    <button type="button" onClick="{{b.open}}" style="flex: 1; min-height: {{b.h}}px; border-radius: 20px; padding: 10px 16px; display: flex; gap: 12px; align-items: center; text-align: left; opacity: {{b.o}}; background: {{b.bg}}; border: {{b.border}}; box-shadow: {{b.shadow}}; transition: opacity 0.3s ease">
+                      <span class="{{b.dot}}" aria-hidden="true" style="flex: none; align-self: flex-start; margin-top: 7px; width: 10px; height: 10px; border-radius: 50%"></span>
+                      <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px"><span class="clamp2" style="font-size: 17px; font-weight: 600; line-height: 1.3; text-decoration: {{b.strike}}">{{b.title}}</span><span style="font-size: 15px; font-weight: 500; line-height: 1.3; color: #3B4252">{{b.sub}}</span></span>
+                      <sc-if value="{{b.deadline}}" hint-placeholder-val="{{false}}">
+                        <span style="flex: none; height: 28px; padding: 0 10px; border-radius: 999px; background: rgba(238,122,92,0.16); color: #A3330F; font-size: 14px; font-weight: 700; display: flex; align-items: center">Due 5</span>
+                      </sc-if>
+                      <sc-if value="{{b.fixed}}" hint-placeholder-val="{{false}}">
+                        <svg width="12" height="14" viewBox="0 0 10 12" aria-label="Fixed" role="img"><rect x="1" y="5" width="8" height="6" rx="1.5" fill="#5B6272"/><path d="M3 5V3.5a2 2 0 014 0V5" fill="none" stroke="#5B6272" stroke-width="1.3"/></svg>
+                      </sc-if>
+                    </button>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{isWeek}}" hint-placeholder-val="{{false}}">
+            <div class="float" style="background: #FFFFFF; border-radius: 24px; padding: 6px 16px; display: flex; flex-direction: column; animation: nvFade 0.3s ease both">
+              <sc-for list="{{week}}" as="w" hint-placeholder-count="7">
+                <div style="display: flex; align-items: center; gap: 14px; min-height: 56px; border-bottom: {{w.line}}">
+                  <span style="width: 44px; font-size: 16px; font-weight: {{w.fw}}">{{w.d}}</span>
+                  <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 10px 0">
+                  <span role="img" aria-label="{{w.label}}" style="display: flex; gap: 3px; height: 14px">
+                    <sc-for list="{{w.segs}}" as="sg" hint-placeholder-count="3"><span class="{{sg.c}}" style="flex: {{sg.f}} 1 0; border-radius: 7px"></span></sc-for>
+                    <span style="flex: {{w.free}} 1 0; border-radius: 7px; background: rgba(17,20,26,0.08)"></span>
+                  </span>
+                  <span style="font-size: 15px; font-weight: 500; color: #3B4252">{{w.note}}</span>
+                  </span>
+                  <span style="flex: none; width: 40px; text-align: right; font-size: 15px; font-weight: 700">{{w.h}}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{isList}}" hint-placeholder-val="{{false}}">
+            <div class="float" style="background: #FFFFFF; border-radius: 24px; padding: 6px 8px; display: flex; flex-direction: column; animation: nvFade 0.3s ease both">
+              <sc-for list="{{tasks}}" as="tk" hint-placeholder-count="5">
+                <button type="button" onClick="{{tk.toggle}}" aria-pressed="{{tk.done}}" style="min-height: 60px; padding: 8px 10px; display: flex; align-items: center; gap: 14px; text-align: left; border-bottom: {{tk.line}}">
+                  <span aria-hidden="true" class="{{tk.ring}}" style="flex: none; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center">
+                    <sc-if value="{{tk.done}}" hint-placeholder-val="{{false}}"><svg width="14" height="12" viewBox="0 0 14 12" aria-hidden="true"><path d="M1.5 6.5l3.5 3.5 7.5-8" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></sc-if>
+                  </span>
+                  <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 17px; font-weight: 600; text-decoration: {{tk.strike}}; color: {{tk.c}}">{{tk.t}}</span><span style="font-size: 15px; font-weight: 500; color: #3B4252">{{tk.m}}</span></span>
+                </button>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+      <button type="button" onClick="{{openAsk}}" class="glass" style="position: absolute; left: 16px; right: 16px; bottom: 26px; height: 56px; border-radius: 28px; display: flex; align-items: center; gap: 12px; padding: 0 10px">
+        <span class="vorb sm {{orbSky}}" aria-hidden="true" style="width: 38px; height: 38px"><span class="vorb-sky"></span><span class="vorb-petal"></span><span class="vorb-ring"></span></span>
+        <span style="flex: 1; text-align: left; font-size: 17px; font-weight: 600; color: #2E3442">Ask about {{dayShort}}</span>
+      </button>
+    </section>
+  </div>
+
+  <!-- ================= Header ================= -->
+  <div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 0; height: 112px; pointer-events: none; opacity: {{hdrO}}; transition: opacity 0.3s; background: linear-gradient(180deg, rgba(251,251,253,0.94) 0%, rgba(251,251,253,0.82) 72%, rgba(251,251,253,0) 100%)"></div>
+  <nav aria-label="Pages" style="position: absolute; left: 12px; right: 12px; top: 52px; height: 48px; display: flex; align-items: center; justify-content: space-between">
+    <button type="button" aria-label="Chats and account" onClick="{{openDrawer}}" class="glass" style="width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-sizing: border-box">
+      <svg width="20" height="14" viewBox="0 0 20 14" aria-hidden="true"><path d="M2 2h16M2 7h11M2 12h16" stroke="#11141A" stroke-width="1.9" stroke-linecap="round"/></svg>
+    </button>
+    <div class="glass" style="position: relative; height: 48px; padding: 4px; border-radius: 999px; display: flex; box-sizing: border-box">
+      <span aria-hidden="true" style="position: absolute; top: 4px; left: 4px; width: 80px; height: 38px; border-radius: 999px; background: #FFFFFF; box-shadow: 0 2px 8px rgba(36,62,110,0.16); transform: translateX({{pillX}}px); transition: {{pillT}}"></span>
+      <sc-for list="{{navItems}}" as="n" hint-placeholder-count="3">
+        <button type="button" aria-current="{{n.cur}}" onClick="{{n.go}}" style="position: relative; width: 80px; height: 38px; border-radius: 999px; font-size: 15px; font-weight: {{n.w}}; color: {{n.c}}; display: flex; align-items: center; justify-content: center; gap: 5px">
+          <sc-if value="{{n.orb}}" hint-placeholder-val="{{false}}"><span class="vorb {{orbSky}}" aria-hidden="true" style="width: 16px; height: 16px"><span class="vorb-sky"></span></span></sc-if>{{n.t}}
+          <sc-if value="{{n.dot}}" hint-placeholder-val="{{false}}"><span aria-label="needs you" style="width: 6px; height: 6px; border-radius: 50%; background: #E2552B"></span></sc-if>
+        </button>
+      </sc-for>
+    </div>
+    <button type="button" aria-label="Inbox, {{inboxCount}} waiting" onClick="{{openInbox}}" class="glass" style="position: relative; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-sizing: border-box">
+      <svg width="20" height="18" viewBox="0 0 20 18" aria-hidden="true"><path d="M2 10l2.5-7h11L18 10v5.5H2z" fill="none" stroke="#11141A" stroke-width="1.8" stroke-linejoin="round"/><path d="M2 10h5l1 2h4l1-2h5" fill="none" stroke="#11141A" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      <sc-if value="{{hasInbox}}" hint-placeholder-val="{{true}}"><span aria-hidden="true" style="position: absolute; top: 5px; right: 5px; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 9px; background: #11141A; color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{inboxCount}}</span></sc-if>
+    </button>
+  </nav>
+
+  <!-- Talking bar: voice minimised, keep using the pages -->
+  <sc-if value="{{voiceBar}}" hint-placeholder-val="{{false}}">
+    <div class="glass-strong" style="position: absolute; left: 12px; right: 12px; top: 108px; height: 56px; border-radius: 28px; display: flex; align-items: center; gap: 12px; padding: 0 8px 0 10px; z-index: 25; animation: nvDown 0.4s cubic-bezier(0.2, 0.9, 0.25, 1) both">
+      <button type="button" aria-label="Open voice" onClick="{{openVoice}}" class="vorb sm talk {{orbSky}}" style="width: 40px; height: 40px"><span class="vorb-sky" aria-hidden="true"></span><span class="vorb-petal" aria-hidden="true"></span><span class="vorb-ring" aria-hidden="true"></span></button>
+      <button type="button" onClick="{{openVoice}}" style="flex: 1; text-align: left; font-size: 16px; font-weight: 700">Listening · 0:42</button>
+      <button type="button" onClick="{{endBar}}" style="height: 40px; padding: 0 16px; border-radius: 999px; background: #11141A; color: #fff; font-size: 15px; font-weight: 600">End</button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{toastOn}}" hint-placeholder-val="{{false}}">
+    <div role="status" class="glass-strong" style="position: absolute; left: 0; right: 0; margin: 0 auto; width: fit-content; bottom: 96px; height: 48px; padding: 0 6px 0 18px; border-radius: 999px; display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 600; white-space: nowrap; animation: {{toastAnim}}; z-index: 26">{{toast}}<button type="button" onClick="{{undoToast}}" style="height: 40px; padding: 0 12px; color: #2457D6; font-weight: 700">Undo</button></div>
+  </sc-if>
+
+  </div>
+
+  <!-- ================= Block sheet ================= -->
+  <sc-if value="{{sheetOn}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; z-index: 30">
+      <button type="button" aria-label="Close" onClick="{{closeOv}}" class="x-scrim" style="position: absolute; inset: 0; background: rgba(20,30,52,0.18); animation: nvFade 0.3s ease both; opacity: {{scrimO}}"></button>
+      <div style="position: absolute; inset: 0; pointer-events: none; transform: translateY({{sheetDy}}px); transition: {{sheetT}}"><div role="dialog" aria-label="{{sb.title}}" onPointerDown="{{sd.down}}" onPointerMove="{{sd.move}}" onPointerUp="{{sd.up}}" onPointerCancel="{{sd.up}}" class="x-up glass-strong" style="pointer-events: auto; position: absolute; left: 8px; right: 8px; bottom: 8px; border-radius: 36px; padding: 10px 20px 20px; display: flex; flex-direction: column; gap: 18px; animation: nvUp 0.42s cubic-bezier(0.2, 0.9, 0.25, 1) both">
+        <span aria-hidden="true" style="align-self: center; display: flex; align-items: center; justify-content: center; width: 120px; height: 28px; touch-action: none; cursor: grab"><span style="width: 40px; height: 5px; border-radius: 3px; background: rgba(17,20,26,0.22)"></span></span>
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <h2 style="margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.03em">{{sb.title}}</h2>
+          <span style="font-size: 17px; font-weight: 500; color: #2E3442">{{sb.when}}</span>
+        </div>
+        <sc-if value="{{sb.fixed}}" hint-placeholder-val="{{false}}">
+          <div style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 18px; background: rgba(17,20,26,0.05)">
+            <svg width="13" height="15" viewBox="0 0 10 12" aria-hidden="true"><rect x="1" y="5" width="8" height="6" rx="1.5" fill="#11141A"/><path d="M3 5V3.5a2 2 0 014 0V5" fill="none" stroke="#11141A" stroke-width="1.3"/></svg>
+            <span style="font-size: 16px; font-weight: 600">Fixed. Navi won't move this. You can.</span>
+          </div>
+        </sc-if>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+          <button type="button" onClick="{{openFocus}}" style="height: 54px; border-radius: 999px; background: #11141A; color: #fff; font-size: 16px; font-weight: 600">Start focus</button>
+          <button type="button" onClick="{{sheetDone}}" class="glass" style="height: 54px; border-radius: 999px; font-size: 16px; font-weight: 600">{{sb.doneLabel}}</button>
+          <button type="button" onClick="{{sheetMove}}" class="glass" style="height: 54px; border-radius: 999px; font-size: 16px; font-weight: 600">{{sb.moveT}}</button>
+          <button type="button" onClick="{{openAsk}}" class="glass" style="height: 54px; border-radius: 999px; font-size: 16px; font-weight: 600">Ask Navi</button>
+        </div>
+      </div></div>
+    </div>
+  </sc-if>
+
+  <!-- ================= Ask sheet: Navi over the page you're on ================= -->
+  <sc-if value="{{askOn}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; z-index: 30">
+      <button type="button" aria-label="Close" onClick="{{closeOv}}" class="x-scrim" style="position: absolute; inset: 0; background: rgba(20,30,52,0.14); animation: nvFade 0.3s ease both; opacity: {{scrimO}}"></button>
+      <div style="position: absolute; inset: 0; pointer-events: none; transform: translateY({{sheetDy}}px); transition: {{sheetT}}"><div role="dialog" aria-label="Ask Navi" onPointerDown="{{sd.down}}" onPointerMove="{{sd.move}}" onPointerUp="{{sd.up}}" onPointerCancel="{{sd.up}}" class="x-up glass-strong" style="pointer-events: auto; position: absolute; left: 0; right: 0; bottom: 0; height: 470px; border-radius: 38px 38px 0 0; display: flex; flex-direction: column; animation: nvUp 0.45s cubic-bezier(0.2, 0.9, 0.25, 1) both">
+        <span aria-hidden="true" style="align-self: center; display: flex; align-items: center; justify-content: center; width: 120px; height: 28px; touch-action: none; cursor: grab"><span style="width: 40px; height: 5px; border-radius: 3px; background: rgba(17,20,26,0.22)"></span></span>
+        <div style="flex: 1; padding: 16px 20px 0; display: flex; flex-direction: column; gap: 14px">
+          <span class="glass" style="align-self: flex-start; height: 32px; padding: 0 12px; border-radius: 999px; display: flex; align-items: center; font-size: 14px; font-weight: 600">About · {{askCtx}}</span>
+          <p style="margin: 0; font-size: 22px; line-height: 1.25; font-weight: 700; letter-spacing: -0.02em">{{askLine}}</p>
+          <sc-if value="{{askOpen}}" hint-placeholder-val="{{true}}">
+            <div style="background: #FFFFFF; border-radius: 22px; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 8px 20px -12px rgba(20,32,64,0.2)">
+              <div style="display: flex; align-items: center; gap: 10px"><span class="c-school" aria-hidden="true" style="width: 10px; height: 10px; border-radius: 50%"></span><span style="flex: 1; font-size: 17px; font-weight: 600">Essay intro</span><span style="font-size: 16px; font-weight: 600; color: #2E3442">11:00 – 12:30</span></div>
+              <div style="display: flex; gap: 8px">
+                <button type="button" onClick="{{askYes}}" style="height: 46px; padding: 0 22px; border-radius: 999px; background: #11141A; color: #fff; font-size: 16px; font-weight: 600">Move it</button>
+                <button type="button" onClick="{{askNo}}" class="glass" style="height: 46px; padding: 0 20px; border-radius: 999px; font-size: 16px; font-weight: 600">Not now</button>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{askClosed}}" hint-placeholder-val="{{false}}">
+            <p style="margin: 0; font-size: 17px; font-weight: 600; color: #1E7A53">{{askText}}</p>
+          </sc-if>
+        </div>
+        <div style="padding: 12px 12px 26px; display: flex; gap: 8px">
+          <label class="glass" style="flex: 1; height: 56px; border-radius: 28px; display: flex; align-items: center; padding: 0 20px">
+            <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Ask Navi</span>
+            <input placeholder="Ask anything" style="flex: 1; min-width: 0; height: 44px; border: 0; background: transparent; outline: none; font-size: 17px; font-weight: 500">
+          </label>
+          <button type="button" aria-label="Talk to Navi" onClick="{{openVoice}}" class="vorb sm {{orbSky}}" style="width: 56px; height: 56px"><span class="vorb-sky" aria-hidden="true"></span><span class="vorb-petal" aria-hidden="true"></span><span class="vorb-ring" aria-hidden="true"></span></button>
+        </div>
+      </div></div>
+    </div>
+  </sc-if>
+
+  <!-- ================= Day picker ================= -->
+  <sc-if value="{{dayPickOn}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; z-index: 30">
+      <button type="button" aria-label="Close" onClick="{{closeOv}}" class="x-scrim" style="position: absolute; inset: 0; background: rgba(20,30,52,0.18); animation: nvFade 0.3s ease both; opacity: {{scrimO}}"></button>
+      <div style="position: absolute; inset: 0; pointer-events: none; transform: {{tf.day}}; transition: {{dragT}}"><div onPointerDown="{{dg.day.down}}" onPointerMove="{{dg.day.move}}" onPointerUp="{{dg.day.up}}" onPointerCancel="{{dg.day.up}}" role="dialog" aria-label="Pick a day" class="x-fade glass-strong" style="pointer-events: auto; position: absolute; left: 8px; right: 8px; top: 108px; border-radius: 30px; padding: 18px 14px; display: flex; flex-direction: column; gap: 14px; animation: nvIn 0.3s ease both">
+        <h2 style="margin: 0 6px; font-size: 22px; font-weight: 700; letter-spacing: -0.02em">This week</h2>
+        <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px">
+          <sc-for list="{{days}}" as="dd" hint-placeholder-count="7">
+            <button type="button" onClick="{{dd.go}}" aria-pressed="{{dd.sel}}" style="height: 72px; border-radius: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; background: {{dd.bg}}; color: {{dd.c}}">
+              <span style="font-size: 14px; font-weight: 600">{{dd.w}}</span>
+              <span style="font-size: 20px; font-weight: 700">{{dd.n}}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div></div>
+    </div>
+  </sc-if>
+
+  <!-- ================= Inbox: three clear piles ================= -->
+  <sc-if value="{{inboxOn}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; z-index: 30">
+      <button type="button" aria-label="Close inbox" onClick="{{closeOv}}" class="x-scrim" style="position: absolute; inset: 0; background: rgba(20,30,52,0.2); animation: nvFade 0.3s ease both; opacity: {{scrimO}}"></button>
+      <div style="position: absolute; inset: 0; pointer-events: none; transform: translateY({{sheetDy}}px); transition: {{sheetT}}"><div role="dialog" aria-label="Inbox" onPointerDown="{{sd.down}}" onPointerMove="{{sd.move}}" onPointerUp="{{sd.up}}" onPointerCancel="{{sd.up}}" class="x-up glass-strong" style="pointer-events: auto; position: absolute; left: 0; right: 0; bottom: 0; height: 700px; border-radius: 38px 38px 0 0; display: flex; flex-direction: column; animation: nvUp 0.45s cubic-bezier(0.2, 0.9, 0.25, 1) both">
+        <span aria-hidden="true" style="align-self: center; display: flex; align-items: center; justify-content: center; width: 120px; height: 28px; touch-action: none; cursor: grab"><span style="width: 40px; height: 5px; border-radius: 3px; background: rgba(17,20,26,0.22)"></span></span>
+        <div style="padding: 14px 20px 12px; display: flex; align-items: center; justify-content: space-between">
+          <h2 style="margin: 0; font-size: 32px; font-weight: 700; letter-spacing: -0.035em">Inbox</h2>
+          <button type="button" onClick="{{closeOv}}" class="glass" style="height: 44px; padding: 0 18px; border-radius: 999px; font-size: 16px; font-weight: 600">Close</button>
+        </div>
+        <div role="tablist" aria-label="Inbox piles" style="margin: 0 16px 8px; height: 48px; padding: 4px; border-radius: 999px; background: rgba(17,20,26,0.06); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; box-sizing: border-box">
+          <sc-for list="{{inTabs}}" as="it" hint-placeholder-count="3">
+            <button type="button" role="tab" aria-selected="{{it.sel}}" onClick="{{it.go}}" style="height: 40px; border-radius: 999px; font-size: 15px; font-weight: 700; background: {{it.bg}}; box-shadow: {{it.sh}}; display: flex; align-items: center; justify-content: center; gap: 6px">{{it.t}}<span style="min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border-radius: 11px; font-size: 13px; display: flex; align-items: center; justify-content: center; background: {{it.nb}}; color: {{it.nc}}">{{it.n}}</span></button>
+          </sc-for>
+        </div>
+        <div style="flex: 1; overflow-y: auto; padding: 8px 16px 32px; display: flex; flex-direction: column; gap: 10px">
+
+          <sc-if value="{{tabOk}}" hint-placeholder-val="{{true}}">
+            <sc-for list="{{apPend}}" as="ap" hint-placeholder-count="3">
+              <div style="background: #FFFFFF; border-radius: 24px; padding: 16px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 8px 20px -12px rgba(20,32,64,0.2); animation: nvIn 0.3s ease both">
+                <span style="align-self: flex-start; height: 28px; padding: 0 10px; border-radius: 999px; background: {{ap.tagBg}}; color: {{ap.tagC}}; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 6px">
+                  <sc-if value="{{ap.ext}}" hint-placeholder-val="{{true}}"><svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2h6v6M10 2L2 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></sc-if>{{ap.tag}}</span>
+                <span style="font-size: 17px; font-weight: 700; line-height: 1.3">{{ap.t}}</span>
+                <span style="font-size: 15px; font-weight: 500; color: #2E3442">{{ap.c}}</span>
+                <div style="display: flex; gap: 8px; margin-top: 2px">
+                  <button type="button" onPointerDown="{{ap.h.down}}" onPointerUp="{{ap.h.up}}" onPointerLeave="{{ap.h.up}}" onPointerCancel="{{ap.h.up}}" onKeyDown="{{ap.h.kd}}" onKeyUp="{{ap.h.ku}}" onClick="{{ap.h.tap}}" onContextMenu="{{noCtx}}" style="position: relative; overflow: hidden; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: none; transform: {{ap.h.sc}}; transition: transform 0.18s ease; height: 46px; padding: 0 20px; border-radius: 999px; background: #11141A; color: #fff; font-size: 16px; font-weight: 600"><span aria-hidden="true" style="position: absolute; left: 0; top: 0; bottom: 0; width: {{ap.h.fw}}; background: rgba(255,255,255,0.24); transition: {{ap.h.ft}}"></span><span style="position: relative">{{ap.h.label}}</span></button>
+                  <button type="button" onClick="{{ap.no}}" class="glass" style="height: 46px; padding: 0 20px; border-radius: 999px; font-size: 16px; font-weight: 600">{{ap.noT}}</button>
+                </div>
+              </div>
+            </sc-for>
+            <sc-if value="{{okEmpty}}" hint-placeholder-val="{{false}}">
+              <p style="margin: 70px 0 0; text-align: center; font-size: 24px; font-weight: 700; letter-spacing: -0.02em">Nothing needs <span class="em">your OK</span>.</p>
+            </sc-if>
+          </sc-if>
+
+          <sc-if value="{{tabAdd}}" hint-placeholder-val="{{false}}">
+            <sc-if value="{{hasBulk}}" hint-placeholder-val="{{false}}">
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 4px 4px 2px">
+                <span style="font-size: 15px; font-weight: 700; color: #2E3442">From this morning's chat</span>
+                <button type="button" onClick="{{addAll}}" style="height: 40px; padding: 0 14px; border-radius: 999px; background: #11141A; color: #fff; font-size: 15px; font-weight: 600">Add the {{saidCount}} you said</button>
+              </div>
+            </sc-if>
+            <sc-for list="{{drafts}}" as="dr" hint-placeholder-count="2">
+              <div style="background: #FFFFFF; border-radius: 22px; padding: 10px 10px 10px 18px; display: flex; align-items: center; gap: 10px; box-shadow: 0 8px 20px -12px rgba(20,32,64,0.2); animation: nvIn 0.3s ease both">
+                <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span class="clamp2" style="font-size: 17px; font-weight: 600; line-height: 1.3">{{dr.t}}</span><span style="font-size: 14px; font-weight: 600; color: {{dr.srcC}}">{{dr.src}}</span></span>
+                <button type="button" onClick="{{dr.add}}" style="flex: none; height: 44px; padding: 0 18px; border-radius: 999px; background: #11141A; color: #fff; font-size: 16px; font-weight: 600">Add</button>
+                <button type="button" aria-label="Dismiss {{dr.t}}" onClick="{{dr.drop}}" class="glass" style="flex: none; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="#11141A" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+              </div>
+            </sc-for>
+            <sc-if value="{{addEmpty}}" hint-placeholder-val="{{false}}">
+              <p style="margin: 70px 0 0; text-align: center; font-size: 24px; font-weight: 700; letter-spacing: -0.02em">Nothing <span class="em">to add</span>.</p>
+            </sc-if>
+          </sc-if>
+
+          <sc-if value="{{tabDone}}" hint-placeholder-val="{{false}}">
+            <div style="background: #FFFFFF; border-radius: 22px; overflow: hidden; box-shadow: 0 8px 20px -12px rgba(20,32,64,0.2); animation: nvIn 0.3s ease both">
+              <sc-for list="{{doneRows}}" as="dn" hint-placeholder-count="3">
+                <div style="min-height: 60px; padding: 8px 10px 8px 16px; display: flex; align-items: center; gap: 12px; border-bottom: {{dn.line}}">
+                  <span class="{{dn.dot}}" aria-hidden="true" style="flex: none; width: 10px; height: 10px; border-radius: 50%"></span>
+                  <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 16px; font-weight: 600; line-height: 1.3">{{dn.t}}</span><span style="font-size: 14px; font-weight: 500; color: #3B4252">{{dn.s}}</span></span>
+                  <sc-if value="{{dn.rev}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{dn.undo}}" style="flex: none; height: 44px; padding: 0 10px; font-size: 16px; font-weight: 700; color: #2457D6">Undo</button></sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </div></div>
+    </div>
+  </sc-if>
+
+  <!-- ================= What the Progress numbers mean ================= -->
+  <sc-if value="{{metricsOn}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; z-index: 30">
+      <button type="button" aria-label="Close" onClick="{{closeOv}}" class="x-scrim" style="position: absolute; inset: 0; background: rgba(20,30,52,0.18); animation: nvFade 0.3s ease both; opacity: {{scrimO}}"></button>
+      <div style="position: absolute; inset: 0; pointer-events: none; transform: translateY({{sheetDy}}px); transition: {{sheetT}}"><div role="dialog" aria-label="How these are counted" onPointerDown="{{sd.down}}" onPointerMove="{{sd.move}}" onPointerUp="{{sd.up}}" onPointerCancel="{{sd.up}}" class="x-up glass-strong" style="pointer-events: auto; position: absolute; left: 0; right: 0; bottom: 0; max-height: 720px; border-radius: 38px 38px 0 0; display: flex; flex-direction: column; animation: nvUp 0.45s cubic-bezier(0.2, 0.9, 0.25, 1) both">
+        <span aria-hidden="true" style="align-self: center; display: flex; align-items: center; justify-content: center; width: 120px; height: 28px; touch-action: none; cursor: grab"><span style="width: 40px; height: 5px; border-radius: 3px; background: rgba(17,20,26,0.22)"></span></span>
+        <div style="overflow-y: auto; padding: 16px 16px 34px; display: flex; flex-direction: column; gap: 12px">
+          <h2 style="margin: 0 4px 4px; font-size: 30px; font-weight: 700; letter-spacing: -0.03em">How these are counted</h2>
+          <div style="background: #fff; border-radius: 22px; padding: 16px; display: flex; flex-direction: column; gap: 6px">
+            <span style="font-size: 18px; font-weight: 700">Kept · 13 of 16</span>
+            <span style="font-size: 16px; font-weight: 500; line-height: 1.45; color: #2E3442">Things you planned for yourself and did. Fixed events don't count. Moving something with a day's notice isn't a miss.</span>
+          </div>
+          <div style="background: #fff; border-radius: 22px; padding: 16px; display: flex; flex-direction: column; gap: 6px">
+            <span style="font-size: 18px; font-weight: 700">Focused · 6h 40</span>
+            <span style="font-size: 16px; font-weight: 500; line-height: 1.45; color: #2E3442">Time inside Focus sessions this week.</span>
+          </div>
+          <div style="background: #fff; border-radius: 22px; padding: 16px; display: flex; flex-direction: column; gap: 6px">
+            <span style="font-size: 18px; font-weight: 700; color: #B23A17">Slipping · 1</span>
+            <span style="font-size: 16px; font-weight: 500; line-height: 1.45; color: #2E3442">Moved 3 times or more, or close to missing its deadline.</span>
+            <span style="margin-top: 6px; font-size: 16px; font-weight: 700">Essay intro <span style="font-weight: 500; color: #3B4252">· moved 3 times</span></span>
+          </div>
+          <h3 style="margin: 8px 6px 0; font-size: 15px; font-weight: 700; color: #2E3442">The 3 not kept</h3>
+          <div style="background: #fff; border-radius: 22px; overflow: hidden">
+            <div style="min-height: 52px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(17,20,26,0.06)"><span style="font-size: 16px; font-weight: 600">Run</span><span style="font-size: 15px; font-weight: 500; color: #3B4252">Wednesday</span></div>
+            <div style="min-height: 52px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(17,20,26,0.06)"><span style="font-size: 16px; font-weight: 600">Laundry</span><span style="font-size: 15px; font-weight: 500; color: #3B4252">Tuesday</span></div>
+            <div style="min-height: 52px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between"><span style="font-size: 16px; font-weight: 600">Call home</span><span style="font-size: 15px; font-weight: 500; color: #3B4252">Sunday</span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+  </sc-if>
+
+  <!-- ================= Drawer ================= -->
+  <sc-if value="{{drawerOn}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; z-index: 30">
+      <button type="button" aria-label="Close menu" onClick="{{closeOv}}" class="x-scrim" style="position: absolute; inset: 0; background: rgba(20,30,52,0.2); animation: nvFade 0.3s ease both"></button>
+      <div style="position: absolute; inset: 0; pointer-events: none; transform: {{tf.drawer}}; transition: {{dragT}}"><div onPointerDown="{{dg.drawer.down}}" onPointerMove="{{dg.drawer.move}}" onPointerUp="{{dg.drawer.up}}" onPointerCancel="{{dg.drawer.up}}" role="dialog" aria-label="Chats and account" class="x-left glass-strong" style="pointer-events: auto; position: absolute; left: 8px; top: 8px; bottom: 8px; width: 310px; border-radius: 36px; display: flex; flex-direction: column; overflow: hidden; animation: nvLeft 0.42s cubic-bezier(0.2, 0.9, 0.25, 1) both">
+        <div style="padding: 52px 16px 10px; display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 4px">
+            <h2 style="margin: 0; font-size: 32px; font-weight: 700; letter-spacing: -0.035em">Chats</h2>
+            <button type="button" aria-label="New chat" onClick="{{newChat}}" style="width: 44px; height: 44px; border-radius: 50%; background: #11141A; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg></button>
+          </div>
+          <label class="glass" style="height: 48px; border-radius: 24px; display: flex; align-items: center; gap: 10px; padding: 0 16px">
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="#2E3442" stroke-width="1.8"/><path d="M11 11l3.5 3.5" stroke="#2E3442" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search chats</span>
+            <input placeholder="Search" style="flex: 1; min-width: 0; height: 44px; border: 0; background: transparent; outline: none; font-size: 17px; font-weight: 500">
+          </label>
+        </div>
+        <div style="flex: 1; overflow-y: auto; padding: 6px 10px; display: flex; flex-direction: column; gap: 2px">
+          <sc-for list="{{chats}}" as="c" hint-placeholder-count="5">
+            <button type="button" onClick="{{c.go}}" style="min-height: 52px; padding: 0 14px; border-radius: 18px; display: flex; align-items: center; text-align: left; font-size: 17px; font-weight: 600; background: {{c.bg}}">{{c.t}}</button>
+          </sc-for>
+        </div>
+        <div style="padding: 10px; border-top: 1px solid rgba(17,20,26,0.06)">
+          <button type="button" onClick="{{openSettings}}" style="width: 100%; min-height: 60px; padding: 6px 10px; border-radius: 20px; display: flex; align-items: center; gap: 12px; text-align: left">
+            <span aria-hidden="true" style="width: 42px; height: 42px; border-radius: 50%; background: #11141A; color: #fff; font-size: 17px; font-weight: 700; display: flex; align-items: center; justify-content: center">A</span>
+            <span style="flex: 1; font-size: 17px; font-weight: 700">Aditya</span>
+            <svg width="20" height="20" viewBox="0 0 20 20" aria-label="Settings" role="img"><circle cx="10" cy="10" r="2.6" fill="none" stroke="#2E3442" stroke-width="1.7"/><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4" stroke="#2E3442" stroke-width="1.7" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </div></div>
+    </div>
+  </sc-if>
+
+  <!-- ================= You: Settings and the screens under it ================= -->
+  <sc-if value="{{youOn}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; pointer-events: none; transform: {{tf.you}}; transition: {{dragT}}"><div onPointerDown="{{dg.you.down}}" onPointerMove="{{dg.you.move}}" onPointerUp="{{dg.you.up}}" onPointerCancel="{{dg.you.up}}" class="x-right" style="pointer-events: auto; position: absolute; inset: 0; z-index: 35; background: #F3F5F9; display: flex; flex-direction: column; animation: nvRight 0.38s cubic-bezier(0.2, 0.9, 0.25, 1) both">
+      <div style="padding: 52px 12px 6px; display: flex; align-items: center; gap: 8px">
+        <button type="button" aria-label="Back" onClick="{{youBack}}" class="glass" style="width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center"><svg width="12" height="18" viewBox="0 0 12 18" aria-hidden="true"><path d="M10 2L3 9l7 7" fill="none" stroke="#11141A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </div>
+      <div style="flex: 1; overflow-y: auto; padding: 4px 16px 40px; display: flex; flex-direction: column; gap: 22px">
+        <h1 style="margin: 4px 4px 0; font-size: 36px; font-weight: 700; letter-spacing: -0.035em">{{youTitle}}</h1>
+
+        <sc-if value="{{isSettings}}" hint-placeholder-val="{{true}}">
+          <sc-for list="{{setGroups}}" as="sg" hint-placeholder-count="4">
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <h2 style="margin: 0 6px; font-size: 15px; font-weight: 700; color: #2E3442">{{sg.h}}</h2>
+              <div style="background: #FFFFFF; border-radius: 22px; overflow: hidden">
+                <sc-for list="{{sg.rows}}" as="r" hint-placeholder-count="3">
+                  <button type="button" onClick="{{r.go}}" aria-pressed="{{r.pressed}}" style="width: 100%; min-height: 56px; padding: 0 16px; display: flex; align-items: center; gap: 12px; text-align: left; border-bottom: {{r.line}}">
+                    <span style="flex: 1; font-size: 17px; font-weight: 600; color: {{r.c}}">{{r.t}}</span>
+                    <span style="font-size: 16px; font-weight: 500; color: #2E3442">{{r.v}}</span>
+                    <sc-if value="{{r.toggle}}" hint-placeholder-val="{{false}}">
+                      <span aria-hidden="true" style="width: 50px; height: 30px; border-radius: 15px; background: {{r.tb}}; position: relative; transition: background 0.2s"><span style="position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transform: translateX({{r.tx}}px); transition: transform 0.2s"></span></span>
+                    </sc-if>
+                    <sc-if value="{{r.chev}}" hint-placeholder-val="{{true}}"><svg width="8" height="14" viewBox="0 0 8 14" aria-hidden="true"><path d="M1.5 1.5L6.5 7l-5 5.5" fill="none" stroke="#5B6272" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></sc-if>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </sc-if>
+
+        <sc-if value="{{isMemory}}" hint-placeholder-val="{{false}}">
+          <sc-if value="{{memGuessHas}}" hint-placeholder-val="{{true}}">
+            <h2 style="margin: 0 6px; font-size: 15px; font-weight: 700; color: #7A4300">Navi's guesses · check these</h2>
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <sc-for list="{{memGuess}}" as="mg" hint-placeholder-count="2">
+                <div style="background: #FFFFFF; border-radius: 22px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; border: 1.5px solid rgba(233,169,58,0.45)">
+                  <span style="font-size: 17px; font-weight: 600; line-height: 1.3">{{mg.t}}</span>
+                  <span style="font-size: 15px; font-weight: 500; color: #3B4252">{{mg.s}}</span>
+                  <div style="display: flex; gap: 8px">
+                    <button type="button" onClick="{{mg.yes}}" style="height: 44px; padding: 0 18px; border-radius: 999px; background: #11141A; color: #fff; font-size: 15px; font-weight: 600">That's right</button>
+                    <button type="button" onClick="{{mg.no}}" class="glass" style="height: 44px; padding: 0 18px; border-radius: 999px; font-size: 15px; font-weight: 600">That's wrong</button>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <h2 style="margin: 4px 6px 0; font-size: 15px; font-weight: 700; color: #2E3442">What Navi knows</h2>
+          <div style="background: #FFFFFF; border-radius: 22px; overflow: hidden">
+            <sc-for list="{{memKnown}}" as="mk" hint-placeholder-count="3">
+              <div style="min-height: 64px; padding: 10px 8px 10px 16px; display: flex; align-items: center; gap: 6px; border-bottom: {{mk.line}}">
+                <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px"><span style="font-size: 17px; font-weight: 600; line-height: 1.3">{{mk.t}}</span><span style="font-size: 15px; font-weight: 500; color: #3B4252">{{mk.s}}</span></span>
+                <button type="button" aria-label="Edit {{mk.t}}" onClick="{{mk.edit}}" style="flex: none; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M13.5 3.5l3 3L7 16H4v-3z" fill="none" stroke="#11141A" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+                <button type="button" aria-label="Delete {{mk.t}}" onClick="{{mk.del}}" style="flex: none; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10" fill="none" stroke="#B23A17" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{isSettings}}" hint-placeholder-val="{{true}}">
+          <button type="button" onPointerDown="{{hOut.down}}" onPointerUp="{{hOut.up}}" onPointerLeave="{{hOut.up}}" onPointerCancel="{{hOut.up}}" onKeyDown="{{hOut.kd}}" onKeyUp="{{hOut.ku}}" onClick="{{hOut.tap}}" onContextMenu="{{noCtx}}" style="position: relative; overflow: hidden; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: none; transform: {{hOut.sc}}; transition: transform 0.18s ease; margin-top: 4px; height: 58px; border-radius: 22px; background: #FFFFFF; color: #B23A17; font-size: 17px; font-weight: 700"><span aria-hidden="true" style="position: absolute; left: 0; top: 0; bottom: 0; width: {{hOut.fw}}; background: rgba(178,58,23,0.14); transition: {{hOut.ft}}"></span><span style="position: relative">{{hOut.label}}</span></button>
+        </sc-if>
+        <sc-if value="{{isYouList}}" hint-placeholder-val="{{false}}">
+          <div style="background: #FFFFFF; border-radius: 22px; overflow: hidden">
+            <sc-for list="{{youRows}}" as="yr" hint-placeholder-count="5">
+              <div style="min-height: 64px; padding: 12px 12px 12px 16px; display: flex; align-items: center; gap: 12px; border-bottom: {{yr.line}}; opacity: {{yr.o}}">
+                <sc-if value="{{yr.dot}}" hint-placeholder-val="{{false}}"><span class="{{yr.dotC}}" aria-hidden="true" style="flex: none; width: 10px; height: 10px; border-radius: 50%"></span></sc-if>
+                <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px"><span style="font-size: 17px; font-weight: 600; line-height: 1.3">{{yr.t}}</span><span style="font-size: 15px; font-weight: 500; color: #3B4252">{{yr.s}}</span></span>
+                <sc-if value="{{yr.act}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{yr.do}}" class="glass" style="flex: none; height: 40px; padding: 0 14px; border-radius: 999px; font-size: 15px; font-weight: 600">{{yr.a}}</button></sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </div></div>
+  </sc-if>
+
+  <!-- Password sheet over Settings -->
+  <sc-if value="{{pwOn}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; z-index: 38">
+      <button type="button" aria-label="Close" onClick="{{closePw}}" class="x-scrim" style="position: absolute; inset: 0; background: rgba(20,30,52,0.22); animation: nvFade 0.3s ease both"></button>
+      <div style="position: absolute; inset: 0; pointer-events: none; transform: {{tf.pw}}; transition: {{dragT}}"><div onPointerDown="{{dg.pw.down}}" onPointerMove="{{dg.pw.move}}" onPointerUp="{{dg.pw.up}}" onPointerCancel="{{dg.pw.up}}" role="dialog" aria-label="Password" class="x-up glass-strong" style="pointer-events: auto; position: absolute; left: 0; right: 0; bottom: 0; border-radius: 38px 38px 0 0; padding: 10px 20px 34px; display: flex; flex-direction: column; gap: 16px; animation: nvUp 0.42s cubic-bezier(0.2, 0.9, 0.25, 1) both">
+        <span aria-hidden="true" style="align-self: center; display: flex; align-items: center; justify-content: center; width: 120px; height: 28px; touch-action: none; cursor: grab"><span style="width: 40px; height: 5px; border-radius: 3px; background: rgba(17,20,26,0.22)"></span></span>
+        <h2 style="margin: 4px 0 0; font-size: 28px; font-weight: 700; letter-spacing: -0.03em">Password</h2>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 15px; font-weight: 700; color: #2E3442">New password<input type="password" style="height: 54px; border-radius: 18px; border: 1px solid rgba(17,20,26,0.12); background: #fff; padding: 0 16px; font-size: 17px"></label>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 15px; font-weight: 700; color: #2E3442">Again<input type="password" style="height: 54px; border-radius: 18px; border: 1px solid rgba(17,20,26,0.12); background: #fff; padding: 0 16px; font-size: 17px"></label>
+        <span style="font-size: 15px; font-weight: 500; color: #3B4252">At least 10 characters.</span>
+        <button type="button" onClick="{{savePw}}" style="height: 56px; border-radius: 999px; background: #11141A; color: #fff; font-size: 17px; font-weight: 600">Save</button>
+      </div></div>
+    </div>
+  </sc-if>
+
+  <!-- ================= Focus: its own place, above the clouds ================= -->
+  <sc-if value="{{focusOn}}" hint-placeholder-val="{{false}}">
+    <div role="dialog" aria-label="Focus" class="x-fade" style="position: absolute; inset: 0; z-index: 40; overflow: hidden; background: #F4EEE8; animation: nvFade 0.6s ease both">
+      <div class="{{fSkyCls}}" aria-hidden="true" style="position: absolute; inset: -40px; background-size: cover; background-position: 50% 50%; animation: fDrift 36s ease-in-out infinite"></div>
+      <div aria-hidden="true" style="position: absolute; inset: 0; background: {{fVeil}}"></div>
+
+      <sc-if value="{{fSetup}}" hint-placeholder-val="{{true}}">
+        <div style="position: absolute; inset: 0; padding: 52px 16px 34px; display: flex; flex-direction: column; animation: nvFade 0.45s ease both">
+          <button type="button" aria-label="Close" onClick="{{closeOv}}" class="glass" style="align-self: flex-start; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 2l10 10M12 2L2 12" stroke="#11141A" stroke-width="2" stroke-linecap="round"/></svg></button>
+          <div style="margin-top: 70px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center">
+            <span class="glass" style="height: 36px; padding: 0 14px; border-radius: 999px; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700"><span class="c-school" aria-hidden="true" style="width: 9px; height: 9px; border-radius: 50%"></span>School</span>
+            <h1 style="margin: 0; font-size: 54px; line-height: 0.98; font-weight: 800; letter-spacing: -0.045em; color: #0E1116">{{fTitle}}</h1>
+            <p style="margin: 0; font-size: 19px; font-weight: 500; color: #1A1F2A">Your last free stretch <span class="em">before the shift</span>.</p>
+          </div>
+          <div style="flex: 1"></div>
+          <div class="glass-strong" style="border-radius: 34px; padding: 12px; display: flex; flex-direction: column; gap: 10px">
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px">
+              <sc-for list="{{fLens}}" as="fl" hint-placeholder-count="3">
+                <button type="button" onClick="{{fl.go}}" aria-pressed="{{fl.sel}}" style="height: 64px; border-radius: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: {{fl.bg}}; color: {{fl.c}}"><span style="font-size: 24px; font-weight: 800; letter-spacing: -0.03em">{{fl.n}}</span><span style="font-size: 13px; font-weight: 600">min</span></button>
+              </sc-for>
+            </div>
+            <button type="button" onClick="{{toggleHold}}" aria-pressed="{{holdP}}" style="min-height: 54px; border-radius: 22px; padding: 0 8px 0 14px; display: flex; align-items: center; gap: 12px; text-align: left">
+              <span style="flex: 1; font-size: 16px; font-weight: 600">Hold what can wait</span>
+              <span aria-hidden="true" style="width: 50px; height: 30px; border-radius: 15px; background: {{holdBg}}; position: relative"><span style="position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transform: translateX({{holdX}}px); transition: transform 0.2s"></span></span>
+            </button>
+            <button type="button" onPointerDown="{{hBegin.down}}" onPointerUp="{{hBegin.up}}" onPointerLeave="{{hBegin.up}}" onPointerCancel="{{hBegin.up}}" onKeyDown="{{hBegin.kd}}" onKeyUp="{{hBegin.ku}}" onClick="{{hBegin.tap}}" onContextMenu="{{noCtx}}" style="position: relative; overflow: hidden; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: none; transform: {{hBegin.sc}}; transition: transform 0.18s ease; height: 62px; border-radius: 999px; background: #11141A; color: #fff; font-size: 18px; font-weight: 700"><span aria-hidden="true" style="position: absolute; left: 0; top: 0; bottom: 0; width: {{hBegin.fw}}; background: rgba(255,255,255,0.24); transition: {{hBegin.ft}}"></span><span style="position: relative">{{hBegin.label}}</span></button>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{fCount}}" hint-placeholder-val="{{false}}">
+        <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; animation: nvFade 0.45s ease both">
+          <div class="glass" style="width: 250px; height: 250px; border-radius: 50%; display: flex; align-items: center; justify-content: center">
+            <sc-for list="{{fNums}}" as="fn" hint-placeholder-count="1"><sc-if value="{{fn.cur}}" hint-placeholder-val="{{true}}"><span aria-live="assertive" style="font-size: 150px; font-weight: 800; letter-spacing: -0.06em; animation: nvPop 0.5s cubic-bezier(0.2, 0.9, 0.25, 1) both">{{fn.n}}</span></sc-if></sc-for>
+          </div>
+          <p style="margin: 0; font-size: 22px; font-weight: 600; color: #1A1F2A">Breathe <span class="em">in</span>.</p>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{fSession}}" hint-placeholder-val="{{false}}">
+        <div style="position: absolute; inset: 0; padding: 56px 20px 34px; display: flex; flex-direction: column; align-items: center; animation: nvFade 0.45s ease both">
+          <button type="button" onClick="{{openHeld}}" class="glass" style="height: 44px; padding: 0 16px; border-radius: 999px; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #A3A8BF"></span>2 held till you're done</button>
+          <div style="position: relative; margin-top: 64px; width: 300px; height: 300px">
+            <div aria-hidden="true" style="position: absolute; inset: -30px; border-radius: 50%; background: radial-gradient(closest-side, rgba(255,255,255,0.75), rgba(255,255,255,0)); animation: fGlow 5s ease-in-out infinite"></div>
+            <div class="glass" aria-hidden="true" style="position: absolute; inset: 14px; border-radius: 50%"></div>
+            <svg width="300" height="300" viewBox="0 0 300 300" aria-hidden="true" style="position: absolute; inset: 0"><circle cx="150" cy="150" r="140" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="8"/><circle cx="150" cy="150" r="140" fill="none" stroke="#11141A" stroke-width="8" stroke-linecap="round" stroke-dasharray="880" stroke-dashoffset="{{fDash}}" transform="rotate(-90 150 150)"/></svg>
+            <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px">
+              <span style="font-size: 64px; font-weight: 800; letter-spacing: -0.05em">{{fLeft}}</span>
+              <span style="font-size: 16px; font-weight: 600; color: #2E3442">ends {{fEnds}}</span>
+            </div>
+          </div>
+          <h2 style="margin: 40px 0 0; font-size: 32px; font-weight: 800; letter-spacing: -0.035em; text-align: center">{{fTitle}}</h2>
+          <span style="margin-top: 6px; font-size: 17px; font-weight: 600; color: #2E3442">{{fState}}</span>
+          <div style="flex: 1"></div>
+          <div style="align-self: stretch; display: flex; gap: 8px">
+            <button type="button" onClick="{{fPause}}" class="glass" style="flex: 1; height: 60px; border-radius: 999px; font-size: 17px; font-weight: 700">{{fPauseT}}</button>
+            <button type="button" onPointerDown="{{hFinish.down}}" onPointerUp="{{hFinish.up}}" onPointerLeave="{{hFinish.up}}" onPointerCancel="{{hFinish.up}}" onKeyDown="{{hFinish.kd}}" onKeyUp="{{hFinish.ku}}" onClick="{{hFinish.tap}}" onContextMenu="{{noCtx}}" style="position: relative; overflow: hidden; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: none; transform: {{hFinish.sc}}; transition: transform 0.18s ease; flex: 1; height: 60px; border-radius: 999px; background: #11141A; color: #fff; font-size: 17px; font-weight: 700"><span aria-hidden="true" style="position: absolute; left: 0; top: 0; bottom: 0; width: {{hFinish.fw}}; background: rgba(255,255,255,0.24); transition: {{hFinish.ft}}"></span><span style="position: relative">{{hFinish.label}}</span></button>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{fUrgent}}" hint-placeholder-val="{{false}}">
+        <div role="alert" class="glass-strong" style="position: absolute; left: 12px; right: 12px; top: 52px; border-radius: 28px; padding: 16px; display: flex; flex-direction: column; gap: 12px; z-index: 3; animation: nvDown 0.45s cubic-bezier(0.2, 0.9, 0.25, 1) both">
+          <span style="align-self: flex-start; height: 28px; padding: 0 10px; border-radius: 999px; background: rgba(238,122,92,0.16); color: #A3330F; font-size: 14px; font-weight: 700; display: flex; align-items: center">Breaks through focus</span>
+          <span style="font-size: 20px; font-weight: 700; letter-spacing: -0.015em">Café shift in 10 minutes</span>
+          <div style="display: flex; gap: 8px">
+            <button type="button" onClick="{{fDone}}" style="height: 46px; padding: 0 20px; border-radius: 999px; background: #11141A; color: #fff; font-size: 16px; font-weight: 600">Wrap up</button>
+            <button type="button" onClick="{{snoozeUrgent}}" class="glass" style="height: 46px; padding: 0 18px; border-radius: 999px; font-size: 16px; font-weight: 600">5 more minutes</button>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{fHeldOn}}" hint-placeholder-val="{{false}}">
+        <div style="position: absolute; inset: 0; z-index: 4">
+          <button type="button" aria-label="Close" onClick="{{closeHeld}}" style="position: absolute; inset: 0; background: rgba(20,30,52,0.16)"></button>
+          <div style="position: absolute; inset: 0; pointer-events: none; transform: {{tf.held}}; transition: {{dragT}}"><div onPointerDown="{{dg.held.down}}" onPointerMove="{{dg.held.move}}" onPointerUp="{{dg.held.up}}" onPointerCancel="{{dg.held.up}}" role="dialog" aria-label="What happens during focus" class="x-up glass-strong" style="pointer-events: auto; position: absolute; left: 8px; right: 8px; bottom: 8px; border-radius: 34px; padding: 10px 18px 20px; display: flex; flex-direction: column; gap: 14px; animation: nvUp 0.42s cubic-bezier(0.2, 0.9, 0.25, 1) both">
+            <span aria-hidden="true" style="align-self: center; display: flex; align-items: center; justify-content: center; width: 120px; height: 28px; touch-action: none; cursor: grab"><span style="width: 40px; height: 5px; border-radius: 3px; background: rgba(17,20,26,0.22)"></span></span>
+            <h2 style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.02em">Held till you're done</h2>
+            <div style="background: #fff; border-radius: 20px; overflow: hidden">
+              <div style="min-height: 52px; padding: 0 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(17,20,26,0.06)"><span class="c-rest" aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%"></span><span style="font-size: 16px; font-weight: 600">Sam replied</span></div>
+              <div style="min-height: 52px; padding: 0 16px; display: flex; align-items: center; gap: 10px"><span class="c-rest" aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%"></span><span style="font-size: 16px; font-weight: 600">A suggestion for Saturday</span></div>
+            </div>
+            <h2 style="margin: 4px 0 0; font-size: 24px; font-weight: 700; letter-spacing: -0.02em">Still breaks through</h2>
+            <div style="background: #fff; border-radius: 20px; overflow: hidden">
+              <div style="min-height: 52px; padding: 0 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(17,20,26,0.06)"><span class="c-school" aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%"></span><span style="font-size: 16px; font-weight: 600">Fixed events, 10 minutes before</span></div>
+              <div style="min-height: 52px; padding: 0 16px; display: flex; align-items: center; gap: 10px"><span class="c-school" aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%"></span><span style="font-size: 16px; font-weight: 600">A hard deadline within the hour</span></div>
+            </div>
+          </div></div>
+        </div>
+      </sc-if>
+      <sc-if value="{{fFinished}}" hint-placeholder-val="{{false}}">
+        <div style="position: absolute; inset: 0; padding: 60px 20px 34px; display: flex; flex-direction: column; align-items: center; text-align: center; animation: nvFade 0.45s ease both">
+          <div style="flex: 1"></div>
+          <div aria-hidden="true" style="position: absolute; left: 50%; top: 40%; width: 440px; height: 300px; margin: -150px 0 0 -220px; background: radial-gradient(closest-side, rgba(255,255,255,0.6), rgba(255,255,255,0)); filter: blur(8px)"></div>
+          <h1 style="position: relative; margin: 0; font-size: 54px; line-height: 0.98; font-weight: 800; letter-spacing: -0.045em; animation: nvIn 0.5s ease both"><span class="em">{{fMins}}</span><br>on the essay.</h1>
+          <p style="position: relative; margin: 16px 0 0; font-size: 20px; font-weight: 600; color: #1A1F2A">2 things waited for you.</p>
+          <div style="flex: 1.3"></div>
+          <div style="align-self: stretch; display: flex; gap: 8px">
+            <button type="button" onClick="{{fNotYet}}" class="glass" style="flex: 1; height: 60px; border-radius: 999px; font-size: 17px; font-weight: 700">Not finished</button>
+            <button type="button" onClick="{{fMark}}" style="flex: 1; height: 60px; border-radius: 999px; background: #11141A; color: #fff; font-size: 17px; font-weight: 700">Mark done</button>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <!-- ================= Voice: white, the flat orb ================= -->
+  <sc-if value="{{voiceOn}}" hint-placeholder-val="{{false}}">
+    <div role="dialog" aria-label="Talking with Navi" class="x-fade" style="position: absolute; inset: 0; z-index: 40; overflow: hidden; background: #FBFBFD; animation: nvFade 0.4s ease both">
+      <button type="button" aria-label="Minimise" onClick="{{minVoice}}" class="glass" style="position: absolute; left: 16px; top: 52px; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 8l5 5 5-5" fill="none" stroke="#11141A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <span class="vorb {{orbSky}} {{orbMode}}" aria-hidden="true" style="position: absolute; left: 50%; top: 200px; width: 240px; height: 240px; margin-left: -120px; animation: nvOrbIn 0.7s cubic-bezier(0.2, 0.9, 0.25, 1) both"><span class="vorb-sky"></span><span class="vorb-petal"></span><span class="vorb-ring"></span></span>
+      <p aria-live="polite" style="position: absolute; left: 24px; right: 24px; top: 488px; margin: 0; text-align: center; font-size: 19px; font-weight: 600; color: #2E3442">{{voiceStatus}}</p>
+      <p style="position: absolute; left: 28px; right: 28px; top: 530px; margin: 0; text-align: center; font-size: 22px; line-height: 1.3; font-weight: 600; color: #11141A">{{voiceLine}}</p>
+      <div style="position: absolute; left: 0; right: 0; bottom: 40px; display: flex; justify-content: center; gap: 18px">
+        <button type="button" onClick="{{toggleMute}}" aria-label="{{muteLabel}}" aria-pressed="{{muted}}" style="width: 68px; height: 68px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: {{muteBg}}; border: 1px solid rgba(17,20,26,0.08)">
+          <svg width="20" height="22" viewBox="0 0 18 20" aria-hidden="true"><rect x="6" y="1.5" width="6" height="11" rx="3" fill="none" stroke="{{muteIc}}" stroke-width="1.8"/><path d="M2.5 9.5a6.5 6.5 0 0013 0M9 16v2.5" fill="none" stroke="{{muteIc}}" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+        <button type="button" onClick="{{voiceType}}" aria-label="Type instead" style="width: 68px; height: 68px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #F0F2F6; border: 1px solid rgba(17,20,26,0.08)">
+          <svg width="22" height="16" viewBox="0 0 20 14" aria-hidden="true"><rect x="1" y="1" width="18" height="12" rx="3" fill="none" stroke="#11141A" stroke-width="1.6"/><path d="M5 9.5h10" stroke="#11141A" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+        <button type="button" onClick="{{closeVoice}}" aria-label="End" style="width: 68px; height: 68px; border-radius: 50%; background: #11141A; display: flex; align-items: center; justify-content: center">
+          <svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ================= Story: the one place the sky fills the screen ================= -->
+  <sc-if value="{{storyOn}}" hint-placeholder-val="{{false}}">
+    <div role="dialog" aria-label="{{storyName}}" class="x-fade" style="position: absolute; inset: 0; z-index: 40; overflow: hidden; background: #FBFBFD; animation: nvFade 0.35s ease both">
+      <div class="sky {{skyCls}}" aria-hidden="true" style="position: absolute; inset: 0; background-size: cover; background-position: {{st.pos}}; transition: background-position 0.8s cubic-bezier(0.2, 0.9, 0.25, 1)"></div>
+      <div aria-hidden="true" style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(251,251,253,0) 35%, rgba(251,251,253,0.65) 62%, rgba(251,251,253,0.95) 100%)"></div>
+      <div style="position: absolute; left: 16px; right: 16px; top: 58px; display: flex; gap: 4px">
+        <sc-for list="{{st.bars}}" as="sbr" hint-placeholder-count="3"><span style="flex: 1; height: 3px; border-radius: 2px; background: {{sbr.bg}}"></span></sc-for>
+      </div>
+      <button type="button" aria-label="Close" onClick="{{closeOv}}" class="glass" style="position: absolute; right: 16px; top: 74px; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 2l10 10M12 2L2 12" stroke="#11141A" stroke-width="1.9" stroke-linecap="round"/></svg></button>
+      <sc-for list="{{st.cards}}" as="cd" hint-placeholder-count="1"><sc-if value="{{cd.cur}}" hint-placeholder-val="{{true}}">
+        <h2 style="position: absolute; left: 24px; right: 24px; bottom: 132px; margin: 0; font-size: 44px; line-height: 1.02; font-weight: 700; letter-spacing: -0.035em; color: #0E1116; animation: nvIn 0.5s cubic-bezier(0.2, 0.9, 0.25, 1) both">{{cd.a}}<span class="em">{{cd.b}}</span>{{cd.c}}</h2>
+      </sc-if></sc-for>
+      <div style="position: absolute; left: 16px; right: 16px; bottom: 34px; display: flex; gap: 8px">
+        <button type="button" onClick="{{storyBack}}" class="glass" style="flex: 1; height: 58px; border-radius: 999px; font-size: 17px; font-weight: 600">Back</button>
+        <button type="button" onClick="{{storyNext}}" style="flex: 2; height: 58px; border-radius: 999px; background: #11141A; color: #fff; font-size: 17px; font-weight: 600">{{st.cta}}</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ================= Opening: the N, then the name, then home rises ================= -->
+  <sc-if value="{{introOn}}" hint-placeholder-val="{{false}}">
+    <div aria-hidden="true" style="position: absolute; inset: 0; z-index: 100; background: #FFFFFF; animation: spOut 0.6s cubic-bezier(0.4, 0, 0.2, 1) 2.3s both">
+      <div style="position: absolute; inset: 0; animation: spLockOut 0.42s cubic-bezier(0.4, 0, 1, 1) 2.0s both">
+        <div style="position: absolute; left: 174px; top: 394px; width: 156px; height: 57px; animation: spWord 0.7s cubic-bezier(0.2, 0.9, 0.25, 1) 1.4s both">
+          <img src="/_blob/f364765c63a1af62319cb11929e58669" alt="" style="display: block; width: 156px; height: 57px">
+        </div>
+        <div style="position: absolute; left: 50px; top: 380px; width: 117px; height: 84px; background: #FFFFFF; border-radius: 30px; animation: spSlide 0.75s cubic-bezier(0.65, 0, 0.2, 1) 0.95s both"></div>
+        <div style="position: absolute; left: 60px; top: 386px; width: 97px; height: 72px; animation: spSlide 0.75s cubic-bezier(0.65, 0, 0.2, 1) 0.95s both">
+          <img src="/_blob/44c459d0278a1f3812bfe3fbc351f048" alt="" style="display: block; width: 97px; height: 72px; animation: spMarkIn 0.65s cubic-bezier(0.2, 0.9, 0.25, 1) 0.1s both">
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{hapOn}}" hint-placeholder-val="{{false}}">
+    <sc-for list="{{hapRuns}}" as="hr" hint-placeholder-count="1"><sc-if value="{{hr.on}}" hint-placeholder-val="{{true}}">
+      <div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 12px; margin: 0 auto; width: fit-content; z-index: 200; height: 28px; padding: 0 12px; border-radius: 999px; background: rgba(17,20,26,0.82); color: #FFFFFF; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 7px; pointer-events: none; animation: hapPing 0.9s ease both"><span style="width: 7px; height: 7px; border-radius: 50%; background: {{hapDot}}"></span>{{hapLabel}}</div>
+    </sc-if></sc-for>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"time":{"editor":"enum","options":["morning","evening"],"default":"morning","section":"Scene"},"emphasis":{"editor":"enum","options":["Sans italic","Serif italic"],"default":"Sans italic","section":"Type"},"playIntro":{"editor":"boolean","default":true,"section":"Scene"},"showHaptics":{"editor":"boolean","default":true,"section":"Scene"},"intro":{"editor":null,"default":""},"startPage":{"editor":null,"default":"navi"},"startView":{"editor":null,"default":"day"},"startOverlay":{"editor":null,"default":""},"variant":{"editor":null,"default":""},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const pg = { progress: 0, navi: 1, plan: 2 }[props.startPage || 'navi'];
+    const ov0 = props.startOverlay || '';
+    const st = { page: pg === undefined ? 1 : pg, dragDx: 0, settling: false, noAnim: false, chatY: 0, planY: 0, progY: 0, view: props.startView || 'day', done: {}, msgs: [], draft: '', typing: false, ov: null, sheetId: 'essay', voiceBar: false, muted: false, story: 'morning', storyI: 0, gift: 'ask', apDone: {}, removed: {}, extraDrafts: [], pat: null, toast: '', undoFn: null, moved: {}, ask: null, sam: null, day: 4, you: 'settings', pw: false, focusStep: 'setup', fNum: 3, fLen: 90, hold: true, paused: false, sets: { quiet: true, remind: true, vibe: true, sky: true, haptics: true } };
+    const map = {
+      drawer: { ov: 'drawer' }, inbox: { ov: 'inbox' }, sheet: { ov: 'sheet' }, ask: { ov: 'ask' }, daypick: { ov: 'daypick' },
+      voice: { ov: 'voice' }, 'voice-muted': { ov: 'voice', muted: true }, 'voice-bar': { voiceBar: true },
+      'focus-setup': { ov: 'focus', focusStep: 'setup' }, 'focus-count': { ov: 'focus', focusStep: 'count', fNum: 3 }, 'focus-session': { ov: 'focus', focusStep: 'session' }, 'focus-done': { ov: 'focus', focusStep: 'done' }, 'focus-held': { ov: 'focus', focusStep: 'session', held: true }, 'focus-urgent': { ov: 'focus', focusStep: 'session', urgent: true },
+      'story-morning': { ov: 'story', story: 'morning' }, 'story-evening': { ov: 'story', story: 'evening' }, 'story-week': { ov: 'story', story: 'week' },
+      settings: { ov: 'you', you: 'settings' }, password: { ov: 'you', you: 'settings', pw: true }, memory: { ov: 'you', you: 'memory' }, notes: { ov: 'you', you: 'notes' }, activity: { ov: 'you', you: 'activity' }, spaces: { ov: 'you', you: 'spaces' },
+      toast: { toast: 'Moved to tomorrow' }, metrics: { ov: 'metrics', page: 0 }, 'sheet-fixed': { ov: 'sheet', sheetId: 'class' }, 'inbox-empty': { ov: 'inbox', apDone: { a1: 'yes', a2: 'no', a3: 'yes' }, removed: { d1: 'add', d2: 'drop', d3: 'drop' } }, 'inbox-add': { ov: 'inbox', inboxTab: 'add' }, 'inbox-done': { ov: 'inbox', inboxTab: 'done', apDone: { a1: 'yes', a3: 'yes' }, removed: { d1: 'add' } }
+    };
+    st.intro = props.intro !== 'off' && props.playIntro !== false && !ov0 && !props.variant && !props.startPage;
+    this.state = Object.assign(st, map[ov0] || {});
+    this._chatRef = (el) => { this._chat = el; };
+  }
+  componentDidMount() { if (this.state.intro) this._it = setTimeout(() => this.setState({ intro: false }), 3250); }
+  componentWillUnmount() { clearTimeout(this._tt); clearTimeout(this._tt2); clearTimeout(this._rt); clearTimeout(this._ct); clearTimeout(this._cl); clearTimeout(this._it); }
+  renderVals() {
+    const s = this.state;
+    const set = (o) => this.setState(o);
+    const evening = (this.props.time ?? 'morning') === 'evening';
+    const variant = this.props.variant || '';
+    const FEEL = { select: ['Tick', [8], '#A3A8BF'], pageCross: ['Tick · passed the line', [8], '#A3A8BF'], pageSettle: ['Light · page lands', [14], '#7FA7E8'], holdStart: ['Tick · hold starts', [8], '#A3A8BF'], holdRamp: ['Tick · rising', [8], '#A3A8BF'], holdDone: ['Medium · held', [22], '#4D86FF'], commit: ['Heavy · it leaves Navi', [38], '#11141A'], go: ['Heavy · focus starts', [38], '#11141A'], count: ['Light · count', [14], '#7FA7E8'], voiceOn: ['Medium · voice on', [22], '#4D86FF'], tapHint: ['Tick · hold, don’t tap', [8, 60, 8], '#E9A93A'], send: ['Light · sent', [14], '#7FA7E8'], success: ['Success', [16, 70, 26], '#36B386'], undo: ['Light · undone', [14], '#7FA7E8'], warning: ['Warning', [30, 80, 30], '#EE7A5C'], sheet: ['Light · let go to close', [14], '#7FA7E8'], end: ['Light · ended', [14], '#7FA7E8'] };
+    const hap = (f) => { const d = FEEL[f]; if (!d) return; if (this.state.sets && this.state.sets.haptics === false) return; try { if (navigator.vibrate) navigator.vibrate(d[1]); } catch (_) {} this.setState({ hapF: f, hapN: (this.state.hapN || 0) + 1 }); };
+    const W = (f, fn) => (fn ? (...a) => { hap(f); return fn(...a); } : fn);
+    const hold = (key, ms, doneFeel, done, idle, busy) => {
+      const clear = () => { (this._ht || []).forEach(clearTimeout); this._ht = []; };
+      const start = () => {
+        if (this.state.hk) return;
+        clear(); hap('holdStart'); this.setState({ hk: key });
+        this._ht = [setTimeout(() => hap('holdRamp'), ms * 0.34), setTimeout(() => hap('holdRamp'), ms * 0.67), setTimeout(() => { this._heldAt = Date.now(); this.setState({ hk: null, hdone: key }); hap(doneFeel); done(); setTimeout(() => this.setState({ hdone: null }), 320); }, ms)];
+      };
+      const stop = () => { if (this.state.hk !== key) return; clear(); this.setState({ hk: null }); };
+      const on = s.hk === key;
+      return {
+        down: (e) => { if (e && e.button > 0) return; if (e && e.stopPropagation) e.stopPropagation(); start(); },
+        up: stop,
+        kd: (e) => { if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) { e.preventDefault(); start(); } },
+        ku: (e) => { if (e.key === 'Enter' || e.key === ' ') stop(); },
+        tap: () => { if (this._heldAt && Date.now() - this._heldAt < 700) return; hap('tapHint'); toastIt(idle.replace('Hold to', 'Press and hold to')); },
+        fw: on ? '100%' : '0%', ft: on ? 'width ' + ms + 'ms linear' : 'width 0.3s cubic-bezier(0.2, 0.9, 0.25, 1)',
+        sc: on ? 'scale(0.97)' : (s.hdone === key ? 'scale(1.03)' : 'none'),
+        grow: on ? 'scale(1.16)' : (s.hdone === key ? 'scale(0.94)' : 'none'), gt: on ? 'transform ' + ms + 'ms cubic-bezier(0.3, 0, 0.2, 1)' : 'transform 0.3s cubic-bezier(0.2, 0.9, 0.25, 1)',
+        label: on ? busy : idle
+      };
+    };
+    const toastIt = (t, undo) => { clearTimeout(this._tt); clearTimeout(this._tt2); set({ toast: t, toastOut: false, undoFn: undo || null }); this._tt = setTimeout(() => this.setState({ toastOut: true }), 2400); this._tt2 = setTimeout(() => this.setState({ toast: '', toastOut: false }), 2680); };
+
+    // ---------- pager ----------
+    const page = s.page;
+    const dragDx = s.dragDx || 0;
+    const dragging = dragDx !== 0 || s.settling;
+    const target = (s.dragDir !== undefined ? s.dragDir : (dragDx < 0 ? 1 : -1)) + page;
+    const prog = Math.min(1, Math.abs(dragDx) / 390);
+    const pageLook = (i) => {
+      if (!dragging) return { r: 0, t: 'none', z: i === page ? 2 : 0, f: 'none', sh: 'none' };
+      if (i === page) {
+        const k = Math.min(1, prog * 2.2);
+        const a = Math.min(1, Math.abs(dragDx) / 28) * Math.pow(1 - prog, 0.6);
+        return { r: Math.round(44 * k), t: 'translateX(' + dragDx + 'px)', z: 2, f: 'none',
+          sh: '0 0 26px 2px rgba(255,255,255,' + (a * 0.85).toFixed(2) + '), 0 0 70px 10px rgba(160,200,255,' + (a * 0.45).toFixed(2) + '), 0 30px 60px -10px rgba(20,40,80,' + (0.22 * k).toFixed(2) + ')' };
+      }
+      if (i === target && target >= 0 && target <= 2) return { r: Math.round(44 * (1 - prog)), t: 'translateX(' + ((page - target) * 390) + 'px)', z: 1, f: 'blur(' + (8 * (1 - prog)).toFixed(1) + 'px) brightness(' + (0.92 + 0.08 * prog).toFixed(2) + ')', sh: 'none' };
+      return { r: 0, t: 'none', z: 0, f: 'none', sh: 'none' };
+    };
+    const goTo = (n) => {
+      if (n === page || s.settling || n < 0 || n > 2) return;
+      const dir = n > page ? 1 : -1;
+      set({ dragDir: dir, settling: true, dragDx: 0 });
+      setTimeout(() => this.setState({ dragDx: dir > 0 ? -390 : 390 }), 20);
+      setTimeout(() => { hap('pageSettle'); this.setState({ noAnim: true, page: n, dragDx: 0, settling: false, dragDir: undefined }); setTimeout(() => this.setState({ noAnim: false }), 30); }, 440);
+    };
+    const down = (e) => { if (s.ov || s.settling) return; this._x = e.clientX; this._y = e.clientY; this._drag = false; };
+    const move = (e) => {
+      if (this._x == null) return;
+      const dx = e.clientX - this._x;
+      if (!this._drag) {
+        if (Math.abs(e.clientY - this._y) > 10 && Math.abs(e.clientY - this._y) > Math.abs(dx)) { this._x = null; return; }
+        if (Math.abs(dx) < 10) return;
+        this._drag = true;
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+      }
+      let d = dx;
+      if ((page === 0 && d > 0) || (page === 2 && d < 0)) d = d * 0.25;
+      const crossed = Math.abs(d) > 110 && !((page === 0 && d > 0) || (page === 2 && d < 0));
+      if (crossed !== !!this._crossed) { this._crossed = crossed; hap('pageCross'); }
+      set({ dragDx: Math.max(-390, Math.min(390, d)), dragDir: d < 0 ? 1 : -1, settling: false });
+    };
+    const up = () => {
+      if (this._x == null) return;
+      const was = this._drag; this._x = null; this._drag = false;
+      if (!was) return;
+      const dx = this.state.dragDx || 0;
+      const n = Math.abs(dx) > 110 ? Math.max(0, Math.min(2, page + (dx < 0 ? 1 : -1))) : page;
+      const fin = n !== page ? (dx < 0 ? -390 : 390) : 0;
+      set({ dragDx: fin, settling: true });
+      this._crossed = false;
+      setTimeout(() => { if (n !== page) hap('pageSettle'); this.setState({ noAnim: true, page: n, dragDx: 0, settling: false, dragDir: undefined }); setTimeout(() => this.setState({ noAnim: false }), 30); }, 400);
+    };
+    const secT = s.noAnim || (dragging && !s.settling) ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0.9, 0.25, 1), border-radius 0.4s, box-shadow 0.4s, filter 0.4s';
+    const names = ['Progress', 'Navi', 'Plan'];
+    const pillX = Math.max(0, Math.min(160, page * 80 - dragDx * 80 / 390));
+    const shut = (extra) => { if (this.state.closing) return; set({ closing: true }); clearTimeout(this._cl); this._cl = setTimeout(() => this.setState(Object.assign({ ov: null, closing: false }, extra || {})), 250); };
+    const closeOv = () => shut();
+    const mkDrag = (key, axis, dir, zone, close) => ({
+      down: (e) => { const r = e.currentTarget.getBoundingClientRect(); if (!zone(e, r)) return; this._dg = { key, x: e.clientX, y: e.clientY, on: false }; },
+      move: (e) => {
+        const g = this._dg; if (!g || g.key !== key) return;
+        const raw = (axis === 'y' ? e.clientY - g.y : e.clientX - g.x) * dir;
+        if (!g.on) { if (Math.abs(raw) < 6) return; const cross = axis === 'y' ? Math.abs(e.clientX - g.x) : Math.abs(e.clientY - g.y); if (cross > Math.abs(raw)) { this._dg = null; return; } g.on = true; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {} }
+        const past = raw > 100; if (past !== !!this._dPast) { this._dPast = past; hap('sheet'); }
+        this.setState({ dk: key, dv: raw > 0 ? raw : raw * 0.15, dDrag: true });
+      },
+      up: () => {
+        const g = this._dg; if (!g || g.key !== key) return; this._dg = null;
+        this._dPast = false;
+        if (!g.on) return;
+        if ((this.state.dv || 0) > 100) { this.setState({ dv: 900, dDrag: false }); setTimeout(() => { close(); this.setState({ dk: null, dv: 0 }); }, 280); }
+        else this.setState({ dv: 0, dDrag: false });
+      }
+    });
+    const topZone = (e, r) => e.clientY - r.top < 110;
+    const anyZone = () => true;
+    const edgeZone = (e, r) => e.clientX - r.left < 44;
+    const tfOf = (key, axis, dir) => (s.dk === key && s.dv ? (axis === 'y' ? 'translateY(' + (s.dv * dir) + 'px)' : 'translateX(' + (s.dv * dir) + 'px)') : 'none');
+    const dg = {
+      pw: mkDrag('pw', 'y', 1, topZone, () => this.setState({ pw: false })),
+      held: mkDrag('held', 'y', 1, topZone, () => this.setState({ held: false })),
+      drawer: mkDrag('drawer', 'x', -1, anyZone, () => this.setState({ ov: null })),
+      day: mkDrag('day', 'y', -1, anyZone, () => this.setState({ ov: null })),
+      you: mkDrag('you', 'x', 1, edgeZone, () => { if (this.state.you === 'settings') this.setState({ ov: 'drawer' }); else this.setState({ you: 'settings' }); })
+    };
+    const tf = { pw: tfOf('pw', 'y', 1), held: tfOf('held', 'y', 1), drawer: tfOf('drawer', 'x', -1), day: tfOf('day', 'y', -1), you: tfOf('you', 'x', 1) };
+
+    const sd = {
+      down: (e) => { const r = e.currentTarget.getBoundingClientRect(); if (e.clientY - r.top > 110) return; this._sy = e.clientY; this._sdrag = false; },
+      move: (e) => {
+        if (this._sy == null) return;
+        const dy = e.clientY - this._sy;
+        if (!this._sdrag) { if (Math.abs(dy) < 6) return; this._sdrag = true; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {} }
+        const past = dy > 110; if (past !== !!this._sPast) { this._sPast = past; hap('sheet'); }
+        set({ sheetDy: dy > 0 ? dy : dy * 0.15, sDrag: true });
+      },
+      up: () => {
+        if (this._sy == null) return;
+        const was = this._sdrag; this._sy = null; this._sdrag = false;
+        this._sPast = false;
+        if (!was) return;
+        if ((this.state.sheetDy || 0) > 110) { set({ sheetDy: 900, sDrag: false }); setTimeout(() => this.setState({ ov: null, sheetDy: 0 }), 280); }
+        else set({ sheetDy: 0, sDrag: false });
+      }
+    };
+
+    // ---------- inbox: needs OK · to add · done (Undo only when it can really be undone) ----------
+    const apAll = [
+      { id: 'a1', t: 'Move the essay deadline to Monday', c: 'Your plan changes. Nobody else is told.', tag: 'Hard deadline', ext: false, rev: true, yesT: 'Move it', noT: 'Keep Friday', res: ['Essay deadline moved to Monday', 'Essay deadline stays Friday'] },
+      { id: 'a2', t: 'Cancel Saturday spin class', c: 'The studio charges $8. Can’t be undone.', tag: 'Leaves Navi · costs $8', ext: true, rev: false, yesT: 'Cancel class', noT: 'Keep it', res: ['Spin class cancelled · $8 fee', 'Spin class stays'] },
+      { id: 'a3', t: 'Text Sam “1 PM works”', c: 'Sent from your account. Can’t be undone.', tag: 'Leaves Navi · sends a text', ext: true, rev: false, yesT: 'Send', noT: 'Not now', res: ['Texted Sam', 'Not sent to Sam'] }
+    ];
+    const apDone = s.apDone;
+    const decide = (id, v) => () => { const n = Object.assign({}, this.state.apDone); if (v) n[id] = v; else delete n[id]; set({ apDone: n }); };
+    const apPend = apAll.filter((a) => !apDone[a.id]).map((a) => ({ t: a.t, c: a.c, tag: a.tag, ext: a.ext, tagBg: a.ext ? 'rgba(233,169,58,0.18)' : 'rgba(17,20,26,0.06)', tagC: a.ext ? '#7A4300' : '#2E3442', yesT: a.yesT, noT: a.noT, yes: decide(a.id, 'yes'), no: decide(a.id, 'no') }));
+    const apPending = apPend.length;
+    const big = variant === 'bigInbox';
+    const draftsAll = (big ? [
+      { id: 'b1', t: 'Return the library books', said: true }, { id: 'b2', t: 'Email the professor about the seminar reading', said: true }, { id: 'b3', t: 'Buy a birthday card for Maya', said: true },
+      { id: 'b4', t: 'Book a haircut before Saturday', said: true }, { id: 'b5', t: 'Renew the bus pass', said: true }, { id: 'b6', t: 'Pick up the parcel from the post office', said: true },
+      { id: 'b7', t: 'Run on Tuesday and Thursday mornings', said: false }, { id: 'b8', t: 'Call home on Sunday evening', said: false }
+    ] : [{ id: 'd1', t: 'Call the café about Saturday', said: true }, { id: 'd2', t: 'Buy running shoes', said: true }, { id: 'd3', t: 'Run three times a week', said: false }]).concat(s.extraDrafts.map((d) => Object.assign({ said: true }, d)));
+    const drafts = draftsAll.filter((d) => !s.removed[d.id]).map((d) => ({
+      t: d.t, src: d.said ? 'You said this' : 'Navi’s guess · check it', srcC: d.said ? '#3B4252' : '#7A4300',
+      add: () => set({ removed: Object.assign({}, this.state.removed, { [d.id]: 'add' }) }),
+      drop: () => set({ removed: Object.assign({}, this.state.removed, { [d.id]: 'drop' }) })
+    }));
+    const saidLeft = draftsAll.filter((d) => d.said && !s.removed[d.id]);
+    const unRemove = (id) => () => { const r = Object.assign({}, this.state.removed); delete r[id]; set({ removed: r }); };
+    const doneList = [{ t: 'Moved the dentist call to 10:40', s: 'Navi · in your plan · 8:04', dot: 'c-health', rev: !s.undoDentist, undo: () => set({ undoDentist: true }) }]
+      .concat(apAll.filter((a) => apDone[a.id]).map((a) => { const yes = apDone[a.id] === 'yes'; const canUndo = !yes || a.rev; return { t: a.res[yes ? 0 : 1], s: yes ? (a.rev ? 'You approved · in your plan' : 'You approved · already sent') : 'You said no', dot: yes ? 'c-health' : 'c-rest', rev: canUndo, undo: decide(a.id, null) }; }))
+      .concat(draftsAll.filter((d) => s.removed[d.id] === 'add').map((d) => ({ t: 'Added: ' + d.t, s: 'To your list', dot: 'c-health', rev: true, undo: unRemove(d.id) })));
+    const doneRows = doneList.map((r, i) => Object.assign(r, { line: i < doneList.length - 1 ? '1px solid rgba(17,20,26,0.06)' : 'none' }));
+    const inboxCount = apPending + drafts.length;
+    const tab = s.inboxTab || (apPending ? 'ok' : (drafts.length ? 'add' : 'done'));
+    const inTabs = [['ok', 'Needs OK', apPending], ['add', 'To add', drafts.length], ['done', 'Done', doneList.length]].map(([id, t, n]) => ({ t, n: String(n), sel: tab === id ? 'true' : 'false', bg: tab === id ? '#FFFFFF' : 'transparent', sh: tab === id ? '0 2px 8px rgba(36,62,110,0.14)' : 'none', nb: tab === id ? '#11141A' : 'rgba(17,20,26,0.08)', nc: tab === id ? '#FFFFFF' : '#11141A', go: () => set({ inboxTab: id }) }));
+
+    // ---------- plan ----------
+    const done = s.done, moved = s.moved;
+    const dayEmpty = variant === 'empty';
+    const crowded = variant === 'crowded';
+    const crowdedData = [
+      { id: 'run', time: '7:00', title: 'Run', when: '7:00 – 7:40', c: 'c-health', h: 52 },
+      { id: 'read', time: '8:00', title: 'Read Econ chapter 7 and write the response paragraph for Thursday’s seminar', when: '8:00 – 8:50', c: 'c-school', h: 64 },
+      { id: 'class', time: '9:00', title: 'Econ lecture', when: '9:00 – 10:30', fixed: true, c: 'c-school', h: 52 },
+      { id: 'now', now: true, time: '10:15' },
+      { id: 'dentist', time: '10:40', title: 'Book the dentist', when: '10:40 · 10 min', c: 'c-health', h: 52 },
+      { id: 'clash', clash: true, time: '11:00', pair: [{ t: 'Group project call', w: '11:00 – 11:45' }, { t: 'Office hours with Prof. Lin', w: '11:00 – 11:30' }] },
+      { id: 'lunch', time: '12:00', title: 'Lunch with Sam', when: '12:00 – 12:45', fixed: true, c: 'c-friends', h: 52 },
+      { id: 'essay', time: '1:00', title: 'Essay intro', when: '1:00 – 2:30 · due 5:00', c: 'c-school', h: 64, deadline: true },
+      { id: 'books', time: '2:40', title: 'Return the library books', when: '2:40 · 15 min', c: 'c-rest', h: 52 },
+      { id: 'cafe', time: '3:00', title: 'Call the café about Saturday', when: '3:00 · 10 min', c: 'c-work', h: 52 },
+      { id: 'shift', time: '4:00', title: 'Café shift', when: '4:00 – 7:00', fixed: true, c: 'c-work', h: 52 },
+      { id: 'dinner', time: '7:30', title: 'Dinner with Maya', when: '7:30 – 9:30', fixed: true, c: 'c-friends', h: 52 },
+      { id: 'bed', time: '11:30', title: 'Bed', when: '11:30', c: 'c-rest', h: 52 }
+    ];
+    const blockData = (crowded ? crowdedData : [
+      { id: 'class', time: '9:00', title: 'Econ lecture', when: '9:00 – 10:30', sub: '9:00 – 10:30 · Room 204', fixed: true, c: 'c-school', h: 64 },
+      { id: 'now', now: true, time: '10:15' },
+      { id: 'dentist', time: '10:40', title: 'Book the dentist', when: '10:40 · 10 min', sub: '10 min · moved here this morning', c: 'c-health', h: 60 },
+      { id: 'free', free: true, time: '11:00', title: 'Free · 2h', sub: 'Until lunch with Sam' },
+      { id: 'lunch', time: '1:00', title: 'Lunch with Sam', when: '1:00 – 1:45', sub: '1:00 – 1:45 · Café Lumen', fixed: true, c: 'c-friends', h: 60 },
+      { id: 'essay', time: '2:00', title: 'Essay intro', when: '2:00 – 3:30 · due 5:00', sub: '90 min · not started', c: 'c-school', h: 76, deadline: true },
+      { id: 'shift', time: '4:00', title: 'Café shift', when: '4:00 – 7:00', sub: '4:00 – 7:00 · every Friday', fixed: true, c: 'c-work', h: 64 },
+      { id: 'dinner', time: '7:30', title: 'Dinner with Maya', when: '7:30 – 9:30', sub: '7:30 – 9:30 · Nonna’s', fixed: true, c: 'c-friends', h: 60 },
+      { id: 'bed', time: '11:30', title: 'Wind down, bed', when: '11:30', sub: 'Quiet hours start · wake at 7', c: 'c-rest', h: 56 }
+    ]).filter((b) => !moved[b.id]);
+    const blocks = blockData.filter((b) => !(b.now && evening)).map((b) => {
+      const d = !!done[b.id];
+      return {
+        time: b.time, title: b.title || '', sub: b.sub || b.when || '', isNow: !!b.now, isFree: !!b.free, isClash: !!b.clash, pair: b.pair || [], isBlock: !b.now && !b.free && !b.clash, h: b.h || 0,
+        tc: b.now ? '#2457D6' : '#2E3442', dot: b.c || '', deadline: !!b.deadline && !d, fixed: !!b.fixed,
+        bg: b.fixed ? '#FFFFFF' : '#EEF3FC', border: b.fixed ? '1px solid rgba(17,20,26,0.06)' : '1px solid rgba(77,134,255,0.18)', shadow: b.fixed ? '0 1px 2px rgba(20,32,64,0.05), 0 10px 30px -16px rgba(20,32,64,0.2)' : 'none',
+        o: d ? 0.5 : 1, strike: d ? 'line-through' : 'none',
+        open: () => set({ ov: 'sheet', sheetId: b.id })
+      };
+    });
+    const views = [['day', 'Day'], ['week', 'Week'], ['list', 'List']].map(([id, t]) => ({ t, sel: s.view === id ? 'true' : 'false', c: s.view === id ? '#11141A' : '#2E3442', go: () => set({ view: id }) }));
+    const segX = { day: 0, week: 70, list: 140 }[s.view];
+    const wk = [['Mon', [['c-school', 5], ['c-work', 4]], 7], ['Tue', [['c-school', 6], ['c-health', 1]], 9], ['Wed', [['c-school', 4], ['c-work', 4], ['c-friends', 2]], 6], ['Thu', [['c-school', 5], ['c-health', 1]], 10], ['Fri', [['c-school', 4], ['c-work', 3], ['c-friends', 3]], 6], ['Sat', [['c-friends', 3], ['c-health', 2]], 11], ['Sun', [['c-friends', 2]], 14]];
+    const catName = { 'c-school': 'School', 'c-work': 'Work', 'c-friends': 'Friends', 'c-health': 'Health' };
+    const weekNotes = ['Lecture and a long shift', 'Seminar reading due', 'Busiest day · 1 clash', 'Light · good for the essay', 'Today · essay due 5', 'Spin class, flat viewing', 'Open · call home'];
+    const week = wk.map(([d, segs, free], i) => ({ d, note: weekNotes[i], h: segs.reduce((a, x) => a + x[1], 0) + 'h', fw: i === 4 ? 800 : 600, segs: segs.map(([c, f]) => ({ c, f })), free, line: i < 6 ? '1px solid rgba(17,20,26,0.06)' : 'none', label: d + ': ' + segs.map(([c, f]) => catName[c] + ' ' + f + 'h').join(', ') + ', ' + free + 'h free' }));
+    const taskList = [{ id: 'dentist', t: 'Book the dentist', m: 'Today · 10:40 · 10 min' }, { id: 'essay', t: 'Essay intro', m: 'Today · due 5:00 · School' }, { id: 'gift', t: 'Get Maya a gift', m: 'Saturday · Friends' }, { id: 'sam', t: 'Reply to Sam', m: 'This week · Friends' }, { id: 'shoes', t: 'Running shoes', m: 'Someday · Health' }].filter((t) => t.id !== 'gift' || s.gift === 'yes');
+    const tasks = taskList.map((t, i, arr) => {
+      const d = !!done[t.id];
+      return { t: t.t, m: t.m, done: d, ring: d ? 'c-ink' : 'c-ring', strike: d ? 'line-through' : 'none', c: d ? '#5B6272' : '#11141A', line: i < arr.length - 1 ? '1px solid rgba(17,20,26,0.06)' : 'none',
+        toggle: () => set({ done: Object.assign({}, this.state.done, { [t.id]: !this.state.done[t.id] }) }) };
+    });
+    const sbData = blockData.find((b) => b.id === s.sheetId) || blockData.find((b) => b.id === 'essay');
+    const sb = { title: sbData.title || '', when: sbData.when || '', fixed: !!sbData.fixed, moveT: sbData.fixed ? 'Change time' : 'Tomorrow', doneLabel: done[sbData.id] ? 'Not done' : 'Done' };
+    const dayWords = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((w, i) => ({ w, n: String(10 + i), sel: s.day === i ? 'true' : 'false', bg: s.day === i ? '#11141A' : 'transparent', c: s.day === i ? '#FFFFFF' : '#11141A', go: () => set({ day: i, ov: null }) }));
+
+    // ---------- chat ----------
+    const send = () => {
+      const t = (this.state.draft || '').trim();
+      if (!t) return;
+      const id = 'x' + Date.now();
+      set({ draft: '', msgs: this.state.msgs.concat([{ me: true, navi: false, t }]), typing: true });
+      const scroll = () => { if (this._chat) this._chat.scrollTop = this._chat.scrollHeight; };
+      setTimeout(scroll, 30);
+      clearTimeout(this._rt);
+      this._rt = setTimeout(() => {
+        const title = t.charAt(0).toUpperCase() + t.slice(1);
+        this.setState({ typing: false, msgs: this.state.msgs.concat([{ me: false, navi: true, t: title }]), extraDrafts: this.state.extraDrafts.concat([{ id, t: title }]) });
+        setTimeout(scroll, 30);
+      }, 1000);
+    };
+
+    // ---------- stories ----------
+    const stories = {
+      morning: [{ a: 'Class first, then ', b: 'two free hours', c: '.', pos: '50% 10%' }, { a: 'The essay is ', b: 'at risk', c: '. Due at 5.', pos: '50% 45%' }, { a: 'Bed by 11:30. ', b: 'Quiet', c: ' till 6.', pos: '50% 100%' }],
+      evening: [{ a: '', b: '2 of 4', c: ' kept today.', pos: '50% 20%' }, { a: 'Essay moves to ', b: 'tomorrow, 9 AM', c: '?', pos: '50% 60%' }, { a: 'Wind down. ', b: 'Quiet', c: ' from 11:30.', pos: '50% 100%' }],
+      week: [{ a: 'You kept ', b: '13 of 16', c: '.', pos: '50% 15%' }, { a: 'Essays slip ', b: 'after lunch', c: '.', pos: '50% 55%' }, { a: 'Next week: ', b: 'lighter', c: ' Wednesday.', pos: '50% 100%' }]
+    };
+    const cards = stories[s.story] || stories.morning;
+    const si = Math.min(s.storyI, cards.length - 1);
+    const st = Object.assign({}, cards[si], { cards: cards.map((c, i) => Object.assign({}, c, { cur: i === si })), cta: si === cards.length - 1 ? 'Done' : 'Next', bars: cards.map((_, i) => ({ bg: i <= si ? '#11141A' : 'rgba(17,20,26,0.15)' })) });
+
+    // ---------- focus ----------
+    const fStep = s.focusStep;
+    const startCount = () => {
+      set({ focusStep: 'count', fNum: 3 }); setTimeout(() => hap('count'), 60);
+      const tick = (n) => { this._ct = setTimeout(() => { if (n > 1) { hap('count'); this.setState({ fNum: n - 1 }); tick(n - 1); } else { hap('go'); this.setState({ focusStep: 'session' }); } }, 800); };
+      tick(3);
+    };
+    const fLens = [25, 50, 90].map((m) => ({ n: String(m), t: m + ' min', sel: s.fLen === m ? 'true' : 'false', bg: s.fLen === m ? '#11141A' : 'rgba(255,255,255,0.7)', c: s.fLen === m ? '#FFFFFF' : '#11141A', go: () => set({ fLen: m }) }));
+
+    // ---------- you ----------
+    const tg = (k) => () => set({ sets: Object.assign({}, this.state.sets, { [k]: !this.state.sets[k] }) });
+    const row = (t, v, go, opts) => Object.assign({ t, v: v || '', go: go || (() => {}), toggle: false, chev: true, c: '#11141A', pressed: 'false', tb: '', tx: 0 }, opts || {});
+    const tog = (t, k) => row(t, '', tg(k), { toggle: true, chev: false, pressed: s.sets[k] ? 'true' : 'false', tb: s.sets[k] ? '#11141A' : 'rgba(17,20,26,0.16)', tx: s.sets[k] ? 20 : 0 });
+    const lines = (rows) => rows.map((r, i) => Object.assign(r, { line: i < rows.length - 1 ? '1px solid rgba(17,20,26,0.06)' : 'none' }));
+    const goYou = (k) => () => set({ you: k });
+    const setGroups = [
+      { h: 'Your day', rows: lines([row('Wake up', '7:00'), row('Bed', '11:30'), row('Morning briefing', '6:00'), row('Evening wrap-up', '9:00'), tog('Quiet hours', 'quiet')]) },
+      { h: 'What Navi knows', rows: lines([row('Memory', '', goYou('memory')), row('Notes', '', goYou('notes')), row('Activity', '', goYou('activity')), row('Spaces', '', goYou('spaces'))]) },
+      { h: 'What Navi does on its own', rows: lines([row('Changes to your plan', 'On its own'), row('Anything that leaves Navi', 'Always asks', null, { chev: false })]) },
+      { h: 'This phone', rows: lines([tog('Reminders', 'remind'), tog('Sky backgrounds', 'sky')]) },
+      { h: 'Account', rows: lines([row('Password', '', () => set({ pw: true })), tog('Haptics', 'haptics'), row('Hold to confirm', 'Focus, sending, signing out', null, { chev: false })]) }
+    ];
+    const youData = {
+      memory: [['Wakes at 7 on weekdays', 'From setup', 'Edit'], ['Essays go better before noon', 'Navi noticed · 3 times', 'Correct'], ['Maya’s birthday is Nov 16', 'You said, Nov 2', 'Edit'], ['Works at the café on Fridays', 'From your calendar', 'Edit']],
+      notes: [['Essay outline', 'Edited today', ''], ['Gift ideas for Maya', 'Yesterday', ''], ['Flat viewing questions', 'Nov 12', '']],
+      activity: [['Moved the dentist call to 10:40', 'In your plan · 8:04 AM', 'Undo'], ['Texted Sam “1 PM works”', 'Sent · can’t be undone · 7:58 AM', ''], ['Added “Call the café” to Inbox', 'In your plan · 7:52 AM', 'Undo'], ['Sent your morning briefing', 'To you · 6:00 AM', '']],
+      spaces: [['School', '6 tasks · 1 due today', '', 'c-school'], ['Work', '2 shifts this week', '', 'c-work'], ['Friends', '3 plans', '', 'c-friends'], ['Health', '3 runs a week', '', 'c-health']]
+    };
+    const undone = s.undone || {};
+    const youRows = (youData[s.you] || []).map((r, i, arr) => ({ t: r[0], s: r[1], a: undone[r[0]] ? 'Undone' : r[2], act: !!r[2], dot: !!r[3], dotC: r[3] || '', o: undone[r[0]] ? 0.5 : 1, line: i < arr.length - 1 ? '1px solid rgba(17,20,26,0.06)' : 'none',
+      do: () => { if (r[2] === 'Undo') set({ undone: Object.assign({}, undone, { [r[0]]: true }) }); } }));
+    const memAll = [
+      { id: 'm1', t: 'Essays go better before noon', s: 'Navi noticed · 3 times this month', guess: true },
+      { id: 'm2', t: 'You don’t want plans on Sunday mornings', s: 'Navi guessed from 4 weeks', guess: true },
+      { id: 'm3', t: 'Wakes at 7 on weekdays', s: 'You said · during setup' },
+      { id: 'm4', t: 'Maya’s birthday is Nov 16', s: 'You said · Nov 2' },
+      { id: 'm5', t: 'Works at the café on Fridays', s: 'From your calendar' }
+    ];
+    const mem = s.mem || {};
+    const memSet = (id, v, msg) => () => { const prev = mem[id]; set({ mem: Object.assign({}, mem, { [id]: v }) }); if (msg) toastIt(msg, () => set({ mem: Object.assign({}, this.state.mem, { [id]: prev }) })); };
+    const memGuess = memAll.filter((m) => m.guess && !mem[m.id]).map((m) => ({ t: m.t, s: m.s, yes: memSet(m.id, 'ok'), no: memSet(m.id, 'del', 'Removed. Navi won’t assume this.') }));
+    const memKnownList = memAll.filter((m) => (!m.guess && mem[m.id] !== 'del') || mem[m.id] === 'ok');
+    const memKnown = memKnownList.map((m, i) => ({ t: m.t, s: mem[m.id] === 'ok' ? 'You confirmed' : m.s, line: i < memKnownList.length - 1 ? '1px solid rgba(17,20,26,0.06)' : 'none', edit: () => toastIt('Edit (prototype)'), del: memSet(m.id, 'del', 'Deleted from memory') }));
+    const youTitles = { settings: 'Settings', memory: 'Memory', notes: 'Notes', activity: 'Activity', spaces: 'Spaces' };
+
+    const script = ['thread', 'busy', 'offline', 'setup', 'longChat'].indexOf(variant) >= 0;
+    const fresh = !script && s.msgs.length === 0 && !s.typing;
+    const curY = [s.progY, s.chatY, s.planY][page];
+    const chatList = [['Morning planning', true], ['Essay', false], ['Maya’s birthday', false], ['Flat viewing', false], ['Running plan', false]];
+    const orbMode = s.muted ? 'mute' : 'talk';
+
+    const R = {
+      emClass: (this.props.emphasis ?? 'Sans italic') === 'Serif italic' ? 'serif' : '',
+      skyCls: s.sets.sky === false ? 'sky-off' : (evening ? 'sky-dusk' : 'sky-day'), orbSky: evening ? 'dusk' : 'day', isEvening: evening,
+      down, move, up, trackX: -page * 390, secT,
+      pg0: pageLook(0), pg1: pageLook(1), pg2: pageLook(2),
+      navItems: names.map((t, i) => ({ t, orb: i === 1, cur: i === page ? 'page' : 'false', go: () => goTo(i), w: i === page ? 700 : 600, c: i === page ? '#11141A' : '#2E3442', dot: i === 2 && apPending > 0 && page !== 2 })),
+      pillX, pillT: s.noAnim || (dragging && !s.settling) ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0.9, 0.25, 1)',
+      introOn: !!s.intro, homeAnim: s.intro ? 'homeUp 1s cubic-bezier(0.2, 0.9, 0.25, 1) 2.2s both' : 'none',
+      dg, tf, dragT: s.dDrag ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.9, 0.25, 1)',
+      sd, sheetDy: s.sheetDy || 0, sheetT: s.sDrag ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.9, 0.25, 1)', scrimO: Math.max(0, 1 - (s.sheetDy || 0) / 600).toFixed(2),
+      hdrO: curY > 24 ? 1 : 0, closeOv, closingCls: s.closing ? 'closing' : '',
+      openDrawer: () => set({ ov: 'drawer' }), drawerOn: s.ov === 'drawer', newChat: () => { shut({ msgs: [] }); goTo(1); },
+      chats: chatList.map(([t, cur]) => ({ t, bg: cur ? 'rgba(17,20,26,0.05)' : 'transparent', go: () => { shut(); goTo(1); } })),
+      openInbox: () => set({ ov: 'inbox' }), inboxOn: s.ov === 'inbox',
+      inboxCount, hasInbox: inboxCount > 0, apPending, hasApprovals: apPending > 0 && !dayEmpty,
+      apPend, drafts, doneRows, inTabs, tabOk: tab === 'ok', tabAdd: tab === 'add', tabDone: tab === 'done', okEmpty: apPending === 0, addEmpty: drafts.length === 0,
+      hasBulk: big && saidLeft.length > 1, saidCount: saidLeft.length, addAll: () => { const r = Object.assign({}, this.state.removed); saidLeft.forEach((d) => { r[d.id] = 'add'; }); set({ removed: r }); },
+      toastOn: !!s.toast, toast: s.toast, toastAnim: s.toastOut ? 'nvToastOut 0.28s ease both' : 'nvIn 0.3s ease both', undoToast: () => { if (this.state.undoFn) this.state.undoFn(); set({ toast: '' }); },
+
+      // chat
+      chatRef: this._chatRef,
+      onChatScroll: (e) => { const y = Math.round(e.target.scrollTop / 4) * 4; if (y !== this.state.chatY) set({ chatY: y }); },
+      onPlanScroll: (e) => { const y = e.target.scrollTop > 24 ? 30 : 0; if (y !== this.state.planY) set({ planY: y }); },
+      onProgScroll: (e) => { const y = e.target.scrollTop > 24 ? 30 : 0; if (y !== this.state.progY) set({ progY: y }); },
+      skyY: Math.round(-s.chatY * 0.35),
+      offline: variant === 'offline', busy: variant === 'busy', setupLeft: variant === 'setup',
+      showScript: script, fresh, notFresh: !fresh,
+      skyTop: fresh ? -20 : -70, skyH: fresh ? 900 : 760,
+      chatVeil: fresh ? 'linear-gradient(180deg, rgba(251,251,253,0.12) 0%, rgba(251,251,253,0.05) 40%, rgba(251,251,253,0.45) 72%, rgba(251,251,253,0.92) 92%, #FBFBFD 100%)' : 'linear-gradient(180deg, rgba(251,251,253,0.22) 0px, rgba(251,251,253,0.12) 150px, rgba(251,251,253,0.62) 300px, #FBFBFD 430px)',
+      greetA: evening ? 'Good evening,' : 'Good morning,', greetB: 'Aditya.',
+      subA: evening ? 'Dinner with Maya at 7:30. ' : 'Four things today. ', subB: evening ? '2 of 4 kept.' : 'Class first.',
+      nowT: evening ? 'Dinner · 7:30' : 'Free till 10:40', momentT: evening ? 'Wrap up today' : 'My morning',
+      naviFirst: evening ? 'The essay intro is still open.' : 'The essay intro is the one thing at risk today.',
+      openStory: () => set({ ov: 'story', story: evening ? 'evening' : 'morning', storyI: 0 }),
+      openWeekStory: () => set({ ov: 'story', story: 'week', storyI: 0 }),
+      storyOn: s.ov === 'story', storyName: s.story === 'week' ? 'Your week' : (s.story === 'evening' ? 'Tonight' : 'Your morning'), st,
+      storyNext: () => { if (si >= cards.length - 1) shut({ storyI: 0 }); else set({ storyI: si + 1 }); },
+      storyBack: () => { if (si === 0) shut(); else set({ storyI: si - 1 }); },
+      goPlan: () => goTo(2),
+      giftFull: s.gift === 'ask' && (!(variant === 'busy') || !!s.giftOpen), giftMini: s.gift === 'ask' && variant === 'busy' && !s.giftOpen, giftExpand: () => set({ giftOpen: true }), longChat: variant === 'longChat', giftDone: s.gift !== 'ask', giftText: s.gift === 'yes' ? 'Added to Saturday.' : 'Okay, not now.',
+      giftYes: () => set({ gift: 'yes' }), giftNo: () => set({ gift: 'no' }), giftUndo: () => set({ gift: 'ask' }),
+      samOpen: !s.sam, samClosed: !!s.sam, samText: s.sam === 'yes' ? 'Sent to Sam.' : 'Not sent.', samYes: () => set({ sam: 'yes' }), samNo: () => set({ sam: 'no' }),
+      msgs: s.msgs, typing: s.typing,
+      draft: s.draft, hasDraft: (s.draft || '').trim().length > 0,
+      onDraft: (e) => set({ draft: e.target.value }),
+      onKey: (e) => { if (e.key === 'Enter') { e.preventDefault(); send(); } },
+      send,
+
+      // voice
+      openVoice: () => set({ ov: 'voice', voiceBar: false }), voiceOn: s.ov === 'voice', voiceBar: !!s.voiceBar && s.ov !== 'voice',
+      closeVoice: () => shut({ voiceBar: false }), minVoice: () => shut({ voiceBar: true }), endBar: () => set({ voiceBar: false }),
+      toggleMute: () => set({ muted: !this.state.muted }), muted: s.muted ? 'true' : 'false', muteLabel: s.muted ? 'Unmute' : 'Mute',
+      muteBg: s.muted ? '#11141A' : '#F0F2F6', muteIc: s.muted ? '#FFFFFF' : '#11141A', orbMode,
+      voiceStatus: s.muted ? 'Muted' : 'Listening', voiceLine: s.muted ? 'Tap the mic when you’re ready.' : '“remind me to text Maya tonight”',
+      voiceType: () => { shut({ voiceBar: false }); goTo(1); },
+
+      // plan
+      packed: crowded && s.view === 'day', planOffline: variant === 'offline', lockTip: variant === 'first' && !s.tipDone, hideLockTip: () => set({ tipDone: true }),
+      isDay: s.view === 'day' && !dayEmpty, isWeek: s.view === 'week', isList: s.view === 'list', dayEmpty: dayEmpty && s.view === 'day',
+      views, segX, blocks, week, tasks, days,
+      planSummary: s.view === 'week' ? '41 hours planned this week. Wednesday is the heavy one.' : (s.view === 'list' ? '5 open · 1 due today' : (dayEmpty ? 'Nothing planned yet.' : (crowded ? '12 things, 1 clash. Free time is mostly gone.' : '9½ hours planned, 3½ free. Most of the free time is before 2.'))),
+      dayName: dayWords[s.day], dayShort: dayWords[s.day],
+      openDayPick: () => set({ ov: 'daypick' }), dayPickOn: s.ov === 'daypick',
+      sheetOn: s.ov === 'sheet', sb,
+      sheetDone: () => shut({ done: Object.assign({}, this.state.done, { [sbData.id]: !this.state.done[sbData.id] }) }),
+      sheetMove: () => { if (sbData.fixed) { set({ ov: 'daypick' }); return; } shut({ moved: Object.assign({}, this.state.moved, { [sbData.id]: true }) }); toastIt('Moved to tomorrow', () => { const m = Object.assign({}, this.state.moved); delete m[sbData.id]; set({ moved: m }); }); },
+
+      // ask
+      openAsk: () => set({ ov: 'ask', ask: null }), askOn: s.ov === 'ask',
+      askCtx: page === 0 ? 'this week' : (page === 2 ? dayWords[s.day] : 'today'),
+      askLine: dayEmpty ? 'Want me to plan Friday around your class and shift?' : 'You’re free 11 to 1. Do the essay then?',
+      askOpen: !s.ask, askClosed: !!s.ask, askText: s.ask === 'yes' ? 'Moved. Essay intro is at 11:00.' : 'Okay, it stays at 2.',
+      askYes: () => set({ ask: 'yes' }), askNo: () => set({ ask: 'no' }),
+
+      // focus
+      openMetrics: () => set({ ov: 'metrics' }), metricsOn: s.ov === 'metrics',
+      openFocus: () => set({ ov: 'focus', focusStep: 'setup' }), focusOn: s.ov === 'focus',
+      fSetup: fStep === 'setup', fCount: fStep === 'count', fSession: fStep === 'session', fFinished: fStep === 'done',
+      fTitle: sbData.id === 'essay' || !sbData.title ? 'Essay intro' : sbData.title, fLens, fNum: s.fNum, fNums: [3, 2, 1].map((n) => ({ n: String(n), cur: s.fNum === n })), fStart: startCount,
+      toggleHold: () => set({ hold: !this.state.hold }), holdP: s.hold ? 'true' : 'false', holdBg: s.hold ? '#11141A' : 'rgba(17,20,26,0.16)', holdX: s.hold ? 20 : 0,
+      fLeft: s.fLen === 90 ? '1:04:12' : (s.fLen === 50 ? '34:12' : '14:12'), fEnds: s.fLen === 90 ? '3:30' : (s.fLen === 50 ? '2:50' : '2:25'), fDash: s.fLen === 90 ? 250 : 280, fState: s.paused ? 'Paused' : 'Focusing',
+      fSkyCls: s.sets.sky === false ? 'sky-off' : (fStep === 'done' ? 'sky-dusk' : 'sky-focus'),
+      fVeil: fStep === 'setup' ? 'linear-gradient(180deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 45%, rgba(255,255,255,0.25) 100%)' : (fStep === 'done' ? 'linear-gradient(180deg, rgba(251,251,253,0) 30%, rgba(251,251,253,0.35) 70%, rgba(251,251,253,0.6) 100%)' : 'radial-gradient(circle at 50% 35%, rgba(255,255,255,0.18), rgba(255,255,255,0) 65%)'),
+      openHeld: () => set({ held: true }), closeHeld: () => set({ held: false }), fHeldOn: !!s.held && fStep === 'session', fUrgent: !!s.urgent && fStep === 'session', snoozeUrgent: () => set({ urgent: false }),
+      fPause: () => set({ paused: !this.state.paused }), fPauseT: s.paused ? 'Resume' : 'Pause',
+      fDone: () => set({ focusStep: 'done' }), fMins: s.fLen + ' minutes',
+      fMark: () => { shut({ done: Object.assign({}, this.state.done, { essay: true }) }); toastIt('Essay intro done'); },
+      fNotYet: () => shut(),
+
+      // you
+      openSettings: () => set({ ov: 'you', you: 'settings' }), youOn: s.ov === 'you',
+      youTitle: youTitles[s.you], isSettings: s.you === 'settings', isYouList: s.you !== 'settings' && s.you !== 'memory', isMemory: s.you === 'memory',
+      youBack: () => { if (s.you === 'settings') set({ ov: 'drawer' }); else set({ you: 'settings' }); },
+      setGroups, youRows, memGuess, memKnown, memGuessHas: memGuess.length > 0,
+      pwOn: !!s.pw && s.ov === 'you', closePw: () => set({ pw: false }), savePw: () => { set({ pw: false }); toastIt('Password saved'); },
+
+      // progress
+      progA: evening ? 'Today, ' : 'Every ', progB: evening ? '2 of 4' : 'morning run', progC: evening ? ' kept.' : ' kept.',
+      patOpen: !s.pat, patClosed: !!s.pat, patText: s.pat === 'yes' ? '7 AM run kept for next week.' : 'Left as it is.',
+      patYes: () => set({ pat: 'yes' }), patNo: () => set({ pat: 'no' })
+    };
+    // ---- every touch gets the feel it deserves (silent when opening, closing or declining) ----
+    const tapFeel = { send: 'send', giftYes: 'success', giftUndo: 'undo', samNo: null, askYes: 'success', patYes: 'success', addAll: 'success', sheetDone: done[sbData.id] ? 'undo' : 'success', sheetMove: 'select', fMark: 'success', snoozeUrgent: 'select', toggleMute: 'select', toggleHold: 'select', storyNext: si >= cards.length - 1 ? 'success' : 'select', storyBack: 'select', closeVoice: 'end', endBar: 'end', minVoice: 'select', undoToast: 'undo', fPause: 'select', savePw: 'success' };
+    Object.keys(tapFeel).forEach((k) => { if (tapFeel[k] && R[k]) R[k] = W(tapFeel[k], R[k]); });
+    R.navItems = R.navItems.map((n) => Object.assign({}, n, { go: W('select', n.go) }));
+    R.views = R.views.map((v) => Object.assign({}, v, { go: W('select', v.go) }));
+    R.inTabs = R.inTabs.map((v) => Object.assign({}, v, { go: W('select', v.go) }));
+    R.fLens = R.fLens.map((v) => Object.assign({}, v, { go: W('select', v.go) }));
+    R.days = R.days.map((v) => Object.assign({}, v, { go: W('select', v.go) }));
+    R.tasks = R.tasks.map((t) => Object.assign({}, t, { toggle: W(t.done ? 'undo' : 'success', t.toggle) }));
+    R.drafts = R.drafts.map((d) => Object.assign({}, d, { add: W('success', d.add) }));
+    R.doneRows = R.doneRows.map((d) => Object.assign({}, d, { undo: W('undo', d.undo) }));
+    R.memGuess = R.memGuess.map((m) => Object.assign({}, m, { yes: W('success', m.yes), no: W('select', m.no) }));
+    R.memKnown = R.memKnown.map((m) => Object.assign({}, m, { del: W('warning', m.del) }));
+    R.setGroups = R.setGroups.map((g) => Object.assign({}, g, { rows: g.rows.map((r) => (r.toggle ? Object.assign({}, r, { go: W('select', r.go) }) : r)) }));
+    // ---- hold to confirm: only where a slip would cost something ----
+    const apById = {};
+    apAll.forEach((a) => { apById[a.t] = a; });
+    R.apPend = R.apPend.map((a) => { const src = apById[a.t]; return Object.assign({}, a, { h: src.ext ? hold('ap-' + src.id, 800, 'commit', a.yes, 'Hold to ' + src.yesT.toLowerCase(), 'Keep holding') : { down: () => {}, up: () => {}, kd: () => {}, ku: () => {}, tap: W('success', a.yes), fw: '0%', ft: 'none', sc: 'none', label: src.yesT } }); });
+    R.hBegin = hold('begin', 1000, 'holdDone', startCount, 'Hold to begin', 'Keep holding');
+    R.hFinish = hold('finish', 800, 'holdDone', () => set({ focusStep: 'done' }), 'Hold to finish early', 'Keep holding');
+    R.hSam = hold('sam', 800, 'commit', () => set({ sam: 'yes' }), 'Hold to send', 'Keep holding');
+    R.hOut = hold('out', 1200, 'warning', () => toastIt('Signed out (prototype)'), 'Hold to sign out', 'Keep holding to sign out');
+    R.hTalk = hold('talk', 450, 'voiceOn', () => set({ ov: 'voice', voiceBar: false }), 'Hold to talk', 'Listening');
+    R.noCtx = (e) => { if (e && e.preventDefault) e.preventDefault(); };
+    R.hapOn = (this.props.showHaptics ?? true) !== false && !!s.hapF && (s.sets.haptics !== false);
+    R.hapLabel = s.hapF ? FEEL[s.hapF][0] : ''; R.hapDot = s.hapF ? FEEL[s.hapF][2] : '#A3A8BF';
+    R.hapRuns = [{ on: (s.hapN || 0) % 2 === 0 }, { on: (s.hapN || 0) % 2 === 1 }];
+    return R;
+  }
+}
+</script>
+</body>
+</html>
