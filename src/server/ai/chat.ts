@@ -212,6 +212,8 @@ export async function upsertMessage(
 }
 
 const PLANNER_CUES = /\b(plan|schedule|week|prioriti|reorgani|broke|behind|overwhelm|review|goal|deadline|realistic|strategy)\b/i;
+/** Planner commands: requests to change the schedule go to the planning model too. */
+const SCHEDULE_CUES = /\b(put|move|swap|clear|skip|recovery|only|instead|reschedule|push|session|lock|unlock)\b|\btake .{1,60} off\b|\bat \d{1,2}(:\d{2})?\s*(am|pm)?\b/i;
 
 /**
  * Context block appended after the cached system prompt. It opens with the
@@ -382,7 +384,7 @@ export async function handleTurn(
     result = await runAgent({
       ctx: turnCtx,
       mode,
-      role: mode === "onboarding" || PLANNER_CUES.test(input.text) || answersOffer ? "planner" : "fast",
+      role: mode === "onboarding" || PLANNER_CUES.test(input.text) || answersOffer || (turnCtx.plannerCommands && SCHEDULE_CUES.test(input.text)) ? "planner" : "fast",
       system: mode === "onboarding" ? ONBOARDING_SYSTEM : turnCtx.plannerCommands ? CHAT_SYSTEM_COMMANDS : turnCtx.plannerV2 ? CHAT_SYSTEM_V2 : CHAT_SYSTEM,
       context: `${context}\nUser's local time (same clock as the top): ${nowIn(profile.timezone).toFormat("cccc yyyy-LL-dd HH:mm ZZ")}${viewingLine(input.viewing)}`,
       history,

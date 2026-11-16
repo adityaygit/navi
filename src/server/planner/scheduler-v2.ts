@@ -334,7 +334,9 @@ export function scheduleDayV2(input: SchedulerV2Input): SchedulerV2Output {
     else if (ratio !== 1 || scale !== 1) reasons.push(`estimate adjusted ×${(ratio * scale).toFixed(2)} from your history`);
     queue.push({
       title: t.title, task_id: t.id, routine_id: null, minutes: remaining, total: overran ? remaining : adjusted, reason: reasons.join(", "),
-      score: taskScore(t, input.now) - (t.commitment === "optional" ? 15 : 0), dueBy: due, tier: must ? 1 : 2, sub, bucket, notBefore,
+      // Policy "commands": imported work that isn't due soon doesn't outrank the person's own work.
+      score: taskScore(t, input.now) - (t.commitment === "optional" ? 15 : 0) - (strict && t.source === "external" && !chosen && !(due && due <= riskEnd) ? 15 : 0),
+      dueBy: due, tier: must ? 1 : 2, sub, bucket, notBefore,
       deps: (input.dependencies?.[t.id] ?? []).filter((d) => openIds.has(d)),
     });
   }

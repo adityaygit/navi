@@ -327,3 +327,83 @@ describe("D5: planning rules with source, scope and the person's control", () =>
     expect((await me.db.from("planning_rules").select("id")).data).toHaveLength(0);
   });
 });
+
+describe("concurrency", () => {
+  it("two placements in the same slot at the same moment: one is saved, the other changes nothing and says why", async () => {
+    const a = await addTask({ title: "Essay", estimate_minutes: 60 });
+    const b = await addTask({ title: "Lab report", estimate_minutes: 60 });
+    const [ra, rb] = await Promise.all([
+      executeCommand(navi, { kind: "schedule_task", task_id: a.id, start: "14:00" }),
+      executeCommand(navi, { kind: "schedule_task", task_id: b.id, start: "14:00" }),
+    ]);
+    const statuses = [ra.status, rb.status].sort();
+    expect(statuses).toEqual(["applied", "infeasible"]);
+    const blocks = await blocksOn(today());
+    expect(blocks).toHaveLength(1);
+    expect(hm(blocks[0].starts_at)).toBe("14:00");
+  });
+
+  it("a re-plan and a placement at the same moment never double-book or overlap", async () => {
+    for (const t of ["Reading", "Spanish", "Piano practice"]) await addTask({ title: t, estimate_minutes: 45 });
+    const nav = await addTask({ title: "Navi work block", estimate_minutes: 60 });
+    await Promise.all([replan(user, [today()], { trigger: "button" }), executeCommand(navi, { kind: "schedule_task", task_id: nav.id, start: "12:00" })]);
+    const blocks = await blocksOn(today());
+    const overlaps = blocks.some((x) => blocks.some((y) => x.id !== y.id && Date.parse(x.starts_at) < Date.parse(y.ends_at) && Date.parse(y.starts_at) < Date.parse(x.ends_at)));
+    expect(overlaps).toBe(false);
+    expect(new Set(blocks.map((x) => x.task_id)).size).toBe(blocks.length);
+    expect(hm(blocks.find((x) => x.task_id === nav.id)!.starts_at)).toBe("12:00");
+  });
+});
+
+describe("realistic overload with a Canvas-heavy list", () => {
+  it("70 imported items + 10 h of the person's own work in a short day: must-do first, no backlog planned, honest counts", async () => {
+    await canvasBacklog(40);
+    const now = DateTime.now();
+    await me.db.from("tasks").insert(Array.from({ length: 30 }, (_, i) => ({ user_id: me.userId, title: `Canvas future ${i}`, source: "external", external_ref: `ext:new${i}`, due_is_hard: true, due_at: now.plus({ days: 5 + i }).toISO(), status: "todo" })));
+    // Only 3–8 PM free today (one-day fact), and 10 hours of the person's own work, two of it must-do.
+    const mustA = await addTask({ title: "Physics lab writeup", estimate_minutes: 120, commitment: "must" });
+    const mustB = await addTask({ title: "History essay draft", estimate_minutes: 90, commitment: "must" });
+    for (let i = 0; i < 6; i++) await addTask({ title: `Own task ${i}`, estimate_minutes: 65 });
+    const r = await executeCommand(navi, { kind: "replan", dates: [today()], exceptions: [{ kind: "busy", start_time: "07:00", end_time: "15:00", note: "school" }] });
+    expect(r.status).toBe("applied");
+    const blocks = await blocksOn(today());
+    const minutesOf = (id: string) => blocks.filter((b) => b.task_id === id).reduce((s, b) => s + (Date.parse(b.ends_at) - Date.parse(b.starts_at)) / 60000, 0);
+    expect(minutesOf(mustA.id)).toBe(120);
+    expect(minutesOf(mustB.id)).toBe(90);
+    // Overdue imports are never planned on their own; upcoming imported deadlines within the
+    // week may be (deadline-aware), but only after the person's must-do work.
+    expect(blocks.some((b) => b.title.startsWith("Canvas overdue"))).toBe(false);
+    const { data: soon } = await me.db.from("tasks").select("id").like("title", "Canvas future%").lte("due_at", DateTime.now().plus({ days: 7 }).toISO());
+    const soonIds = new Set((soon ?? []).map((t) => t.id));
+    expect(blocks.filter((b) => b.title.startsWith("Canvas future")).every((b) => soonIds.has(b.task_id!))).toBe(true);
+    const firstImported = blocks.find((b) => b.title.startsWith("Canvas"));
+    const lastMust = blocks.filter((b) => b.task_id === mustA.id || b.task_id === mustB.id).at(-1)!;
+    if (firstImported) expect(Date.parse(firstImported.starts_at)).toBeGreaterThanOrEqual(Date.parse(lastMust.ends_at));
+    const result = r.run!.results[0];
+    expect(result.triage).toHaveLength(40);
+    // Future Canvas work and the person's undated tasks wait for later days; none of it is "didn't fit today".
+    expect(r.view.leftover?.line ?? "").not.toMatch(/\b\d{2,} things didn't fit/);
+    // Nothing was shortened: placed + still to do = each estimate.
+    for (const u of result.unscheduled.filter((x) => x.title.startsWith("Own task"))) expect(minutesOf(u.task_id) + u.remaining_minutes).toBe(65);
+  });
+});
+
+describe("row level security on the new tables", () => {
+  it("another person can't read or write someone's scope, rules or accountability records, nor fingerprint their plan", async () => {
+    const t = await addTask({ title: "Private", estimate_minutes: 30 });
+    await executeCommand(user, { kind: "set_scope", mode: "exclude", task_ids: [t.id] });
+    await me.db.from("planning_rules").insert({ user_id: me.userId, kind: "daily_load_cap", scope: "global", params: { cap: 0.5 }, source: "stated" });
+    await me.db.from("accountability_checks").insert({ user_id: me.userId, task_id: t.id, decision: "exclude", context_key: "k1", challenge: "c" });
+    const other = await userClient("planner-commands-other@navi.test");
+    for (const table of ["day_plan_scope", "planning_rules", "accountability_checks"]) {
+      expect((await other.db.from(table).select("id")).data).toEqual([]);
+      const ins = await other.db.from(table).insert(table === "day_plan_scope" ? { user_id: me.userId, date: today(), task_id: t.id, mode: "only" } : table === "planning_rules" ? { user_id: me.userId, kind: "daily_load_cap", scope: "global", params: { cap: 0.2 }, source: "stated" } : { user_id: me.userId, decision: "exclude", context_key: "x", challenge: "c" });
+      expect(ins.error).toBeTruthy();
+    }
+    const mine = await me.db.rpc("plan_inputs_version", { p_user: me.userId, p_dates: [today()] });
+    const theirs = await other.db.rpc("plan_inputs_version", { p_user: me.userId, p_dates: [today()] });
+    const empty = await other.db.rpc("plan_inputs_version", { p_user: other.userId, p_dates: [today()] });
+    expect(theirs.data).toBe(empty.data);
+    expect(theirs.data).not.toBe(mine.data);
+  });
+});

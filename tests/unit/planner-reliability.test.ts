@@ -148,3 +148,14 @@ describe("planner commands policy (pure)", () => {
     expect(view.leftover?.line).toMatch(/1 thing waits for another day/);
   });
 });
+
+describe("imported work that isn't due soon doesn't outrank the person's own work (policy commands)", () => {
+  it("an assignment due in 3 weeks waits behind an undated task of the person's", () => {
+    const own = task({ id: "own", title: "Own project", estimate_minutes: 60 });
+    const far = task({ id: "far", title: "Canvas far", source: "external", due_is_hard: true, due_at: morning.plus({ days: 21 }).toISO()!, estimate_minutes: 60 });
+    const out = plan([far, own]);
+    expect(out.blocks[0].task_id).toBe("own");
+    const old = plan([far, own], { policy: "v2" });
+    expect(old.blocks[0].task_id).toBe("far");
+  });
+});

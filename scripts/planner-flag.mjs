@@ -7,6 +7,12 @@
 //   node scripts/planner-flag.mjs status person@example.com
 //   node scripts/planner-flag.mjs on person@example.com
 //   node scripts/planner-flag.mjs off person@example.com
+//   node scripts/planner-flag.mjs commands-on person@example.com
+//   node scripts/planner-flag.mjs commands-off person@example.com
+//
+// commands-on|off sets profiles.preferences.planner_commands: the scheduling
+// command layer (docs/navi-1.5/PLANNER_RELIABILITY.md) on top of planner v2.
+// It needs planner v2 on and migration 20261117000001_planner_commands.
 //
 // Reads NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY from the
 // environment, falling back to .env.local (the local stack). Locally, run it
@@ -26,8 +32,8 @@ if (!url || !key) {
   console.error("Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (env or .env.local).");
   process.exit(1);
 }
-if (!["on", "off", "status"].includes(cmd) || !rawEmail) {
-  console.error("Usage: node scripts/planner-flag.mjs on|off|status person@example.com");
+if (!["on", "off", "status", "commands-on", "commands-off"].includes(cmd) || !rawEmail) {
+  console.error("Usage: node scripts/planner-flag.mjs on|off|commands-on|commands-off|status person@example.com");
   process.exit(1);
 }
 const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -61,14 +67,26 @@ if (error) {
 }
 const prefs = profile.preferences ?? {};
 if (cmd === "status") {
-  console.log(`${email}: new planner ${prefs.planner_v2 === true ? "ON" : "off"}`);
+  console.log(`${email}: new planner ${prefs.planner_v2 === true ? "ON" : "off"}; scheduling commands ${prefs.planner_v2 === true && prefs.planner_commands === true ? "ON" : "off"}`);
   process.exit(0);
 }
-const next = { ...prefs, planner_v2: cmd === "on" };
+if (cmd === "commands-on") {
+  if (prefs.planner_v2 !== true) {
+    console.error(`${email}: turn the new planner on first (node scripts/planner-flag.mjs on ${email}).`);
+    process.exit(1);
+  }
+  const probe2 = await db.from("day_plan_scope").select("id", { head: true, count: "exact" }).limit(1);
+  if (probe2.error) {
+    console.error(`This project doesn't have the planner commands migration yet (${probe2.error.message}). Apply 20261117000001_planner_commands.sql first.`);
+    process.exit(1);
+  }
+}
+const next = cmd.startsWith("commands-") ? { ...prefs, planner_commands: cmd === "commands-on" } : { ...prefs, planner_v2: cmd === "on" };
 const { error: upErr } = await db.from("profiles").update({ preferences: next }).eq("id", user.id);
 if (upErr) {
   console.error(`Could not update: ${upErr.message}`);
   process.exit(1);
 }
-await db.from("activity_log").insert({ user_id: user.id, actor: "system", action: "settings_updated", summary: `New planner turned ${cmd} (admin script)` });
-console.log(`${email}: new planner ${cmd === "on" ? "ON" : "off"}`);
+const what = cmd.startsWith("commands-") ? `Scheduling commands turned ${cmd === "commands-on" ? "on" : "off"}` : `New planner turned ${cmd}`;
+await db.from("activity_log").insert({ user_id: user.id, actor: "system", action: "settings_updated", summary: `${what} (admin script)` });
+console.log(`${email}: ${what.toLowerCase()}`);
