@@ -10,12 +10,16 @@ import type { MDay, MInbox, MTaskGroups, MWeek, MOk, MTaskChange, MBlockOutcome 
 export type Res<T> = { data: T | null; error: string | null; loading: boolean; refresh: () => Promise<void>; savedAt: number | null };
 
 export function useResource<T>(path: string | null): Res<T> {
-  const [data, setData] = useState<T | null>(null);
+  // The answer is kept WITH the path it belongs to: when the path changes (another
+  // day, another week) the old answer is never shown for the new one. Until the new
+  // one arrives you get the copy kept on this phone for it, or nothing (a skeleton).
+  const [held, setHeld] = useState<{ path: string | null; data: T | null }>(() => ({ path, data: path ? cacheGet<T>(path)?.data ?? null : null }));
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [loading, setLoading] = useState(!!path);
   const latest = useRef(path);
   latest.current = path;
+  const data = held.path === path ? held.data : path ? cacheGet<T>(path)?.data ?? null : null;
   const refresh = useCallback(async () => {
     const p = latest.current;
     if (!p) return;
@@ -23,7 +27,7 @@ export function useResource<T>(path: string | null): Res<T> {
     try {
       const d = await api<T>(p);
       if (latest.current === p) {
-        setData(d);
+        setHeld({ path: p, data: d });
         setError(null);
         setSavedAt(null);
         cachePut(p, d);
@@ -34,7 +38,7 @@ export function useResource<T>(path: string | null): Res<T> {
         // Couldn't reach Navi: show the last answer kept on this phone, saying so.
         const kept = cacheGet<T>(p);
         if (kept) {
-          setData((cur) => cur ?? kept.data);
+          setHeld((cur) => (cur.path === p && cur.data ? cur : { path: p, data: kept.data }));
           setSavedAt(kept.at);
         }
       }
@@ -43,9 +47,11 @@ export function useResource<T>(path: string | null): Res<T> {
     }
   }, []);
   useEffect(() => {
+    setError(null);
+    setSavedAt(null);
     void refresh();
   }, [path, refresh]);
-  return { data, error, loading, refresh, savedAt };
+  return { data, error, loading: loading || (!!path && held.path !== path), refresh, savedAt };
 }
 
 export const useDay = (date: string | null) => useResource<MDay>(date ? `/api/m/day?date=${date}` : "/api/m/day");

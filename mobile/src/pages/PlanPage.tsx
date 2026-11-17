@@ -77,7 +77,7 @@ export function PlanPage({ palette: P, active, onAsk, onVoice, onFocus, version 
   const tz = d?.timezone ?? week.data?.timezone ?? "UTC";
   const today = d?.isToday ? d.date : new Date().toISOString().slice(0, 10);
   const shownDate = d?.date ?? date ?? today;
-  const title = view === "tasks" ? "Your list" : view === "week" ? "This week" : d?.isToday ? "Today" : shownDate === addDays(today, 1) ? "Tomorrow" : weekday(shownDate);
+  const title = view === "tasks" ? "Your list" : view === "week" ? "This week" : d?.isToday || (!d && !date) ? "Today" : shownDate === addDays(today, 1) ? "Tomorrow" : weekday(shownDate);
   const approvals = inbox.data?.counts.approvals ?? 0;
   const waiting = approvals + (inbox.data?.counts.proposals ?? 0);
   useEffect(() => {
@@ -240,7 +240,7 @@ export function PlanPage({ palette: P, active, onAsk, onVoice, onFocus, version 
           ) : null}
         </div>
 
-        <div key={view + (date ?? "")} style={{ marginTop: 18, animation: "nFade 0.3s ease both" }}>
+        <div key={view + (date ?? "") + (loadingFirst ? "-wait" : "")} style={{ marginTop: 18, animation: "nFade 0.3s ease both" }}>
           {loadingFirst && !err ? <Skeleton /> : null}
           {err && loadingFirst ? <p style={{ margin: 0, padding: "0 20px", fontSize: 16, fontWeight: 500, color: meaning.slipping }}>Couldn't load your plan. It'll come back when you're online.</p> : null}
           {view === "day" && d ? <DayView day={d} due={due} h={{ onPlace, onOpen: setOpened, onAsk: (prompt, send) => ask(prompt, send), onFocus: focusOn }} /> : null}
