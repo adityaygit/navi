@@ -3,6 +3,7 @@ import type { Basis, CalendarEvent, OccurrenceOverride, PlanBlock, Routine, Rout
 import { atLocalTime, weekdayOf } from "@/lib/time";
 import { MIN_CHUNK_MINUTES, WHOLE_UP_TO_MINUTES, taskScore, type PlannedBlock, type SchedulerOutput } from "./scheduler";
 import { occurrencesOn, type DayModel } from "./day-model";
+import { awaitingTriage, dueWording } from "@/lib/triage";
 
 // The constraint-first day scheduler (planner v2). Same placement rules as
 // scheduler.ts (buffers, chunking, estimate ratio, never in the past, never
@@ -308,7 +309,10 @@ export function scheduleDayV2(input: SchedulerV2Input): SchedulerV2Output {
     const chosen = selected.has(t.id);
     // Overdue imported work isn't today's mandatory work by default: it waits
     // for the person's decision (plan it, defer it, or say it's handed in).
-    if (strict && overdue && t.source === "external" && !chosen && t.commitment !== "must") {
+    // Applies under every policy: a feed can't say whether it was submitted.
+    // Work the person placed themselves (a kept block here or on another day) was chosen.
+    const placedByPerson = (keptTaskMinutes[t.id] ?? 0) > 0 || (input.alreadyScheduledMinutes?.[t.id] ?? 0) > 0;
+    if (overdue && awaitingTriage(t, input.now.toMillis(), chosen || placedByPerson)) {
       triage.push({ task_id: t.id, title: t.title, due_at: t.due_at, remaining_minutes: remaining });
       continue;
     }
@@ -442,7 +446,8 @@ export function scheduleDayV2(input: SchedulerV2Input): SchedulerV2Output {
         ...(item.bucket ? { bucket: item.bucket } : {}),
       });
       if (item.dueBy && item.dueBy.setZone(zone).toISODate()! <= date) {
-        warnings.push(`“${item.title}” is due today but ${left} min of it doesn't fit.`);
+        const d = item.dueBy.setZone(zone);
+        warnings.push(`“${item.title}” ${dueWording(d.toISODate()!, date, d.toFormat("ccc LLL d"))} but ${left} min of it doesn't fit.`);
       }
     } else if (left > 0 && item.routine_id) {
       unplacedRoutines.push({ routine_id: item.routine_id, title: item.title, why: why ?? "No free time left for it today" });

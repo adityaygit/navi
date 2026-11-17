@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { DateTime } from "luxon";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { logActivity } from "@/server/domain/activity";
+import { provenanceRef } from "@/lib/triage";
 import { openSecret } from "./crypto";
 import { parseIcs } from "./ics/parse";
 import { FeedError, safeFetchText, withRetries, type FeedErrorCode } from "./safe-fetch";
@@ -40,6 +41,8 @@ export type SyncCounts = {
   restored: number;
   pendingRemoval: number;
   duplicates: number;
+  /** Tasks from an earlier connection of the same calendar, linked again instead of imported twice. */
+  relinked: number;
   newCourses: string[];
   courses: number;
 };
@@ -350,14 +353,14 @@ type Profileish = { zone: string };
 
 export async function reconcile(
   db: Db,
-  conn: Pick<ConnectionRow, "id" | "user_id">,
+  conn: Pick<ConnectionRow, "id" | "user_id"> & Partial<Pick<ConnectionRow, "provider" | "display_host">>,
   incoming: NormalizedItem[],
   opts: { now: Date; window: { start: Date; end: Date }; allowRemovals: boolean } & Profileish,
 ): Promise<SyncCounts> {
   const { now, zone } = opts;
   const nowIso = now.toISOString();
   const userId = conn.user_id;
-  const counts: SyncCounts = { assignments: 0, events: 0, created: 0, updated: 0, removed: 0, cancelled: 0, restored: 0, pendingRemoval: 0, duplicates: 0, newCourses: [], courses: 0 };
+  const counts: SyncCounts = { assignments: 0, events: 0, created: 0, updated: 0, removed: 0, cancelled: 0, restored: 0, pendingRemoval: 0, duplicates: 0, relinked: 0, newCourses: [], courses: 0 };
 
   // Courses ---------------------------------------------------------------
   const existingCourses = must(await db.from("external_courses").select("id,course_key,name,excluded,workspace_id,project_id").eq("connection_id", conn.id), "load courses") as CourseRow[];
@@ -402,6 +405,37 @@ export async function reconcile(
     if (k) ownByTitle.set(k, [...(ownByTitle.get(k) ?? []), t]);
   }
 
+  // Tasks this calendar made before a disconnect ("keep my items"): a
+  // returning assignment re-links to its old task (keeping done/priority/
+  // estimate) instead of being imported a second time. Exact provenance key
+  // first; tasks disconnected before keys existed (external_ref cleared) only
+  // on an exact title and due-date match.
+  const adoptByKey = new Map<string, string>();
+  const legacyByTitleDue = new Map<string, string[]>();
+  if (conn.provider && conn.display_host) {
+    const prefix = provenanceRef(conn.provider, conn.display_host, "");
+    const former = await selectAll<{ id: string; title: string; due_at: string | null; external_ref: string | null }>((a, b) =>
+      db.from("tasks").select("id,title,due_at,external_ref").eq("user_id", userId).eq("source", "external").or(`external_ref.is.null,external_ref.like.${prefix.replace(/[,()]/g, "")}%`).order("id").range(a, b),
+    );
+    for (const t of former) {
+      if (t.external_ref) adoptByKey.set(t.external_ref, t.id);
+      else if (t.due_at) {
+        const k = `${normTitle(t.title)}|${Date.parse(t.due_at)}`;
+        legacyByTitleDue.set(k, [...(legacyByTitleDue.get(k) ?? []), t.id]);
+      }
+    }
+  }
+  const adopted = new Set<string>();
+  const adoptions = new Map<string, string>(); // external_id → task id
+  const adoptFor = (i: NormalizedItem): string | null => {
+    if (i.kind !== "assignment" || !conn.provider || !conn.display_host) return null;
+    const byKey = adoptByKey.get(provenanceRef(conn.provider, conn.display_host, i.externalId));
+    if (byKey && !adopted.has(byKey)) return byKey;
+    const due = Date.parse(dueFor({ starts_at: i.startsAt, all_day: i.allDay, all_day_date: i.allDayDate }, opts.zone));
+    const legacy = (legacyByTitleDue.get(`${normTitle(i.title)}|${due}`) ?? []).filter((id) => !adopted.has(id));
+    return legacy.length === 1 ? legacy[0] : null; // ambiguous → import normally (duplicate check still applies)
+  };
+
   const providerFields = (i: NormalizedItem) => ({
     uid: i.uid,
     recurrence_id: i.recurrenceId,
@@ -431,8 +465,13 @@ export async function reconcile(
     const prev = byExt.get(i.externalId);
     const fields = providerFields(i);
     if (!prev) {
+      const adopt = adoptFor(i);
+      if (adopt) {
+        adopted.add(adopt);
+        adoptions.set(i.externalId, adopt);
+      }
       let dup: string | null = null;
-      if (i.kind === "assignment" && i.status !== "cancelled") {
+      if (!adopt && i.kind === "assignment" && i.status !== "cancelled") {
         const due = Date.parse(i.startsAt);
         dup = (ownByTitle.get(normTitle(i.title)) ?? []).find((t) => !t.due_at || Math.abs(Date.parse(t.due_at) - due) <= 36 * 3600_000)?.id ?? null;
       }
@@ -461,6 +500,22 @@ export async function reconcile(
   await inChunks(inserts, 200, async (chunk) => {
     must(await db.from("external_items").upsert(chunk, { onConflict: "connection_id,external_id", ignoreDuplicates: true }), "insert items");
   });
+  if (adoptions.size) {
+    // Link each re-adopted task to its new item (the task becomes feed-owned again).
+    const ids = new Map<string, string>();
+    await inChunks([...adoptions.keys()], 100, async (extIds) => {
+      for (const r of must(await db.from("external_items").select("id,external_id,task_id").eq("connection_id", conn.id).in("external_id", extIds), "read adopted") ?? []) {
+        if (!r.task_id) ids.set(r.external_id, r.id);
+      }
+    });
+    await pool([...ids.entries()], 8, async ([extId, itemId]) => {
+      const taskId = adoptions.get(extId)!;
+      const { error } = await db.from("tasks").update({ external_ref: `ext:${itemId}` }).eq("user_id", userId).eq("id", taskId).eq("source", "external");
+      if (error) return; // left unlinked: settle imports it normally
+      must(await db.from("external_items").update({ task_id: taskId, materialized: true }).eq("id", itemId).eq("user_id", userId), "link adopted");
+      counts.relinked++;
+    });
+  }
   await inChunks(changed, 200, async (chunk) => {
     must(await db.from("external_items").upsert(chunk, { onConflict: "connection_id,external_id" }), "update items");
   });
@@ -600,9 +655,10 @@ export async function runSync(
       last_summary: summary,
     });
     if (run) await db.from("integration_sync_runs").update({ status, finished_at: new Date().toISOString(), counts: summary, window_start: window.start.toISOString(), window_end: window.end.toISOString() }).eq("id", run.id);
-    if (counts.created || counts.removed || counts.restored) {
+    if (counts.created || counts.removed || counts.restored || counts.relinked) {
       const parts = [
         counts.created ? `added ${counts.created} item${counts.created === 1 ? "" : "s"}` : null,
+        counts.relinked ? `re-linked ${counts.relinked} task${counts.relinked === 1 ? "" : "s"} you kept from before` : null,
         counts.removed ? `removed ${counts.removed} deleted in ${provider.name}` : null,
         counts.restored ? `restored ${counts.restored}` : null,
       ].filter(Boolean);

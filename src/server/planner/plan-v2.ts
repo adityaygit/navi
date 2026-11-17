@@ -393,6 +393,22 @@ export async function computeRun(ctx: Ctx, dates: string[], opts: PlanOptions, o
     if (!plannedEnds[b.task_id] || Date.parse(b.ends_at) > Date.parse(plannedEnds[b.task_id])) plannedEnds[b.task_id] = b.ends_at;
   };
   for (const b of existing) if (b.plan_date >= today && b.plan_date < runDates[0] && ["planned", "in_progress"].includes(b.status)) count(b);
+  // Work the person (or Navi on their request) deliberately placed on a LATER
+  // day is already scheduled: an earlier day's re-plan must not plan it again
+  // (a test moved to tomorrow used to come back tonight).
+  const placedLater = (date: string) => {
+    const out: Record<string, number> = {};
+    for (const b of existing) {
+      if (!b.task_id || b.plan_date <= date || !isKept(b) || !["planned", "in_progress"].includes(b.status) || Date.parse(b.ends_at) <= nowMs) continue;
+      out[b.task_id] = (out[b.task_id] ?? 0) + (Date.parse(b.ends_at) - Date.parse(b.starts_at)) / 60000;
+    }
+    return out;
+  };
+  const scheduledElsewhere = (date: string) => {
+    const merged: Record<string, number> = date > today ? { ...plannedBefore } : {};
+    for (const [id, m] of Object.entries(placedLater(date))) merged[id] = (merged[id] ?? 0) + m;
+    return Object.keys(merged).length ? merged : undefined;
+  };
 
   const ops: Op[] = [
     ...explicit,
@@ -416,7 +432,7 @@ export async function computeRun(ctx: Ctx, dates: string[], opts: PlanOptions, o
     const out = scheduleDayV2({
       date, zone, now, model,
       events: inputs.events, overrides: inputs.overrides, routines: inputs.routines, tasks: inputs.tasks,
-      keptBlocks: kept, alreadyScheduledMinutes: date > today ? { ...plannedBefore } : undefined,
+      keptBlocks: kept, alreadyScheduledMinutes: scheduledElsewhere(date),
       estimateRatio: inputs.estimate.ratio, loadCap: (prefs.commands ? loadCapRule(inputs.planningRules, date, zone) : null) ?? prefs.loadCap, focusTaskIds: opts.focusTaskIds,
       dependencies: inputs.dependencies, plannedEnds: { ...plannedEnds },
       ...(prefs.commands ? { policy: "commands" as const, scope: scopeFor(inputs.scope, date), riskHours: prefs.riskHours, estimateScale: scales } : {}),

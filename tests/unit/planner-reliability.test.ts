@@ -88,10 +88,14 @@ describe("R2 / no false success", () => {
 });
 
 describe("planner commands policy (pure)", () => {
-  it("before the fix (policy v2) the overdue backlog still wins: the switch keeps old accounts unchanged", () => {
+  it("policy v2 (switch off) also holds overdue imported work for triage, so the overdue backlog no longer wins", () => {
+    // Reliability repair 2026-11-16: the owner's account runs v2 without the
+    // commands switch and old Canvas assignments filled every day. Triage is
+    // now a data-correctness rule for every policy (lib/triage.ts).
     const out = plan([...canvasBacklog(morning), ...mine], { focusTaskIds: ["ela", "chem"], policy: "v2" });
-    expect(out.blocks.some((b) => b.task_id === "ela")).toBe(false);
-    expect(out.triage).toEqual([]);
+    expect(out.blocks.some((b) => b.task_id === "ela")).toBe(true);
+    expect(out.triage).toHaveLength(40);
+    expect(out.blocks.some((b) => b.task_id?.startsWith("canvas-old"))).toBe(false);
   });
 
   it("overdue imported work waits for a decision (triage), keeping its deadline and identity; nothing is dropped", () => {

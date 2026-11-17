@@ -27,7 +27,9 @@ import { generateDayPlan, generateWeekPlan, recoverPlan } from "@/server/planner
 import { ProfileUpdate, TaskCreate, TaskUpdate, compact } from "@/server/domain/schemas";
 import { ENTITY_PATCHES } from "@/server/domain/schemas";
 import { formatDue, formatTime, nowIn } from "@/lib/time";
+import { awaitingTriage, isImported } from "@/lib/triage";
 import { integrations } from "@/server/integrations";
+import { setItemHidden } from "@/server/integrations/connections";
 import type { CalendarEvent, OccurrenceOverride, PlanBlock, Proposal, Routine, Task } from "@/lib/types";
 import { buildDayAgenda, describeDayAgenda, type AgendaEntry } from "@/server/planner/agenda";
 import { proposalTitle } from "@/server/domain/proposals";
@@ -93,6 +95,25 @@ const DONE_WORDS = /\b(done|finish\w*|complet\w*|submit\w*|sent|did|handed in|tu
  * quoted statement must appear in it (ignoring case, spacing and punctuation)
  * and read like a completion.
  */
+const sameTitle = (t: string) => t.replace(/\s*\[[^[\]]*\]\s*$/, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+
+/**
+ * An open task the person would call "the same one": same title (ignoring a
+ * trailing "[Course]", case and punctuation). An imported assignment counts
+ * when no due date was given or it's due within 36 hours of the new one.
+ */
+export async function findSameTask(ctx: Ctx, title: string, dueAt: string | null) {
+  const key = sameTitle(title);
+  if (!key) return null;
+  const { data } = await ctx.db.from("tasks").select("id,title,status,due_at,source,external_ref,created_at").in("status", ["todo", "in_progress", "blocked"]).order("created_at", { ascending: false }).limit(500);
+  const rows = (data ?? []) as Pick<Task, "id" | "title" | "status" | "due_at" | "source" | "external_ref">[];
+  return rows.find((t) => {
+    if (sameTitle(t.title) !== key) return false;
+    if (!isImported(t) || !dueAt || !t.due_at) return true;
+    return Math.abs(Date.parse(t.due_at) - Date.parse(dueAt)) <= 36 * 3600_000;
+  }) ?? null;
+}
+
 export function userSaidItsDone(userMessage: string | undefined, statement: string): boolean {
   if (!userMessage) return false;
   const said = normalizeWords(userMessage);
@@ -330,8 +351,7 @@ async function overview(ctx: Ctx): Promise<string> {
   const now = nowIn(zone);
   const today = now.toISODate()!;
   const week = dates(zone, today, 7);
-  const [tasks, inbox, projects, goals, approvals, workspaces, routines, agendaInputs] = await Promise.all([
-    ctx.db.from("tasks").select("id,title,status,priority,due_at,due_is_hard,estimate_minutes,project_id,blocker,commitment").in("status", ["todo", "in_progress", "blocked"]).order("due_at", { ascending: true, nullsFirst: false }).limit(40),
+  const [inbox, projects, goals, approvals, workspaces, routines, agendaInputs] = await Promise.all([
     ctx.db.from("proposals").select("kind,payload,source_excerpt", { count: "exact" }).eq("status", "pending").order("created_at", { ascending: false }).limit(8),
     ctx.db.from("projects").select("id,name,status,due_date").eq("status", "active"),
     ctx.db.from("goals").select("id,title,status,target_date").eq("status", "active"),
@@ -368,22 +388,35 @@ async function overview(ctx: Ctx): Promise<string> {
   const caps = v2 ? await capacityLines(ctx, zone, [today, week[1]], agendaInputs) : null;
   lines.push(`Today's plan: ${dayLine(today)}${caps ? `\n${caps.get(today)}` : ""}`);
   lines.push(`Tomorrow's plan (${week[1]}): ${dayLine(week[1])}. For any other date, call get_plan.${caps ? `\n${caps.get(week[1])}` : ""}`);
-  let open = (tasks.data ?? []) as Task[];
+  let open: Task[] = [];
   let triageLine = "";
-  if (commands) {
-    // The person's own and chosen work first; overdue imported work is summarised (get_backlog lists it).
-    const [{ data: all }, { data: scope }] = await Promise.all([
-      ctx.db.from("tasks").select("id,title,status,priority,due_at,due_is_hard,estimate_minutes,project_id,blocker,commitment,source,estimate_source").in("status", ["todo", "in_progress", "blocked"]).limit(400),
-      ctx.db.from("day_plan_scope").select("task_id,mode").eq("date", today),
+  {
+    // Every open task is considered (not the first 40 by due date: a backlog
+    // of overdue imports used to push the person's own undated tasks out of
+    // Navi's sight, so it "didn't see" a task it had just created and made it
+    // again). The person's own and chosen work first; overdue imported work is
+    // summarised as waiting for a decision.
+    const [{ data: all }, scopeRes] = await Promise.all([
+      ctx.db.from("tasks").select("id,title,status,priority,due_at,due_is_hard,estimate_minutes,project_id,blocker,commitment,source,external_ref,estimate_source,created_at").in("status", ["todo", "in_progress", "blocked"]).order("created_at", { ascending: false }).limit(400),
+      commands ? ctx.db.from("day_plan_scope").select("task_id,mode").eq("date", today) : Promise.resolve({ data: [] as { task_id: string; mode: string }[] }),
     ]);
-    const rows = (all ?? []) as Task[];
-    const chosen = new Set(((scope ?? []) as { task_id: string; mode: string }[]).filter((x) => x.mode !== "exclude").map((x) => x.task_id));
-    const offToday = new Set(((scope ?? []) as { task_id: string; mode: string }[]).filter((x) => x.mode === "exclude").map((x) => x.task_id));
-    const overdueImported = rows.filter((t) => t.source === "external" && t.due_at && Date.parse(t.due_at) < Date.now() && t.commitment !== "must" && !chosen.has(t.id));
-    const rank = (t: Task) => (chosen.has(t.id) ? 0 : t.commitment === "must" ? 1 : t.source !== "external" ? 2 : 3);
-    open = rows.filter((t) => !overdueImported.includes(t)).sort((a, b) => rank(a) - rank(b) || (a.due_at ?? "9999").localeCompare(b.due_at ?? "9999")).slice(0, 45)
-      .map((t) => ({ ...t, title: `${t.title}${chosen.has(t.id) ? " [chosen for today]" : offToday.has(t.id) ? " [kept off today]" : ""}${t.source === "external" ? " (Canvas)" : ""}` }));
-    if (overdueImported.length) triageLine = `\nOverdue imported (Canvas) work NOT planned automatically, waiting for the user's decision: ${overdueImported.length} item${overdueImported.length === 1 ? "" : "s"} (call get_backlog for the list). Don't call them failures to fit, and don't plan them unless the user chooses them.`;
+    const rows = (all ?? []) as (Task & { created_at: string })[];
+    const scope = (scopeRes.data ?? []) as { task_id: string; mode: string }[];
+    const chosen = new Set(scope.filter((x) => x.mode !== "exclude").map((x) => x.task_id));
+    const offToday = new Set(scope.filter((x) => x.mode === "exclude").map((x) => x.task_id));
+    const nowMs = Date.now();
+    const overdueImported = rows.filter((t) => awaitingTriage(t, nowMs, chosen.has(t.id)));
+    const recent = (t: { created_at: string }) => nowMs - Date.parse(t.created_at) < 6 * 3600_000;
+    const rank = (t: Task & { created_at: string }) => (chosen.has(t.id) ? 0 : t.commitment === "must" ? 1 : recent(t) ? 2 : !isImported(t) ? 3 : 4);
+    open = rows.filter((t) => !overdueImported.includes(t)).sort((a, b) => rank(a) - rank(b) || (a.due_at ?? "9999").localeCompare(b.due_at ?? "9999")).slice(0, 60)
+      .map((t) => ({ ...t, title: `${t.title}${chosen.has(t.id) ? " [chosen for today]" : offToday.has(t.id) ? " [kept off today]" : ""}${isImported(t) ? " (Canvas)" : ""}` }));
+    const shown = rows.length - overdueImported.length;
+    if (shown > open.length) triageLine += `\n(${shown - open.length} more open tasks not listed; call search_items before creating anything that may already exist.)`;
+    if (overdueImported.length) {
+      triageLine += `\nOverdue imported (Canvas) work, NOT planned automatically and waiting for the user's decision (the feed can't show whether it was handed in): ${overdueImported.length} item${overdueImported.length === 1 ? "" : "s"}`
+        + (commands ? " (call get_backlog for the list)." : `: ${overdueImported.slice(0, 40).map((t) => `${t.title} (was due ${formatDue(t.due_at!, zone)}) [${t.id}]`).join("; ")}${overdueImported.length > 40 ? "; …" : ""}.`)
+        + " Don't call them failures to fit or \"due today\", don't plan them unless the user chooses them, and when the user says they're handed in, mark them done.";
+    }
   }
   lines.push(
     `Open tasks: ${open.map((t) => `${t.title} (${v2 && t.commitment === "must" ? "MUST-COMPLETE, " : v2 && t.commitment === "optional" ? "optional, " : ""}P${t.priority}, ${t.status}${t.due_at ? `, due ${formatDue(t.due_at, zone)}${t.due_is_hard ? " HARD" : ""}` : ", no due date"}${t.estimate_minutes ? `, ~${t.estimate_minutes}m${commands && t.estimate_source === "user" ? " (user's estimate)" : ""}` : ""}${t.blocker ? `, blocked: ${t.blocker}` : ""}) [${t.id}]`).join("; ") || "none"}${triageLine}`,
@@ -672,11 +705,14 @@ export const TOOLS = [
       "Create a committed task immediately. ONLY when the user directly and explicitly commands it right now (e.g. 'add a task to email Ms. Lee'). For anything inferred or mentioned in passing, use propose_items instead. Check search_items first so you don't duplicate an existing task or inbox item. Tasks have no 'do on' date, only a due date: if the user names a day ('call mom on Sunday'), set due_at to the end of that day (23:59 local) with due_is_hard=false unless they say it's a real deadline. Don't write dates into notes. Tell the user exactly what the result says was set (e.g. 'due Sunday, not a hard deadline'); never say it's scheduled or planned for a day unless a plan block was actually made.",
     schema: TaskCreate.extend({
       user_command: z.string().min(3).max(300).describe("The user's explicit instruction, quoted"),
+      allow_duplicate: z.boolean().nullish().describe("Only when the user explicitly wants a second, separate task with the same name as an existing open one"),
       schedule: z.object({ start: z.string().max(40).describe("Local HH:MM or 'now'"), date: z.string().regex(/^(\d{4}-\d{2}-\d{2}|today|tomorrow)$/).nullish(), minutes: z.number().int().min(5).max(480).nullish() }).nullish()
         .describe("Only when the user explicitly said when to do it ('schedule the pamphlet at 4'): also puts it on the plan at that time (scheduling commands only)"),
     }),
     run: async (ctx, input) => {
-      const { user_command, schedule, ...task } = input;
+      const { user_command, schedule, ...rest } = input;
+      const task = { ...rest };
+      delete task.allow_duplicate;
       if (ctx.autonomy === "ask") {
         // The person asked Navi to check with them before changing things.
         const values = { ...compact(TaskCreate.parse(task)), title: task.title };
@@ -686,6 +722,26 @@ export const TOOLS = [
           details: { op: "create", table: "tasks", values, subject: values.title, reason: "you chose to approve every change", user_command },
         });
         return { ok: true, mutated: true, summary: `Not created yet: the task “${values.title}” is waiting for the user's Approve tap. ${WAITING}` };
+      }
+      // Never the same task twice: an open task with the same title (the
+      // person's own, or an imported assignment due around the same time) is
+      // the one they mean. The model can't always see every task, and a
+      // "did you add it?" used to create a second copy.
+      if (ctx.actor === "navi" && !input.allow_duplicate) {
+        const existing = await findSameTask(ctx, task.title, task.due_at ?? null);
+        if (existing) {
+          const where = isImported(existing) ? " (imported from Canvas)" : "";
+          if (schedule && (await plannerCommandsFor(ctx))) {
+            const placed = await runCommand(ctx, "create_task", { kind: "schedule_task", task_id: existing.id, start: schedule.start, date: schedule.date ?? null, minutes: schedule.minutes ?? null });
+            return { ...placed, summary: `NOT created again: “${existing.title}” is already on the list${where} [${existing.id}]. Scheduling that one: ${placed.summary}`, data: { id: existing.id, existing: true, ...(placed.data as object) } };
+          }
+          return {
+            ok: true, mutated: false,
+            summary: `NOT created again: “${existing.title}” is already on the list${where}, ${existing.status}${existing.due_at ? `, due ${formatDue(existing.due_at, ctx.timezone)}` : ", no due date"} [${existing.id}]. Tell the user it already exists; use update_task to change it. Only if they explicitly want a second separate copy, call create_task with allow_duplicate=true.`,
+            display: `${q(existing.title)} is already on your list`,
+            data: { id: existing.id, existing: true },
+          };
+        }
       }
       const t = await createTask(ctx, task);
       await logActivity(ctx, { action: "explicit_command", entityType: "tasks", entityId: t.id, summary: `Added at your request: “${user_command.slice(0, 120)}”` });
@@ -841,7 +897,7 @@ export const TOOLS = [
       days: z.number().int().min(1).max(7).nullish().describe("How many days (default 1)"),
       mode: z.enum(["apply", "propose"]).nullish(),
       focus_task_ids: z.array(z.string().uuid()).max(10).nullish(),
-      capacity_minutes: z.number().int().min(0).max(1440).nullish().describe("At most this much work on the first day, as the user said"),
+      capacity_minutes: z.number().int().min(0).max(1440).nullish().describe("The user's TOTAL work time for the whole first day ('I only have 2 hours today'). NOT for 'work on X for the next hour': that is focus_task_ids=[X] with start_from='now' (or schedule_task when offered)"),
       free: z.array(z.object({ start: HHMM, end: HHMM })).max(6).nullish().describe("Local times the user said they're free on the first day"),
       busy: z.array(z.object({ start: HHMM, end: HHMM, title: z.string().max(120).nullish() })).max(6).nullish().describe("Local times the user said they're busy on the first day (one-off, e.g. 'karate tonight 6–7:30')"),
       start_from: z.union([HHMM, z.literal("now")]).nullish().describe("Plan the first day from this local time (e.g. 'I'm free from 15:00'), or 'now' ('start now'). Navi's code reads 'now' from the real clock; never compute the current time yourself."),
@@ -867,7 +923,27 @@ export const TOOLS = [
       const lead = facts.length ? `Saved for ${DateTime.fromISO(first, { zone }).toFormat("cccc")} only: ${facts.join("; ")}. ` : "";
       const summary = run.status === "unchanged" ? `${lead}Nothing changed: the planner found no better arrangement (this is not a success if what the user asked for isn't placed; check the result). ${run.summary}` : `${lead}${run.summary}${run.status === "applied" ? " (The user can undo this.)" : run.status === "proposed" ? ` ${WAITING}` : ""}`;
       const view = runView(run.results, zone, run);
-      return { ok: true, mutated: true, summary, ...view, ...(facts.length && view.detail ? { detail: [...facts.map((f) => `Just ${dayName(first, zone)}: ${f}`), ...view.detail] } : {}), data: run.results.map((r) => ({ date: r.date, blocks: r.blocks.map((b) => ({ title: b.title, start: b.starts_at, end: b.ends_at, assumed: b.basis === "inferred" })), ...v2Data(r) })) };
+      // What the person asked to prioritise must actually be on the plan; say plainly when it isn't.
+      const focus = input.focus_task_ids ?? [];
+      const placedIds = new Set(run.results.flatMap((r) => r.blocks.map((b) => b.task_id)).filter(Boolean));
+      if (focus.length) {
+        const { data: kept } = await ctx.db.from("plan_blocks").select("task_id").in("task_id", focus).in("plan_date", days).in("status", ["planned", "in_progress"]);
+        for (const k of kept ?? []) placedIds.add(k.task_id);
+      }
+      const missing = focus.filter((id) => !placedIds.has(id));
+      let missingNote = "";
+      if (missing.length) {
+        const { data: rows } = await ctx.db.from("tasks").select("id,title").in("id", missing);
+        const names = (rows ?? []).map((t) => `“${t.title}”`);
+        missingNote = ` NOT on the plan (what the user asked for is unmet; say so plainly and offer a concrete option): ${names.join(", ") || `${missing.length} task(s)`}.`;
+      }
+      const changed = run.status !== "unchanged" || facts.length > 0;
+      return {
+        ok: true, mutated: changed, summary: `${summary}${missingNote}`, ...view,
+        ...(missing.length ? { display: `Couldn't fit ${missing.length === 1 ? "what you asked for" : `${missing.length} things you asked for`}` } : {}),
+        ...(facts.length && view.detail ? { detail: [...facts.map((f) => `Just ${dayName(first, zone)}: ${f}`), ...view.detail] } : {}),
+        data: run.results.map((r) => ({ date: r.date, blocks: r.blocks.map((b) => ({ title: b.title, start: b.starts_at, end: b.ends_at, assumed: b.basis === "inferred" })), ...v2Data(r) })),
+      };
     },
   }),
   tool({
@@ -1213,17 +1289,69 @@ export const TOOLS = [
     description: "Read overdue imported (Canvas) work that Navi holds for the user's decision instead of planning it on its own, with ids and due dates, plus how much future imported work there is. Read-only.",
     schema: z.object({}),
     run: async (ctx) => {
-      const { data } = await ctx.db.from("tasks").select("id,title,due_at,estimate_minutes,commitment").eq("source", "external").in("status", ["todo", "in_progress", "blocked"]).order("due_at");
-      const rows = (data ?? []) as Pick<Task, "id" | "title" | "due_at" | "estimate_minutes" | "commitment">[];
+      const { data } = await ctx.db.from("tasks").select("id,title,due_at,estimate_minutes,commitment,status,source,external_ref").eq("source", "external").in("status", ["todo", "in_progress", "blocked"]).order("due_at");
+      const rows = (data ?? []) as Pick<Task, "id" | "title" | "due_at" | "estimate_minutes" | "commitment" | "status" | "source" | "external_ref">[];
       const now = Date.now();
-      const overdue = rows.filter((t) => t.due_at && Date.parse(t.due_at) < now);
+      const overdue = rows.filter((t) => awaitingTriage(t, now));
       return {
         ok: true, summary: `Read the imported backlog: ${overdue.length} overdue, ${rows.length - overdue.length} upcoming`,
         data: {
-          note: "Overdue items are NOT failures to fit; the user decides: plan some today (set_day_scope include), set a later day (keep_off_until), or say they're handed in (only they can mark work done). Canvas doesn't report submissions.",
+          note: "Overdue items are NOT failures to fit; the user decides: plan some (plan with focus_task_ids, or schedule_task / set_day_scope when offered), set a later day (keep_off_until), say they're handed in (resolve_overdue_imports handed_in, quoting them), or say they aren't needed (resolve_overdue_imports not_needed). Canvas doesn't report submissions.",
           overdue: overdue.slice(0, 60).map((t) => ({ id: t.id, title: t.title, was_due: t.due_at ? formatDue(t.due_at, ctx.timezone) : null, estimate_minutes: t.estimate_minutes })),
           upcoming_count: rows.length - overdue.length,
         },
+      };
+    },
+  }),
+  tool({
+    name: "resolve_overdue_imports",
+    description:
+      "Record the user's decision about overdue imported (Canvas) work held for triage: 'handed_in' marks them done (the user handed them in), 'not_needed' sets them aside (hidden from Navi, kept in Canvas settings, reversible). Use only when the user's latest message says so; user_statement must quote their own words from that message exactly (e.g. 'those old canvas ones are all turned in'). task_ids from get_backlog or the overview, or all_overdue=true for every overdue imported item. To work on one instead, plan it (focus_task_ids) or give it a time. The result reports what was actually changed (read back).",
+    schema: z.object({
+      decision: z.enum(["handed_in", "not_needed"]),
+      task_ids: z.array(z.string().uuid()).max(200).nullish(),
+      all_overdue: z.boolean().nullish(),
+      user_statement: z.string().min(3).max(300),
+    }),
+    run: async (ctx, { decision, task_ids, all_overdue, user_statement }) => {
+      // The authority is what the person said this turn (held by the server).
+      if (ctx.actor === "navi" && !quoteIsTheirs(ctx.userMessage, user_statement)) {
+        return { ok: false, summary: "Nothing changed: user_statement isn't the user's own words from their latest message. Ask them which items are handed in (or not needed)." };
+      }
+      if (decision === "handed_in" && ctx.actor === "navi" && !userSaidItsDone(ctx.userMessage, user_statement)) {
+        return { ok: false, summary: "Nothing changed: the user's words don't say the work was handed in or finished. Ask them." };
+      }
+      const { data } = await ctx.db.from("tasks").select("id,title,status,source,external_ref,due_at,commitment").eq("source", "external").in("status", ["todo", "in_progress", "blocked"]);
+      const now = Date.now();
+      const pool = ((data ?? []) as Pick<Task, "id" | "title" | "status" | "source" | "external_ref" | "due_at" | "commitment">[]).filter((t) => awaitingTriage(t, now) || (task_ids ?? []).includes(t.id));
+      const wanted = all_overdue ? pool : pool.filter((t) => (task_ids ?? []).includes(t.id));
+      const unknown = (task_ids ?? []).filter((id) => !pool.some((t) => t.id === id));
+      if (!wanted.length) return { ok: false, summary: `Nothing changed: no open imported tasks matched${unknown.length ? ` (${unknown.length} id${unknown.length === 1 ? "" : "s"} not found or already closed)` : ""}.` };
+      const failed: string[] = [];
+      for (const t of wanted) {
+        try {
+          if (decision === "handed_in") await completeTask({ ...ctx, actor: "user" }, t.id);
+          else {
+            const { data: item } = await ctx.db.from("external_items").select("id").eq("task_id", t.id).maybeSingle();
+            if (item) await setItemHidden(ctx, item.id, true);
+            else await updateTask({ ...ctx, actor: "user" }, t.id, { status: "cancelled" });
+          }
+        } catch {
+          failed.push(t.title);
+        }
+      }
+      // Verify: read back what actually changed.
+      const { data: after } = await ctx.db.from("tasks").select("id,title,status").in("id", wanted.map((t) => t.id));
+      const target = decision === "handed_in" ? "done" : "cancelled";
+      const changed = (after ?? []).filter((t) => t.status === target);
+      const notChanged = wanted.filter((t) => !changed.some((c) => c.id === t.id));
+      await logActivity(ctx, { action: "explicit_command", summary: `${decision === "handed_in" ? "Marked handed in" : "Set aside"} ${changed.length} overdue imported item${changed.length === 1 ? "" : "s"} because you said: “${user_statement.slice(0, 120)}”` });
+      const verb = decision === "handed_in" ? "Marked done (handed in)" : "Set aside (not needed)";
+      return {
+        ok: notChanged.length === 0,
+        mutated: changed.length > 0,
+        summary: `${verb}: ${changed.length} of ${wanted.length}${changed.length ? ` (${changed.slice(0, 8).map((t) => `“${t.title}”`).join(", ")}${changed.length > 8 ? ", …" : ""})` : ""}.${notChanged.length ? ` NOT changed: ${notChanged.slice(0, 8).map((t) => `“${t.title}”`).join(", ")}.` : ""}${unknown.length ? ` ${unknown.length} id${unknown.length === 1 ? "" : "s"} not found or already closed.` : ""}`,
+        display: `${verb}: ${things(changed.length)}`,
       };
     },
   }),
@@ -1459,7 +1587,7 @@ export async function runTool(ctx: Ctx, name: string, rawInput: unknown): Promis
 export const PLANNER_V2_TOOLS: readonly string[] = ["plan", "set_day_exception", "skip_occurrence", "move_block", "undo_plan", "set_usual_time"];
 
 /** Tools that only exist with the scheduling-command layer (planner_commands). */
-export const PLANNER_COMMAND_TOOLS: readonly string[] = ["schedule_task", "swap_work", "change_block", "remove_work", "lock_block", "set_day_scope", "group_session", "split_task", "confirm_change", "get_backlog", "learn_planning_rule", "list_planning_rules", "update_planning_rule"];
+export const PLANNER_COMMAND_TOOLS: readonly string[] = ["schedule_task", "swap_work", "change_block", "remove_work", "lock_block", "set_day_scope", "group_session", "split_task", "confirm_change", "learn_planning_rule", "list_planning_rules", "update_planning_rule"];
 
 export function toolsFor(mode: "chat" | "onboarding" | "capture" | "voice", opts: { plannerV2?: boolean; plannerCommands?: boolean } = {}): NaviTool[] {
   const all = (TOOLS as readonly NaviTool[]).filter((t) => (opts.plannerV2 || !PLANNER_V2_TOOLS.includes(t.name)) && (opts.plannerCommands || !PLANNER_COMMAND_TOOLS.includes(t.name)));

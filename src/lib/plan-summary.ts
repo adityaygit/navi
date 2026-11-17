@@ -25,8 +25,9 @@ export type PlanLike = {
   unplacedRoutines?: { title: string; why: string }[];
   blockedTasks?: { title: string }[];
   waiting?: { title: string; why: string }[];
-  // Planner commands policy only (absent otherwise):
+  /** Overdue imported work held for the person's decision (every policy). */
   triage?: { task_id: string; title: string; due_at: string | null }[];
+  // Planner commands policy only (absent otherwise):
   outOfScope?: { task_id: string; title: string }[];
 };
 

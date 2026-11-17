@@ -285,7 +285,9 @@ describe("Canvas calendar feed", () => {
     expect(r).toEqual({ removedTasks: 3, removedEvents: 6 });
     const left = await tasks();
     expect(left.map((t) => t.title).sort()).toEqual(["Lab report 1 [HIST 210 Modern Europe]", "Problem set 4"]);
-    expect(left.every((t) => t.external_ref === null)).toBe(true);
+    // The kept (finished) one remembers where it came from, but isn't Canvas-owned any more.
+    expect(left.find((t) => t.title.startsWith("Lab report 1"))!.external_ref).toBe("was:canvas:navi-u.instructure.com:event-assignment-1005");
+    expect((await byTitle("Problem set 4"))!.external_ref).toBeNull();
     for (const t of ["integration_connections", "integration_secrets", "external_items", "external_courses", "integration_sync_runs"]) {
       const { count } = await a.from(t).select("*", { count: "exact", head: true }).eq("user_id", me.userId);
       expect(count, t).toBe(0);
@@ -296,11 +298,58 @@ describe("Canvas calendar feed", () => {
     const { connectionId } = await connectWithOwnTask();
     await disconnectFeed(ctx, connectionId, { removeImported: false }, { admin: a });
     const essay = (await byTitle("Essay 1"))!;
-    expect(essay.external_ref).toBeNull();
+    expect(essay.external_ref).toBe("was:canvas:navi-u.instructure.com:event-assignment-1001");
     await updateTask(ctx, essay.id, { title: "Essay 1 (mine now)" });
     const { data: events } = await me.db.from("events").select("external_ref");
     expect(events!.length).toBe(6);
     expect(events!.every((e) => e.external_ref === null)).toBe(true);
+  });
+
+  it("reconnecting the same calendar re-links kept tasks: no duplicates, finished work stays finished", async () => {
+    const { connectionId } = await connectWithOwnTask();
+    const lab = (await byTitle("Lab report 1"))!;
+    await updateTask(ctx, lab.id, { status: "done" });
+    const essay = (await byTitle("Essay 1"))!;
+    await updateTask(ctx, essay.id, { priority: 1, estimate_minutes: 120 });
+    const before = (await tasks()).length;
+    await disconnectFeed(ctx, connectionId, { removeImported: false }, { admin: a });
+    const again = await connectFeed(ctx, "canvas", FEED, deps(at(10)));
+    expect(again.outcome.ok).toBe(true);
+    if (!again.outcome.ok) return;
+    expect(again.outcome.counts.relinked).toBe(4);
+    const after = await tasks();
+    expect(after.length).toBe(before);
+    for (const prefix of ["Essay 1", "Quiz 3", "Reading response", "Lab report 1"]) expect(after.filter((t) => t.title.startsWith(prefix)), prefix).toHaveLength(1);
+    expect((await byTitle("Lab report 1"))!).toMatchObject({ id: lab.id, status: "done" });
+    expect((await byTitle("Essay 1"))!).toMatchObject({ id: essay.id, priority: 1, estimate_minutes: 120 });
+    expect((await byTitle("Essay 1"))!.external_ref).toMatch(/^ext:/);
+    // Further syncs stay idempotent.
+    const conn2 = again.connectionId;
+    for (const m of [40, 80, 120]) {
+      const r = await sync(conn2, at(m), V1);
+      expect(r.ok && r.counts.created).toBe(0);
+    }
+    expect((await tasks()).length).toBe(before);
+  });
+
+  it("re-links tasks kept by an older disconnect (no provenance) only on an exact title and due match", async () => {
+    const { connectionId } = await connectWithOwnTask();
+    const lab = (await byTitle("Lab report 1"))!;
+    await updateTask(ctx, lab.id, { status: "done" });
+    await disconnectFeed(ctx, connectionId, { removeImported: false }, { admin: a });
+    // What the old disconnect left behind: no reference at all.
+    await a.from("tasks").update({ external_ref: null }).eq("user_id", me.userId).like("external_ref", "was:%");
+    const quiz = (await byTitle("Quiz 3"))!;
+    await a.from("tasks").update({ due_at: "2026-11-26T15:00:00Z" }).eq("id", quiz.id); // no longer an exact match
+    const again = await connectFeed(ctx, "canvas", FEED, deps(at(10)));
+    expect(again.outcome.ok && again.outcome.counts.relinked).toBe(3);
+    expect((await byTitle("Lab report 1"))!).toMatchObject({ id: lab.id, status: "done" });
+    expect((await tasks()).filter((t) => t.title.startsWith("Lab report 1"))).toHaveLength(1);
+    // The changed one isn't silently merged: the new import is held as a possible duplicate, never a second open copy.
+    const { data: held } = await me.db.from("external_items").select("hidden_reason,title").like("title", "Quiz 3%").single();
+    expect(held!.hidden_reason).toBe("duplicate");
+    // The person's own task is never adopted.
+    expect((await byTitle("Problem set 4"))!.source).toBe("user");
   });
 
   it("the scheduled job syncs due connections only", async () => {
