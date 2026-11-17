@@ -99,6 +99,14 @@ export async function proxy(request: NextRequest) {
     url.search = "";
     return NextResponse.redirect(url);
   }
+  // The marketing page loads its files by relative path (landing/...), so it must be shown at a
+  // top-level path. Older nested links (/guides/<slug>) go to their section.
+  // Never redirect /landing/index.html itself: the rewrite below comes back through this proxy with that path.
+  if (isMarketing(path) && path.indexOf("/", 1) !== -1) {
+    const url = request.nextUrl.clone();
+    url.pathname = path.slice(0, path.indexOf("/", 1));
+    return NextResponse.redirect(url);
+  }
   if ((!signedIn && path === "/") || isMarketing(path)) {
     const rewrite = NextResponse.rewrite(new URL("/landing/index.html", request.url), { request: { headers: requestHeaders } });
     rewrite.headers.set("Content-Security-Policy", csp);

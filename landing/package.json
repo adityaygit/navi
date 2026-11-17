@@ -7,8 +7,7 @@
     "dev": "vite --host 127.0.0.1 --port 5180",
     "build": "vite build && node scripts/artifact-html.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 5181",
-    "test": "node --test tests/build.test.mjs",
-    "build:app": "vite build --base=/landing/ --outDir ../public/landing --emptyOutDir"
+    "test": "node --test tests/build.test.mjs"
   },
   "dependencies": {
     "@fontsource/instrument-sans": "^5.1.0",

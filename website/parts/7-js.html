@@ -1,0 +1,447 @@
+<script>
+(function () {
+  "use strict";
+  var RM = window.matchMedia("(prefers-reduced-motion: reduce)");
+  var reduced = function () { return RM.matches; };
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var clamp = function (v, a, b) { return Math.max(a, Math.min(b, v)); };
+
+  /* ---------- phones with real screens ---------- */
+  var ALT = {
+    home: "Navi home screen: Good evening, Maya. A calm day.",
+    talk: "Navi setup: What does your week look like? A typed conversation about classes, an essay and the gym.",
+    review: "Navi setup review: Turn on what's right, with switches for calendar items, a to-do and a routine.",
+    notify: "Navi setup: choosing morning and evening check-ins.",
+    firstplan: "Navi setup: Your Monday is ready, with an econ lecture, a history essay and the gym.",
+    day: "Navi Plan, Today: a locked lecture, the gym now, a free gap, and an essay block that's due soon.",
+    block: "Navi Plan: an essay block opened as a sheet with Start focus, Done, Move it and Ask Navi.",
+    week: "Navi Plan, This week: each day as a coloured bar with hours planned.",
+    packed: "Navi Plan: a packed-day banner with a Lighten it button.",
+    "inbox-ok": "Navi Inbox, Needs OK: a text to Sam waiting for a hold to send, and a deadline change.",
+    "chat-card": "Navi chat: Sort out my Saturday, with a suggestion card to move the essay.",
+    "focus-setup": "Navi Focus setup on the sky: Essay draft, choose 25, 50 or 90 minutes, Hold to begin.",
+    "focus-run": "Navi Focus running: a ring timer with 1:29:57 left, Pause and Hold to finish.",
+    voice: "Navi voice: the orb listening, with Say what's on your mind.",
+    progress: "Navi Progress: A steady week. 13 of 16 kept, 6 hours 40 focused, 1 slipping.",
+    story1: "Navi weekly story: You kept 13 of 16 things you planned.",
+    story2: "Navi weekly story: You focused for 6 h 40.",
+    memory: "Navi Memory: Navi's guesses to check, and what Navi knows.",
+    signin: "Navi sign-in screen on the sky: Your week, planned with you. Navi is invite-only for now."
+  };
+  var DARK_TOP = { story1: 1, story2: 1 };
+  var SB = '<span class="t">9:41</span><span></span><span class="ic">'
+    + '<svg viewBox="0 0 18 12" style="width:4.5cqw" aria-hidden="true"><rect x="0" y="7.6" width="3.2" height="4.4" rx="1" fill="currentColor"/><rect x="4.9" y="5.1" width="3.2" height="6.9" rx="1" fill="currentColor"/><rect x="9.8" y="2.6" width="3.2" height="9.4" rx="1" fill="currentColor"/><rect x="14.7" y="0" width="3.2" height="12" rx="1" fill="currentColor"/></svg>'
+    + '<svg viewBox="0 0 16 12" style="width:4.1cqw" aria-hidden="true"><path fill="currentColor" d="M8 2.3c2.5 0 4.8 1 6.5 2.6l1.3-1.3C13.7 1.5 11 .4 8 .4S2.3 1.5.2 3.6l1.3 1.3C3.2 3.3 5.5 2.3 8 2.3z"/><path fill="currentColor" d="M8 5.8c1.5 0 2.9.6 4 1.6l1.3-1.3C11.9 4.7 10 3.9 8 3.9S4.1 4.7 2.7 6.1L4 7.4c1.1-1 2.5-1.6 4-1.6z"/><path fill="currentColor" d="M8 9.3c.6 0 1.2.2 1.6.6L8 11.6 6.4 9.9c.4-.4 1-.6 1.6-.6z"/></svg>'
+    + '<svg viewBox="0 0 27 13" style="width:6.7cqw" aria-hidden="true"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".38"/><rect x="2" y="2" width="20" height="9" rx="2.4" fill="currentColor"/><path d="M25 4.4v4.2c.8-.3 1.4-1.1 1.4-2.1S25.8 4.7 25 4.4z" fill="currentColor" opacity=".45"/></svg></span>';
+  $$(".phone[data-s]").forEach(function (ph) {
+    var list = ph.getAttribute("data-s").split(",");
+    var hidden = !!ph.closest("[aria-hidden='true']");
+    var sc = document.createElement("span");
+    sc.className = "screen";
+    var html = '<span class="island"></span><span class="sb' + (DARK_TOP[list[0]] ? " light" : "") + '">' + SB + "</span>";
+    list.forEach(function (k, i) {
+      html += '<img src="s/' + k + '.webp" data-k="' + k + '" alt="' + (hidden || i > 0 ? "" : (ALT[k] || "")) + '" loading="lazy" decoding="async" style="opacity:' + (i ? 0 : 1) + '">';
+    });
+    html += '<span class="glare"></span>';
+    sc.innerHTML = html;
+    ph.appendChild(sc);
+    var bt = document.createElement("span"); bt.className = "btns"; bt.setAttribute("aria-hidden", "true"); bt.innerHTML = '<i class="v1"></i><i class="v2"></i><i class="pw"></i>'; ph.appendChild(bt);
+    if (!hidden && list.length === 1) { ph.setAttribute("role", "img"); ph.setAttribute("aria-label", ALT[list[0]] || "Navi screen"); sc.querySelector("img").alt = ""; }
+    if (list.length > 1) ph.setAttribute("aria-hidden", "true");
+  });
+  function showShot(ph, idx) {
+    if (!ph) return;
+    var imgs = $$("img", ph);
+    imgs.forEach(function (im, i) { im.style.opacity = i === idx ? 1 : 0; });
+    var k = imgs[idx] && imgs[idx].getAttribute("data-k");
+    var sb = $(".sb", ph);
+    if (sb) sb.classList.toggle("light", !!DARK_TOP[k]);
+  }
+
+  /* ---------- router ---------- */
+  var pages = {};
+  $$(".page").forEach(function (p) { pages[p.getAttribute("data-page")] = p; });
+  var current = null, firstRoute = true;
+  var hdr = $("#hdr");
+  function routeName() {
+    var h = (location.hash || "").replace(/^#/, "");
+    if (!h) return "home";
+    if (h === "main") return current || "home";
+    return pages[h] ? h : "missing";
+  }
+  var PRODUCT = { product: 1, plan: 1, voice: 1, focus: 1, trust: 1 };
+  function setActive(name) {
+    $$("a[data-link]").forEach(function (a) {
+      var t = (a.getAttribute("href") || "").slice(1);
+      if (a.closest(".toc")) return;
+      if (t === name && !a.classList.contains("btn") && !a.classList.contains("brand")) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    });
+    $("#dd-btn").classList.toggle("cur", !!PRODUCT[name]);
+  }
+  function go() {
+    var name = routeName();
+    if (location.hash === "#main") return;
+    closeDD(); closeDrawer(true);
+    if (name === current) { window.scrollTo(0, 0); return; }
+    var prev = current ? pages[current] : null;
+    var next = pages[name];
+    var swap = function () {
+      if (prev) prev.classList.remove("on", "out");
+      next.classList.add("on");
+      current = name;
+      document.title = next.getAttribute("data-title") || "Navi";
+      setActive(name);
+      window.scrollTo(0, 0);
+      prepareReveals(next);
+      onPageShown(name);
+      tick();
+      if (!firstRoute) { var h1 = $("h1", next); if (h1) { h1.setAttribute("tabindex", "-1"); h1.focus({ preventScroll: true }); } }
+      firstRoute = false;
+    };
+    if (prev && !reduced()) { prev.classList.add("out"); prev.classList.remove("on"); setTimeout(swap, 170); } else swap();
+  }
+  window.addEventListener("hashchange", go);
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest("a[data-link]");
+    if (a && !e.metaKey && !e.ctrlKey && a.getAttribute("href") === location.hash) { e.preventDefault(); window.scrollTo({ top: 0, behavior: reduced() ? "auto" : "smooth" }); closeDrawer(); closeDD(); }
+  });
+  $("[data-skip]").addEventListener("click", function (e) { e.preventDefault(); var h1 = $(".page.on h1"); if (h1) { h1.setAttribute("tabindex", "-1"); h1.focus(); } });
+
+  /* ---------- dropdown ---------- */
+  var dd = $("#dd"), ddBtn = $("#dd-btn"), ddTimer = 0;
+  function openDD() { clearTimeout(ddTimer); dd.classList.add("open"); ddBtn.setAttribute("aria-expanded", "true"); }
+  function closeDD() { clearTimeout(ddTimer); dd.classList.remove("open"); ddBtn.setAttribute("aria-expanded", "false"); }
+  ddBtn.addEventListener("click", function () { dd.classList.contains("open") ? closeDD() : openDD(); });
+  var fine = window.matchMedia("(hover: hover) and (pointer: fine)");
+  dd.addEventListener("pointerenter", function (e) { if (e.pointerType === "mouse" && fine.matches) openDD(); });
+  dd.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse" && fine.matches) ddTimer = setTimeout(closeDD, 180); });
+  dd.addEventListener("keydown", function (e) {
+    var items = $$(".dd-panel a", dd);
+    var i = items.indexOf(document.activeElement);
+    if (e.key === "Escape") { closeDD(); ddBtn.focus(); }
+    else if (e.key === "ArrowDown") { e.preventDefault(); openDD(); (items[i + 1] || items[0]).focus(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); openDD(); (items[i - 1] || items[items.length - 1]).focus(); }
+  });
+  dd.addEventListener("focusout", function () { setTimeout(function () { if (!dd.contains(document.activeElement)) closeDD(); }, 0); });
+  document.addEventListener("pointerdown", function (e) { if (!dd.contains(e.target)) closeDD(); });
+
+  /* ---------- drawer ---------- */
+  var drawer = $("#drawer"), burger = $("#burger"), dprod = $("#dprod");
+  function openDrawer() {
+    drawer.hidden = false;
+    requestAnimationFrame(function () { drawer.classList.add("open"); });
+    burger.setAttribute("aria-expanded", "true");
+    document.body.classList.add("lock");
+    var inProduct = !!PRODUCT[current] && current !== "product" ? true : PRODUCT[current];
+    dprod.classList.toggle("exp", !!inProduct);
+    $("button", dprod).setAttribute("aria-expanded", inProduct ? "true" : "false");
+    setTimeout(function () { var x = $(".xbtn", drawer); if (x) x.focus(); }, 60);
+  }
+  function closeDrawer(silent) {
+    if (drawer.hidden) return;
+    drawer.classList.remove("open");
+    burger.setAttribute("aria-expanded", "false");
+    document.body.classList.remove("lock");
+    setTimeout(function () { if (!drawer.classList.contains("open")) drawer.hidden = true; }, reduced() ? 0 : 420);
+    if (!silent) burger.focus();
+  }
+  burger.addEventListener("click", openDrawer);
+  $$("[data-close]", drawer).forEach(function (b) { b.addEventListener("click", function () { closeDrawer(); }); });
+  $("button", dprod).addEventListener("click", function () { var on = !dprod.classList.contains("exp"); dprod.classList.toggle("exp", on); this.setAttribute("aria-expanded", on ? "true" : "false"); });
+  drawer.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") { closeDrawer(); return; }
+    if (e.key !== "Tab") return;
+    var f = $$("a[href], button:not([disabled])", drawer).filter(function (el) { return el.offsetParent !== null; });
+    if (!f.length) return;
+    if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+    else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+  });
+  window.addEventListener("resize", function () { if (window.innerWidth > 900) closeDrawer(true); });
+
+  /* ---------- scroll choreography ---------- */
+  var hero = $("#hero"), story = $("#story"), dusk = $("#dusk"), foHero = $("#fo-hero");
+  var storyPhone = $("#story-phone"), storySteps = $$(".story-steps li"), storyTexts = $$(".story-text > div");
+  var lastStep = -1, ticking = false;
+  var mbar = $("#mbar"), NO_BAR = { "early-access": 1, contact: 1, privacy: 1, terms: 1, missing: 1 };
+  function tick() {
+    ticking = false;
+    var y = window.scrollY, vh = window.innerHeight;
+    hdr.classList.toggle("solid", current !== "home" || y > 40);
+    var mbarOn = !NO_BAR[current] && y > vh * .7 && (document.documentElement.scrollHeight - y - vh) > 260;
+    if (mbar.classList.contains("show") !== mbarOn) { mbar.classList.toggle("show", mbarOn); mbar.setAttribute("aria-hidden", mbarOn ? "false" : "true"); $("a", mbar).tabIndex = mbarOn ? 0 : -1; }
+    if (current === "home") {
+      if (!reduced()) {
+        var hp = clamp(y / (hero.offsetHeight * .85), 0, 1);
+        hero.style.setProperty("--hp", hp.toFixed(4));
+      }
+      var r = story.getBoundingClientRect();
+      var sp = clamp(-r.top / Math.max(1, r.height - vh), 0, 1);
+      story.style.setProperty("--sp", sp.toFixed(4));
+      var step = Math.min(3, Math.floor(sp * 4.0 + 0.0001));
+      if (step !== lastStep) {
+        lastStep = step;
+        showShot(storyPhone, step);
+        storySteps.forEach(function (li, i) { li.classList.toggle("on", i === step); li.classList.toggle("done", i < step); });
+        storyTexts.forEach(function (d, i) { d.classList.toggle("on", i === step); });
+      }
+      if (dusk) { var dr = dusk.getBoundingClientRect(); dusk.style.setProperty("--dp", clamp((vh - dr.top) / (vh + dr.height) * 2 - 1, -1, 1).toFixed(3)); }
+    } else if (current === "focus" && foHero && !reduced()) {
+      foHero.style.setProperty("--fp", clamp(y / vh, 0, 1).toFixed(3));
+    }
+  }
+  window.addEventListener("scroll", function () { if (!ticking) { ticking = true; requestAnimationFrame(tick); } }, { passive: true });
+  window.addEventListener("resize", function () { requestAnimationFrame(tick); });
+  $$("[data-scroll]").forEach(function (b) { b.addEventListener("click", function () { var t = $(b.getAttribute("data-scroll")); if (t) window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY + 2, behavior: reduced() ? "auto" : "smooth" }); }); });
+  $("[data-top]").addEventListener("click", function () { window.scrollTo({ top: 0, behavior: reduced() ? "auto" : "smooth" }); });
+
+  /* reveals: only things below the fold when a page opens */
+  var REVEAL = ".split-head, .bc, .ask > *, .starts figure, .t-row, .pt, .run, .principles > div, .c-card, .letter, .transcript .bub, .p-tabs > *, .runs, .honest";
+  var io = "IntersectionObserver" in window ? new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.remove("pre"); io.unobserve(e.target); } });
+  }, { rootMargin: "0px 0px -8% 0px" }) : null;
+  function prepareReveals(page) {
+    if (!io || reduced()) return;
+    var vh = window.innerHeight, sib = {};
+    $$(REVEAL, page).forEach(function (el) {
+      if (el.getBoundingClientRect().top < vh * 0.95) return;
+      el.classList.add("pre", "rise");
+      var p = el.parentNode; sib[p] = sib[p] || 0;
+      var n = Array.prototype.indexOf.call(p.children, el);
+      el.style.transitionDelay = (Math.min(n, 3) * 70) + "ms";
+      io.observe(el);
+    });
+  }
+
+  /* product: capability index swaps the sticky phone */
+  var capPhone = $("#cap-phone"), capItems = $$("#cap-list li");
+  if ("IntersectionObserver" in window) {
+    var capIO = new IntersectionObserver(function (es) {
+      es.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        var i = capItems.indexOf(e.target);
+        capItems.forEach(function (li, j) { li.classList.toggle("on", j === i); });
+        showShot(capPhone, i);
+      });
+    }, { rootMargin: "-45% 0px -45% 0px" });
+    capItems.forEach(function (li) { capIO.observe(li); });
+  }
+  capItems[0] && capItems[0].classList.add("on");
+
+  /* mobile: story carousel dots */
+  $$(".m-snap").forEach(function (sn) {
+    var dots = $$(".m-dots i", sn.parentNode), cards = $$(".m-card", sn);
+    sn.addEventListener("scroll", function () {
+      var c = sn.scrollLeft + sn.clientWidth / 2, best = 0, bd = 1e9;
+      cards.forEach(function (k, i) { var m = k.offsetLeft + k.offsetWidth / 2, dist = Math.abs(m - c); if (dist < bd) { bd = dist; best = i; } });
+      dots.forEach(function (d, i) { d.classList.toggle("on", i === best); });
+    }, { passive: true });
+  });
+  /* mobile: feature switcher on Product */
+  (function () {
+    var tabs = $$(".mcap-chips [role=tab]"), ph = $("#mcap-phone"), texts = $$(".mcap-text"), body = $("#mcp");
+    function sel(i, focus) {
+      tabs.forEach(function (t, j) { var on = i === j; t.setAttribute("aria-selected", on ? "true" : "false"); t.tabIndex = on ? 0 : -1; });
+      texts.forEach(function (t, j) { t.hidden = i !== j; });
+      showShot(ph, i); if (body) body.setAttribute("aria-labelledby", tabs[i].id);
+      if (focus) tabs[i].focus();
+      var strip = tabs[i].parentNode; strip.scrollTo({ left: tabs[i].offsetLeft - strip.clientWidth / 2 + tabs[i].offsetWidth / 2, behavior: reduced() ? "auto" : "smooth" });
+    }
+    tabs.forEach(function (t, i) {
+      t.addEventListener("click", function () { sel(i); });
+      t.addEventListener("keydown", function (e) { if (e.key === "ArrowRight") { e.preventDefault(); sel((i + 1) % tabs.length, true); } if (e.key === "ArrowLeft") { e.preventDefault(); sel((i - 1 + tabs.length) % tabs.length, true); } });
+    });
+  })();
+
+  /* legal TOC */
+  $$("[data-toc]").forEach(function (toc) {
+    var links = $$("a", toc);
+    links.forEach(function (a) { a.addEventListener("click", function (e) { e.preventDefault(); var t = document.getElementById(a.getAttribute("data-sec")); if (t) { t.scrollIntoView({ behavior: reduced() ? "auto" : "smooth" }); t.setAttribute("tabindex", "-1"); t.focus({ preventScroll: true }); } }); });
+    if (!("IntersectionObserver" in window)) return;
+    var tio = new IntersectionObserver(function (es) {
+      es.forEach(function (e) { if (e.isIntersecting) links.forEach(function (a) { a.classList.toggle("on", a.getAttribute("data-sec") === e.target.id); }); });
+    }, { rootMargin: "-20% 0px -70% 0px" });
+    links.forEach(function (a) { var t = document.getElementById(a.getAttribute("data-sec")); if (t) tio.observe(t); });
+  });
+
+  function onPageShown(name) {
+    lastStep = -1;
+    var arc = $("#arc");
+    if (name === "product" && arc && !reduced()) { arc.classList.add("pre-k"); setTimeout(function () { arc.classList.remove("pre-k"); }, 120); }
+  }
+
+  /* ---------- press and hold (the app's confirm gesture) ---------- */
+  function holdable(btn, ms, onDone) {
+    var raf = 0, start = 0, fill = 0, held = false, kb = false;
+    function set(v) { fill = v; btn.style.setProperty("--fill", v.toFixed(3)); }
+    function step(t) {
+      if (!held) return;
+      var v = clamp((t - start) / ms, 0, 1); set(v);
+      if (v >= 1) { held = false; btn.classList.remove("held"); onDone(); return; }
+      raf = requestAnimationFrame(step);
+    }
+    function down() { if (btn.disabled) return; held = true; btn.classList.add("held"); start = performance.now() - fill * ms; cancelAnimationFrame(raf); raf = requestAnimationFrame(step); }
+    function up() {
+      if (!held) return;
+      held = false; btn.classList.remove("held"); cancelAnimationFrame(raf);
+      var from = fill, t0 = performance.now();
+      (function drain(t) { var v = Math.max(0, from - (t - t0) / 260); set(v); if (v > 0) raf = requestAnimationFrame(drain); })(t0);
+      if (from < .25) btn.dispatchEvent(new CustomEvent("tapped"));
+    }
+    btn.addEventListener("pointerdown", function (e) { e.preventDefault(); try { btn.setPointerCapture(e.pointerId); } catch (x) {} down(); });
+    btn.addEventListener("pointerup", up);
+    btn.addEventListener("pointercancel", up);
+    btn.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+    btn.addEventListener("keydown", function (e) { if ((e.key === " " || e.key === "Enter") && !e.repeat) { e.preventDefault(); kb = true; down(); } });
+    btn.addEventListener("keyup", function (e) { if (e.key === " " || e.key === "Enter") { kb = false; up(); } });
+    btn.addEventListener("click", function (e) { e.preventDefault(); });
+    return { reset: function () { set(0); } };
+  }
+
+  // home: hold to send
+  $$(".hold[data-hold]").forEach(function (btn) {
+    if (btn.id === "focus-hold") return;
+    var label = btn.textContent, msg = $("#" + btn.getAttribute("aria-describedby")), base = msg ? msg.textContent : "";
+    var h = holdable(btn, +btn.getAttribute("data-hold"), function () {
+      btn.classList.add("done"); btn.textContent = btn.getAttribute("data-done");
+      if (msg) msg.textContent = "That's the feel of it. In the app, this is when the message would go.";
+      setTimeout(function () { btn.classList.remove("done"); btn.textContent = label; h.reset(); if (msg) msg.textContent = base; }, 2800);
+    });
+    btn.addEventListener("tapped", function () { if (msg) { msg.textContent = "Press and hold, like in the app."; setTimeout(function () { msg.textContent = base; }, 1800); } });
+  });
+
+  // focus: hold to begin, 3·2·1, a 25-second ring
+  (function () {
+    var btn = $("#focus-hold"); if (!btn) return;
+    var t = $("#ring-t"), s = $("#ring-s"), arc = $("#ring-arc"), note = $("#focus-note");
+    var C = 653.5, state = "idle", timer = 0, raf = 0;
+    function fmt(sec) { var m = Math.floor(sec / 60), r = Math.floor(sec % 60); return m + ":" + (r < 10 ? "0" : "") + r; }
+    function idle() { state = "idle"; t.textContent = "25:00"; s.textContent = "Essay draft"; arc.style.strokeDashoffset = 0; btn.textContent = "Hold to begin · 25 min"; btn.classList.remove("done"); h.reset(); }
+    function run() {
+      state = "run"; btn.textContent = "Hold to finish early"; h.reset();
+      var t0 = performance.now(), D = 25000;
+      (function f(now) {
+        if (state !== "run") return;
+        var p = clamp((now - t0) / D, 0, 1);
+        t.textContent = fmt(1500 * (1 - p)); arc.style.strokeDashoffset = (C * p).toFixed(1); s.textContent = "Focusing";
+        if (p >= 1) { state = "done"; t.textContent = "Done"; s.textContent = "Focus done"; btn.textContent = "Start again"; btn.classList.add("done"); timer = setTimeout(idle, 3500); return; }
+        raf = requestAnimationFrame(f);
+      })(t0);
+    }
+    var h = holdable(btn, 1000, function () {
+      if (state === "idle" || state === "done") {
+        clearTimeout(timer); state = "count"; btn.textContent = "Starting…"; var n = 3; t.textContent = n; s.textContent = "Get ready";
+        (function c() { timer = setTimeout(function () { n--; if (n > 0) { t.textContent = n; c(); } else run(); }, reduced() ? 10 : 700); })();
+      } else if (state === "run") {
+        state = "ended"; cancelAnimationFrame(raf); s.textContent = "Finished early"; btn.textContent = "Start again"; btn.classList.add("done"); timer = setTimeout(idle, 3000);
+      }
+    });
+    btn.addEventListener("tapped", function () { note.textContent = "Press and hold for a second, like in the app."; setTimeout(function () { note.textContent = "Demo: 25 minutes run in 25 seconds. Hold again to finish early."; }, 1800); });
+  })();
+
+  // voice: the orb
+  (function () {
+    var o = $("#big-orb"); if (!o) return;
+    var hint = $("#orb-hint"), base = hint.textContent, tmr = 0, back = 0, fired = false, t0 = 0;
+    var orb = $(".orb", o);
+    function down() { fired = false; t0 = performance.now(); o.classList.add("held"); clearTimeout(back); tmr = setTimeout(fire, 450); }
+    function fire() { fired = true; orb.classList.add("talk"); hint.textContent = "In the app, voice opens now and starts listening. This page doesn't use your microphone."; back = setTimeout(reset, 3600); }
+    function up() { clearTimeout(tmr); if (!fired) { o.classList.remove("held"); hint.textContent = "Press and hold to talk."; back = setTimeout(reset, 1600); } }
+    function reset() { o.classList.remove("held"); orb.classList.remove("talk"); hint.textContent = base; }
+    o.addEventListener("pointerdown", function (e) { e.preventDefault(); try { o.setPointerCapture(e.pointerId); } catch (x) {} down(); });
+    o.addEventListener("pointerup", up); o.addEventListener("pointercancel", up);
+    o.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+    o.addEventListener("keydown", function (e) { if ((e.key === "Enter" || e.key === " ") && !e.repeat) { e.preventDefault(); o.classList.add("held"); fire(); } });
+  })();
+
+  /* ---------- plan tabs ---------- */
+  (function () {
+    var tabs = $$("#plan-tabs [role=tab]"), ph = $("#plan-phone");
+    function sel(i, focus) {
+      tabs.forEach(function (t, j) {
+        var on = i === j; t.setAttribute("aria-selected", on ? "true" : "false"); t.tabIndex = on ? 0 : -1;
+        document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
+      });
+      showShot(ph, i); if (focus) tabs[i].focus();
+    }
+    tabs.forEach(function (t, i) {
+      t.addEventListener("click", function () { sel(i); });
+      t.addEventListener("keydown", function (e) {
+        if (e.key === "ArrowRight") { e.preventDefault(); sel((i + 1) % tabs.length, true); }
+        if (e.key === "ArrowLeft") { e.preventDefault(); sel((i - 1 + tabs.length) % tabs.length, true); }
+        if (e.key === "Home") { e.preventDefault(); sel(0, true); }
+        if (e.key === "End") { e.preventDefault(); sel(tabs.length - 1, true); }
+      });
+    });
+  })();
+
+  /* ---------- FAQ ---------- */
+  var FAQ = [
+    ["Using Navi", "What is Navi?", "A personal planner you talk to. You tell it about your life by text or voice, it proposes a plan, and once you've checked it, it helps you keep to it: daily plans, focus, an inbox for things you mention, and a weekly look back."],
+    ["Using Navi", "Do I have to fill in a setup form?", "No. Setup is one conversation. Navi suggests routines, commitments and a first plan from it, and you turn on what's right. Anything you leave off waits in Inbox."],
+    ["Using Navi", "Will Navi do things without asking?", "Inside your own plan it can make small changes straight away, like moving a block or adding a task, and every change can be undone. Anything that leaves Navi, such as a message sent from your account, waits as a card until you press and hold."],
+    ["Using Navi", "Can I use Navi without voice?", "Yes. Everything works by typing. Voice is there when talking is easier, and both share one history."],
+    ["Using Navi", "Which devices does it run on?", "There's an app for iPhone and Android, and a web app for when you're at a computer. They share the same account and plan."],
+    ["Using Navi", "Does it connect to my other calendars?", "We'll share what Navi connects to before launch. Today, Navi keeps its own plan, built from what you tell it."],
+    ["Privacy", "Is my voice recorded?", "Voice conversations are saved to your chat as text so you can read them back. The audio itself isn't kept."],
+    ["Privacy", "What does Navi remember about me?", "What it remembers is written as plain sentences in Memory, with where each one came from. Its guesses are marked for you to confirm, and you can edit or delete anything."],
+    ["Privacy", "Where can I read the privacy policy?", "On the Privacy page: what Navi keeps, what it never keeps, who can see it and who processes it."],
+    ["Early access", "How do I get access?", "Leave your email on the early access page. You'll get a link to a short application, about two minutes. When there's room, you'll get an email with a link that signs you straight in."],
+    ["Early access", "How much will Navi cost?", "During early access, Navi is free. Pricing after that hasn't been announced."],
+    ["Early access", "When will Navi launch?", "There's no public date yet. Early access comes first."]
+  ];
+  (function () {
+    var list = $("#faq-list"), q = $("#faq-q"), chips = $$("#faq-chips button"), empty = $("#faq-empty"), cat = "all";
+    list.innerHTML = FAQ.map(function (f, i) {
+      return '<div class="acc-item" data-cat="' + f[0] + '"><h3><button type="button" aria-expanded="false" aria-controls="fa-' + i + '" id="fq-' + i + '"><span>' + f[1] + '</span><span class="pm" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span></button></h3><div class="acc-panel" id="fa-' + i + '" role="region" aria-labelledby="fq-' + i + '"><div><p>' + f[2] + '</p></div></div></div>';
+    }).join("");
+    $$(".acc-item button", list).forEach(function (b) {
+      b.addEventListener("click", function () { var it = b.closest(".acc-item"), on = !it.classList.contains("open"); it.classList.toggle("open", on); b.setAttribute("aria-expanded", on ? "true" : "false"); });
+    });
+    function filter() {
+      var s = q.value.trim().toLowerCase(), n = 0;
+      $$(".acc-item", list).forEach(function (it, i) {
+        var f = FAQ[i], ok = (cat === "all" || f[0] === cat) && (!s || (f[1] + " " + f[2]).toLowerCase().indexOf(s) >= 0);
+        it.hidden = !ok; if (ok) n++;
+      });
+      empty.hidden = n > 0;
+    }
+    q.addEventListener("input", filter);
+    chips.forEach(function (c) { c.addEventListener("click", function () { cat = c.getAttribute("data-cat"); chips.forEach(function (x) { x.setAttribute("aria-pressed", x === c ? "true" : "false"); }); filter(); }); });
+  })();
+
+  /* ---------- early access: the live site's waitlist flow ----------
+     Posts the email (plus a hidden honeypot field) to the Navi app's /api/waitlist on the same
+     site, which emails a link to a short application. The artifact preview can't reach that API,
+     so there a failed request says so instead of pretending. */
+  function onNavi() { return /(^|\.)meetnavi\.app$|\.vercel\.app$|^localhost$|^127\.0\.0\.1$/.test(location.hostname); }
+  var WL_NOTE = { sent: "Check your inbox for a short application.", invalid: "That email address doesn\u2019t look right.", error: "Something went wrong on our side. Try again in a minute.", offline: "Couldn\u2019t reach Navi from this preview. Sign-up works on the live site." };
+  $$("form[data-waitlist]").forEach(function (f) {
+    var btn = $("button[type=submit]", f), note = $(".wl-note", f), label = btn.textContent;
+    function set(st) {
+      btn.disabled = st === "sending" || st === "sent";
+      f.email.disabled = st === "sent";
+      btn.textContent = st === "sending" ? "Sending\u2026" : st === "sent" ? "Sent" : label;
+      note.textContent = WL_NOTE[st] || "";
+      note.className = "wl-note" + (st === "sent" ? " ok" : WL_NOTE[st] ? " bad" : "");
+    }
+    f.addEventListener("submit", function (e) {
+      e.preventDefault();
+      set("sending");
+      fetch("/api/waitlist", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: f.email.value, website: f.website.value }) })
+        .then(function (res) { set(res.ok ? "sent" : res.status === 400 ? "invalid" : onNavi() ? "error" : "offline"); })
+        .catch(function () { set(onNavi() ? "error" : "offline"); });
+    });
+  });
+  $$("[data-live-only]").forEach(function (el) { el.hidden = !onNavi(); });
+
+  /* ---------- go ---------- */
+  RM.addEventListener && RM.addEventListener("change", function () { tick(); });
+  if (!location.hash) {
+    var OLD = { "/how-it-works": "product", "/features": "product", "/privacy-and-control": "privacy", "/about": "about", "/terms": "terms", "/guides": "faq" };
+    var path = location.pathname.replace(/\/+$/, "");
+    history.replaceState(null, "", "#" + (OLD[path] || (path.indexOf("/guides/") === 0 ? "faq" : "home")));
+  }
+  go();
+})();
+</script>

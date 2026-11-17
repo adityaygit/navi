@@ -54,3 +54,6 @@ supabase/.temp
 /landing/assets-src/*.png
 /landing/assets-src.log
 .claude/worktrees/
+
+# website build: the artifact copy of the page (public/landing is the deployed build)
+/website/dist/
