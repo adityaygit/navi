@@ -18,7 +18,7 @@ website/checks/        browser checks against the built files (no server needed)
 2. `python3 website/build.py`
 3. Check: `node website/checks/sweep-selftest.mjs`, then
    `node website/checks/layout-sweep.mjs 320x568,390x844,768x1024,1440x900 /tmp/sweep.jsonl` (empty output file = clean;
-   the full matrix used for launch is in BUILD_INTELLIGENCE.md), `node website/checks/waitlist-flow.mjs`, and
+   the full matrix used for launch is in BUILD_INTELLIGENCE.md), `node website/checks/waitlist-flow.mjs`, `node website/checks/panel-seams.mjs` (rounded panel corners match what's beside them), and
    `scripts/local-only.sh npx vitest run tests/unit/landing-proxy.test.ts`.
 4. Update the artifact preview by publishing `website/dist/navi-website.html` with the files under `public/landing/`
    at the same paths (`landing/...`), so preview and live stay identical.
