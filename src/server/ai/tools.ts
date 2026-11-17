@@ -396,11 +396,13 @@ async function overview(ctx: Ctx): Promise<string> {
     // Navi's sight, so it "didn't see" a task it had just created and made it
     // again). The person's own and chosen work first; overdue imported work is
     // summarised as waiting for a decision.
-    const [{ data: all }, scopeRes] = await Promise.all([
-      ctx.db.from("tasks").select("id,title,status,priority,due_at,due_is_hard,estimate_minutes,project_id,blocker,commitment,source,external_ref,estimate_source,created_at").in("status", ["todo", "in_progress", "blocked"]).order("created_at", { ascending: false }).limit(400),
+    const [{ data: all, error: allErr }, scopeRes] = await Promise.all([
+      // estimate_source exists only with the planner commands migration (20261117000001).
+      ctx.db.from("tasks").select(`id,title,status,priority,due_at,due_is_hard,estimate_minutes,project_id,blocker,commitment,source,external_ref,created_at${commands ? ",estimate_source" : ""}`).in("status", ["todo", "in_progress", "blocked"]).order("created_at", { ascending: false }).limit(400),
       commands ? ctx.db.from("day_plan_scope").select("task_id,mode").eq("date", today) : Promise.resolve({ data: [] as { task_id: string; mode: string }[] }),
     ]);
-    const rows = (all ?? []) as (Task & { created_at: string })[];
+    if (allErr) throw new Error(`Could not read open tasks: ${allErr.message}`);
+    const rows = (all ?? []) as unknown as (Task & { created_at: string })[];
     const scope = (scopeRes.data ?? []) as { task_id: string; mode: string }[];
     const chosen = new Set(scope.filter((x) => x.mode !== "exclude").map((x) => x.task_id));
     const offToday = new Set(scope.filter((x) => x.mode === "exclude").map((x) => x.task_id));
