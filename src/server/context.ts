@@ -27,6 +27,10 @@ export type Ctx = {
    * model wrote.
    */
   userMessage?: string;
+  /** When the current turn started (its user message was saved): offers made before it may be confirmed in words. */
+  turnStartedAt?: string;
+  /** The current turn's user message id (makes a tool call idempotent within the turn). */
+  turnId?: string;
   /**
    * Navi's autonomy setting for this turn. "ask": every change Navi would make
    * becomes an inline card first. Unset is treated as "auto".
@@ -34,6 +38,8 @@ export type Ctx = {
   autonomy?: "auto" | "ask";
   /** The constraint-first planner (profiles.preferences.planner_v2) is on for this person. Unset = look it up. */
   plannerV2?: boolean;
+  /** The scheduling-command layer (preferences.planner_commands, with planner v2) is on. Unset = look it up. */
+  plannerCommands?: boolean;
   /** Told about each activity-log entry written (so a tool call can offer Undo). */
   onActivity?: (entry: { id: string; reversible: boolean }) => void;
   /** Told about each action a step proposed (so its reply can show the card). */

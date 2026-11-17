@@ -5,7 +5,15 @@
 // Navi may plan in awake time nobody told it about, as a stated assumption
 // (D1, on).
 
-export type PlanningPrefs = { v2: boolean; loadCap: number; assumeFreeTime: boolean };
+export type PlanningPrefs = {
+  v2: boolean;
+  loadCap: number;
+  assumeFreeTime: boolean;
+  /** The scheduling-command layer (planner reliability overhaul): v2 plus preferences.planner_commands. */
+  commands: boolean;
+  /** Hard deadlines within this many hours count as at risk (impact analysis). Default 48. */
+  riskHours: number;
+};
 
 function prefs(preferences: unknown): Record<string, unknown> {
   return preferences && typeof preferences === "object" ? (preferences as Record<string, unknown>) : {};
@@ -18,5 +26,17 @@ export function plannerV2(preferences: unknown): boolean {
 export function planningPrefs(preferences: unknown): PlanningPrefs {
   const p = prefs(preferences);
   const cap = typeof p.plan_load_cap === "number" && p.plan_load_cap >= 0.1 && p.plan_load_cap <= 1 ? p.plan_load_cap : 0.7;
-  return { v2: p.planner_v2 === true, loadCap: cap, assumeFreeTime: p.assume_free_time !== false };
+  const risk = typeof p.plan_deadline_risk_hours === "number" && p.plan_deadline_risk_hours >= 1 && p.plan_deadline_risk_hours <= 336 ? p.plan_deadline_risk_hours : 48;
+  return { v2: p.planner_v2 === true, loadCap: cap, assumeFreeTime: p.assume_free_time !== false, commands: p.planner_v2 === true && p.planner_commands === true, riskHours: risk };
+}
+
+/**
+ * The scheduling-command layer (docs/navi-1.5/PLANNER_RELIABILITY.md): every
+ * schedule change is previewed, its impact analysed, authorized, applied as
+ * one change set, verified and reported. Only with planner v2 and
+ * profiles.preferences.planner_commands = true (default off: v2 runs as before).
+ */
+export function plannerCommands(preferences: unknown): boolean {
+  const p = prefs(preferences);
+  return p.planner_v2 === true && p.planner_commands === true;
 }

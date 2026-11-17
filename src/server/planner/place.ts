@@ -4,7 +4,7 @@ import { DateTime } from "luxon";
 import type { Ctx } from "@/server/context";
 import { createEntity, getEntity } from "@/server/domain/entities";
 import type { PlanBlock, Task } from "@/lib/types";
-import { plannerV2 } from "@/lib/planner-flag";
+import { plannerCommands, plannerV2 } from "@/lib/planner-flag";
 import { fixedClash } from "./clash";
 
 export const PlaceInput = z.object({
@@ -22,6 +22,18 @@ export const PlaceInput = z.object({
  */
 export async function placeTask(ctx: Ctx, input: unknown): Promise<PlanBlock> {
   const v = PlaceInput.parse(input);
+  const { data: prefRow } = await ctx.db.from("profiles").select("preferences").eq("id", ctx.userId).single();
+  if (plannerCommands(prefRow?.preferences)) {
+    // Scheduling commands: the same validated command Navi's tools use (preview,
+    // impact, one change set, verified). Navi's own flexible blocks there move
+    // to make room; fixed things and blocks you placed are never overlapped.
+    const { executeCommand } = await import("./commands");
+    const r = await executeCommand(ctx, { kind: "schedule_task", task_id: v.taskId, start: DateTime.fromISO(v.startsAt).setZone(ctx.timezone).toISO()!, minutes: v.minutes });
+    if (r.status !== "applied" || !r.verification?.ok) throw new Error(r.view.display || r.summary);
+    const placed = r.verification.checks.length ? (await ctx.db.from("plan_blocks").select("*").eq("task_id", v.taskId).eq("starts_at", DateTime.fromISO(v.startsAt).toUTC().toISO()!).eq("status", "planned").limit(1).maybeSingle()).data : null;
+    if (!placed) throw new Error("Couldn't confirm it was placed.");
+    return placed as PlanBlock;
+  }
   const task = await getEntity<Task>(ctx, "tasks", v.taskId);
   if (["done", "cancelled"].includes(task.status)) throw new Error("That task is already finished.");
   const start = DateTime.fromISO(v.startsAt).setZone(ctx.timezone);

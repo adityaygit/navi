@@ -413,3 +413,25 @@ describe("focus and briefings", () => {
     expect((await post<MApiError>("briefings/generate", { kind: "hourly" })).status).toBe(400);
   });
 });
+
+describe("scheduling commands (planner commands): one contract for the phone and Navi", () => {
+  it("is refused when the switch is off, previews without changing anything, applies once per request, and verifies", async () => {
+    const { data: t } = await me.db.from("tasks").insert({ user_id: me.userId, title: "Bio notes", estimate_minutes: 30 }).select("id").single();
+    const command = { kind: "schedule_task", task_id: t!.id, start: "14:00", date: "tomorrow" };
+    expect((await post<MApiError>("schedule", { command })).status).toBe(400);
+    await setPrefs({ planner_v2: true, planner_commands: true, wake_time: "07:00", bed_time: "23:00" });
+    const preview = await post<{ status: string }>("schedule", { command, mode: "preview" });
+    expect(preview.body.status).toBe("proposed");
+    expect((await me.db.from("plan_blocks").select("id")).data).toHaveLength(0);
+    const first = await post<{ status: string; ok: boolean; checks: { ok: boolean }[]; undo: string[] }>("schedule", { command, requestId: "phone-req-0001" });
+    expect(first.body.status).toBe("applied");
+    expect(first.body.ok).toBe(true);
+    expect(first.body.checks.every((c) => c.ok)).toBe(true);
+    const again = await post<{ status: string }>("schedule", { command, requestId: "phone-req-0001" });
+    expect(again.body.status).toBe("duplicate");
+    expect((await me.db.from("plan_blocks").select("id")).data).toHaveLength(1);
+    const undone = await post<{ undone: number }>("undo", { activityIds: first.body.undo });
+    expect(undone.status).toBe(200);
+    expect((await me.db.from("plan_blocks").select("id")).data).toHaveLength(0);
+  });
+});

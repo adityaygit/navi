@@ -42,7 +42,8 @@ export type PlannedBlock = {
 export type SchedulerOutput = {
   blocks: PlannedBlock[];
   fixed: { title: string; starts_at: string; ends_at: string; kind: "event" | "routine" | "block" | "busy" }[];
-  unscheduled: { task_id: string; title: string; why: string; remaining_minutes: number; due_at: string | null }[];
+  /** bucket (planner commands policy only): today's work that didn't fit, or work that can wait for a later day. */
+  unscheduled: { task_id: string; title: string; why: string; remaining_minutes: number; due_at: string | null; bucket?: "today" | "later" }[];
   /** Work that only fits after its deadline (placed anyway, so the user can see and decide). */
   afterDeadline: { task_id: string; title: string; due_at: string }[];
   warnings: string[];

@@ -88,6 +88,8 @@ export type Task = {
   commitment?: TaskCommitment;
   /** Don't plan work on it before this time. */
   not_before?: string | null;
+  /** Who set estimate_minutes: the person's own number is never scaled by learned ratios. Null = not recorded. */
+  estimate_source?: EstimateSource | null;
   source: string;
   /** Set while the task is owned by a connected calendar (Canvas): its title and due date come from there. */
   external_ref?: string | null;
@@ -115,6 +117,27 @@ export type Routine = {
 };
 
 export type TaskCommitment = "must" | "normal" | "optional";
+export type EstimateSource = "user" | "ai" | "import" | "default";
+/** How a block got where it is: placed by the planner, at the person's request, or by the person's own hand. */
+export type BlockPlacement = "auto" | "requested" | "manual";
+/** One task's place in a day's plan scope (day_plan_scope). */
+export type DayScopeMode = "only" | "include" | "exclude";
+export type DayScopeRow = { id?: string; date: string; task_id: string; mode: DayScopeMode };
+/** A planning preference Navi applies (planning_rules). Suggested = inferred, not applied until confirmed. */
+export type PlanningRule = {
+  id: string;
+  kind: "estimate_scale" | "daily_load_cap";
+  scope: "task" | "project" | "workspace" | "global";
+  scope_id: string | null;
+  params: Record<string, unknown>;
+  source: "stated" | "inferred" | "observed";
+  confidence: number;
+  status: "active" | "suggested" | "paused";
+  note: string | null;
+  expires_on: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
 export type RoutineProtection = "fixed" | "protected" | "flexible";
 export type RoutineKind = "sleep" | "meal" | "exercise" | "recovery" | "other";
 export type Basis = "confirmed" | "inferred";
@@ -199,6 +222,10 @@ export type PlanBlock = {
   basis?: Basis | null;
   assumption?: string | null;
   changeset_id?: string | null;
+  placement?: BlockPlacement;
+  /** Blocks of one grouped work session share this id (each task keeps its own block). */
+  session_id?: string | null;
+  session_title?: string | null;
 };
 
 export type ProposalKind =

@@ -10,6 +10,36 @@ import { OUTCOMES, STOPPED_NO_REASON, withNote } from "@/lib/outcomes";
 import { refreshStoredReview } from "@/server/jobs/briefings";
 import { UserFacingError } from "@/server/http";
 import type { FocusSession } from "@/lib/focus";
+import { plannerCommands } from "@/lib/planner-flag";
+
+/** Does the text state this many minutes (or the same in hours)? */
+export function mentionsMinutes(text: string | undefined, minutes: number): boolean {
+  if (!text) return false;
+  const t = text.toLowerCase();
+  if (new RegExp(`\\b${minutes}\\s*(m|min|mins|minutes?)\\b`).test(t)) return true;
+  const h = minutes / 60;
+  if (Number.isInteger(h * 2) && h > 0) {
+    const words: Record<number, string[]> = { 0.5: ["half an hour", "half hour", "30 min"], 1: ["an hour", "one hour", "1 hour", "1 hr", "1h"], 1.5: ["an hour and a half", "1.5 hours", "one and a half hours"], 2: ["two hours", "2 hours", "2 hrs", "2h"], 3: ["three hours", "3 hours", "3h"] };
+    if ((words[h] ?? []).some((w) => t.includes(w)) || new RegExp(`\\b${h}\\s*(h|hr|hrs|hours?)\\b`).test(t)) return true;
+  }
+  return false;
+}
+
+/**
+ * Who set an estimate (planner commands only; the column exists with that
+ * migration): the person's own number, typed by them or said in their own
+ * message this turn, is "user" and is never scaled by learned ratios.
+ */
+async function estimateSource(ctx: Ctx, minutes: number | null | undefined): Promise<Record<string, unknown>> {
+  if (minutes == null) return {};
+  let on = ctx.plannerCommands;
+  if (on === undefined) {
+    const { data } = await ctx.db.from("profiles").select("preferences").eq("id", ctx.userId).maybeSingle();
+    on = plannerCommands(data?.preferences);
+  }
+  if (!on) return {};
+  return { estimate_source: ctx.actor === "user" || mentionsMinutes(ctx.userMessage, minutes) ? "user" : "ai" };
+}
 
 export type { FocusSession };
 
@@ -38,7 +68,7 @@ export async function createTask(ctx: Ctx, input: TaskCreate, opts: { id?: strin
   const values: Record<string, unknown> = compact(TaskCreate.parse(input));
   // "Not given" for columns that have defaults (the schema allows null, the table doesn't).
   for (const k of ["due_is_hard", "priority"]) if (values[k] === null) delete values[k];
-  return createEntity<Task>(ctx, "tasks", { ...values, source: ctx.actor === "navi" ? "navi" : "user" }, { id: opts.id });
+  return createEntity<Task>(ctx, "tasks", { ...values, ...(await estimateSource(ctx, values.estimate_minutes as number | null | undefined)), source: ctx.actor === "navi" ? "navi" : "user" }, { id: opts.id });
 }
 
 /**
@@ -66,6 +96,7 @@ export async function updateTask(ctx: Ctx, id: string, input: TaskUpdate) {
   else if (patch.status) patch.completed_at = null;
   // A new (or cleared) reminder time is a fresh reminder: it hasn't been sent yet.
   if ("remind_at" in patch) patch.reminded_at = null;
+  if ("estimate_minutes" in patch) Object.assign(patch, await estimateSource(ctx, patch.estimate_minutes as number | null));
   return updateEntity<Task>(ctx, "tasks", id, patch);
 }
 

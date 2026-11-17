@@ -332,6 +332,24 @@ export type MTaskChange = { result: MUpdateResult<MTask> };
 export type MPlaceTask = { startsAt: string; minutes: number };
 /** POST /api/m/plan/day, /api/m/plan/week: one plain sentence about what was planned. */
 export type MPlanResult = { message: string };
+
+/**
+ * A scheduling command (planner commands on): the same contract Navi's tools
+ * use. `mode` "preview" works it out and returns its impact without changing
+ * anything; "apply" runs it through preview → impact → apply → verify.
+ */
+export type MScheduleCommand = { command: Record<string, unknown> & { kind: string }; mode?: "preview" | "apply"; requestId?: string; allowOverlap?: boolean };
+export type MScheduleResult = {
+  status: "applied" | "proposed" | "unchanged" | "infeasible" | "challenged" | "duplicate" | "stale";
+  ok: boolean;
+  message: string;
+  changeId: string | null;
+  actionId: string | null;
+  consequences: { key: string; level: "high" | "moderate"; text: string }[];
+  checks: { label: string; ok: boolean; soft?: boolean; actual?: string }[];
+  alternatives: string[];
+  undo: string[];
+};
 /** POST /api/m/blocks/:id/outcome */
 export type MBlockOutcome = { status: MBlockStatus; reason?: string | null };
 

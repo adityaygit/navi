@@ -13,7 +13,7 @@ export type PlanLike = {
   date: string;
   blocks: { task_id: string | null; title?: string; starts_at?: string }[];
   moved: number;
-  unscheduled: { task_id: string; title: string; remaining_minutes: number; why?: string }[];
+  unscheduled: { task_id: string; title: string; remaining_minutes: number; why?: string; bucket?: "today" | "later" }[];
   afterDeadline: { task_id: string; title: string; due_at: string }[];
   warnings: string[];
   // Planner v2 only (absent from the old planner):
@@ -25,6 +25,9 @@ export type PlanLike = {
   unplacedRoutines?: { title: string; why: string }[];
   blockedTasks?: { title: string }[];
   waiting?: { title: string; why: string }[];
+  // Planner commands policy only (absent otherwise):
+  triage?: { task_id: string; title: string; due_at: string | null }[];
+  outOfScope?: { task_id: string; title: string }[];
 };
 
 /** One change a planning run made, for the disclosure under its chat card. */
@@ -58,10 +61,20 @@ function dueText(iso: string, zone: string) {
   return DateTime.fromISO(iso).setZone(zone).toFormat("ccc h:mm a");
 }
 
-/** Work that didn't fit (not what was kept free on purpose or is waiting on something). */
+/**
+ * Work that didn't fit (not what was kept free on purpose or is waiting on
+ * something). Under the planner commands policy only today's work counts:
+ * the person's chosen and must-do work and deadlines inside the risk window,
+ * never every open item that could wait for a later day.
+ */
 function notFitted(r: PlanLike) {
-  return r.unscheduled.filter((u) => u.why !== HELD && !r.waiting?.some((w) => w.title === u.title));
+  return r.unscheduled.filter((u) => u.why !== HELD && u.bucket !== "later" && !r.waiting?.some((w) => w.title === u.title));
 }
+/** Policy "commands": open work that simply waits for a later day (not a failure to fit). */
+function laterWork(r: PlanLike) {
+  return r.unscheduled.filter((u) => u.why !== HELD && u.bucket === "later" && !r.waiting?.some((w) => w.title === u.title));
+}
+const triageLine = (n: number) => `${things(n)} overdue ${n === 1 ? "needs" : "need"} a decision`;
 
 export function summarizeDayPlan(r: PlanLike, zone: string): string {
   const parts: string[] = [];
@@ -71,6 +84,10 @@ export function summarizeDayPlan(r: PlanLike, zone: string): string {
   const notFit = notFitted(r);
   if (notFit.length) parts.push(`Didn't fit: ${leftover(notFit)}. ${notFit.length === 1 ? "It stays" : "They stay"} on your task list.`);
   if (held.length) parts.push(`Left for another day so today isn't packed: ${leftover(held)}.`);
+  const later = laterWork(r);
+  if (later.length) parts.push(`Not planned today, due later (that's fine): ${list(later.map((u) => `“${u.title}”`))}.`);
+  if (r.triage?.length) parts.push(`Overdue, not planned automatically until the user decides (plan it today, set a later day, or they say it's handed in): ${list(r.triage.map((u) => `“${u.title}”`), 6)}.`);
+  if (r.outOfScope?.length) parts.push(`Left off this day as the user chose: ${list(r.outOfScope.map((u) => `“${u.title}”`))}.`);
   if (r.afterDeadline.length) parts.push(`Only fits after it's due: ${r.afterDeadline.map((a) => `“${a.title}” (due ${dueText(a.due_at, zone)})`).join(", ")}.`);
   parts.push(...[...new Set(r.warnings.filter((w) => !covered(w) && w !== r.clarification))]);
   parts.push(...v2Lines(r));
@@ -133,10 +150,13 @@ export function planView(rs: PlanLike[], zone: string, opts: { now?: DateTime; c
   const one = rs.length === 1;
   const when = one ? dayWord(rs[0].date, zone, now) : "this week";
   const total = rs.reduce((s, r) => s + r.blocks.length, 0);
+  const stillShort = (one ? notFitted(rs[0]) : notFitted(rs[rs.length - 1])).length;
   const display = opts.recovered
     ? "Reworked the rest of today"
     : opts.unchanged
-      ? "Your plan already works; nothing changed"
+      ? stillShort
+        ? `Nothing changed: ${things(stillShort)} still ${stillShort === 1 ? "doesn't" : "don't"} fit ${when}`
+        : "Your plan already works; nothing changed"
       : one
         ? total
           ? `Planned ${when}: ${things(total)}`
@@ -162,6 +182,26 @@ export function planView(rs: PlanLike[], zone: string, opts: { now?: DateTime; c
     ];
     if (options.length === 1) options.push("Tell me what can wait, or move a due date, and I'll re-plan.");
     left = { line, options };
+  } else if (rs.some((r) => r.triage?.length)) {
+    const tri = [...new Map(rs.flatMap((r) => r.triage ?? []).map((t) => [t.task_id, t])).values()];
+    left = {
+      line: triageLine(tri.length),
+      options: [
+        `${tri.length > 3 ? `Includes ${tri.slice(0, 3).map((u) => q(u.title, 30)).join(", ")} and ${tri.length - 3} more` : tri.map((u) => q(u.title, 30)).join(", ")}. I didn't plan ${tri.length === 1 ? "it" : "them"} on my own; nothing was dropped.`,
+        "Tell me which to do today, which can wait, or which you already handed in.",
+      ],
+    };
+  } else if (laterWork(one ? rs[0] : rs[rs.length - 1]).length) {
+    // Planner commands policy: work with room on later days isn't "didn't fit".
+    const later = laterWork(one ? rs[0] : rs[rs.length - 1]);
+    const names = later.map((u) => q(u.title, 30));
+    left = {
+      line: `${things(later.length)} ${later.length === 1 ? "waits" : "wait"} for another day`,
+      options: [
+        `${names.length > 3 ? `Includes ${names.slice(0, 3).join(", ")} and ${names.length - 3} more` : names.join(", ")}. Not due soon, so ${later.length === 1 ? "it stays" : "they stay"} on your list; nothing was dropped.`,
+        "Tell me if any of it has to happen today.",
+      ],
+    };
   } else {
     // Planner v2 keeps some time open on purpose: say how much waits for another day.
     const held = (one ? rs[0] : rs[rs.length - 1]).unscheduled.filter((u) => u.why === HELD);

@@ -45,7 +45,23 @@ export type SchedulerV2Input = {
   dependencies?: Record<string, string[]>;
   /** Latest end of work already planned for a task on earlier days (dependencies). */
   plannedEnds?: Record<string, string>;
+  /**
+   * "commands" = the planner reliability rules (preferences.planner_commands):
+   * the day's scope, overdue imported work held for triage, the person's
+   * chosen work first, their own estimates never scaled, and what didn't fit
+   * split into today's work vs later. Default "v2": exactly as before.
+   */
+  policy?: "v2" | "commands";
+  /** This day's scope (policy "commands"): only these / also these / not these task ids. */
+  scope?: DayScope;
+  /** Hard deadlines within this many hours count as today's work in reports (default 48). */
+  riskHours?: number;
+  /** Learned / stated estimate scale per task id (planning rules); never applied to the person's own estimate. */
+  estimateScale?: Record<string, number>;
 };
+
+export type DayScope = { only: string[]; include: string[]; exclude: string[] };
+export const EMPTY_SCOPE: DayScope = { only: [], include: [], exclude: [] };
 
 export type PlannedBlockV2 = PlannedBlock & { basis: Basis | null; assumption: string | null };
 
@@ -64,7 +80,15 @@ export type SchedulerV2Output = Omit<SchedulerOutput, "blocks" | "fixed"> & {
   /** Free minutes after fixed plans, before any work is placed, by how sure Navi is. */
   freeByBasis: { confirmed: number; inferred: number };
   mustTaskIds: string[];
+  /** Policy "commands": overdue imported work not planned automatically; it needs the person's decision. */
+  triage: { task_id: string; title: string; due_at: string | null; remaining_minutes: number }[];
+  /** Policy "commands": open tasks left off this day by its scope. */
+  outOfScope: { task_id: string; title: string; why: string }[];
+  /** Policy "commands": the tasks the person chose for this run or day (focus, only, include). */
+  selectedTaskIds: string[];
 };
+
+export type UnscheduledBucket = "today" | "later";
 
 const DEFAULT_ESTIMATE = 30;
 const UNWORKED_STATUSES = ["skipped", "missed", "rest", "interrupted"];
@@ -118,6 +142,15 @@ export function scheduleDayV2(input: SchedulerV2Input): SchedulerV2Output {
   const loadCap = Math.min(1, Math.max(0.1, input.loadCap ?? 0.7));
   const horizonEnd = input.horizonEnd ?? input.now.plus({ days: 7 });
   const focus = new Set(input.focusTaskIds ?? []);
+  const policy = input.policy ?? "v2";
+  const strict = policy === "commands";
+  const scope = input.scope ?? EMPTY_SCOPE;
+  const selected = new Set(strict ? [...focus, ...scope.only, ...scope.include] : [...focus]);
+  const excluded = new Set(strict ? scope.exclude.filter((id) => !focus.has(id)) : []);
+  const onlyMode = strict && scope.only.length > 0;
+  const riskEnd = input.now.plus({ hours: input.riskHours ?? 48 });
+  const triage: SchedulerV2Output["triage"] = [];
+  const outOfScope: SchedulerV2Output["outOfScope"] = [];
   const warnings: string[] = [];
   const conflicts: string[] = [];
   const dow = weekdayOf(date, zone);
@@ -168,7 +201,7 @@ export function scheduleDayV2(input: SchedulerV2Input): SchedulerV2Output {
   // 2. Routines: fixed ones are busy; protected ones are reserved in their window.
   const blocks: PlannedBlockV2[] = [];
   const unplacedRoutines: SchedulerV2Output["unplacedRoutines"] = [];
-  type Item = { title: string; task_id: string | null; routine_id: string | null; minutes: number; total: number; reason: string; score: number; dueBy?: DateTime; tier: 0 | 1 | 2; notBefore?: DateTime; deps: string[] };
+  type Item = { title: string; task_id: string | null; routine_id: string | null; minutes: number; total: number; reason: string; score: number; dueBy?: DateTime; tier: 0 | 1 | 2; sub?: number; bucket?: UnscheduledBucket; notBefore?: DateTime; deps: string[] };
   const queue: Item[] = [];
   const todays = input.routines.filter((r) => r.active && r.days.includes(dow) && !keptRoutineIds.has(r.id));
   const timedReservations: { r: Routine; window: Interval; preferred: Interval }[] = [];
@@ -246,8 +279,20 @@ export function scheduleDayV2(input: SchedulerV2Input): SchedulerV2Output {
   const waiting: SchedulerV2Output["waiting"] = [];
   const mustTaskIds: string[] = [];
   for (const t of open) {
+    if (strict && excluded.has(t.id)) {
+      outOfScope.push({ task_id: t.id, title: t.title, why: "you left it off this day" });
+      continue;
+    }
+    if (onlyMode && !selected.has(t.id)) {
+      outOfScope.push({ task_id: t.id, title: t.title, why: "not in what you chose for this day" });
+      continue;
+    }
     const estimate = t.estimate_minutes ?? DEFAULT_ESTIMATE;
-    const adjusted = Math.round(estimate * ratio);
+    // The person's own number is used as they said it; learned ratios and
+    // planning rules only adjust estimates Navi or an import made up.
+    const own = strict && t.estimate_source === "user" && t.estimate_minutes != null;
+    const scale = own ? 1 : (input.estimateScale?.[t.id] ?? 1);
+    const adjusted = own ? estimate : Math.round(estimate * ratio * scale);
     // Worked past the estimate but not finished: it took longer, so assume a bit more.
     const overran = t.actual_minutes > 0 && t.actual_minutes >= adjusted;
     const need = overran ? minChunk : adjusted - t.actual_minutes;
@@ -259,10 +304,24 @@ export function scheduleDayV2(input: SchedulerV2Input): SchedulerV2Output {
       continue;
     }
     const due = t.due_at ? DateTime.fromISO(t.due_at) : undefined;
-    const must = t.commitment === "must" || focus.has(t.id) || (t.due_is_hard && !!due && due <= horizonEnd);
+    const overdue = !!due && due < input.now;
+    const chosen = selected.has(t.id);
+    // Overdue imported work isn't today's mandatory work by default: it waits
+    // for the person's decision (plan it, defer it, or say it's handed in).
+    if (strict && overdue && t.source === "external" && !chosen && t.commitment !== "must") {
+      triage.push({ task_id: t.id, title: t.title, due_at: t.due_at, remaining_minutes: remaining });
+      continue;
+    }
+    // A hard deadline makes work must-complete only while it's still ahead
+    // (policy "commands"); work the person chose keeps its place even when overdue.
+    const hardAhead = t.due_is_hard && !!due && due <= horizonEnd && (!strict || !overdue);
+    const must = t.commitment === "must" || chosen || hardAhead;
     if (must) mustTaskIds.push(t.id);
+    const sub = !strict ? 0 : chosen ? 0 : t.commitment === "must" ? 1 : 2;
+    const bucket: UnscheduledBucket | undefined = !strict ? undefined : chosen || t.commitment === "must" || (!!due && due <= riskEnd) ? "today" : "later";
     const reasons: string[] = [];
     if (focus.has(t.id)) reasons.push("you asked to focus on it");
+    else if (chosen) reasons.push("you chose it for this day");
     else if (t.commitment === "must") reasons.push("must-complete");
     if (due) {
       const d = due.setZone(zone);
@@ -271,15 +330,18 @@ export function scheduleDayV2(input: SchedulerV2Input): SchedulerV2Output {
     reasons.push(`P${t.priority}`);
     if (overran) reasons.push(`took longer than its estimate; ${minChunk}m more assumed`);
     else if (!t.estimate_minutes) reasons.push(`no estimate, ${DEFAULT_ESTIMATE}m assumed`);
-    else if (ratio !== 1) reasons.push(`estimate adjusted ×${ratio.toFixed(2)} from your history`);
+    else if (own) reasons.push("your estimate");
+    else if (ratio !== 1 || scale !== 1) reasons.push(`estimate adjusted ×${(ratio * scale).toFixed(2)} from your history`);
     queue.push({
       title: t.title, task_id: t.id, routine_id: null, minutes: remaining, total: overran ? remaining : adjusted, reason: reasons.join(", "),
-      score: taskScore(t, input.now) - (t.commitment === "optional" ? 15 : 0), dueBy: due, tier: must ? 1 : 2, notBefore,
+      // Policy "commands": imported work that isn't due soon doesn't outrank the person's own work.
+      score: taskScore(t, input.now) - (t.commitment === "optional" ? 15 : 0) - (strict && t.source === "external" && !chosen && !(due && due <= riskEnd) ? 15 : 0),
+      dueBy: due, tier: must ? 1 : 2, sub, bucket, notBefore,
       deps: (input.dependencies?.[t.id] ?? []).filter((d) => openIds.has(d)),
     });
   }
   const byDue = (a: Item, b: Item) => (a.dueBy?.toMillis() ?? Infinity) - (b.dueBy?.toMillis() ?? Infinity);
-  queue.sort((a, b) => a.tier - b.tier || (a.tier === 1 ? byDue(a, b) || b.score - a.score : b.score - a.score || byDue(a, b)));
+  queue.sort((a, b) => a.tier - b.tier || (a.tier === 1 ? (a.sub ?? 0) - (b.sub ?? 0) || byDue(a, b) || b.score - a.score : b.score - a.score || byDue(a, b)));
   // Prerequisites go before the tasks that wait for them.
   for (let pass = 0; pass < queue.length; pass++) {
     let movedAny = false;
@@ -316,7 +378,7 @@ export function scheduleDayV2(input: SchedulerV2Input): SchedulerV2Output {
     const pending = item.deps.find((d) => (leftover[d] ?? 0) > 0 || (!placedTaskEnd[d] && !keptTaskEnds[d] && !input.plannedEnds?.[d]));
     if (pending) {
       if (item.task_id) waiting.push({ task_id: item.task_id, title: item.title, why: `waiting on “${titleOf.get(pending) ?? "another task"}”` });
-      if (item.task_id) unscheduled.push({ task_id: item.task_id, title: item.title, remaining_minutes: left, due_at: item.dueBy?.toISO() ?? null, why: `Waiting on “${titleOf.get(pending) ?? "another task"}”` });
+      if (item.task_id) unscheduled.push({ task_id: item.task_id, title: item.title, remaining_minutes: left, due_at: item.dueBy?.toISO() ?? null, why: `Waiting on “${titleOf.get(pending) ?? "another task"}”`, ...(item.bucket ? { bucket: item.bucket } : {}) });
       continue;
     }
     for (const d of item.deps) {
@@ -377,6 +439,7 @@ export function scheduleDayV2(input: SchedulerV2Input): SchedulerV2Output {
       unscheduled.push({
         task_id: item.task_id, title: item.title, remaining_minutes: left, due_at: item.dueBy?.toISO() ?? null,
         why: why ?? (placedAny ? "Only part of it fits today" : wholeNow() ? `No free ${left}-minute slot left today` : "No free time left today"),
+        ...(item.bucket ? { bucket: item.bucket } : {}),
       });
       if (item.dueBy && item.dueBy.setZone(zone).toISODate()! <= date) {
         warnings.push(`“${item.title}” is due today but ${left} min of it doesn't fit.`);
@@ -421,5 +484,8 @@ export function scheduleDayV2(input: SchedulerV2Input): SchedulerV2Output {
     capacity: model.minutes,
     freeByBasis,
     mustTaskIds,
+    triage,
+    outOfScope,
+    selectedTaskIds: [...selected],
   };
 }

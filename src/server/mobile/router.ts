@@ -9,6 +9,8 @@ import { createConversation, deleteConversation, renameConversation } from "@/se
 import { changeTask, completeTask, createTask, endFocus, FocusEndInput, pauseFocus, resumeFocus, startFocus } from "@/server/domain/tasks";
 import { TaskCreate } from "@/server/domain/schemas";
 import { placeTask } from "@/server/planner/place";
+import { executeCommand, commandMessage } from "@/server/planner/commands";
+import { plannerCommands } from "@/lib/planner-flag";
 import { BlockOutcomeInput, dayPlanMessage, generateDayPlan, generateWeekPlan, setBlockOutcome, weekPlanMessage } from "@/server/planner/plan";
 import { acceptMany, acceptManyProblem, acceptProposal, editProposal, mergeProposalIntoTask, setProposalStatus } from "@/server/domain/proposals";
 import { decideActionView, decisionMessage } from "@/server/domain/approvals";
@@ -24,6 +26,7 @@ import type {
   MFocusResult,
   MOk,
   MPlanResult,
+  MScheduleResult,
   MProposalResult,
   MTaskChange,
   MTaskResult,
@@ -112,6 +115,17 @@ route("POST", "tasks/:id/uncomplete", async (ctx, { params }): Promise<MTaskChan
 route("POST", "tasks/:id/place", async (ctx, { params, body }): Promise<MOk> => {
   await placeTask(ctx, { ...(body as object), taskId: params.id });
   return { ok: true };
+});
+route("POST", "schedule", async (ctx, { body }): Promise<MScheduleResult> => {
+  const v = z.object({ command: z.record(z.string(), z.unknown()), mode: z.enum(["preview", "apply"]).nullish(), requestId: z.string().min(8).max(80).nullish(), allowOverlap: z.boolean().nullish() }).parse(body ?? {});
+  const { data: prefRow } = await ctx.db.from("profiles").select("preferences").eq("id", ctx.userId).single();
+  if (!plannerCommands(prefRow?.preferences)) throw new UserFacingError("Scheduling commands aren't on for this account.", 400);
+  // The person's own edit: previews are shown inline (no chat card), applies run and are verified.
+  const r = await executeCommand(ctx, v.command as never, { mode: v.mode === "preview" ? "preview" : "apply", idempotencyKey: v.requestId ? `m:${v.requestId}` : null, allowOverlap: !!v.allowOverlap });
+  return {
+    status: r.status, ok: r.ok, message: commandMessage(r), changeId: r.changesetId, actionId: r.actionId,
+    consequences: r.impact?.consequences ?? [], checks: r.verification?.checks ?? [], alternatives: r.alternatives ?? [], undo: r.undo,
+  };
 });
 route("POST", "plan/day", async (ctx, { body }): Promise<MPlanResult> => {
   const { date } = z.object({ date: IsoDate.nullish() }).parse(body ?? {});

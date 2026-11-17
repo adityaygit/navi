@@ -8,7 +8,11 @@ import { createProposals, proposalProblem } from "@/server/domain/proposals";
 import { createTask, completeTask, updateTask } from "@/server/domain/tasks";
 import { deleteEntity, getEntity, updateEntity, type EntityTable } from "@/server/domain/entities";
 import { logActivity, revertActivities } from "@/server/domain/activity";
-import { plannerV2 } from "@/lib/planner-flag";
+import { plannerV2, plannerCommands } from "@/lib/planner-flag";
+import { createHash } from "node:crypto";
+import { executeCommand, confirmChange, type Command, type CommandOptions, type CommandResult } from "@/server/planner/commands";
+import { addPlanningRule, changePlanningRule, describeRule, listPlanningRules } from "@/server/domain/planning-rules";
+import { quoteIsTheirs } from "@/server/planner/commands/authorize";
 import { atLocalTime } from "@/lib/time";
 import { wakeBed } from "@/server/day";
 import { isWakeBedDefault, occurrencesOn, type DayModel } from "@/server/planner/day-model";
@@ -141,6 +145,50 @@ export async function plannerV2For(ctx: Ctx): Promise<boolean> {
   if (ctx.plannerV2 !== undefined) return ctx.plannerV2;
   const { data } = await ctx.db.from("profiles").select("preferences").eq("id", ctx.userId).maybeSingle();
   return plannerV2(data?.preferences);
+}
+
+/** Is the scheduling-command layer on for this person? */
+export async function plannerCommandsFor(ctx: Ctx): Promise<boolean> {
+  if (ctx.plannerCommands !== undefined) return ctx.plannerCommands;
+  const { data } = await ctx.db.from("profiles").select("preferences").eq("id", ctx.userId).maybeSingle();
+  return plannerCommands(data?.preferences);
+}
+
+/** Options every scheduling-command tool takes (authorization of high-impact consequences, previews, the one challenge). */
+const CommandControls = {
+  mode: z.enum(["apply", "preview"]).nullish().describe("'preview' = show it as one card (an offer) and change nothing; default 'apply' (Navi's code still turns high-impact changes into a card)"),
+  authorize: z.array(z.string().max(200)).max(20).nullish().describe("Consequence keys from an earlier result that the user explicitly agreed to in their own words this turn; pass with user_quote"),
+  user_quote: z.string().max(300).nullish().describe("The user's exact words this turn that authorize those consequences"),
+  reaffirmed: z.boolean().nullish().describe("true only after Navi challenged once and the user still wants it"),
+  allow_overlap: z.boolean().nullish().describe("true only when the user explicitly said it may overlap a fixed commitment"),
+};
+type Controls = { mode?: "apply" | "preview" | null; authorize?: string[] | null; user_quote?: string | null; reaffirmed?: boolean | null; allow_overlap?: boolean | null };
+
+/** Run a scheduling command for a tool call: same request in the same turn runs once. */
+async function runCommand(ctx: Ctx, tool: string, cmd: Command, c: Controls = {}): Promise<ToolResult> {
+  const key = ctx.turnId ? createHash("sha256").update(`${ctx.turnId}:${tool}:${JSON.stringify(cmd)}:${JSON.stringify(c)}`).digest("hex").slice(0, 40) : null;
+  const opts: CommandOptions = { mode: c.mode ?? undefined, authorize: c.authorize ?? null, userQuote: c.user_quote ?? null, reaffirmed: !!c.reaffirmed, allowOverlap: !!c.allow_overlap, idempotencyKey: key };
+  return commandToolResult(await executeCommand(ctx, cmd, opts));
+}
+
+/** A command's outcome as a tool result: what the model needs to act on, and what the person sees. */
+export function commandToolResult(r: CommandResult): ToolResult {
+  const data = {
+    status: r.status,
+    change_id: r.changesetId,
+    consequences: r.impact?.consequences.map((c) => ({ key: c.key, level: c.level, text: c.text })) ?? [],
+    checks: r.verification?.checks ?? [],
+    alternatives: r.alternatives ?? [],
+  };
+  const changed = r.status === "applied" || r.status === "proposed";
+  return {
+    ok: r.ok || r.status === "proposed" || r.status === "unchanged" || r.status === "duplicate" || r.status === "challenged",
+    mutated: changed,
+    summary: r.status === "proposed" ? `${r.summary} ${WAITING}` : r.summary,
+    data,
+    ...(r.status === "challenged" ? { display: "" } : r.view),
+    ...(r.status === "infeasible" || r.status === "stale" ? { display: r.view.display } : {}),
+  };
 }
 
 const hours = (n: number) => (n >= 60 ? `${Math.floor(n / 60)}h${n % 60 ? ` ${n % 60}m` : ""}` : `${n}m`);
@@ -304,6 +352,7 @@ async function overview(ctx: Ctx): Promise<string> {
   const later = now.plus({ days: 7 });
   const offsets = `UTC offset ${now.toFormat("ZZ")}${later.offset !== now.offset ? `, ${later.toFormat("ZZ")} from ${week.find((d) => DateTime.fromISO(d, { zone }).endOf("day").offset !== now.offset) ?? later.toISODate()}` : ""}`;
   const v2 = plannerV2(profile.preferences);
+  const commands = plannerCommands(profile.preferences);
   const wb = wakeBed(profile);
   const usual = v2
     ? `Usual times: ${wb ? `up ${wb.wake}, bed ${wb.bed}` : "wake-up/bedtime unknown"}; free times they set: ${isWakeBedDefault(profile.availability, wb) ? "none (only the setup default)" : JSON.stringify(profile.availability)}. Navi's planner works out free time itself (confirmed / assumed / unknown, see Free time lines); never ask the user to set availability.`
@@ -319,8 +368,25 @@ async function overview(ctx: Ctx): Promise<string> {
   const caps = v2 ? await capacityLines(ctx, zone, [today, week[1]], agendaInputs) : null;
   lines.push(`Today's plan: ${dayLine(today)}${caps ? `\n${caps.get(today)}` : ""}`);
   lines.push(`Tomorrow's plan (${week[1]}): ${dayLine(week[1])}. For any other date, call get_plan.${caps ? `\n${caps.get(week[1])}` : ""}`);
+  let open = (tasks.data ?? []) as Task[];
+  let triageLine = "";
+  if (commands) {
+    // The person's own and chosen work first; overdue imported work is summarised (get_backlog lists it).
+    const [{ data: all }, { data: scope }] = await Promise.all([
+      ctx.db.from("tasks").select("id,title,status,priority,due_at,due_is_hard,estimate_minutes,project_id,blocker,commitment,source,estimate_source").in("status", ["todo", "in_progress", "blocked"]).limit(400),
+      ctx.db.from("day_plan_scope").select("task_id,mode").eq("date", today),
+    ]);
+    const rows = (all ?? []) as Task[];
+    const chosen = new Set(((scope ?? []) as { task_id: string; mode: string }[]).filter((x) => x.mode !== "exclude").map((x) => x.task_id));
+    const offToday = new Set(((scope ?? []) as { task_id: string; mode: string }[]).filter((x) => x.mode === "exclude").map((x) => x.task_id));
+    const overdueImported = rows.filter((t) => t.source === "external" && t.due_at && Date.parse(t.due_at) < Date.now() && t.commitment !== "must" && !chosen.has(t.id));
+    const rank = (t: Task) => (chosen.has(t.id) ? 0 : t.commitment === "must" ? 1 : t.source !== "external" ? 2 : 3);
+    open = rows.filter((t) => !overdueImported.includes(t)).sort((a, b) => rank(a) - rank(b) || (a.due_at ?? "9999").localeCompare(b.due_at ?? "9999")).slice(0, 45)
+      .map((t) => ({ ...t, title: `${t.title}${chosen.has(t.id) ? " [chosen for today]" : offToday.has(t.id) ? " [kept off today]" : ""}${t.source === "external" ? " (Canvas)" : ""}` }));
+    if (overdueImported.length) triageLine = `\nOverdue imported (Canvas) work NOT planned automatically, waiting for the user's decision: ${overdueImported.length} item${overdueImported.length === 1 ? "" : "s"} (call get_backlog for the list). Don't call them failures to fit, and don't plan them unless the user chooses them.`;
+  }
   lines.push(
-    `Open tasks: ${((tasks.data ?? []) as Task[]).map((t) => `${t.title} (${v2 && t.commitment === "must" ? "MUST-COMPLETE, " : v2 && t.commitment === "optional" ? "optional, " : ""}P${t.priority}, ${t.status}${t.due_at ? `, due ${formatDue(t.due_at, zone)}${t.due_is_hard ? " HARD" : ""}` : ", no due date"}${t.estimate_minutes ? `, ~${t.estimate_minutes}m` : ""}${t.blocker ? `, blocked: ${t.blocker}` : ""}) [${t.id}]`).join("; ") || "none"}`,
+    `Open tasks: ${open.map((t) => `${t.title} (${v2 && t.commitment === "must" ? "MUST-COMPLETE, " : v2 && t.commitment === "optional" ? "optional, " : ""}P${t.priority}, ${t.status}${t.due_at ? `, due ${formatDue(t.due_at, zone)}${t.due_is_hard ? " HARD" : ""}` : ", no due date"}${t.estimate_minutes ? `, ~${t.estimate_minutes}m${commands && t.estimate_source === "user" ? " (user's estimate)" : ""}` : ""}${t.blocker ? `, blocked: ${t.blocker}` : ""}) [${t.id}]`).join("; ") || "none"}${triageLine}`,
   );
   const pending = (inbox.data ?? []) as Pick<Proposal, "kind" | "payload" | "source_excerpt">[];
   lines.push(
@@ -468,6 +534,35 @@ function runView(rs: Parameters<typeof planView>[0], zone: string, run: { status
 /** A date the person named as a word Navi says ("Monday", "tomorrow"). */
 const dayName = (date: string, zone: string) => dayWord(date, zone, DateTime.now(), false).replace("tonight", "today");
 
+/** The plan tool through the scheduling-command pipeline: one-day facts, focus and the re-plan in ONE change set. */
+async function planViaCommand(ctx: Ctx, first: string, input: { days?: number | null; mode?: "apply" | "propose" | null; focus_task_ids?: string[] | null; capacity_minutes?: number | null; free?: { start: string; end: string }[] | null; busy?: { start: string; end: string; title?: string | null }[] | null; start_from?: string | null }): Promise<ToolResult> {
+  const zone = ctx.timezone;
+  const today = nowIn(zone).toISODate()!;
+  const exceptions: { date: string; kind: "busy" | "free" | "capacity"; start_time?: string | null; end_time?: string | null; minutes?: number | null; note?: string | null }[] = [];
+  const facts: string[] = [];
+  if (input.capacity_minutes != null) { exceptions.push({ date: first, kind: "capacity", minutes: input.capacity_minutes, note: `at most ${input.capacity_minutes} min of work` }); facts.push(`at most ${input.capacity_minutes} min of work`); }
+  for (const f of input.free ?? []) { exceptions.push({ date: first, kind: "free", start_time: f.start, end_time: f.end, note: "free" }); facts.push(`free ${f.start}–${f.end}`); }
+  for (const b of input.busy ?? []) { exceptions.push({ date: first, kind: "busy", start_time: b.start, end_time: b.end, note: b.title ?? "Busy" }); facts.push(`${b.title ?? "busy"} ${b.start}–${b.end}`); }
+  let from: DateTime | undefined;
+  if (input.start_from === "now") { if (first === today) from = resolveClock("now", first, zone, nowIn(zone))!; }
+  else if (input.start_from) {
+    if (first === today) from = DateTime.max(atLocalTime(first, input.start_from, zone), nowIn(zone));
+    else { exceptions.push({ date: first, kind: "busy", start_time: "00:00", end_time: input.start_from, note: `not free before ${input.start_from}` }); facts.push(`not free before ${input.start_from}`); }
+  }
+  const days = Array.from({ length: input.days ?? 1 }, (_, i) => DateTime.fromISO(first, { zone }).plus({ days: i }).toISODate()!);
+  const key = ctx.turnId ? createHash("sha256").update(`${ctx.turnId}:plan:${JSON.stringify(input)}`).digest("hex").slice(0, 40) : null;
+  const r = await executeCommand(ctx, { kind: "replan", dates: days, focus_task_ids: input.focus_task_ids ?? null, exceptions }, { mode: input.mode === "propose" ? "preview" : "apply", idempotencyKey: key }, { trigger: "chat", from });
+  const out = commandToolResult(r);
+  const lead = facts.length ? `Saved for ${DateTime.fromISO(first, { zone }).toFormat("cccc")} only: ${facts.join("; ")}. ` : "";
+  const rs = r.run?.results ?? [];
+  const view = r.status === "proposed" ? { plan: true } : runView(rs, zone, r.run ? { status: r.run.status, changes: r.run.changes } : undefined);
+  return {
+    ...out, summary: `${lead}${out.summary}`, ...view,
+    ...(facts.length && view.detail ? { detail: [...facts.map((f) => `Just ${dayName(first, zone)}: ${f}`), ...view.detail] } : {}),
+    data: { ...(out.data as object), days: rs.map((x) => ({ date: x.date, blocks: x.blocks.map((b) => ({ title: b.title, start: b.starts_at, end: b.ends_at, assumed: b.basis === "inferred" })), ...v2Data(x) })) },
+  };
+}
+
 export const TOOLS = [
   tool({
     name: "get_overview",
@@ -575,9 +670,13 @@ export const TOOLS = [
     name: "create_task",
     description:
       "Create a committed task immediately. ONLY when the user directly and explicitly commands it right now (e.g. 'add a task to email Ms. Lee'). For anything inferred or mentioned in passing, use propose_items instead. Check search_items first so you don't duplicate an existing task or inbox item. Tasks have no 'do on' date, only a due date: if the user names a day ('call mom on Sunday'), set due_at to the end of that day (23:59 local) with due_is_hard=false unless they say it's a real deadline. Don't write dates into notes. Tell the user exactly what the result says was set (e.g. 'due Sunday, not a hard deadline'); never say it's scheduled or planned for a day unless a plan block was actually made.",
-    schema: TaskCreate.extend({ user_command: z.string().min(3).max(300).describe("The user's explicit instruction, quoted") }),
+    schema: TaskCreate.extend({
+      user_command: z.string().min(3).max(300).describe("The user's explicit instruction, quoted"),
+      schedule: z.object({ start: z.string().max(40).describe("Local HH:MM or 'now'"), date: z.string().regex(/^(\d{4}-\d{2}-\d{2}|today|tomorrow)$/).nullish(), minutes: z.number().int().min(5).max(480).nullish() }).nullish()
+        .describe("Only when the user explicitly said when to do it ('schedule the pamphlet at 4'): also puts it on the plan at that time (scheduling commands only)"),
+    }),
     run: async (ctx, input) => {
-      const { user_command, ...task } = input;
+      const { user_command, schedule, ...task } = input;
       if (ctx.autonomy === "ask") {
         // The person asked Navi to check with them before changing things.
         const values = { ...compact(TaskCreate.parse(task)), title: task.title };
@@ -590,6 +689,10 @@ export const TOOLS = [
       }
       const t = await createTask(ctx, task);
       await logActivity(ctx, { action: "explicit_command", entityType: "tasks", entityId: t.id, summary: `Added at your request: “${user_command.slice(0, 120)}”` });
+      if (schedule && (await plannerCommandsFor(ctx))) {
+        const placed = await runCommand(ctx, "create_task", { kind: "schedule_task", task_id: t.id, start: schedule.start, date: schedule.date ?? null, minutes: schedule.minutes ?? null });
+        return { ...placed, ok: true, mutated: true, summary: `Created task “${t.title}” (${taskDateSummary(t, ctx.timezone, user_command)}). Scheduling it: ${placed.summary}`, display: placed.ok && (placed.data as { status?: string })?.status === "applied" ? `Added ${q(t.title)}; ${String(placed.display ?? "").replace(/^Put /, "put it ")}` : `Added ${q(t.title)}`, data: { id: t.id, ...(placed.data as object) } };
+      }
       return { ok: true, mutated: true, summary: `Created task “${t.title}”: ${taskDateSummary(t, ctx.timezone, user_command)}`, display: `Added ${q(t.title)}${t.due_at ? `, due ${dayWord(DateTime.fromISO(t.due_at).setZone(ctx.timezone).toISODate()!, ctx.timezone, DateTime.now(), false).replace("tonight", "today")}` : ""}`, data: { id: t.id, due_at: t.due_at, due_is_hard: t.due_is_hard } };
     },
   }),
@@ -608,7 +711,8 @@ export const TOOLS = [
       if (!Object.keys(compact(patch)).length) return { ok: true, mutated: true, summary: deps || "Nothing to change", display: deps ? "Changed what it waits for" : "" };
       const r = await updateTask(ctx, id, patch);
       if (r.kind === "approval_requested") return { ok: true, mutated: true, summary: `${deps ? `${deps} ` : ""}That change needs the user's OK because ${r.reason}. ${WAITING}` };
-      const dates = "due_at" in patch || "due_is_hard" in patch ? `: ${await taskScheduleSummary(ctx, r.row)}` : "";
+      // A priority/commitment change isn't a time: say whether it's actually planned (R2).
+      const dates = "due_at" in patch || "due_is_hard" in patch || "commitment" in patch || "priority" in patch ? `: ${await taskScheduleSummary(ctx, r.row)}${"commitment" in patch && patch.commitment === "must" ? ". Must-do means planned first, NOT placed at a time; to put it at a time use schedule_task" : ""}` : "";
       const changed = Object.keys(compact(patch));
       const display = r.row.due_at && "due_at" in patch
         ? `${q(r.row.title)} is now due ${DateTime.fromISO(r.row.due_at).setZone(ctx.timezone).toFormat("cccc")}`
@@ -657,6 +761,14 @@ export const TOOLS = [
       const checked = parseEntityPatch(table, patch);
       if (!checked.ok) return { ok: false, summary: checked.summary };
       const clean = checked.patch;
+      if (table === "plan_blocks" && ("starts_at" in clean || "ends_at" in clean || "plan_date" in clean || "pinned" in clean) && (await plannerCommandsFor(ctx))) {
+        // Moves, resizes and locks go through the scheduling commands (preview, impact, verify).
+        const b = await getEntity<PlanBlock>(ctx, "plan_blocks", id);
+        if ("pinned" in clean && !("starts_at" in clean) && !("ends_at" in clean)) return runCommand(ctx, "update_item", { kind: "lock", block_ids: [id], locked: !!clean.pinned });
+        const start = typeof clean.starts_at === "string" ? clean.starts_at : b.starts_at;
+        const end = typeof clean.ends_at === "string" ? clean.ends_at : DateTime.fromISO(start).plus({ milliseconds: Date.parse(b.ends_at) - Date.parse(b.starts_at) }).toISO()!;
+        return runCommand(ctx, "update_item", { kind: "move_many", moves: [{ block_id: id, start, minutes: Math.max(5, Math.round((Date.parse(end) - Date.parse(start)) / 60000)) }] });
+      }
       // A routine's protection and the old planner's is_fixed say the same thing.
       if (table === "routines" && typeof clean.protection === "string") clean.is_fixed = clean.protection === "fixed";
       const r = await updateEntity(ctx, table as EntityTable, id, clean);
@@ -737,6 +849,7 @@ export const TOOLS = [
     run: async (ctx, input) => {
       const zone = ctx.timezone;
       const first = resolveDate(input.date, zone);
+      if (await plannerCommandsFor(ctx)) return planViaCommand(ctx, first, input);
       const facts: string[] = [];
       if (input.capacity_minutes != null) facts.push(await addException(ctx, { date: first, kind: "capacity", minutes: input.capacity_minutes, note: `at most ${input.capacity_minutes} min of work` }));
       for (const f of input.free ?? []) facts.push(await addException(ctx, { date: first, kind: "free", start_time: f.start, end_time: f.end, note: "free" }));
@@ -752,7 +865,7 @@ export const TOOLS = [
       const days = Array.from({ length: input.days ?? 1 }, (_, i) => DateTime.fromISO(first, { zone }).plus({ days: i }).toISODate()!);
       const run = await planDays(ctx, days, { trigger: "chat", mode: input.mode ?? undefined, from, focusTaskIds: input.focus_task_ids ?? undefined });
       const lead = facts.length ? `Saved for ${DateTime.fromISO(first, { zone }).toFormat("cccc")} only: ${facts.join("; ")}. ` : "";
-      const summary = run.status === "unchanged" ? `${lead}The plan already fits: nothing to change. ${run.summary}` : `${lead}${run.summary}${run.status === "applied" ? " (The user can undo this.)" : run.status === "proposed" ? ` ${WAITING}` : ""}`;
+      const summary = run.status === "unchanged" ? `${lead}Nothing changed: the planner found no better arrangement (this is not a success if what the user asked for isn't placed; check the result). ${run.summary}` : `${lead}${run.summary}${run.status === "applied" ? " (The user can undo this.)" : run.status === "proposed" ? ` ${WAITING}` : ""}`;
       const view = runView(run.results, zone, run);
       return { ok: true, mutated: true, summary, ...view, ...(facts.length && view.detail ? { detail: [...facts.map((f) => `Just ${dayName(first, zone)}: ${f}`), ...view.detail] } : {}), data: run.results.map((r) => ({ date: r.date, blocks: r.blocks.map((b) => ({ title: b.title, start: b.starts_at, end: b.ends_at, assumed: b.basis === "inferred" })), ...v2Data(r) })) };
     },
@@ -826,6 +939,7 @@ export const TOOLS = [
       "Move planned work blocks to new times and pin them there (re-plans then leave them alone), e.g. 'move my studying earlier', 'put Chemistry at 4'. Get block ids from get_plan. The rest of that day is re-fitted around them automatically. Never moves fixed things; a fixed block becomes a card.",
     schema: z.object({ moves: z.array(z.object({ block_id: z.string().uuid(), start: z.string().describe("New start: local HH:MM on the block's day (as the user said it), 'now', or an ISO date-time with the user's offset. 'now' is read from the real clock by Navi's code.") })).min(1).max(6) }),
     run: async (ctx, { moves }) => {
+      if (await plannerCommandsFor(ctx)) return runCommand(ctx, "move_block", { kind: "move_many", moves: moves.map((m) => ({ block_id: m.block_id, start: m.start })) });
       const zone = ctx.timezone;
       const done: string[] = [];
       const problems: string[] = [];
@@ -974,6 +1088,12 @@ export const TOOLS = [
       const firstStart = DateTime.min(...spans.map((s) => s.start))!;
       const pullIn = i.start_at === "now" && startAt && firstStart > startAt ? -Math.round(firstStart.diff(startAt, "minutes").minutes) : null;
       const { moves, stuck } = shiftTimes(spans, busy, { startAt: pullIn ? null : startAt, minutes: pullIn ?? i.minutes ?? null, earliest: now, dayEnd: DateTime.fromISO(date, { zone }).endOf("day") });
+      if (await plannerCommandsFor(ctx)) {
+        if (!moves.length) return { ok: true, summary: "Nothing needed to move.", display: "Nothing needed to move", plan: true, unchanged: true };
+        const r = await runCommand(ctx, "shift_blocks", { kind: "move_many", moves: moves.map((m) => ({ block_id: m.id, start: m.start.toISO()! })) });
+        const stuckTitles = stuck.map((id) => blocks.find((b) => b.id === id)!.title);
+        return stuckTitles.length ? { ...r, summary: `${r.summary} Left where they were (would run past midnight): ${stuckTitles.map((t) => `“${t}”`).join(", ")}.` } : r;
+      }
       const v2 = await plannerV2For(ctx);
       const changes: PlanChange[] = [];
       let waiting = false;
@@ -1004,6 +1124,153 @@ export const TOOLS = [
         ...(changes.length ? {} : { unchanged: true }),
         ...(stuckTitles.length ? { leftover: { line: `${things(stuckTitles.length)} wouldn't fit ${dayName(date, zone)}`, options: [`${stuckTitles.slice(0, 3).map((t) => q(t, 30)).join(", ")}${stuckTitles.length > 3 ? ` and ${stuckTitles.length - 3} more` : ""} stayed where ${stuckTitles.length === 1 ? "it was" : "they were"}.`, "Tell me what can wait and I'll make room."] } } : {}),
       };
+    },
+  }),
+  // ---- Scheduling commands (planner reliability): offered only when they're on (toolsFor). ----
+  tool({
+    name: "schedule_task",
+    description:
+      "Put a task on the plan at a specific time ('put Navi work at 2 PM', 'do the pamphlet at 4 tomorrow'). The success condition is a saved block at that time: Navi's code checks it and the result says exactly what was saved. Other flexible work on that day moves to make room; fixed things never move (if the time overlaps one, nothing changes and the result gives free times instead). This is NOT the same as marking a task must-do (that only changes priority).",
+    schema: z.object({ task_id: z.string().uuid(), start: z.string().max(40).describe("Local HH:MM as the user said it, or 'now'"), date: z.string().regex(/^(\d{4}-\d{2}-\d{2}|today|tomorrow)$/).nullish(), minutes: z.number().int().min(5).max(480).nullish().describe("Default: the task's estimate"), ...CommandControls }),
+    run: async (ctx, { task_id, start, date, minutes, ...c }) => runCommand(ctx, "schedule_task", { kind: "schedule_task", task_id, start, date: date ?? null, minutes: minutes ?? null }, c),
+  }),
+  tool({
+    name: "swap_work",
+    description:
+      "Swap planned work in one change: put a task (or block) in, take another off that day ('put Navi work where Algebra is and take Algebra off today'). Without start, the new work takes the removed work's slot. The removed task stays on the list and later re-plans keep it off that day. Verified after saving.",
+    schema: z.object({
+      put_task_id: z.string().uuid().nullish(), put_block_id: z.string().uuid().nullish(), start: z.string().max(40).nullish(), minutes: z.number().int().min(5).max(480).nullish(),
+      take_off_task_id: z.string().uuid().nullish(), take_off_block_id: z.string().uuid().nullish(), date: z.string().regex(/^(\d{4}-\d{2}-\d{2}|today|tomorrow)$/).nullish(), ...CommandControls,
+    }),
+    run: async (ctx, i) => runCommand(ctx, "swap_work", { kind: "swap", place_task_id: i.put_task_id ?? null, place_block_id: i.put_block_id ?? null, start: i.start ?? null, minutes: i.minutes ?? null, remove_task_id: i.take_off_task_id ?? null, remove_block_id: i.take_off_block_id ?? null, date: i.date ?? null }, i),
+  }),
+  tool({
+    name: "change_block",
+    description: "Move and/or resize one planned block ('move my study block to 5', 'make it 30 minutes'). A grouped work session moves and resizes as a whole; each task keeps its own part. The rest of the day re-fits; fixed things never move.",
+    schema: z.object({ block_id: z.string().uuid(), start: z.string().max(40).nullish().describe("New local HH:MM or 'now'"), minutes: z.number().int().min(5).max(480).nullish(), ...CommandControls }),
+    run: async (ctx, { block_id, start, minutes, ...c }) => {
+      if (!start && !minutes) return { ok: false, summary: "Give start and/or minutes." };
+      if (!start) return runCommand(ctx, "change_block", { kind: "resize_block", block_id, minutes: minutes! }, c);
+      const b = await getEntity<PlanBlock>(ctx, "plan_blocks", block_id);
+      if (b.session_id && minutes) {
+        const moved = await runCommand(ctx, "change_block", { kind: "move_block", block_id, start }, c);
+        if (!moved.ok) return moved;
+        return runCommand(ctx, "change_block", { kind: "resize_block", block_id, minutes }, c);
+      }
+      return runCommand(ctx, "change_block", { kind: "move_many", moves: [{ block_id, start, minutes: minutes ?? null }] }, c);
+    },
+  }),
+  tool({
+    name: "remove_work",
+    description:
+      "Take work off the plan without deleting tasks: specific tasks or blocks for a day ('take Algebra off today'), or the whole day's flexible work (whole_day true: 'clear my schedule today'). Fixed events and locked or hand-placed blocks stay unless include_locked. Tasks stay on the list, later re-plans keep them off that day, and it's one change with one Undo. High-impact cases (must-do work, a hard deadline within the risk window) become ONE card with the consequences.",
+    schema: z.object({
+      date: z.string().regex(/^(\d{4}-\d{2}-\d{2}|today|tomorrow)$/).nullish(), task_ids: z.array(z.string().uuid()).max(30).nullish(), block_ids: z.array(z.string().uuid()).max(30).nullish(),
+      whole_day: z.boolean().nullish(), include_locked: z.boolean().nullish(), ...CommandControls,
+    }),
+    run: async (ctx, i) =>
+      i.whole_day
+        ? runCommand(ctx, "remove_work", { kind: "clear_day", date: i.date ?? null, include_locked: !!i.include_locked }, i)
+        : runCommand(ctx, "remove_work", { kind: "unschedule", date: i.date ?? null, task_ids: i.task_ids ?? null, block_ids: i.block_ids ?? null }, i),
+  }),
+  tool({
+    name: "lock_block",
+    description: "Lock planned blocks where they are (re-plans leave them alone) or unlock them so Navi may move them again.",
+    schema: z.object({ block_ids: z.array(z.string().uuid()).min(1).max(30), locked: z.boolean() }),
+    run: async (ctx, { block_ids, locked }) => runCommand(ctx, "lock_block", { kind: "lock", block_ids, locked }),
+  }),
+  tool({
+    name: "set_day_scope",
+    description:
+      "Say what a day's plan may contain, then re-plan it. scope_mode 'only': plan only these tasks that day ('today is a recovery day: only the things I listed; old Canvas items can wait'). 'include': plan these too (e.g. chosen overdue Canvas work). 'exclude': keep these off that day. 'clear': back to normal. It sticks for every re-plan of that day (buttons, chat, the morning plan) until changed. Tasks stay on the list.",
+    schema: z.object({ date: z.string().regex(/^(\d{4}-\d{2}-\d{2}|today|tomorrow)$/).nullish(), scope_mode: z.enum(["only", "include", "exclude", "clear"]), task_ids: z.array(z.string().uuid()).min(1).max(40), ...CommandControls }),
+    run: async (ctx, { date, scope_mode, task_ids, ...c }) => runCommand(ctx, "set_day_scope", { kind: "set_scope", date: date ?? null, mode: scope_mode, task_ids }, c),
+  }),
+  tool({
+    name: "group_session",
+    description: "Plan related tasks as one work session, back to back, without merging them ('do the PBL sketch, CAD and isometric sketch as one engineering session at 3'). Each task keeps its own block, status and links; the session moves and resizes as a unit.",
+    schema: z.object({ task_ids: z.array(z.string().uuid()).min(2).max(8), start: z.string().max(40), date: z.string().regex(/^(\d{4}-\d{2}-\d{2}|today|tomorrow)$/).nullish(), minutes: z.array(z.number().int().min(5).max(480)).max(8).nullish().describe("Minutes per task, in order (default: each estimate)"), title: z.string().max(200).nullish(), ...CommandControls }),
+    run: async (ctx, { task_ids, start, date, minutes, title, ...c }) => runCommand(ctx, "group_session", { kind: "group_session", task_ids, start, date: date ?? null, minutes: minutes ?? null, title: title ?? null }, c),
+  }),
+  tool({
+    name: "split_task",
+    description: "Plan one task as several sessions at given times ('do the essay in two 45-minute sessions, at 3 and at 7').",
+    schema: z.object({ task_id: z.string().uuid(), sessions: z.array(z.object({ start: z.string().max(40), date: z.string().regex(/^(\d{4}-\d{2}-\d{2}|today|tomorrow)$/).nullish(), minutes: z.number().int().min(5).max(480) })).min(1).max(8), ...CommandControls }),
+    run: async (ctx, { task_id, sessions, ...c }) => runCommand(ctx, "split_task", { kind: "split_task", task_id, sessions: sessions.map((x) => ({ start: x.start, date: x.date ?? null, minutes: x.minutes })) }, c),
+  }),
+  tool({
+    name: "confirm_change",
+    description:
+      "The user said yes in words to a plan change that is waiting on a card in this chat (one you proposed in an earlier reply, consequences shown). Navi's code checks their message is a clear yes and that exactly one such change is waiting (or the one you name with change_id); otherwise nothing is approved and you ask which one. Never use it for anything else.",
+    schema: z.object({ change_id: z.string().uuid().nullish() }),
+    run: async (ctx, { change_id }) => {
+      const r = await confirmChange(ctx, change_id ?? null);
+      return { ok: r.ok, mutated: r.ok, summary: r.summary, display: r.display, plan: true };
+    },
+  }),
+  tool({
+    name: "get_backlog",
+    description: "Read overdue imported (Canvas) work that Navi holds for the user's decision instead of planning it on its own, with ids and due dates, plus how much future imported work there is. Read-only.",
+    schema: z.object({}),
+    run: async (ctx) => {
+      const { data } = await ctx.db.from("tasks").select("id,title,due_at,estimate_minutes,commitment").eq("source", "external").in("status", ["todo", "in_progress", "blocked"]).order("due_at");
+      const rows = (data ?? []) as Pick<Task, "id" | "title" | "due_at" | "estimate_minutes" | "commitment">[];
+      const now = Date.now();
+      const overdue = rows.filter((t) => t.due_at && Date.parse(t.due_at) < now);
+      return {
+        ok: true, summary: `Read the imported backlog: ${overdue.length} overdue, ${rows.length - overdue.length} upcoming`,
+        data: {
+          note: "Overdue items are NOT failures to fit; the user decides: plan some today (set_day_scope include), set a later day (keep_off_until), or say they're handed in (only they can mark work done). Canvas doesn't report submissions.",
+          overdue: overdue.slice(0, 60).map((t) => ({ id: t.id, title: t.title, was_due: t.due_at ? formatDue(t.due_at, ctx.timezone) : null, estimate_minutes: t.estimate_minutes })),
+          upcoming_count: rows.length - overdue.length,
+        },
+      };
+    },
+  }),
+  tool({
+    name: "learn_planning_rule",
+    description:
+      "Save a planning preference Navi applies from now on, only when the user says it's how things USUALLY go ('ELA work always takes me 50% longer', 'never fill more than 60% of my weekday afternoons'). kind estimate_scale (factor 0.5–3, scope task/project/workspace/global) or daily_load_cap (cap 0.1–1, optional days). origin 'stated' needs user_quote (their exact words this turn) and applies at once; anything you infer is 'inferred' and stays a suggestion until they confirm. A one-time correction is NOT a rule: change that task's estimate or that day instead. expires_on makes it temporary.",
+    schema: z.object({
+      kind: z.enum(["estimate_scale", "daily_load_cap"]),
+      scope: z.enum(["task", "project", "workspace", "global"]),
+      scope_id: z.string().uuid().nullish(),
+      factor: z.number().min(0.5).max(3).nullish(),
+      cap: z.number().min(0.1).max(1).nullish(),
+      days: z.array(z.number().int().min(0).max(6)).max(7).nullish(),
+      origin: z.enum(["stated", "inferred"]),
+      user_quote: z.string().max(300).nullish(),
+      confidence: z.number().min(0).max(1).nullish(),
+      note: z.string().max(300).nullish(),
+      expires_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+    }),
+    run: async (ctx, i) => {
+      // "Stated" is checked against what the person actually said; otherwise it's only a suggestion.
+      const stated = i.origin === "stated" && quoteIsTheirs(ctx.userMessage, i.user_quote);
+      const r = await addPlanningRule(ctx, {
+        kind: i.kind, scope: i.scope, scope_id: i.scope_id ?? null, params: i.kind === "estimate_scale" ? { factor: i.factor } : { cap: i.cap, days: i.days ?? undefined },
+        source: stated ? "stated" : "inferred", confidence: i.confidence ?? null, note: i.note ?? null, expires_on: i.expires_on ?? null,
+      });
+      return { ok: true, mutated: true, summary: `Saved: ${describeRule(r)}${i.origin === "stated" && !stated ? ". Saved as a suggestion only: the quote isn't in the user's message this turn." : ""} [${r.id}]`, display: r.status === "active" ? "Saved how you plan" : "Noted as a suggestion (not applied until you confirm)" };
+    },
+  }),
+  tool({
+    name: "list_planning_rules",
+    description: "Read the planning preferences Navi applies or has suggested, with where each came from, its scope and status. Read-only. Use for 'what have you learned about how I plan?'.",
+    schema: z.object({}),
+    run: async (ctx) => {
+      const rules = await listPlanningRules(ctx);
+      return { ok: true, summary: `Read ${rules.length} planning rule${rules.length === 1 ? "" : "s"}`, data: rules.map((r) => ({ id: r.id, rule: describeRule(r), kind: r.kind, scope: r.scope, scope_id: r.scope_id, params: r.params, source: r.source, confidence: r.confidence, status: r.status })) };
+    },
+  }),
+  tool({
+    name: "update_planning_rule",
+    description: "Change a planning rule when the user asks: confirm a suggestion, pause, resume, remove, or edit its numbers or end date.",
+    schema: z.object({ id: z.string().uuid(), action: z.enum(["confirm", "pause", "resume", "remove", "edit"]), factor: z.number().min(0.5).max(3).nullish(), cap: z.number().min(0.1).max(1).nullish(), expires_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish() }),
+    run: async (ctx, i) => {
+      const params = i.factor != null ? { factor: i.factor } : i.cap != null ? { cap: i.cap } : undefined;
+      const said = await changePlanningRule(ctx, i.id, { action: i.action, params, expires_on: i.expires_on });
+      return { ok: true, mutated: true, summary: said, display: i.action === "remove" ? "Removed that planning rule" : "Updated how you plan" };
     },
   }),
   tool({
@@ -1082,6 +1349,8 @@ export const TOOLS = [
     description: "Delete a task, project, goal, area (workspace), routine, event, milestone, plan block or note by id when the user asks. Deleting can't be undone, so it always becomes a card the user approves with one tap; just call it, don't ask first in text.",
     schema: z.object({ table: z.enum(["tasks", ...ENTITY_TABLES]), id: z.string().uuid() }),
     run: async (ctx, { table, id }) => {
+      // Taking a block off the plan isn't deleting anything: its task stays (one change, with Undo).
+      if (table === "plan_blocks" && (await plannerCommandsFor(ctx))) return runCommand(ctx, "delete_item", { kind: "unschedule", block_ids: [id] });
       const r = await deleteEntity(ctx, table as EntityTable, id);
       if (r.kind === "approval_requested") return { ok: true, mutated: true, summary: `Deleting needs the user's OK. ${WAITING}` };
       return { ok: true, mutated: true, summary: `Deleted the ${table.replace(/s$/, "")}`, display: "Deleted it" };
@@ -1151,10 +1420,17 @@ export async function runTool(ctx: Ctx, name: string, rawInput: unknown): Promis
     v2 = plannerV2(data?.preferences);
   }
   if (PLANNER_V2_TOOLS.includes(name) && !v2) return { ok: false, summary: `${name} isn't available: the new planner isn't on for this account.` };
+  let commands = ctx.plannerCommands;
+  if (commands === undefined && PLANNER_COMMAND_TOOLS.includes(name)) {
+    const { data } = await ctx.db.from("profiles").select("preferences").eq("id", ctx.userId).maybeSingle();
+    commands = plannerCommands(data?.preferences);
+  }
+  if (PLANNER_COMMAND_TOOLS.includes(name) && !commands) return { ok: false, summary: `${name} isn't available: the scheduling commands aren't on for this account.` };
   const stepCtx: Ctx = {
     ...ctx,
     autonomy,
     plannerV2: v2,
+    ...(commands !== undefined ? { plannerCommands: commands } : {}),
     onActivity: (e) => {
       if (e.reversible) undo.push(e.id);
       ctx.onActivity?.(e);
@@ -1172,15 +1448,21 @@ export async function runTool(ctx: Ctx, name: string, rawInput: unknown): Promis
     const plan = result.plan ?? PLAN_TOOLS.includes(name);
     return { ...result, display, ...(plan ? { plan } : {}), ...(actionId ? { actionId } : {}), ...(undo.length ? { undo } : {}) };
   } catch (err) {
-    return { ok: false, summary: err instanceof Error ? err.message : String(err), display: "" };
+    const message = err instanceof Error ? err.message : String(err);
+    // Anything this step already saved before the error stays undoable and is said plainly.
+    if (undo.length) return { ok: false, mutated: true, summary: `Partly done before an error: ${undo.length} change${undo.length === 1 ? " was" : "s were"} saved (the user can undo ${undo.length === 1 ? "it" : "them"}), then: ${message}`, display: "Only part of that went through", undo, ...(actions.at(-1) ? { actionId: actions.at(-1) } : {}) };
+    return { ok: false, summary: message, display: "", ...(actions.at(-1) ? { actionId: actions.at(-1) } : {}) };
   }
 }
 
 /** Tools that only exist with the constraint-first planner (planner v2). */
 export const PLANNER_V2_TOOLS: readonly string[] = ["plan", "set_day_exception", "skip_occurrence", "move_block", "undo_plan", "set_usual_time"];
 
-export function toolsFor(mode: "chat" | "onboarding" | "capture" | "voice", opts: { plannerV2?: boolean } = {}): NaviTool[] {
-  const all = (TOOLS as readonly NaviTool[]).filter((t) => opts.plannerV2 || !PLANNER_V2_TOOLS.includes(t.name));
+/** Tools that only exist with the scheduling-command layer (planner_commands). */
+export const PLANNER_COMMAND_TOOLS: readonly string[] = ["schedule_task", "swap_work", "change_block", "remove_work", "lock_block", "set_day_scope", "group_session", "split_task", "confirm_change", "get_backlog", "learn_planning_rule", "list_planning_rules", "update_planning_rule"];
+
+export function toolsFor(mode: "chat" | "onboarding" | "capture" | "voice", opts: { plannerV2?: boolean; plannerCommands?: boolean } = {}): NaviTool[] {
+  const all = (TOOLS as readonly NaviTool[]).filter((t) => (opts.plannerV2 || !PLANNER_V2_TOOLS.includes(t.name)) && (opts.plannerCommands || !PLANNER_COMMAND_TOOLS.includes(t.name)));
   if (mode === "capture") return all.filter((t) => ["get_overview", "get_plan", "propose_items"].includes(t.name));
   if (mode === "onboarding") return all.filter((t) => ["get_overview", "propose_items", "remember", "mark_onboarding_ready", "update_settings"].includes(t.name));
   return all.filter((t) => t.name !== "mark_onboarding_ready");
