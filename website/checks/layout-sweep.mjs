@@ -1,14 +1,16 @@
 // Layout sweep: every page x many viewport sizes. Flags clipped text, off-screen content,
 // overlapping text/controls, text covered by other elements while scrolling, oversize sticky
 // blocks, stray scrollbars, and menu/accordion/tab/form states that don't fit.
-// usage: node website/checks/layout-sweep.js 390x844,1440x900 out.jsonl   (PAGES=home,faq to limit pages)
-// Run website/checks/sweep-selftest.js first to see each check catch a planted defect.
-const { chromium } = require('playwright');
-const fs = require('fs');
+// usage: node website/checks/layout-sweep.mjs 390x844,1440x900 out.jsonl   (PAGES=home,faq to limit pages)
+// Run website/checks/sweep-selftest.mjs first to see each check catch a planted defect.
+import { chromium } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 const SIZES = (process.argv[2] || '').split(',').filter(Boolean).map(s => s.split('x').map(Number));
 const OUT = process.argv[3];
 const PAGES = process.env.PAGES ? process.env.PAGES.split(',') : ['home', 'product', 'plan', 'voice', 'focus', 'trust', 'about', 'early-access', 'faq', 'contact', 'privacy', 'terms', 'nope'];
-const { serve } = require('./serve');
+import { serve } from './serve.mjs';
 const ORIGIN = 'http://navi.test', BASE = ORIGIN + '/';
 const NOANIM = '*,*::before,*::after{transition:none!important;animation-duration:0s!important;animation-delay:0s!important;scroll-behavior:auto!important}';
 
@@ -126,8 +128,8 @@ function audit(o) {
   return out;
 }
 
-module.exports = { audit };
-if (require.main === module) (async () => {
+export { audit };
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) (async () => {
   const b = await chromium.launch();
   const issues = [];
   const add = (size, page, state, list) => list.forEach(i => issues.push({ size, page, state, ...i }));
@@ -170,7 +172,7 @@ if (require.main === module) (async () => {
     } catch (e) { issues.push({ size, page: pg, state: '-', type: 'sweep-error', sel: '-', txt: String(e.message).slice(0, 160) }); } }
     // menus
     try {
-    await p.evaluate(h => { location.hash = '#home'; }, ''); await p.waitForTimeout(600);
+    await p.evaluate(() => { location.hash = '#home'; }); await p.waitForTimeout(600);
     if (await p.isVisible('#burger')) {
       await p.click('#burger'); await p.waitForTimeout(400);
       add(size, 'menu', 'drawer-open', await p.evaluate(audit, opts({ scopes: ['#drawer'], atTop: false })));

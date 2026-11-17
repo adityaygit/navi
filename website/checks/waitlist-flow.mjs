@@ -1,8 +1,8 @@
 // Waitlist flow on the built website: POST /api/waitlist {email, website} (the contract of src/app/api/waitlist/route.ts),
 // each server answer's message, and the preview behaviour off the real domain. The API is mocked; nothing is sent.
-// usage: node website/checks/waitlist-flow.js
-const { chromium } = require('playwright');
-const { serve } = require('./serve');
+// usage: node website/checks/waitlist-flow.mjs
+import { chromium } from '@playwright/test';
+import { serve } from './serve.mjs';
 const ok = (c, m) => { if (!c) process.exitCode = 1; console.log((c ? 'PASS ' : 'FAIL ') + m); };
 (async () => {
   const b = await chromium.launch();

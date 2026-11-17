@@ -1,7 +1,7 @@
 // Plants one of each defect into the live page and checks the audit reports it.
-const { chromium } = require('playwright');
-const { audit } = require('./layout-sweep');
-const { serve } = require('./serve');
+import { chromium } from '@playwright/test';
+import { audit } from './layout-sweep.mjs';
+import { serve } from './serve.mjs';
 (async () => {
   const b = await chromium.launch(); const ctx = await b.newContext({ viewport: { width: 390, height: 844 } }); await serve(ctx, 'http://navi.test'); const p = await ctx.newPage();
   await p.goto('http://navi.test/#about'); await p.waitForTimeout(800);
