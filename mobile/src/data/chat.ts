@@ -23,9 +23,25 @@ export type ChatState = {
   sending: boolean;
   error: string | null;
   loading: boolean;
+  /** Counts each time the person switches chat (not when the server names a new one): the thread fades between them. */
+  epoch: number;
+  /** The reply was stopped by the person; what arrived is kept. */
+  stopped: boolean;
 };
 
 type ChatPayload = { id: string; title: string | null; messages: Message[]; actions: Record<string, ActionView>; undone: string[] };
+
+// Chats already opened this run: switching back shows them at once, then refreshes quietly.
+const seenChats = new Map<string, ChatPayload>();
+const remember = (c: ChatPayload) => {
+  seenChats.delete(c.id);
+  seenChats.set(c.id, c);
+  if (seenChats.size > 12) seenChats.delete(seenChats.keys().next().value as string);
+};
+/** On sign out, so another person on the phone never sees these. */
+export function clearChatCache() {
+  seenChats.clear();
+}
 
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`);
 
@@ -33,22 +49,28 @@ const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toSt
 export function useChat(initialId: string | null, opts: { kind?: "chat" | "onboarding" } = {}) {
   const kind = opts.kind ?? "chat";
   const historyPath = (id: string, limit?: number) => (kind === "onboarding" ? "/api/m/welcome/talk" : `/api/m/chats/${id}/messages${limit ? `?limit=${limit}` : ""}`);
-  const [state, setState] = useState<ChatState>({ conversationId: initialId, title: null, messages: [], actions: {}, undone: new Set(), live: null, sending: false, error: null, loading: !!initialId });
+  const [state, setState] = useState<ChatState>({ conversationId: initialId, title: null, messages: [], actions: {}, undone: new Set(), live: null, sending: false, error: null, loading: !!initialId, epoch: 0, stopped: false });
   const abort = useRef<AbortController | null>(null);
 
   const load = useCallback(async (id: string | null) => {
     abort.current?.abort();
     if (!id) {
-      setState((s) => ({ ...s, conversationId: null, title: null, messages: [], actions: {}, undone: new Set(), live: null, loading: false, error: null }));
+      setState((s) => ({ ...s, conversationId: null, title: null, messages: [], actions: {}, undone: new Set(), live: null, sending: false, loading: false, error: null, stopped: false, epoch: s.epoch + 1 }));
       return;
     }
-    // Switching chats: clear the old one at once, so nothing from it lingers.
-    setState((s) => (s.conversationId === id ? { ...s, loading: true, error: null } : { ...s, conversationId: id, title: null, messages: [], actions: {}, undone: new Set(), live: null, loading: true, error: null }));
+    // Switching chats: the old one goes at once (nothing lingers); a chat opened before shows from memory while it refreshes.
+    const had = kind === "chat" ? seenChats.get(id) : undefined;
+    setState((s) =>
+      s.conversationId === id
+        ? { ...s, loading: !had && !s.messages.length, error: null }
+        : { ...s, conversationId: id, title: had?.title ?? null, messages: had?.messages ?? [], actions: had?.actions ?? {}, undone: new Set(had?.undone ?? []), live: null, sending: false, loading: !had, error: null, stopped: false, epoch: s.epoch + 1 },
+    );
     try {
       const c = await api<ChatPayload>(historyPath(id));
+      if (kind === "chat") remember({ ...c, id });
       setState((s) => (s.conversationId !== id ? s : { ...s, title: c.title, messages: c.messages, actions: c.actions ?? {}, undone: new Set(c.undone ?? []), loading: false }));
     } catch (e) {
-      setState((s) => ({ ...s, loading: false, error: "Couldn't open that chat. Check your connection and try again." }));
+      setState((s) => (s.conversationId !== id ? s : { ...s, loading: false, error: s.messages.length ? null : "Couldn't open that chat. Check your connection and try again." }));
       void e;
     }
   }, []);
@@ -64,13 +86,20 @@ export function useChat(initialId: string | null, opts: { kind?: "chat" | "onboa
     void load(initialId);
   }, [initialId, load]);
 
+  // Keep what's on screen as the copy for next time.
+  useEffect(() => {
+    if (kind === "chat" && state.conversationId && !state.loading && !state.live && state.messages.length && !state.messages.some((m) => m.id.startsWith("local-"))) {
+      remember({ id: state.conversationId, title: state.title, messages: state.messages, actions: state.actions, undone: [...state.undone] });
+    }
+  }, [kind, state.conversationId, state.loading, state.live, state.messages, state.actions, state.undone, state.title]);
+
   const sendText = useCallback(async (text: string, viewing?: string) => {
     const clientMessageId = uuid();
     const optimistic: Message = { id: `local-${clientMessageId}`, conversation_id: "", role: "user", content: text, modality: "text", tool_events: [], created_at: new Date().toISOString(), client_id: clientMessageId };
     let conversationId: string | null = null;
     setState((s) => {
       conversationId = s.conversationId;
-      return { ...s, messages: [...s.messages, optimistic], live: { text: "", segment: 0, steps: [] }, sending: true, error: null };
+      return { ...s, messages: [...s.messages, optimistic], live: { text: "", segment: 0, steps: [] }, sending: true, error: null, stopped: false };
     });
     const ctl = new AbortController();
     abort.current = ctl;
@@ -101,6 +130,22 @@ export function useChat(initialId: string | null, opts: { kind?: "chat" | "onboa
       setState((s) => ({ ...s, live: null, sending: false, error: (e as Error).message }));
       feel("warning");
     }
+  }, []);
+
+  /** Stop the reply: what has arrived stays on screen, marked as stopped. (The server finishes anything it had already started; it shows up when the chat is opened again.) */
+  const stop = useCallback(() => {
+    if (!abort.current) return;
+    abort.current.abort();
+    abort.current = null;
+    feel("select");
+    setState((s) => {
+      if (!s.sending) return s;
+      const text = s.live?.text.trim() ?? "";
+      const kept: Message[] = text ? [{ id: `stopped-${uuid()}`, conversation_id: s.conversationId ?? "", role: "assistant", content: text, modality: "text", tool_events: [], created_at: new Date().toISOString() } as Message] : [];
+      // The person's own message was already sent: it stops looking pending.
+      const sent = s.messages.map((m) => (m.id.startsWith("local-") ? { ...m, id: `sent-${m.id.slice(6)}` } : m));
+      return { ...s, messages: [...sent, ...kept], live: null, sending: false, stopped: true };
+    });
   }, []);
 
   /** Undo what a reply changed (activity-log ids). */
@@ -138,7 +183,7 @@ export function useChat(initialId: string | null, opts: { kind?: "chat" | "onboa
     }
   }, []);
 
-  return { state, load, sendText, undo, decide };
+  return { state, load, sendText, stop, undo, decide };
 }
 
 function reduce(s: ChatState, ev: ChatStreamEvent, optimisticId: string): ChatState {

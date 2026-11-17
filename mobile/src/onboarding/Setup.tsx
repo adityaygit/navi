@@ -286,7 +286,7 @@ function Talk({ bar, busy, onReview }: { bar: React.ReactNode; busy: boolean; on
   const P = usePalette();
   // The setup conversation; `ver` reloads it after a voice session added turns.
   const [ver, setVer] = useState(0);
-  const { state, sendText, undo, decide } = useChat(`onboarding-${ver}`, { kind: "onboarding" });
+  const { state, sendText, stop, undo, decide } = useChat(`onboarding-${ver}`, { kind: "onboarding" });
   const [picked, setPicked] = useState<MProposal[]>([]);
   const [tray, setTray] = useState(false);
   const [voice, setVoice] = useState(false);
@@ -327,7 +327,7 @@ function Talk({ bar, busy, onReview }: { bar: React.ReactNode; busy: boolean; on
           {picked.length === 1 ? "1 thing picked up" : `${picked.length} things picked up`}
           <svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 12l5-5 5 5" fill="none" stroke={ink.text} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
-        <Composer palette={P} placeholder="Tell Navi about your week" onSend={(t) => void sendText(t, "Setup")} onVoice={() => setVoice(true)} />
+        <Composer palette={P} placeholder="Tell Navi about your week" onSend={(t) => void sendText(t, "Setup")} onVoice={() => setVoice(true)} busy={state.sending} onStop={stop} />
       </div>
       {tray ? (
         <Sheet label="What Navi picked up" height="78%" onClose={() => setTray(false)}>

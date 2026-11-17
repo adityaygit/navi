@@ -6,6 +6,7 @@ import { ease, glass, glassStrong, ink, meaning, type Palette } from "../theme/t
 import { HoldButton } from "./HoldButton";
 import { useToast } from "./Toast";
 import { feel } from "../native/haptics";
+import { ActionRow, MessageMenu, useLongPress, type MenuTarget } from "./messageActions";
 
 // The conversation (M6): Navi speaks in glass bubbles, you in black ones, what
 // Navi did shows as a receipt (Undo only when it can really be undone), and
@@ -84,7 +85,19 @@ function gap(p: Item | undefined, m: Item): number {
   return 12;
 }
 
-type Handlers = { P: Palette; undone: Set<string>; onUndo: (ids: string[]) => void; onDecide: (id: string, d: "approve" | "decline") => void; isNew: (key: string) => boolean };
+type Handlers = {
+  P: Palette;
+  undone: Set<string>;
+  onUndo: (ids: string[]) => void;
+  onDecide: (id: string, d: "approve" | "decline") => void;
+  isNew: (key: string) => boolean;
+  /** Put one of your messages back in the bar to change and send again. */
+  onEdit?: (text: string) => void;
+  /** Navi is answering now: no copy row until it's done. */
+  busy?: boolean;
+  /** Press and hold a bubble for its menu. */
+  onMenu?: (t: MenuTarget) => void;
+};
 
 const KEEP = 16; // a long chat shows its last 16 parts; the rest fold to "Earlier · N messages"
 
@@ -110,10 +123,14 @@ export function folded(items: Item[], showAll: boolean, showCards: boolean): { l
   return { list, earlier, more };
 }
 
-export function Thread({ items, ...h }: { items: Item[] } & Handlers) {
+export function Thread({ items, ...h }: { items: Item[] } & Omit<Handlers, "onMenu">) {
   const [showAll, setShowAll] = useState(false);
   const [showCards, setShowCards] = useState(false);
+  const [menu, setMenu] = useState<MenuTarget | null>(null);
   const { list, earlier, more } = folded(items, showAll, showCards);
+  // The small copy / edit row sits under the latest message of each side, once Navi is done.
+  const lastMe = [...list].reverse().find((m) => m.k === "me" && !m.pending)?.key;
+  const lastNavi = [...list].reverse().find((m) => m.k === "navi" && !m.live)?.key;
   const firstCard = list.find((m) => m.k === "card" && m.action.status === "proposed")?.key;
   const chip: React.CSSProperties = { ...glass, height: 40, padding: "0 16px", borderRadius: 20, fontSize: 15, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, maxWidth: "100%" };
   return (
@@ -125,7 +142,9 @@ export function Thread({ items, ...h }: { items: Item[] } & Handlers) {
       ) : null}
       {list.map((m, i) => (
         <div key={m.key} style={{ marginTop: gap(list[i - 1], m), display: "flex", flexDirection: "column", animation: h.isNew(m.key) ? `nRise 0.36s ${ease} both` : undefined }}>
-          <Part m={m} {...h} />
+          <Part m={m} {...h} onMenu={setMenu} />
+          {!h.busy && m.k === "me" && m.key === lastMe ? <ActionRow mine text={m.text} onEdit={h.onEdit} /> : null}
+          {!h.busy && m.k === "navi" && m.key === lastNavi ? <ActionRow mine={false} text={m.text} /> : null}
           {more && m.key === firstCard ? (
             <button type="button" onClick={() => { feel("select"); setShowCards(true); }} style={{ ...chip, alignSelf: "flex-start", marginTop: 10 }}>
               <span style={{ flex: "none" }}>{more.n} more suggestion{more.n === 1 ? "" : "s"}</span>
@@ -134,22 +153,34 @@ export function Thread({ items, ...h }: { items: Item[] } & Handlers) {
           ) : null}
         </div>
       ))}
+      {menu ? <MessageMenu target={menu} onClose={() => setMenu(null)} onEdit={h.onEdit} /> : null}
     </div>
   );
 }
 
-function Part({ m, P, undone, onUndo, onDecide }: { m: Item } & Handlers) {
+/** A message bubble: press and hold for Copy (and Edit on yours). */
+function Bubble({ mine, text, pending, onMenu }: { mine: boolean; text: string; pending?: boolean; onMenu?: (t: MenuTarget) => void }) {
+  const lp = useLongPress((rect) => onMenu?.({ text, mine, rect }));
+  const base: React.CSSProperties = { margin: 0, padding: "13px 16px", fontSize: 17, lineHeight: 1.4, whiteSpace: "pre-wrap", overflowWrap: "anywhere", userSelect: "none", WebkitUserSelect: "none", transform: lp.pressed ? "scale(0.98)" : "none", transition: `transform 0.25s ${ease}` };
+  return mine ? (
+    <div {...lp.handlers} style={{ ...base, alignSelf: "flex-end", maxWidth: "80%", borderRadius: "22px 22px 8px 22px", background: ink.text, color: "#FFFFFF", opacity: pending ? 0.7 : 1, transformOrigin: "100% 50%" }}>
+      {text}
+    </div>
+  ) : (
+    <p {...lp.handlers} style={{ ...glassStrong, ...base, alignSelf: "flex-start", maxWidth: "86%", borderRadius: "22px 22px 22px 8px", color: ink.text, transformOrigin: "0 50%" }}>
+      {text}
+    </p>
+  );
+}
+
+function Part({ m, P, undone, onUndo, onDecide, onMenu }: { m: Item } & Handlers) {
   switch (m.k) {
     case "stamp":
       return <div style={{ alignSelf: "center", fontSize: 14, fontWeight: 600, color: ink.dim, padding: "4px 0" }}>{m.text}</div>;
     case "me":
-      return (
-        <div style={{ alignSelf: "flex-end", maxWidth: "80%", padding: "13px 16px", borderRadius: "22px 22px 8px 22px", background: ink.text, fontSize: 17, lineHeight: 1.4, color: "#FFFFFF", opacity: m.pending ? 0.7 : 1, userSelect: "text", WebkitUserSelect: "text", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
-          {m.text}
-        </div>
-      );
+      return <Bubble mine text={m.text} pending={m.pending} onMenu={onMenu} />;
     case "navi":
-      return <p style={{ ...glassStrong, alignSelf: "flex-start", maxWidth: "86%", margin: 0, padding: "13px 16px", borderRadius: "22px 22px 22px 8px", fontSize: 17, lineHeight: 1.4, color: ink.text, userSelect: "text", WebkitUserSelect: "text", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{m.text}</p>;
+      return <Bubble mine={false} text={m.text} onMenu={m.live ? undefined : onMenu} />;
     case "looking":
       return (
         <div role="status" style={{ display: "flex", alignItems: "center", gap: 12, minHeight: 44, color: ink.faint, fontSize: 15, fontWeight: 500 }}>

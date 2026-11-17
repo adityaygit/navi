@@ -12,13 +12,23 @@
 :root {
   /* Safe areas. The status bar overlays the app; the app draws under it. */
   --sat: env(safe-area-inset-top, 0px);
-  --sab: max(env(safe-area-inset-bottom, 0px), 16px);
+  /* The keyboard (iOS): set from native/keyboard.ts the moment it starts to rise, and eased
+     here over the same time and curve, so the whole app follows it instead of jumping after it.
+     --kbo is 1 with no keyboard and 0 with one (the home-bar gap isn't needed above a keyboard). */
+  --kb: 0px;
+  --kbo: 1;
+  --sab: max(calc(env(safe-area-inset-bottom, 0px) * var(--kbo)), calc(10px + 6px * var(--kbo)));
+  transition: --kb 250ms cubic-bezier(0.17, 0.59, 0.4, 0.77), --kbo 250ms cubic-bezier(0.17, 0.59, 0.4, 0.77);
   color-scheme: light;
 }
+@property --kb { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --kbo { syntax: "<number>"; inherits: true; initial-value: 1; }
 /* Browser preview at phone size: pretend there is a notch and a home bar, so screenshots match the device. */
-:root.sim { --sat: 50px; --sab: 34px; }
+:root.sim { --sat: 50px; --sab: max(calc(34px * var(--kbo)), calc(10px + 6px * var(--kbo))); }
 
 html, body, #root { height: 100%; margin: 0; background: #FBFBFD; overflow: hidden; overscroll-behavior: none; }
+/* The app ends where the keyboard begins (like a native resize, but in step with the keyboard). */
+#root { position: fixed; inset: 0 0 var(--kb) 0; height: auto; }
 body {
   color: #11141A;
   font-family: Figtree, -apple-system, system-ui, sans-serif;

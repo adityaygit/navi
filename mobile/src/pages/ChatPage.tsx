@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { MDay, MLine } from "@shared/mobile-api-types";
 import { useMe } from "../data/me";
 import { useChat } from "../data/chat";
@@ -45,18 +45,37 @@ export function nowNext(d: MDay | null): string | null {
   return `Next · ${next.title} at ${clockAmPm(next.start, tz)}`;
 }
 
+/** Placeholder bubbles while a chat that wasn't opened before loads. */
+function Opening() {
+  const bar = (w: string, me: boolean) => <div style={{ alignSelf: me ? "flex-end" : "flex-start", width: w, height: 46, borderRadius: me ? "22px 22px 8px 22px" : "22px 22px 22px 8px", background: me ? "rgba(17,20,26,0.07)" : "rgba(17,20,26,0.05)", animation: "nPulse 1.6s ease-in-out infinite" }} />;
+  return (
+    <div role="status" aria-label="Opening your chat" style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 14 }}>
+      {bar("52%", true)}
+      {bar("74%", false)}
+      {bar("38%", true)}
+    </div>
+  );
+}
+
 export function ChatPage({ palette: P, chatId, onChatId, onVoice, onOpenPlan, typeNow }: Props) {
   const me = useMe();
-  const { state, sendText, undo, decide } = useChat(chatId);
+  const { state, sendText, stop, undo, decide } = useChat(chatId);
+  const [editing, setEditing] = useState<{ text: string; nonce: number } | null>(null);
   const day = useDay(null);
   const skyOn = useSkyOn();
   const moment = momentAt();
   const first = me?.name?.split(/\s+/)[0];
 
-  // A new chat gets its id from the server on the first message.
+  // A new chat gets its id from the server on the first message. Only react when the
+  // chat itself changes under us (named by the server), never to a chat we just left:
+  // choosing "New chat" clears chatId a moment before the old messages are cleared.
+  const named = useRef(state.conversationId);
   useEffect(() => {
-    if (!chatId && state.conversationId) onChatId(state.conversationId);
-    if (state.conversationId) rememberChat(state.conversationId);
+    const prev = named.current;
+    named.current = state.conversationId;
+    if (!state.conversationId || state.conversationId === prev) return;
+    if (!chatId) onChatId(state.conversationId);
+    rememberChat(state.conversationId);
   }, [state.conversationId, chatId, onChatId]);
 
   // Only messages that arrive while you watch animate in.
@@ -125,9 +144,9 @@ export function ChatPage({ palette: P, chatId, onChatId, onVoice, onOpenPlan, ty
         </div>
       ) : (
         <div className="scroll" style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column-reverse", WebkitMaskImage: "linear-gradient(to bottom, transparent 0, #000 28px)", maskImage: "linear-gradient(to bottom, transparent 0, #000 28px)" }}>
-          <div style={{ padding: "28px 16px 24px" }}>
-            {state.loading && !state.messages.length ? <p style={{ margin: 0, textAlign: "center", color: ink.faint, fontSize: 15, fontWeight: 500 }}>Opening your chat…</p> : null}
-            <Thread items={items} P={P} undone={state.undone} onUndo={undo} onDecide={decide} isNew={isNew} />
+          <div key={state.epoch} style={{ padding: "28px 16px 24px", animation: state.epoch ? `nFade 0.3s ease both` : undefined }}>
+            {state.loading && !state.messages.length ? <Opening /> : null}
+            <Thread items={items} P={P} undone={state.undone} onUndo={undo} onDecide={decide} isNew={isNew} onEdit={(text) => setEditing({ text, nonce: Date.now() })} busy={state.sending} />
           </div>
         </div>
       )}
@@ -135,7 +154,7 @@ export function ChatPage({ palette: P, chatId, onChatId, onVoice, onOpenPlan, ty
         <p role="alert" style={{ position: "relative", margin: "0 20px 4px", fontSize: 15, fontWeight: 500, color: "#B23A17", animation: "nRise 0.3s ease both" }}>{state.error}</p>
       ) : null}
       <div style={{ position: "relative", flex: "none", padding: "8px 12px var(--sab)" }}>
-        <Composer palette={P} autoFocus={typeNow} onSend={send} onVoice={onVoice} offline={!online} onOfflineTalk={() => { feel("tapHint"); toast("Voice needs a connection. Type it and Navi gets it later."); }} />
+        <Composer palette={P} autoFocus={typeNow} onSend={(t) => { setEditing(null); send(t); }} onVoice={onVoice} busy={state.sending} onStop={stop} editing={editing} onCancelEdit={() => setEditing(null)} offline={!online} onOfflineTalk={() => { feel("tapHint"); toast("Voice needs a connection. Type it and Navi gets it later."); }} />
       </div>
     </div>
   );

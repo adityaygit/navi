@@ -1,6 +1,10 @@
 import { StrictMode, Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles/global.css";
+import { startKeyboard } from "./native/keyboard";
+
+// The page follows the keyboard (iPhone) from the very first frame.
+startKeyboard();
 
 // If anything fails at start-up, show what happened instead of a blank screen (M6: light).
 function Failed({ error }: { error: unknown }) {

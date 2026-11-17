@@ -87,7 +87,7 @@ export function Drawer({ currentId, onOpen, onClose, onSettings }: Props) {
             <span style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>Search chats</span>
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" style={{ flex: 1, minWidth: 0, height: 44, border: 0, outline: "none", background: "transparent", fontSize: 17 }} />
           </label>
-          <button type="button" aria-label="New chat" onClick={() => { feel("select"); shut(() => onOpen(null)); }} style={{ width: 48, height: 48, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(17,20,26,0.05)" }}>
+          <button type="button" aria-label="New chat" onClick={() => { feel("select"); onOpen(null); shut(); }} style={{ width: 48, height: 48, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(17,20,26,0.05)" }}>
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h8" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
           </button>
         </div>
@@ -100,7 +100,7 @@ export function Drawer({ currentId, onOpen, onClose, onSettings }: Props) {
               {g.items.map((c) => {
                 const cur = c.id === currentId;
                 return (
-                  <button key={c.id} type="button" aria-current={cur || undefined} onClick={() => { feel("select"); shut(() => onOpen(c.id)); }} style={{ minHeight: 48, display: "flex", alignItems: "center", padding: "0 12px", borderRadius: 12, fontSize: 17, color: cur ? ink.text : ink.soft, background: cur ? "rgba(17,20,26,0.05)" : "transparent", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <button key={c.id} type="button" aria-current={cur || undefined} onClick={() => { feel("select"); onOpen(c.id); shut(); }} style={{ minHeight: 48, display: "flex", alignItems: "center", padding: "0 12px", borderRadius: 12, fontSize: 17, color: cur ? ink.text : ink.soft, background: cur ? "rgba(17,20,26,0.05)" : "transparent", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {c.title || "New chat"}
                   </button>
                 );

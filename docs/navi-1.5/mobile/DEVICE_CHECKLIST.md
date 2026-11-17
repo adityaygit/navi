@@ -26,6 +26,13 @@ What can only be checked on a real iPhone and Android phone. Everything here has
 - [ ] Letting go early drains the fill silently. Turning Vibration off silences all of it.
 - [ ] Sheets: a tick as a drag passes the close line; short pulls spring back.
 
+## Message bar and keyboard (iPhone first, then Android)
+- [ ] Tap the bar: the keyboard rises and the bar, thread and any open sheet travel up WITH it, with no hide-then-jump. Closing it, they come back down together.
+- [ ] Type several lines: the bar grows (about six lines), then scrolls inside. Return adds a line; the arrow sends. While you type, the orb is the Send button; empty again, it's the orb.
+- [ ] While Navi answers the button is Stop; tapping it ends the reply and keeps what had arrived.
+- [ ] Press and hold a message: Copy (and Edit on yours). The small copy / edit row sits under the latest messages. Edit puts the text back in the bar ("Changing your message") to send again.
+- [ ] Menu → New chat shows the greeting, never the chat you just left. Switching to a chat you opened before is instant; a new one fades in.
+
 ## Gestures
 - [ ] Inbox, block sheet, Ask sheet, focus rules, password and edit sheets close by dragging down from the top bar.
 - [ ] Day picker closes by pushing it up; the chats menu by dragging it left; You screens by dragging right from the left edge.
