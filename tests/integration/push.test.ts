@@ -33,7 +33,8 @@ beforeAll(async () => {
     req.on("end", () => {
       received.push({ path: req.url ?? "", headers: req.headers, body: Buffer.concat(chunks) });
       res.statusCode = req.url === "/gone" ? 410 : req.url === "/down" ? 503 : 201;
-      res.end();
+      // "/slow" stands in for a push service that takes a while to answer.
+      setTimeout(() => res.end(), req.url === "/slow" ? 1500 : 0);
     });
   });
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
@@ -112,6 +113,32 @@ describe("web push delivery", () => {
     const { data: row } = await a.from("notifications").select("status,attempts").eq("id", n!.id).single();
     expect(row).toEqual({ status: "sent", attempts: 1 });
     await a.from("push_subscriptions").delete().eq("user_id", userId);
+  });
+
+  it("doesn't send it again when a scheduler run starts while another is still sending", async () => {
+    const device = createECDH("prime256v1");
+    device.generateKeys();
+    const a = admin();
+    await a.from("push_subscriptions").insert({ user_id: userId, endpoint: `https://127.0.0.1:${port}/slow`, p256dh: device.getPublicKey().toString("base64url"), auth: randomBytes(16).toString("base64url") });
+    await a.from("profiles").update({ quiet_hours_start: null, quiet_hours_end: null }).eq("id", userId);
+    const { data: n } = await a.from("notifications").insert({ user_id: userId, kind: "deadline", title: "Due soon", body: "Essay due 5 PM", dedupe_key: `inflight:${Date.now()}` }).select("id").single();
+    const { data: profile } = await a.from("profiles").select("*").eq("id", userId).single();
+
+    try {
+      const before = received.length;
+      const first = dispatchDue(a, profile as Profile);
+      // Wait until the first run has claimed it and its request is with the push service.
+      const t0 = Date.now();
+      while (received.length === before && Date.now() - t0 < 10_000) await new Promise((r) => setTimeout(r, 20));
+      expect(received.length - before).toBe(1);
+      await dispatchDue(a, profile as Profile);
+      await first;
+      expect(received.length - before).toBe(1);
+      const { data: row } = await a.from("notifications").select("status,attempts").eq("id", n!.id).single();
+      expect(row).toEqual({ status: "sent", attempts: 1 });
+    } finally {
+      await a.from("push_subscriptions").delete().eq("user_id", userId);
+    }
   });
 
   it("retries a failed delivery later, then gives up after three attempts", async () => {

@@ -100,10 +100,14 @@ export async function dispatchDue(db: SupabaseClient, profile: Profile) {
   let delivered = 0;
   for (const n of due ?? []) {
     // Claim it by bumping its attempt count from the value read, so when two
-    // scheduler runs overlap only one of them sends it.
+    // scheduler runs overlap only one of them sends it. The claim also moves
+    // deliver_after forward as a short lease: until the outcome is written the
+    // row is still queued, and without the lease a run that reads it in that
+    // window would see it due, claim the next attempt and send it again. If
+    // this run dies mid-send, the lease lapses and the next run retries it.
     const { data: claimed } = await db
       .from("notifications")
-      .update({ attempts: n.attempts + 1 })
+      .update({ attempts: n.attempts + 1, deliver_after: new Date(Date.now() + 2 * 60_000).toISOString() })
       .eq("id", n.id)
       .eq("attempts", n.attempts)
       .in("status", ["queued", "held_quiet_hours"])
