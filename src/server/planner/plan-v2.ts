@@ -268,6 +268,24 @@ export async function applyChangeset(ctx: Ctx, changesetId: string, summary: str
 export async function revertChangeset(ctx: Ctx, changesetId: string): Promise<void> {
   const { error } = await ctx.db.rpc("revert_plan_changeset", { p_changeset: changesetId });
   if (error) throw new Error(stripCode(error.message));
+  await dropBlocksOfClosedTasks(ctx);
+}
+
+/**
+ * Undoing an older plan puts back the blocks it had replaced, including ones
+ * for work finished, dropped or deleted since. Those mustn't come back as
+ * work to do: open blocks from today on whose task isn't open are removed
+ * (blocks with a recorded outcome stay as history).
+ */
+async function dropBlocksOfClosedTasks(ctx: Ctx) {
+  const today = DateTime.now().setZone(ctx.timezone).toISODate()!;
+  const { data: blocks } = await ctx.db.from("plan_blocks").select("id,task_id").gte("plan_date", today).in("status", ["planned", "in_progress"]).not("task_id", "is", null);
+  const ids = [...new Set((blocks ?? []).map((b) => b.task_id as string))];
+  if (!ids.length) return;
+  const { data: open } = await ctx.db.from("tasks").select("id").in("id", ids).in("status", ["todo", "in_progress", "blocked"]);
+  const keep = new Set((open ?? []).map((t) => t.id));
+  const drop = (blocks ?? []).filter((b) => !keep.has(b.task_id as string)).map((b) => b.id);
+  if (drop.length) await ctx.db.from("plan_blocks").delete().in("id", drop).in("status", ["planned", "in_progress"]);
 }
 
 export type PlanOptions = {
@@ -449,6 +467,29 @@ export async function computeRun(ctx: Ctx, dates: string[], opts: PlanOptions, o
     const wanted = opts.refit === "existing" ? desired.filter((d) => replaceable.some((r) => keyOf(r) === keyOf(d))) : desired;
     const dayOps = opts.refit === false ? [] : diffDay(date, replaceable, wanted);
     ops.push(...dayOps);
+    // Work this day now books may still sit in Navi's own (unpinned) blocks on
+    // a LATER day outside this run: drop those, latest first, until the task
+    // isn't booked for more than it needs. Otherwise planning Sat, then Thu,
+    // then Tue put the same 30-minute task on all three days.
+    if (opts.refit !== false) {
+      const placedHere = new Map<string, number>();
+      for (const b of wanted) if (b.task_id) placedHere.set(b.task_id, (placedHere.get(b.task_id) ?? 0) + (Date.parse(b.ends_at) - Date.parse(b.starts_at)) / 60000);
+      const gone = new Set(ops.filter((o) => o.op === "delete" || o.op === "remove").map((o) => (o as { id: string }).id));
+      for (const [taskId, minutes] of placedHere) {
+        const t = inputs.tasks.find((x) => x.id === taskId);
+        const need = Math.max(minutes, Math.round((t?.estimate_minutes ?? 30) * Math.min(2, Math.max(0.8, inputs.estimate.ratio ?? 1))) - (t?.actual_minutes ?? 0));
+        const later = existing
+          .filter((b) => b.task_id === taskId && b.plan_date > date && !runDates.includes(b.plan_date) && openNavi(b) && Date.parse(b.ends_at) > nowMs && !gone.has(b.id))
+          .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at));
+        let booked = minutes + later.reduce((m, b) => m + (Date.parse(b.ends_at) - Date.parse(b.starts_at)) / 60000, 0);
+        for (const b of later) {
+          if (booked <= need) break;
+          ops.push({ op: "delete", id: b.id, before: blockFields(b) });
+          gone.add(b.id);
+          booked -= (Date.parse(b.ends_at) - Date.parse(b.starts_at)) / 60000;
+        }
+      }
+    }
     for (const b of kept) if (["planned", "in_progress"].includes(b.status)) count(b);
     for (const b of desired) count(b);
     if (!firstUnscheduled) firstUnscheduled = new Set(out.unscheduled.map((u) => u.task_id));

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { DateTime } from "luxon";
 import { admin, ctxFor, resetUser, userClient } from "./helpers";
 import { runTool } from "@/server/ai/tools";
-import { createTask } from "@/server/domain/tasks";
+import { createTask, completeTask } from "@/server/domain/tasks";
 import { generateDayPlan } from "@/server/planner/plan";
 import type { Ctx } from "@/server/context";
 import type { PlanBlock } from "@/lib/types";
@@ -73,6 +73,38 @@ describe.each([
     expect(planned.some((id) => oldRows!.some((o) => o.id === id))).toBe(false);
     expect((r as { triage?: unknown[] }).triage).toHaveLength(12);
     expect(r.warnings.join(" ")).not.toMatch(/due today/);
+  });
+});
+
+describe("found by the stress simulation (2026-11-17, planner v2)", () => {
+  beforeEach(async () => {
+    await admin().from("profiles").update({ preferences: { planner_v2: true, wake_time: "07:00", bed_time: "23:00" }, availability: [], timezone: zone }).eq("id", me.userId);
+  });
+
+  it("planning a later day and then an earlier one books a task once, not on both days", async () => {
+    const d = D();
+    const t = await createTask(user, { title: "Read chapter 4", estimate_minutes: 30 });
+    await generateDayPlan(user, next(next(d)));
+    expect((await blocks(next(next(d)))).filter((b) => b.task_id === t.id)).toHaveLength(1);
+    await generateDayPlan(user, d);
+    const all = (await me.db.from("plan_blocks").select("plan_date,task_id").eq("task_id", t.id).eq("status", "planned")).data ?? [];
+    expect(all).toEqual([{ plan_date: d, task_id: t.id }]);
+  });
+
+  it("undoing an old plan run doesn't bring back blocks for work finished since", async () => {
+    const d = D();
+    const t = await createTask(user, { title: "Math problem set", estimate_minutes: 30 });
+    await generateDayPlan(user, d); // run A books it on d
+    expect((await blocks(d)).filter((b) => b.task_id === t.id)).toHaveLength(1);
+    // The person puts it on the next day themselves; run B then takes it off d.
+    await admin().from("plan_blocks").insert({ user_id: me.userId, plan_date: next(d), task_id: t.id, title: t.title, starts_at: at(next(d), "18:00"), ends_at: at(next(d), "18:30"), is_flexible: true, created_by: "user", status: "planned" });
+    const b = await runTool(navi, "plan", { date: d });
+    expect((await blocks(d)).filter((x) => x.task_id === t.id)).toHaveLength(0);
+    await completeTask(user, t.id);
+    const { revertActivity } = await import("@/server/domain/activity");
+    await revertActivity(user, b.undo![0]); // undo run B
+    const left = (await me.db.from("plan_blocks").select("plan_date,status").eq("task_id", t.id).in("status", ["planned", "in_progress"])).data ?? [];
+    expect(left).toEqual([]);
   });
 });
 
