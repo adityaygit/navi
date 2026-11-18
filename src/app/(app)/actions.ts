@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireApiCtx, type Ctx } from "@/server/context";
 import { createTask, changeTask, completeTask, startFocus, endFocus, pauseFocus, resumeFocus, FocusEndInput } from "@/server/domain/tasks";
 import { createEntity, deleteEntity, updateEntity, type EntityTable } from "@/server/domain/entities";
+import { resolveTriage } from "@/server/domain/triage";
 import {
   acceptMany,
   acceptManyProblem,
@@ -81,6 +82,18 @@ export async function updateTaskAction(id: string, input: unknown) {
 }
 export async function completeTaskAction(id: string, actualMinutes?: number | null) {
   return act((ctx) => completeTask(ctx, id, actualMinutes), "Done");
+}
+/** Today's "needs a decision" row: overdue imported (Canvas) work handed in, or not needed. Read back. */
+export async function resolveTriageAction(decision: "handed_in" | "not_needed", target: { ids?: string[]; all?: boolean }) {
+  return act(
+    async (ctx) => {
+      const i = z.object({ decision: z.enum(["handed_in", "not_needed"]), ids: z.array(z.string().uuid()).max(200).optional(), all: z.boolean().optional() }).parse({ decision, ...target });
+      const r = await resolveTriage(ctx, i.decision, { ids: i.ids, all: i.all });
+      if (r.notChanged.length) throw new Error(`${r.changed.length} changed, ${r.notChanged.length} didn't. Try again.`);
+      return { changed: r.changed.length };
+    },
+    (d) => `${d.changed} ${d.changed === 1 ? "item" : "items"} ${decision === "handed_in" ? "marked handed in" : "set aside"}`,
+  );
 }
 export async function startFocusAction(input: { task_id?: string | null; block_id?: string | null; planned_minutes?: number | null }) {
   return act((ctx) => startFocus(ctx, input));

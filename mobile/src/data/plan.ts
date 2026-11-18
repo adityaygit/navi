@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { cacheGet, cachePut } from "./offline";
-import type { MDay, MInbox, MTaskGroups, MWeek, MOk, MTaskChange, MBlockOutcome } from "@shared/mobile-api-types";
+import type { MDay, MInbox, MTaskGroups, MWeek, MOk, MTaskChange, MBlockOutcome, MTriageDecision, MTriageResult } from "@shared/mobile-api-types";
 
 // Plan data: one small hook per view. Each keeps the last good answer while it
 // refreshes, so switching views never flashes an empty screen.
@@ -64,4 +64,5 @@ export const planActions = {
   blockOutcome: (blockId: string, body: MBlockOutcome) => api<MOk>(`/api/m/blocks/${blockId}/outcome`, { body }),
   completeTask: (taskId: string) => api<MTaskChange>(`/api/m/tasks/${taskId}/complete`, { body: {} }),
   uncompleteTask: (taskId: string) => api<MTaskChange>(`/api/m/tasks/${taskId}/uncomplete`, { body: {} }),
+  triage: (body: MTriageDecision) => api<MTriageResult>("/api/m/triage", { body }),
 };

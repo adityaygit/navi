@@ -1,4 +1,5 @@
 import "server-only";
+import { awaitingTriage } from "@/lib/triage";
 import { DateTime } from "luxon";
 import { getProfile, type Ctx } from "@/server/context";
 import { UserFacingError } from "@/server/http";
@@ -39,6 +40,7 @@ import type {
   MTaskGroups,
   MTaskItem,
   MWeek,
+  MNeedsDecision,
 } from "@/lib/mobile-api-types";
 
 // Read models for the phone app's screens (/api/m/*). Every number and line
@@ -228,6 +230,7 @@ export async function dayView(ctx: Ctx, requested?: string | null): Promise<MDay
       space: spaceOf(src.spaces, t.workspace_id),
     })),
     needsTimeTotal: unscheduled.length,
+    needsDecision: isToday ? decisionView(work.triage) : { count: 0, items: [] },
     untimed: day.untimed.map((e) => ({ id: e.id, title: e.title })),
     plan: v2Day ? { assumptions: v2Day.assumptions, unknown: v2Day.unknown, proposals: v2Day.proposals } : null,
     briefing: briefingView((briefingRes.data as Briefing | null) ?? null),
@@ -340,18 +343,27 @@ export async function taskGroupsView(ctx: Ctx): Promise<MTaskGroups> {
   const item = (t: Task): MTaskItem => ({ ...taskView(t), space: spaceOf(spaces, t.workspace_id), steps: steps.get(t.id) ?? { total: 0, done: 0 }, next: next.get(t.id) ?? null });
 
   const dueMs = (t: Task) => (t.due_at ? Date.parse(t.due_at) : null);
+  // Overdue imports wait for a decision (one row), unless the person gave them a time.
+  const nowMs = Date.now();
+  const triage = open.filter((t) => awaitingTriage(t, nowMs, next.has(t.id) || todayBlock.has(t.id)));
+  const active = open.filter((t) => !triage.includes(t));
   const isToday = (t: Task) => todayBlock.has(t.id) || (dueMs(t) != null && dueMs(t)! <= dayEnd);
-  const todayTasks = open.filter(isToday);
+  const todayTasks = active.filter(isToday);
   const overdue = todayTasks.filter((t) => !todayBlock.has(t.id) && dueMs(t)! < dayStart.toMillis());
   const when = (t: Task) => (todayBlock.has(t.id) ? Date.parse(todayBlock.get(t.id)!) : (dueMs(t) ?? Infinity));
   const rest = todayTasks.filter((t) => !overdue.includes(t)).sort((a, b) => when(a) - when(b));
-  const notToday = open.filter((t) => !isToday(t));
+  const notToday = active.filter((t) => !isToday(t));
   return {
     today: [...overdue, ...rest].map(item),
     needsTime: notToday.filter((t) => !next.has(t.id) && t.priority < 4).map(item),
     later: notToday.filter((t) => next.has(t.id) || t.priority === 4).map(item),
     doneToday: done.map(item),
+    needsDecision: decisionView(triage),
   };
+}
+
+function decisionView(rows: { id: string; title: string; due_at: string | null }[]): MNeedsDecision {
+  return { count: rows.length, items: rows.slice(0, 60).map((t) => ({ id: t.id, title: t.title, due_at: t.due_at })) };
 }
 
 // ---- inbox ---------------------------------------------------------------------------------

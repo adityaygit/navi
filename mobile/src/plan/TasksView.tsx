@@ -3,11 +3,12 @@ import type { MTaskGroups, MTaskItem } from "@shared/mobile-api-types";
 import { duration } from "../data/time";
 import { feel } from "../native/haptics";
 import { ease, ink, meaning } from "../theme/tokens";
+import { DecisionCard } from "./DecisionCard";
 
 // The list (M6): white cards by when, each row a ring to tick, the title,
 // and one line of what matters (deadline, steps, how long).
 
-type Props = { groups: MTaskGroups; tz: string; onToggle: (t: MTaskItem, done: boolean) => void; onAsk: (prompt: string) => void };
+type Props = { groups: MTaskGroups; tz: string; onToggle: (t: MTaskItem, done: boolean) => void; onAsk: (prompt: string, send?: boolean) => void; onHandedIn: (ids: string[]) => Promise<void> };
 
 const ymd = (d: Date, tz: string) => new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(d);
 
@@ -32,7 +33,7 @@ function meta(t: MTaskItem, tz: string): string {
   return bits.join(" · ");
 }
 
-export function TasksView({ groups, tz, onToggle, onAsk }: Props) {
+export function TasksView({ groups, tz, onToggle, onAsk, onHandedIn }: Props) {
   // Ticked rows stay in place (struck through) until the view reloads, so nothing jumps under your finger.
   const [ticked, setTicked] = useState<Set<string>>(new Set());
   const sections: [string, MTaskItem[]][] = [
@@ -41,7 +42,8 @@ export function TasksView({ groups, tz, onToggle, onAsk }: Props) {
     ["Later", groups.later],
   ];
   const any = sections.some(([, i]) => i.length);
-  if (!any)
+  const decision = groups.needsDecision?.count ? <DecisionCard decision={groups.needsDecision} tz={tz} onHandedIn={onHandedIn} onAsk={onAsk} /> : null;
+  if (!any && !decision)
     return (
       <div style={{ padding: "56px 24px 0", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 18 }}>
         <p style={{ margin: 0, fontSize: 30, lineHeight: 1.1, fontWeight: 700, letterSpacing: "-0.03em" }}>
@@ -54,6 +56,7 @@ export function TasksView({ groups, tz, onToggle, onAsk }: Props) {
     );
   return (
     <div style={{ padding: "0 16px", display: "flex", flexDirection: "column", gap: 8 }}>
+      {decision}
       {sections
         .filter(([, items]) => items.length)
         .map(([h, items], si) => (

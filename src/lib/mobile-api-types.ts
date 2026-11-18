@@ -231,6 +231,8 @@ export type MDay = {
   /** Open tasks with no time yet (at most 5, soonest due first). */
   needsTime: MNeedsTime[];
   needsTimeTotal: number;
+  /** Overdue imported (Canvas) work waiting for the person's decision: shown as one row, never as work needing a time. */
+  needsDecision?: MNeedsDecision;
   /** Routines with no set time that day. */
   untimed: { id: string; title: string }[];
   /** Planner v2 only: assumptions the plan relies on, time Navi doesn't know about, plans waiting for an OK. */
@@ -304,7 +306,18 @@ export type MTaskItem = MTask & {
  * later: open, not today, planned for a later day or parked (priority 4);
  * doneToday: finished today.
  */
-export type MTaskGroups = { today: MTaskItem[]; needsTime: MTaskItem[]; later: MTaskItem[]; doneToday: MTaskItem[] };
+export type MTaskGroups = { today: MTaskItem[]; needsTime: MTaskItem[]; later: MTaskItem[]; doneToday: MTaskItem[]; needsDecision?: MNeedsDecision };
+
+/**
+ * Overdue imported work (Canvas can't say what was handed in). Not part of
+ * today/needsTime/later. The person decides with POST /api/m/triage.
+ */
+export type MNeedsDecision = { count: number; items: { id: string; title: string; due_at: string | null }[] };
+
+/** POST /api/m/triage: "handed_in" marks done, "not_needed" sets aside (reversible). ids or all. */
+export type MTriageDecision = { decision: "handed_in" | "not_needed"; ids?: string[]; all?: boolean };
+/** Read back from the database after the change. */
+export type MTriageResult = { changed: number; notChanged: number; remaining: number };
 
 /** POST /api/m/tasks. `id`: a uuid made once per submit so a retry doesn't add it twice. */
 export type MTaskCreate = {

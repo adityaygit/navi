@@ -152,6 +152,20 @@ export function PlanPage({ palette: P, active, onAsk, onVoice, onFocus, version 
       void tasks.refresh();
     }
   };
+  // Past-due Canvas items: the person says they're handed in (read back by the server).
+  const onHandedIn = async (ids: string[]) => {
+    try {
+      const r = await planActions.triage({ decision: "handed_in", ids });
+      feel(r.notChanged ? "warning" : "success");
+      toast(r.notChanged ? `${r.changed} marked done, ${r.notChanged} didn't save. Try again.` : `${r.changed} marked handed in`, { accent: P.accent });
+    } catch (e) {
+      feel("warning");
+      toast(`Couldn't save that: ${(e as Error).message}`);
+    } finally {
+      void day.refresh();
+      void tasks.refresh();
+    }
+  };
   const focusOn = (it: MDayItem) => onFocus({ title: it.title, taskId: it.taskId, blockId: it.kind === "block" ? it.id : null, minutes: it.minutes, space: it.space?.name ?? null });
 
   const err = view === "day" ? day.error : view === "week" ? week.error : tasks.error;
@@ -243,9 +257,9 @@ export function PlanPage({ palette: P, active, onAsk, onVoice, onFocus, version 
         <div key={view + (date ?? "") + (loadingFirst ? "-wait" : "")} style={{ marginTop: 18, animation: "nFade 0.3s ease both" }}>
           {loadingFirst && !err ? <Skeleton /> : null}
           {err && loadingFirst ? <p style={{ margin: 0, padding: "0 20px", fontSize: 16, fontWeight: 500, color: meaning.slipping }}>Couldn't load your plan. It'll come back when you're online.</p> : null}
-          {view === "day" && d ? <DayView day={d} due={due} h={{ onPlace, onOpen: setOpened, onAsk: (prompt, send) => ask(prompt, send), onFocus: focusOn }} /> : null}
+          {view === "day" && d ? <DayView day={d} due={due} h={{ onPlace, onOpen: setOpened, onAsk: (prompt, send) => ask(prompt, send), onFocus: focusOn, onHandedIn }} /> : null}
           {view === "week" && week.data ? <WeekView week={week.data} onOpenDay={(dt) => { setDate(dt); setView("day"); }} /> : null}
-          {view === "tasks" && tasks.data ? <TasksView groups={tasks.data} tz={tz} onToggle={onToggle} onAsk={(p) => ask(p)} /> : null}
+          {view === "tasks" && tasks.data ? <TasksView groups={tasks.data} tz={tz} onToggle={onToggle} onAsk={(p, send) => ask(p, send)} onHandedIn={onHandedIn} /> : null}
         </div>
       </div>
 

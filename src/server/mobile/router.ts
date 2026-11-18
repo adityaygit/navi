@@ -9,6 +9,7 @@ import { createConversation, deleteConversation, renameConversation } from "@/se
 import { changeTask, completeTask, createTask, endFocus, FocusEndInput, pauseFocus, resumeFocus, startFocus } from "@/server/domain/tasks";
 import { TaskCreate } from "@/server/domain/schemas";
 import { placeTask } from "@/server/planner/place";
+import { resolveTriage, triageList } from "@/server/domain/triage";
 import { executeCommand, commandMessage } from "@/server/planner/commands";
 import { plannerCommands } from "@/lib/planner-flag";
 import { BlockOutcomeInput, dayPlanMessage, generateDayPlan, generateWeekPlan, setBlockOutcome, weekPlanMessage } from "@/server/planner/plan";
@@ -19,6 +20,7 @@ import { BriefingKind, generateBriefing, markBriefingRead } from "@/server/domai
 import type { UpdateResult } from "@/server/domain/entities";
 import type { Task } from "@/lib/types";
 import type {
+  MTriageResult,
   MAcceptManyResult,
   MBriefingGenerated,
   MChatCreated,
@@ -112,6 +114,12 @@ route("POST", "tasks/:id/complete", async (ctx, { params, body }): Promise<MTask
   return { result: updateResult(await completeTask(ctx, params.id, actualMinutes)) };
 });
 route("POST", "tasks/:id/uncomplete", async (ctx, { params }): Promise<MTaskChange> => ({ result: updateResult(await changeTask(ctx, params.id, { status: "todo" })) }));
+route("POST", "triage", async (ctx, { body }): Promise<MTriageResult> => {
+  const i = z.object({ decision: z.enum(["handed_in", "not_needed"]), ids: z.array(Uuid).max(200).optional(), all: z.boolean().optional() })
+    .refine((v) => v.all || (v.ids?.length ?? 0) > 0, "Say which items (ids) or all.").parse(body ?? {});
+  const r = await resolveTriage(ctx, i.decision, { ids: i.ids, all: i.all });
+  return { changed: r.changed.length, notChanged: r.notChanged.length + r.unknown.length, remaining: (await triageList(ctx)).length };
+});
 route("POST", "tasks/:id/place", async (ctx, { params, body }): Promise<MOk> => {
   await placeTask(ctx, { ...(body as object), taskId: params.id });
   return { ok: true };

@@ -6,6 +6,7 @@ import { tasksHeadline } from "@/lib/sentences";
 import { spaceColor } from "@/lib/space-color";
 import { TaskBoard, type TaskGroup, type Nudge } from "@/components/tasks/task-board";
 import { QuickAddBar } from "@/components/tasks/quick-add-bar";
+import { awaitingTriage } from "@/lib/triage";
 
 export const metadata = { title: "Tasks · Navi" };
 
@@ -38,17 +39,23 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const dayStart = now.startOf("day").toISO()!;
   const dayEnd = now.endOf("day");
 
-  const [openRes, doneTodayRes, blocksRes, spacesRes, dismissedRes] = await Promise.all([
+  const [openRes, doneTodayRes, blocksRes, spacesRes, dismissedRes, placedRes] = await Promise.all([
     ctx.db.from("tasks").select("*").in("status", OPEN).is("parent_task_id", null).order("due_at", { ascending: true, nullsFirst: false }).order("created_at"),
     ctx.db.from("tasks").select("*").eq("status", "done").is("parent_task_id", null).gte("completed_at", dayStart),
     ctx.db.from("plan_blocks").select("task_id,starts_at,status").eq("plan_date", today).not("task_id", "is", null).order("starts_at"),
     ctx.db.from("workspaces").select("id,name,color").eq("status", "active").order("sort_order").order("created_at"),
     ctx.db.from("dismissed_suggestions").select("key").like("key", "old_task:%"),
+    ctx.db.from("plan_blocks").select("task_id").gte("plan_date", today).in("status", ["planned", "in_progress"]).not("task_id", "is", null),
   ]);
   const spaces = (spacesRes.data ?? []) as Pick<Workspace, "id" | "name" | "color">[];
   const space = sp.space ? (spaces.find((s) => s.id === sp.space) ?? null) : null;
   const inSpace = (t: Task) => !space || t.workspace_id === space.id;
-  const open = ((openRes.data ?? []) as Task[]).filter(inSpace);
+  // Overdue imported (Canvas) work waits for a decision: one row on Today, not
+  // a list of overdue work (lib/triage.ts). Work the person gave a time stays.
+  const placed = new Set(((placedRes.data ?? []) as { task_id: string }[]).map((b) => b.task_id));
+  const allOpen = ((openRes.data ?? []) as Task[]).filter(inSpace);
+  const triage = allOpen.filter((t) => awaitingTriage(t, now.toMillis(), placed.has(t.id)));
+  const open = allOpen.filter((t) => !triage.includes(t));
   const doneToday = ((doneTodayRes.data ?? []) as Task[]).filter(inSpace);
 
   // A task's time today: its first plan block today, else its due time if due today (not "end of day").
@@ -198,6 +205,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         tasks={shown}
         steps={steps}
         groups={groups}
+        triage={tab === "today" ? triage.map((t) => ({ id: t.id, title: t.title, due_at: t.due_at })) : []}
         spaces={spaceList}
         initialOpen={sp.open ?? null}
         nudge={nudge}

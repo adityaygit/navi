@@ -29,7 +29,7 @@ import { ENTITY_PATCHES } from "@/server/domain/schemas";
 import { formatDue, formatTime, nowIn } from "@/lib/time";
 import { awaitingTriage, isImported } from "@/lib/triage";
 import { integrations } from "@/server/integrations";
-import { setItemHidden } from "@/server/integrations/connections";
+import { resolveTriage } from "@/server/domain/triage";
 import type { CalendarEvent, OccurrenceOverride, PlanBlock, Proposal, Routine, Task } from "@/lib/types";
 import { buildDayAgenda, describeDayAgenda, type AgendaEntry } from "@/server/planner/agenda";
 import { proposalTitle } from "@/server/domain/proposals";
@@ -1323,30 +1323,10 @@ export const TOOLS = [
       if (decision === "handed_in" && ctx.actor === "navi" && !userSaidItsDone(ctx.userMessage, user_statement)) {
         return { ok: false, summary: "Nothing changed: the user's words don't say the work was handed in or finished. Ask them." };
       }
-      const { data } = await ctx.db.from("tasks").select("id,title,status,source,external_ref,due_at,commitment").eq("source", "external").in("status", ["todo", "in_progress", "blocked"]);
-      const now = Date.now();
-      const pool = ((data ?? []) as Pick<Task, "id" | "title" | "status" | "source" | "external_ref" | "due_at" | "commitment">[]).filter((t) => awaitingTriage(t, now) || (task_ids ?? []).includes(t.id));
-      const wanted = all_overdue ? pool : pool.filter((t) => (task_ids ?? []).includes(t.id));
-      const unknown = (task_ids ?? []).filter((id) => !pool.some((t) => t.id === id));
-      if (!wanted.length) return { ok: false, summary: `Nothing changed: no open imported tasks matched${unknown.length ? ` (${unknown.length} id${unknown.length === 1 ? "" : "s"} not found or already closed)` : ""}.` };
-      const failed: string[] = [];
-      for (const t of wanted) {
-        try {
-          if (decision === "handed_in") await completeTask({ ...ctx, actor: "user" }, t.id);
-          else {
-            const { data: item } = await ctx.db.from("external_items").select("id").eq("task_id", t.id).maybeSingle();
-            if (item) await setItemHidden(ctx, item.id, true);
-            else await updateTask({ ...ctx, actor: "user" }, t.id, { status: "cancelled" });
-          }
-        } catch {
-          failed.push(t.title);
-        }
-      }
-      // Verify: read back what actually changed.
-      const { data: after } = await ctx.db.from("tasks").select("id,title,status").in("id", wanted.map((t) => t.id));
-      const target = decision === "handed_in" ? "done" : "cancelled";
-      const changed = (after ?? []).filter((t) => t.status === target);
-      const notChanged = wanted.filter((t) => !changed.some((c) => c.id === t.id));
+      const r = await resolveTriage(ctx, decision, { ids: task_ids, all: all_overdue });
+      const { changed, notChanged, unknown } = r;
+      if (!r.asked) return { ok: false, summary: `Nothing changed: no open imported tasks matched${unknown.length ? ` (${unknown.length} id${unknown.length === 1 ? "" : "s"} not found or already closed)` : ""}.` };
+      const wanted = { length: r.asked };
       await logActivity(ctx, { action: "explicit_command", summary: `${decision === "handed_in" ? "Marked handed in" : "Set aside"} ${changed.length} overdue imported item${changed.length === 1 ? "" : "s"} because you said: “${user_statement.slice(0, 120)}”` });
       const verb = decision === "handed_in" ? "Marked done (handed in)" : "Set aside (not needed)";
       return {

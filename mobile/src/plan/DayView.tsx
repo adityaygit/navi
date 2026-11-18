@@ -3,6 +3,7 @@ import type { MDay, MDayItem } from "@shared/mobile-api-types";
 import { clock, clockAmPm, duration, range } from "../data/time";
 import { feel } from "../native/haptics";
 import { ease, glass, ink, meaning } from "../theme/tokens";
+import { DecisionCard } from "./DecisionCard";
 
 // The day (M6): two-line blocks to scale, fixed ones white with a lock,
 // time you set aside pale blue, hard deadlines with a coral "Due" tag,
@@ -21,6 +22,7 @@ export type DayHandlers = {
   onOpen: (item: MDayItem) => void;
   onAsk: (prompt: string, send?: boolean) => void;
   onFocus: (item: MDayItem) => void;
+  onHandedIn: (ids: string[]) => Promise<void>;
 };
 
 type Row =
@@ -230,6 +232,12 @@ export function DayView({ day, h, due }: { day: MDay; h: DayHandlers; due: DueMa
           );
         })}
       </ol>
+
+      {day.needsDecision?.count ? (
+        <div style={{ margin: `18px 0 0 ${LEFT}px` }}>
+          <DecisionCard decision={day.needsDecision} tz={tz} onHandedIn={h.onHandedIn} onAsk={h.onAsk} />
+        </div>
+      ) : null}
 
       {day.untimed.length || day.needsTimeTotal ? (
         <div style={{ margin: `18px 0 0 ${LEFT}px`, display: "flex", flexDirection: "column", gap: 8 }}>

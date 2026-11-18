@@ -34,6 +34,7 @@ export function newSubmitId(): string {
 export const createTaskAction = safe(server.createTaskAction);
 export const updateTaskAction = safe(server.updateTaskAction);
 export const completeTaskAction = safe(server.completeTaskAction);
+export const resolveTriageAction = safe(server.resolveTriageAction);
 export const startFocusAction = safe(server.startFocusAction);
 export const endFocusAction = safe(server.endFocusAction);
 export const pauseFocusAction = safe(server.pauseFocusAction);
