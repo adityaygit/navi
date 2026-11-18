@@ -1,5 +1,7 @@
 # Landing Page Reconstruction — Progress Record
 
+> **Superseded (2026-11-17).** www.meetnavi.app now serves the "Sky" marketing website from `website/` (built into `public/landing` by `website/build.py`). This project is kept for reference only; its `build:app` script was removed because it would overwrite `public/landing`.
+
 Separate from the Navi app. Self-contained static site in `landing/`, published as a Claude artifact.
 
 ## Decisions (established with user — do not re-ask)
