@@ -1,4 +1,5 @@
 import "server-only";
+import { isFeedOwned } from "@/lib/triage";
 import { DateTime } from "luxon";
 import type { Ctx } from "@/server/context";
 import { logActivity, sameValue } from "./activity";
@@ -146,7 +147,7 @@ export async function updateEntity<T = Record<string, unknown>>(
   const before = await getEntity<Record<string, unknown>>(ctx, table, id);
   // Imported from a connected calendar (Canvas): its title and due date belong
   // to that service and are refreshed on every sync. Planning fields stay Navi's.
-  if (table === "tasks" && before.external_ref && changes(before, patch, ["title", "due_at"])) {
+  if (table === "tasks" && isFeedOwned(before.external_ref as string | null) && changes(before, patch, ["title", "due_at"])) {
     throw new UserFacingError("That title and due date come from Canvas, so change them there. You can still set its priority, estimate, notes and status here.", 409);
   }
   if (ctx.actor === "navi") {

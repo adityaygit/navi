@@ -2,9 +2,10 @@ import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, t
 import { ease } from "../theme/tokens";
 import { feel } from "../native/haptics";
 
-// Three pages side by side: Progress ← Navi → Plan. Pulling one away rounds
-// its corners, shrinks and dims it, while the page underneath stays put and
-// comes into focus (blur and darkness fade out). Matches M4-Proto `pageLook`.
+// Three pages side by side: Progress ← Navi → Plan (M6). Pulling one away
+// slides it off flat (no zoom), its corners round as it lifts, and a soft
+// white glow wraps the page being torn away. The page underneath stays put,
+// starts rounded and slightly blurred, and comes into focus as it's revealed.
 //
 // Drag frames write styles straight to the DOM (no React render per frame) so
 // the pull keeps up with 120 Hz screens.
@@ -41,19 +42,27 @@ export function Pager({ page, onPage, onDrag, enabled, children, handle }: Props
       const target = p + dir;
       const prog = Math.min(1, Math.abs(dx) / w);
       const active = dx !== 0 || st.current.settling;
-      const tr = animate ? `transform ${SETTLE_MS}ms ${ease}, border-radius ${SETTLE_MS}ms, filter ${SETTLE_MS}ms` : "none";
+      const tr = animate ? `transform ${SETTLE_MS}ms ${ease}, filter ${SETTLE_MS}ms, border-radius ${SETTLE_MS}ms, box-shadow ${SETTLE_MS}ms` : "none";
       secs.current.forEach((el, i) => {
         if (!el) return;
         el.style.transition = tr;
         if (!active) {
-          Object.assign(el.style, { transform: `translateX(${(i - p) * w}px)`, borderRadius: "0px", filter: "none", zIndex: i === p ? "2" : "0", visibility: i === p ? "visible" : "hidden" });
+          Object.assign(el.style, { transform: `translateX(${(i - p) * w}px)`, filter: "none", borderRadius: "0px", boxShadow: "none", zIndex: i === p ? "2" : "0", visibility: i === p ? "visible" : "hidden" });
           return;
         }
         if (i === p) {
           const k = Math.min(1, prog * 2.2);
-          Object.assign(el.style, { transform: `translateX(${dx}px) scale(${(1 - 0.07 * k).toFixed(3)})`, borderRadius: `${Math.round(44 * k)}px`, filter: `brightness(${(1 - 0.35 * prog).toFixed(2)})`, zIndex: "2", visibility: "visible" });
+          const a = Math.min(1, Math.abs(dx) / 28) * Math.pow(1 - prog, 0.6);
+          Object.assign(el.style, {
+            transform: `translateX(${dx}px)`,
+            filter: "none",
+            borderRadius: `${Math.round(44 * k)}px`,
+            boxShadow: `0 0 26px 2px rgba(255,255,255,${(a * 0.85).toFixed(2)}), 0 0 70px 10px rgba(160,200,255,${(a * 0.45).toFixed(2)}), 0 30px 60px -10px rgba(20,40,80,${(0.22 * k).toFixed(2)})`,
+            zIndex: "2",
+            visibility: "visible",
+          });
         } else if (i === target && target >= 0 && target <= 2) {
-          Object.assign(el.style, { transform: `translateX(0px) scale(${(0.93 + 0.07 * prog).toFixed(3)})`, borderRadius: `${Math.round(44 * (1 - prog))}px`, filter: `blur(${(14 * (1 - prog)).toFixed(1)}px) brightness(${(0.55 + 0.45 * prog).toFixed(2)})`, zIndex: "1", visibility: "visible" });
+          Object.assign(el.style, { transform: "translateX(0px)", filter: `blur(${(8 * (1 - prog)).toFixed(1)}px) brightness(${(0.92 + 0.08 * prog).toFixed(2)})`, borderRadius: `${Math.round(44 * (1 - prog))}px`, boxShadow: "none", zIndex: "1", visibility: "visible" });
         } else {
           Object.assign(el.style, { visibility: "hidden", zIndex: "0" });
         }
@@ -156,7 +165,7 @@ export function Pager({ page, onPage, onDrag, enabled, children, handle }: Props
 
   return (
     <>
-      <div ref={gap} aria-hidden="true" style={{ position: "absolute", inset: 0, background: "#141416", opacity: 0 }} />
+      <div ref={gap} aria-hidden="true" style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, #DCE7F5 0%, #EEF2F8 100%)", opacity: 0 }} />
       <div
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -171,7 +180,7 @@ export function Pager({ page, onPage, onDrag, enabled, children, handle }: Props
               secs.current[i] = el;
             }}
             aria-hidden={i !== page}
-            style={{ position: "absolute", inset: 0, overflow: "hidden", background: "#000", transformOrigin: "50% 50%", willChange: "transform" }}
+            style={{ position: "absolute", inset: 0, overflow: "hidden", background: "#FBFBFD", transformOrigin: "50% 50%", willChange: "transform" }}
           >
             {child}
           </section>

@@ -4,8 +4,9 @@ import { getProfile } from "@/server/context";
 import type { Message, ToolEvent } from "@/lib/types";
 import { relevantMemories } from "@/server/domain/memory";
 import { runAgent, type AgentMode } from "./agent";
-import { CHAT_SYSTEM, CHAT_SYSTEM_V2, ONBOARDING_SYSTEM } from "./prompts";
-import { plannerV2 } from "@/lib/planner-flag";
+import { CHAT_SYSTEM, CHAT_SYSTEM_COMMANDS, CHAT_SYSTEM_V2, ONBOARDING_SYSTEM } from "./prompts";
+import { plannerV2, plannerCommands } from "@/lib/planner-flag";
+import { isAffirmative } from "@/server/planner/commands/authorize";
 import { runTool } from "./tools";
 import { nowIn } from "@/lib/time";
 import { nowLine } from "@/lib/time-words";
@@ -211,6 +212,8 @@ export async function upsertMessage(
 }
 
 const PLANNER_CUES = /\b(plan|schedule|week|prioriti|reorgani|broke|behind|overwhelm|review|goal|deadline|realistic|strategy)\b/i;
+/** Planner commands: requests to change the schedule go to the planning model too. */
+const SCHEDULE_CUES = /\b(put|move|swap|clear|skip|recovery|only|instead|reschedule|push|session|lock|unlock)\b|\btake .{1,60} off\b|\bat \d{1,2}(:\d{2})?\s*(am|pm)?\b/i;
 
 /**
  * Context block appended after the cached system prompt. It opens with the
@@ -256,13 +259,37 @@ export type TurnResult = {
 };
 
 /** Action cards and Undo state for these messages: what each card shows, and which automatic changes were undone. */
-export async function messageActions(ctx: Ctx, messages: Message[]): Promise<{ actions: Record<string, ActionView>; undone: string[] }> {
+export async function messageActions(ctx: Ctx, messages: Message[], opts: { inPlace?: boolean } = {}): Promise<{ actions: Record<string, ActionView>; undone: string[]; inPlace: string[] }> {
   const events = messages.flatMap((m) => m.tool_events ?? []);
-  const [actions, reverted] = await Promise.all([
+  const undoIds = events.flatMap((e) => e.undo ?? []);
+  const [actions, reverted, inPlace] = await Promise.all([
     actionViews(ctx, events.flatMap((e) => (e.action_id ? [e.action_id] : []))),
-    revertedAmong(ctx, events.flatMap((e) => e.undo ?? [])),
+    revertedAmong(ctx, undoIds),
+    opts.inPlace ? stillInPlace(ctx, undoIds) : Promise.resolve(new Set<string>()),
   ]);
-  return { actions, undone: [...reverted] };
+  return { actions, undone: [...reverted], inPlace: [...inPlace] };
+}
+
+/**
+ * Which of these logged changes are still in place right now: not undone, and
+ * the row they made or changed still exists. Checked by code at the start of
+ * every turn, so "did you actually do that?" is answered from the database,
+ * not from the model second-guessing its own history (real-model stress test
+ * A1, 2026-11-17: Navi retracted a true "Added", saying the task "was already
+ * there before I ran the add").
+ */
+async function stillInPlace(ctx: Ctx, ids: string[]): Promise<Set<string>> {
+  if (!ids.length) return new Set();
+  const { data } = await ctx.db.from("activity_log").select("id,entity_type,entity_id").in("id", [...new Set(ids)]).is("reverted_at", null);
+  const rows = ((data ?? []) as { id: string; entity_type: string | null; entity_id: string | null }[]).filter((r) => r.entity_type && r.entity_id && r.entity_type !== "plan_changesets");
+  const byTable = new Map<string, string[]>();
+  for (const r of rows) byTable.set(r.entity_type!, [...(byTable.get(r.entity_type!) ?? []), r.entity_id!]);
+  const exists = new Set<string>();
+  await Promise.all([...byTable].map(async ([table, entityIds]) => {
+    const { data: found } = await ctx.db.from(table).select("id").in("id", [...new Set(entityIds)]);
+    for (const f of (found ?? []) as { id: string }[]) exists.add(`${table}:${f.id}`);
+  }));
+  return new Set(rows.filter((r) => exists.has(`${r.entity_type}:${r.entity_id}`)).map((r) => r.id));
 }
 
 /**
@@ -271,12 +298,15 @@ export async function messageActions(ctx: Ctx, messages: Message[]): Promise<{ a
  * since), and automatic changes the person undid say so, so the next reply
  * acknowledges the decision instead of repeating or re-proposing it.
  */
-function actionsTaken(m: Message, actions: Record<string, ActionView>, undone: Set<string>): string {
+function actionsTaken(m: Message, actions: Record<string, ActionView>, undone: Set<string>, inPlace: Set<string>): string {
   const lines = m.tool_events.map((e) => {
     const card = e.action_id ? actions[e.action_id] : undefined;
     if (card) return `${e.name}: ${card.verb} “${card.subject}” [action ${card.id}] — ${actionStatusForModel(card)}`;
-    const undoneNote = e.undo?.length && e.undo.every((id) => undone.has(id)) ? " — the user undid this" : "";
-    return `${e.name}: ${e.summary}${undoneNote}`;
+    const note = !e.undo?.length ? ""
+      : e.undo.every((id) => undone.has(id)) ? " — the user undid this"
+      : e.undo.every((id) => inPlace.has(id)) ? ` — verified by Navi's code at the start of this turn: this reply really did it${e.name === "create_task" ? " (it created the item; it did not exist before)" : ""}, and it is still in place`
+      : "";
+    return `${e.name}: ${e.summary}${note}`;
   });
   return `${m.content}\n[Actions taken: ${lines.join("; ")}]`;
 }
@@ -343,13 +373,14 @@ export async function handleTurn(
   const conversationId = await resolveConversation(ctx, input.kind, input.conversationId);
   const prior = await listMessages(ctx, conversationId, 24);
   if (input.kind === "chat" && !prior.some((m) => m.role === "user")) await nameNewChat(ctx, conversationId, input.text);
-  const before = await messageActions(ctx, prior);
+  const before = await messageActions(ctx, prior, { inPlace: true });
   const undone = new Set(before.undone);
+  const inPlace = new Set(before.inPlace);
   const history = prior
     .filter((m) => m.role !== "system" && m.content.trim())
     .map((m) => ({
       role: m.role as "user" | "assistant",
-      content: m.tool_events.length ? actionsTaken(m, before.actions, undone) : m.content,
+      content: m.tool_events.length ? actionsTaken(m, before.actions, undone, inPlace) : m.content,
     }));
   let userMessage: Message;
   try {
@@ -369,14 +400,20 @@ export async function handleTurn(
   let result: Awaited<ReturnType<typeof runAgent>>;
   try {
     const profile = await getProfile(ctx);
-    const turnCtx: Ctx = { ...ctx, conversationId, autonomy: autonomyFrom(profile.preferences), plannerV2: plannerV2(profile.preferences) };
+    const turnCtx: Ctx = {
+      ...ctx, conversationId, autonomy: autonomyFrom(profile.preferences), plannerV2: plannerV2(profile.preferences), plannerCommands: plannerCommands(profile.preferences),
+      turnId: userMessage.id, turnStartedAt: userMessage.created_at,
+    };
+    // A short "yes" to a waiting plan change is a planning decision: the planner model resolves it.
+    const answersOffer = turnCtx.plannerCommands && input.text.length <= 60 && isAffirmative(input.text)
+      && !!(await ctx.db.from("plan_changesets").select("id").eq("conversation_id", conversationId).eq("status", "proposed").limit(1).maybeSingle()).data;
     const mode: AgentMode = input.kind === "onboarding" ? "onboarding" : "chat";
     const context = await buildContext(turnCtx, input.text, mode);
     result = await runAgent({
       ctx: turnCtx,
       mode,
-      role: mode === "onboarding" || PLANNER_CUES.test(input.text) ? "planner" : "fast",
-      system: mode === "onboarding" ? ONBOARDING_SYSTEM : turnCtx.plannerV2 ? CHAT_SYSTEM_V2 : CHAT_SYSTEM,
+      role: mode === "onboarding" || PLANNER_CUES.test(input.text) || answersOffer || (turnCtx.plannerCommands && SCHEDULE_CUES.test(input.text)) ? "planner" : "fast",
+      system: mode === "onboarding" ? ONBOARDING_SYSTEM : turnCtx.plannerCommands ? CHAT_SYSTEM_COMMANDS : turnCtx.plannerV2 ? CHAT_SYSTEM_V2 : CHAT_SYSTEM,
       context: `${context}\nUser's local time (same clock as the top): ${nowIn(profile.timezone).toFormat("cccc yyyy-LL-dd HH:mm ZZ")}${viewingLine(input.viewing)}`,
       history,
       userText: input.text,

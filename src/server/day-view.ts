@@ -1,4 +1,5 @@
 import "server-only";
+import { awaitingTriage } from "@/lib/triage";
 import { DateTime } from "luxon";
 import type { Ctx } from "./context";
 import type { PlanBlock, Task } from "@/lib/types";
@@ -85,17 +86,17 @@ export function weekSummary(days: DayData[], zone: string): { date: string; name
   });
 }
 
-export type OpenTask = Pick<Task, "id" | "title" | "status" | "due_at" | "due_is_hard" | "estimate_minutes" | "workspace_id" | "created_at">;
+export type OpenTask = Pick<Task, "id" | "title" | "status" | "due_at" | "due_is_hard" | "estimate_minutes" | "workspace_id" | "created_at" | "source" | "external_ref" | "commitment">;
 
 /**
  * Open top-level tasks (soonest due first), which of them already have a
  * planned time from `today` on, and how many open steps each has.
  */
-export async function loadOpenWork(ctx: Ctx, today: string): Promise<{ openTasks: OpenTask[]; scheduled: Set<string>; steps: Map<string, number> }> {
+export async function loadOpenWork(ctx: Ctx, today: string): Promise<{ openTasks: OpenTask[]; scheduled: Set<string>; steps: Map<string, number>; triage: OpenTask[] }> {
   const [openTasksRes, scheduledRes, stepsRes] = await Promise.all([
     ctx.db
       .from("tasks")
-      .select("id,title,status,due_at,due_is_hard,estimate_minutes,workspace_id,created_at")
+      .select("id,title,status,due_at,due_is_hard,estimate_minutes,workspace_id,created_at,source,external_ref,commitment")
       .is("parent_task_id", null)
       .in("status", ["todo", "in_progress", "blocked"])
       .order("due_at", { ascending: true, nullsFirst: false })
@@ -103,9 +104,14 @@ export async function loadOpenWork(ctx: Ctx, today: string): Promise<{ openTasks
     ctx.db.from("plan_blocks").select("task_id").gte("plan_date", today).in("status", ["planned", "in_progress"]).not("task_id", "is", null),
     ctx.db.from("tasks").select("parent_task_id").not("parent_task_id", "is", null).in("status", ["todo", "in_progress", "blocked"]),
   ]);
-  const openTasks = (openTasksRes.data ?? []) as OpenTask[];
   const scheduled = new Set(((scheduledRes.data ?? []) as { task_id: string }[]).map((b) => b.task_id));
+  // Overdue imported work waits for the person's decision (lib/triage.ts):
+  // it isn't offered as work needing a time; Today shows it as one row.
+  const all = (openTasksRes.data ?? []) as OpenTask[];
+  const nowMs = Date.now();
+  const triage = all.filter((t) => awaitingTriage(t, nowMs, scheduled.has(t.id)));
+  const openTasks = all.filter((t) => !triage.includes(t));
   const steps = new Map<string, number>();
   for (const s of (stepsRes.data ?? []) as { parent_task_id: string }[]) steps.set(s.parent_task_id, (steps.get(s.parent_task_id) ?? 0) + 1);
-  return { openTasks, scheduled, steps };
+  return { openTasks, scheduled, steps, triage };
 }

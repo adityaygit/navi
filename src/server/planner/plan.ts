@@ -103,6 +103,24 @@ export async function generateDayPlan(
     }
   }
 
+  // Work the person placed on a later day (their own or pinned blocks) is
+  // already scheduled: re-planning this day must not book it again.
+  {
+    const { data: later } = await ctx.db
+      .from("plan_blocks")
+      .select("task_id,starts_at,ends_at,is_flexible,created_by,pinned")
+      .eq("user_id", ctx.userId)
+      .gt("plan_date", day)
+      .lte("plan_date", DateTime.fromISO(day, { zone }).plus({ days: 14 }).toISODate()!)
+      .in("status", ["planned", "in_progress"])
+      .gt("ends_at", new Date().toISOString())
+      .not("task_id", "is", null);
+    for (const b of later ?? []) {
+      if (b.is_flexible && b.created_by !== "user" && !b.pinned) continue;
+      alreadyScheduledMinutes[b.task_id] = (alreadyScheduledMinutes[b.task_id] ?? 0) + (Date.parse(b.ends_at) - Date.parse(b.starts_at)) / 60000;
+    }
+  }
+
   const now = opts.from ?? DateTime.now().setZone(zone);
   const out = scheduleDay({
     date: day,

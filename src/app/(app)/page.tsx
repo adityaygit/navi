@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { awaitingTriage } from "@/lib/triage";
 import { DateTime } from "luxon";
 import { requireCtx, getProfile } from "@/server/context";
 import type { Briefing, Task } from "@/lib/types";
@@ -50,10 +51,12 @@ export default async function HomePage() {
     ctx.db.from("briefings").select("*").is("read_at", null).eq("local_date", today).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     ctx.db.from("plan_blocks").select("id", { count: "exact", head: true }).eq("plan_date", yesterday).in("status", ["planned", "in_progress"]),
     ctx.db.from("dismissed_suggestions").select("key"),
-    ctx.db.from("tasks").select("id,title,due_at,estimate_minutes").is("parent_task_id", null).in("status", ["todo", "in_progress", "blocked"]).not("due_at", "is", null).order("due_at").limit(1).maybeSingle(),
+    // Soonest due, skipping overdue imports that wait for a decision (lib/triage.ts).
+    ctx.db.from("tasks").select("id,title,due_at,estimate_minutes,status,source,external_ref,commitment").is("parent_task_id", null).in("status", ["todo", "in_progress", "blocked"]).not("due_at", "is", null).order("due_at").limit(200),
     ctx.db.from("tasks").select("title").in("status", ["todo", "in_progress", "blocked"]),
   ]);
   const day = dayFrom(src, today);
+  const nextDue = ((nextDueRes.data ?? []) as Pick<Task, "id" | "title" | "due_at" | "estimate_minutes" | "status" | "source" | "external_ref" | "commitment">[]).find((t) => !awaitingTriage(t, nowMs)) ?? null;
   const dismissed = new Set(((dismissedRes.data ?? []) as { key: string }[]).map((d) => d.key));
 
   // ---- the summary: today's tasks (due today, or with a block today) and planned time by part of day
@@ -101,8 +104,8 @@ export default async function HomePage() {
       const worked = lastWorkedText(Date.parse(last.ended_at), last.actual_minutes, nowMs, z.hourOf, z.sameDay, z.yesterday);
       const stepText = step?.title ? ` Next step: ${step.title.charAt(0).toLowerCase()}${step.title.slice(1)}.` : "";
       cont = { label: "Pick up where you left off", title: last.tasks.title, sub: `${worked}${stepText}`, taskId: last.tasks.id, minutes: last.tasks.estimate_minutes ? Math.min(last.tasks.estimate_minutes, 50) : 25 };
-    } else if (nextDueRes.data) {
-      const t = nextDueRes.data as Pick<Task, "id" | "title" | "due_at" | "estimate_minutes">;
+    } else if (nextDue) {
+      const t = nextDue;
       const due = DateTime.fromISO(t.due_at!, { zone });
       const when = due.hasSame(now, "day") ? `today at ${due.toFormat("h:mm a")}` : due < now ? `${due.toFormat("ccc")} — it's overdue` : due.toFormat("cccc");
       cont = { label: "Next up", title: t.title, sub: `Due ${when}.`, taskId: t.id, minutes: t.estimate_minutes ? Math.min(t.estimate_minutes, 50) : 25 };

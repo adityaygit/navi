@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildItems } from "../ui/Thread";
+import { buildItems, folded } from "../ui/Thread";
 import type { Message } from "@shared/types";
 
 const msg = (id: string, role: "user" | "assistant", content: string, minsAgo: number, extra: Partial<Message> & Record<string, unknown> = {}): Message =>
@@ -24,5 +24,28 @@ describe("conversation layout", () => {
   it("shows what Navi is doing while a reply streams", () => {
     const items = buildItems([], {}, { text: "", segment: 0, steps: [{ id: "s", label: "Moving the essay", done: false, ok: true, readOnly: false }] });
     expect(items).toEqual([expect.objectContaining({ k: "looking", text: "Moving the essay" })]);
+  });
+});
+
+describe("folding (M6)", () => {
+  type Item = Parameters<typeof folded>[0][number];
+  const card = (key: string, subject: string, status = "proposed") => ({ k: "card", key, action: { id: key, status, subject } }) as unknown as Item;
+  const talk = (n: number): Item[] => Array.from({ length: n }, (_, i) => ({ k: i % 2 ? "navi" : "me", key: `t${i}`, text: `m${i}` }) as Item);
+
+  it("shows one waiting suggestion and folds the rest into “N more”", () => {
+    const items = [...talk(2), card("a", "Move the essay"), card("b", "Text Sam"), card("c", "Book gym"), card("d", "Done thing", "completed")];
+    const f = folded(items, false, false);
+    expect(f.list.map((i) => i.key)).toEqual(["t0", "t1", "a", "d"]);
+    expect(f.more).toEqual({ n: 2, subject: "Text Sam" });
+    expect(folded(items, false, true).list).toHaveLength(6);
+  });
+
+  it("folds the start of a long chat at a turn and counts the messages", () => {
+    const f = folded(talk(40), false, false);
+    expect(f.list[0].k).toBe("me");
+    expect(f.list.length).toBeGreaterThanOrEqual(16);
+    expect(f.earlier + f.list.length).toBe(40);
+    expect(folded(talk(40), true, false).earlier).toBe(0);
+    expect(folded(talk(20), false, false).earlier).toBe(0);
   });
 });

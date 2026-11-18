@@ -1,6 +1,7 @@
 import { DateTime, Interval } from "luxon";
 import type { AvailabilityWindow, CalendarEvent, PlanBlock, Routine, Task } from "@/lib/types";
 import { atLocalTime, weekdayOf } from "@/lib/time";
+import { awaitingTriage, dueWording } from "@/lib/triage";
 
 // Deterministic day planner. Places flexible work into the user's declared
 // availability around fixed commitments. Pure: no I/O, fully unit-tested.
@@ -42,11 +43,14 @@ export type PlannedBlock = {
 export type SchedulerOutput = {
   blocks: PlannedBlock[];
   fixed: { title: string; starts_at: string; ends_at: string; kind: "event" | "routine" | "block" | "busy" }[];
-  unscheduled: { task_id: string; title: string; why: string; remaining_minutes: number; due_at: string | null }[];
+  /** bucket (planner commands policy only): today's work that didn't fit, or work that can wait for a later day. */
+  unscheduled: { task_id: string; title: string; why: string; remaining_minutes: number; due_at: string | null; bucket?: "today" | "later" }[];
   /** Work that only fits after its deadline (placed anyway, so the user can see and decide). */
   afterDeadline: { task_id: string; title: string; due_at: string }[];
   warnings: string[];
   freeMinutes: number;
+  /** Overdue imported work held for the person's decision (never planned or reported as "doesn't fit"). */
+  triage?: { task_id: string; title: string; due_at: string | null; remaining_minutes: number }[];
 };
 
 const DEFAULT_ESTIMATE = 30;
@@ -181,6 +185,7 @@ export function scheduleDay(input: SchedulerInput): SchedulerOutput {
   const open = input.tasks.filter(
     (t) => (t.status === "todo" || t.status === "in_progress") && !parentsWithOpenChildren.has(t.id),
   );
+  const triage: NonNullable<SchedulerOutput["triage"]> = [];
   for (const t of open) {
     const estimate = t.estimate_minutes ?? DEFAULT_ESTIMATE;
     const adjusted = Math.round(estimate * ratio);
@@ -189,6 +194,12 @@ export function scheduleDay(input: SchedulerInput): SchedulerOutput {
     // "Keep it off until Monday": not planned before that time (a later day isn't "didn't fit").
     const notBefore = t.not_before ? DateTime.fromISO(t.not_before).setZone(zone) : undefined;
     if (notBefore && notBefore >= dayEnd) continue;
+    // Overdue imported work waits for the person's decision (see lib/triage.ts),
+    // unless they placed it themselves.
+    if (awaitingTriage(t, input.now.toMillis(), (keptTaskMinutes[t.id] ?? 0) > 0 || (input.alreadyScheduledMinutes?.[t.id] ?? 0) > 0)) {
+      triage.push({ task_id: t.id, title: t.title, due_at: t.due_at, remaining_minutes: remaining });
+      continue;
+    }
     const reasons: string[] = [];
     if (t.due_at) {
       const due = DateTime.fromISO(t.due_at).setZone(zone);
@@ -266,12 +277,13 @@ export function scheduleDay(input: SchedulerInput): SchedulerOutput {
         why: placedAny ? "Only part of it fits today" : wholeNow() ? `No free ${left}-minute slot left today` : "No free time left today",
       });
       if (item.dueBy && item.dueBy.setZone(zone).toISODate()! <= date) {
-        warnings.push(`“${item.title}” is due today but ${left} min of it doesn't fit.`);
+        const d = item.dueBy.setZone(zone);
+        warnings.push(`“${item.title}” ${dueWording(d.toISODate()!, date, d.toFormat("ccc LLL d"))} but ${left} min of it doesn't fit.`);
       }
     }
   }
   blocks.sort((a, b) => a.starts_at.localeCompare(b.starts_at));
-  return { blocks, fixed: fixed.sort((a, b) => a.starts_at.localeCompare(b.starts_at)), unscheduled, afterDeadline, warnings, freeMinutes };
+  return { blocks, fixed: fixed.sort((a, b) => a.starts_at.localeCompare(b.starts_at)), unscheduled, afterDeadline, warnings, freeMinutes, triage };
 }
 
 /**

@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { MMe, MSettingsPatch } from "@shared/mobile-api-types";
-import { NAVI_COLORS } from "@shared/navi-colors";
 import { saveSettings, useProfile, forgetMe } from "../data/me";
 import { supabase } from "../auth/supabase";
 import { config } from "../config";
@@ -8,17 +7,20 @@ import { feel } from "../native/haptics";
 import { getSetting, setSetting } from "../native/settings";
 import { canNotify, notificationsAvailable } from "../native/notify";
 import { usePalette } from "../theme/colour";
-import { ease, ink, meaning } from "../theme/tokens";
-import { Stone } from "../ui/Stone";
-import { useExit } from "../ui/useExit";
+import { ink, meaning } from "../theme/tokens";
+import { HoldButton } from "../ui/HoldButton";
+import { Pushed } from "../you/Pushed";
+import { MemoryScreen } from "../you/Memory";
+import { NotesScreen } from "../you/Notes";
+import { ActivityScreen } from "../you/Activity";
+import { SpacesScreen } from "../you/Spaces";
 import { useHideToast, useToast } from "../ui/Toast";
-import { ColourPicker } from "./ColourPicker";
 import { PasswordSheet } from "./PasswordSheet";
 import { Group, RadioRow, Row, SelectRow, SwitchRow, TimeRow, card } from "./parts";
 import { skippedByQuiet, syncReminders } from "./reminders";
 
-// Settings (M5). One scrolling page in the M4 look: who you are, Navi's
-// colour, your day, briefings, how much Navi does alone, this phone, privacy,
+// Settings (M6 You). One scrolling page: who you are, what Navi keeps
+// (memory, notes, activity, spaces), your day, briefings, how much Navi does alone, this phone, privacy,
 // account. Every change saves at once and syncs with the website; a failed
 // save rolls back and says why. Swipe from the left edge (or Back) to close.
 
@@ -28,19 +30,17 @@ function zoneLabel(z: string) {
   return z.replace(/_/g, " ").replace(/^.*\//, "");
 }
 
-export function Settings({ onClose }: { onClose: () => void }) {
+export function Settings({ onClose, onSetup }: { onClose: () => void; onSetup?: () => void }) {
   const P = usePalette();
   const me = useProfile();
   const toast = useToast();
   const hideToast = useHideToast();
   useEffect(() => hideToast(), [hideToast]);
-  const { closing, close } = useExit(300);
   const [pw, setPw] = useState(false);
+  const [sub, setSub] = useState<null | "memory" | "notes" | "activity" | "spaces">(null);
+  const [sky, setSky] = useState(getSetting("sky"));
   const [haptics, setHaptics] = useState(getSetting("haptics"));
   const [reminders, setReminders] = useState(getSetting("reminders"));
-  const panel = useRef<HTMLDivElement>(null);
-  const [scrolled, setScrolled] = useState(false);
-  const shut = () => close(onClose);
 
   async function save(patch: MSettingsPatch, optimistic: Partial<MMe>, ok?: string) {
     feel("select");
@@ -58,33 +58,6 @@ export function Settings({ onClose }: { onClose: () => void }) {
     void syncReminders(me);
   }, [me, reminders]);
 
-  // Swipe from the left edge to go back, like any iPhone page.
-  const drag = useRef<{ x: number; dx: number } | null>(null);
-  const onTouchStart = (e: React.TouchEvent) => {
-    const x = e.touches[0].clientX;
-    if (x < 28) drag.current = { x, dx: 0 };
-  };
-  const onTouchMove = (e: React.TouchEvent) => {
-    if (!drag.current || !panel.current) return;
-    drag.current.dx = Math.max(0, e.touches[0].clientX - drag.current.x);
-    panel.current.style.transition = "none";
-    panel.current.style.transform = `translateX(${drag.current.dx}px)`;
-  };
-  const onTouchEnd = () => {
-    const d = drag.current;
-    drag.current = null;
-    if (!d || !panel.current) return;
-    if (d.dx > 110) {
-      feel("pageSettle");
-      panel.current.style.transition = `transform 0.24s ${ease}`;
-      panel.current.style.transform = "translateX(100%)";
-      window.setTimeout(onClose, 230);
-    } else {
-      panel.current.style.transition = `transform 0.3s ${ease}`;
-      panel.current.style.transform = "translateX(0)";
-    }
-  };
-
   const zones = useMemo(() => {
     const list = typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : [];
     const all = Array.from(new Set([me?.timezone ?? phoneZone, phoneZone, ...list]));
@@ -94,55 +67,35 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const skipped = me ? skippedByQuiet(me) : [];
 
   return (
-    <div style={{ position: "absolute", inset: 0, zIndex: 20 }}>
-      <div aria-hidden="true" style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)", animation: closing ? "nFadeOut 0.3s ease both" : "nFade 0.3s ease both" }} />
-      <div
-        ref={panel}
-        role="dialog"
-        aria-label="Settings"
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-        style={{ position: "absolute", inset: 0, background: ink.bg, display: "flex", flexDirection: "column", animation: closing ? `nRightOut 0.3s ${ease} both` : `nRight 0.38s ${ease} both`, boxShadow: "-20px 0 40px rgba(0,0,0,0.5)" }}
-      >
-        <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, top: 0, height: 360, background: P.scene, opacity: 0.7, pointerEvents: "none" }} />
-        {/* Top bar */}
-        <div style={{ position: "relative", zIndex: 1, flex: "none", height: "calc(var(--sat) + 52px)", boxSizing: "border-box", display: "flex", alignItems: "center", padding: "var(--sat) 8px 0", background: scrolled ? "rgba(0,0,0,0.72)" : "transparent", backdropFilter: scrolled ? "blur(20px)" : undefined, WebkitBackdropFilter: scrolled ? "blur(20px)" : undefined, transition: "background-color 0.2s" }}>
-          <button type="button" onClick={() => { feel("select"); shut(); }} style={{ height: 44, display: "flex", alignItems: "center", gap: 4, padding: "0 10px 0 6px", fontSize: 17, color: P.accent }}>
-            <svg width="12" height="20" viewBox="0 0 12 20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 2 2 10l8 8" /></svg>
-            Back
-          </button>
-          <span aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, bottom: 14, textAlign: "center", fontSize: 17, fontWeight: 600, pointerEvents: "none", opacity: scrolled ? 1 : 0, transition: "opacity 0.2s" }}>Settings</span>
-          <span aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 1, background: ink.line, opacity: scrolled ? 1 : 0, transition: "opacity 0.2s" }} />
-        </div>
-
-        <div onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 44)} style={{ position: "relative", flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "0 16px calc(var(--sab) + 40px)" }}>
-          <h1 style={{ margin: "4px 4px 18px", fontSize: 34, fontWeight: 700, letterSpacing: "-0.02em" }}>Settings</h1>
-
+    <>
+      <Pushed title="Settings" onClose={onClose}>
+        {() => (
+          <>
           {!me ? (
             <div style={{ padding: "60px 0", textAlign: "center", color: ink.faint, fontSize: 15 }}>Loading your settings…</div>
           ) : (
             <>
-              {/* You */}
-              <div style={{ display: "flex", alignItems: "center", gap: 16, padding: 16, borderRadius: 20, background: card }}>
-                <Stone w={52} h={48} bg={P.stone} shadow={`0 10px 24px ${P.stoneShadow}`} />
+              <div style={{ display: "flex", alignItems: "center", gap: 14, padding: 16, borderRadius: 22, background: card }}>
+                <span aria-hidden="true" style={{ flex: "none", width: 48, height: 48, borderRadius: 24, background: ink.text, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 700 }}>{(me.displayName || me.email || "Y").slice(0, 1).toUpperCase()}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: 0, fontSize: 20, fontWeight: 600, letterSpacing: "-0.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{me.displayName || "You"}</p>
-                  <p style={{ margin: "2px 0 0", fontSize: 15, color: ink.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{me.email}</p>
+                  <p style={{ margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: "-0.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{me.displayName || "You"}</p>
+                  <p style={{ margin: "2px 0 0", fontSize: 15, fontWeight: 500, color: ink.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{me.email}</p>
                 </div>
               </div>
-              <p style={{ margin: "10px 16px 0", fontSize: 13, lineHeight: 1.45, color: ink.dim }}>
-                You can also change any of this by telling Navi, like <span style={{ color: ink.soft }}>"move my morning briefing to 7"</span>.
-              </p>
 
-              <ColourPicker
-                me={me}
-                onPick={(followsDay, key) => {
-                  if (followsDay === me.colourFollowsDay && (!key || key === me.naviColor.key)) return;
-                  const patch: MSettingsPatch = { colourFollowsDay: followsDay, ...(key ? { naviColor: key } : {}) };
-                  void save(patch, { colourFollowsDay: followsDay, ...(key ? { naviColor: { ...me.naviColor, ...(colourOf(key) ?? {}) } } : {}) });
-                }}
-              />
+              {me.onboarding.status === "skipped" && onSetup ? (
+                <button type="button" onClick={() => { feel("select"); onSetup(); }} style={{ marginTop: 16, width: "100%", minHeight: 64, borderRadius: 22, background: ink.text, color: "#fff", padding: "0 20px", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 17, fontWeight: 700 }}>
+                  Finish setting up Navi
+                  <svg width="8" height="14" viewBox="0 0 8 14" aria-hidden="true"><path d="M1.5 1.5L6.5 7l-5 5.5" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </button>
+              ) : null}
+
+              <Group label="What Navi keeps" foot={<>You can also change any of this by telling Navi, like “move my morning briefing to 7”.</>}>
+                <Row label="Memory" sub="What Navi knows about you" chevron onClick={() => { feel("select"); setSub("memory"); }} />
+                <Row label="Notes" sub="Things you wanted to keep" chevron onClick={() => { feel("select"); setSub("notes"); }} />
+                <Row label="Activity" sub="Everything that changed, with Undo" chevron onClick={() => { feel("select"); setSub("activity"); }} />
+                <Row label="Spaces" sub="School, work, friends and the rest" chevron onClick={() => { feel("select"); setSub("spaces"); }} />
+              </Group>
 
               <Group label="Your day" foot="Navi only plans between waking up and bedtime, in your time zone.">
                 <NameRow value={me.displayName ?? ""} onSave={(v) => save({ displayName: v || null }, { displayName: v || null }, "Name saved")} />
@@ -197,6 +150,17 @@ export function Settings({ onClose }: { onClose: () => void }) {
                   }}
                 />
                 <SwitchRow
+                  label="Sky backgrounds"
+                  sub="Behind the greeting, Focus and stories"
+                  on={sky}
+                  accent={P.accent}
+                  onChange={(v) => {
+                    feel("select");
+                    setSetting("sky", v);
+                    setSky(v);
+                  }}
+                />
+                <SwitchRow
                   label="Vibration"
                   sub="Taps when you swipe, send, finish and hold to talk"
                   on={haptics}
@@ -219,16 +183,32 @@ export function Settings({ onClose }: { onClose: () => void }) {
               <Group label="Account" foot="Connected services like Canvas, the AI budget and deleting your account are on the website for now.">
                 <Row label="Password" value="Set or change" chevron onClick={() => { feel("select"); setPw(true); }} />
                 <Row label="More settings on the website" chevron onClick={() => { feel("select"); window.open(`${config.apiBase}/settings`, "_blank"); }} />
-                <Row label="Sign out" danger onClick={() => { feel("warning"); forgetMe(); void supabase.auth.signOut(); }} />
               </Group>
+              <HoldButton
+                ms={1200}
+                doneFeel="warning"
+                label="Hold to sign out"
+                onDone={() => {
+                  forgetMe();
+                  void supabase.auth.signOut();
+                }}
+                onHint={(t) => toast(t)}
+                fill="rgba(178,58,23,0.12)"
+                style={{ marginTop: 24, width: "100%", height: 56, borderRadius: 28, background: card, color: meaning.slipping, fontSize: 17, fontWeight: 700, textAlign: "center" }}
+              />
 
-              <p style={{ margin: "28px 0 0", textAlign: "center", fontSize: 13, color: ink.dim }}>Navi 1.5</p>
+              <p style={{ margin: "24px 0 0", textAlign: "center", fontSize: 14, fontWeight: 500, color: ink.dim }}>Navi 1.5</p>
             </>
           )}
-        </div>
-      </div>
+          </>
+        )}
+      </Pushed>
+      {sub === "memory" ? <MemoryScreen onClose={() => setSub(null)} /> : null}
+      {sub === "notes" ? <NotesScreen onClose={() => setSub(null)} /> : null}
+      {sub === "activity" ? <ActivityScreen onClose={() => setSub(null)} /> : null}
+      {sub === "spaces" ? <SpacesScreen onClose={() => setSub(null)} /> : null}
       {pw ? <PasswordSheet palette={P} onClose={() => setPw(false)} onSaved={() => toast("Password saved. You can sign in with it now.", { accent: P.accent })} /> : null}
-    </div>
+    </>
   );
 }
 
@@ -251,9 +231,4 @@ function NameRow({ value, onSave }: { value: string; onSave: (v: string) => void
       />
     </label>
   );
-}
-
-function colourOf(key: string) {
-  const c = NAVI_COLORS.find((x) => x.key === key);
-  return c ? { key: c.key, name: c.name, light: c.light, mid: c.mid, dark: c.dark, ink: c.ink, text: c.text } : null;
 }

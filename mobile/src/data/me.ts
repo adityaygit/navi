@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 import type { MMe, MSettingsPatch } from "@shared/mobile-api-types";
+import { clearOfflineCache } from "./offline";
 import { api } from "../api/client";
 import { supabase } from "../auth/supabase";
 import { rememberColour } from "../theme/colour";
@@ -75,5 +76,6 @@ export async function saveSettings(patch: MSettingsPatch, optimistic?: Partial<M
 /** Sign-out clears the cached profile. */
 export function forgetMe() {
   set(null);
+  clearOfflineCache();
 }
 

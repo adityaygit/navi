@@ -5,6 +5,7 @@ import type { Ctx } from "@/server/context";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { UserFacingError } from "@/server/http";
 import { logActivity } from "@/server/domain/activity";
+import { provenanceRef } from "@/lib/triage";
 import { fingerprint, integrationCryptoReady, sealSecret } from "./crypto";
 import { parseIcs } from "./ics/parse";
 import { FeedError, safeFetchText, withRetries } from "./safe-fetch";
@@ -138,9 +139,9 @@ export async function refreshConnection(ctx: Ctx, connectionId: string, deps: De
 export async function disconnectFeed(ctx: Ctx, connectionId: string, opts: { removeImported: boolean }, deps: Deps = {}) {
   const admin = adminOf(deps);
   const conn = await ownedConnection(admin, ctx.userId, connectionId);
-  const links: { task_id: string | null; event_id: string | null }[] = [];
+  const links: { task_id: string | null; event_id: string | null; external_id: string }[] = [];
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await admin.from("external_items").select("task_id,event_id").eq("connection_id", conn.id).eq("user_id", ctx.userId).order("id").range(from, from + 999);
+    const { data, error } = await admin.from("external_items").select("task_id,event_id,external_id").eq("connection_id", conn.id).eq("user_id", ctx.userId).order("id").range(from, from + 999);
     if (error) throw new Error(error.message);
     links.push(...(data ?? []));
     if (!data || data.length < 1000) break;
@@ -157,8 +158,23 @@ export async function disconnectFeed(ctx: Ctx, connectionId: string, opts: { rem
       const { data } = await admin.from("tasks").delete().eq("user_id", ctx.userId).like("external_ref", "ext:%").in("id", ids).neq("status", "done").select("id");
       removedTasks += data?.length ?? 0;
     }
-    // Whatever is left becomes an ordinary task the person can edit freely.
-    await admin.from("tasks").update({ external_ref: null }).eq("user_id", ctx.userId).in("id", ids);
+  }
+  // Whatever is left becomes an ordinary task the person can edit freely. It
+  // keeps where it came from (not the live "ext:" link), so connecting the
+  // same calendar again re-links it instead of importing it a second time
+  // (that used to duplicate every assignment, finished ones reopened as to-do).
+  const keyOf = new Map(links.filter((l) => l.task_id).map((l) => [l.task_id!, provenanceRef(conn.provider, conn.display_host, l.external_id)]));
+  const left: string[] = [];
+  for (let i = 0; i < taskIds.length; i += 100) {
+    const { data } = await admin.from("tasks").select("id").eq("user_id", ctx.userId).in("id", taskIds.slice(i, i + 100));
+    left.push(...(data ?? []).map((t) => t.id));
+  }
+  for (let i = 0; i < left.length; i += 8) {
+    await Promise.all(left.slice(i, i + 8).map(async (id) => {
+      const { error } = await admin.from("tasks").update({ external_ref: keyOf.get(id) ?? null }).eq("user_id", ctx.userId).eq("id", id);
+      // A clash would mean the same assignment came through two connections: keep the task, drop the key.
+      if (error) await admin.from("tasks").update({ external_ref: null }).eq("user_id", ctx.userId).eq("id", id);
+    }));
   }
   for (let i = 0; i < eventIds.length; i += 100) {
     const ids = eventIds.slice(i, i + 100);

@@ -1,4 +1,5 @@
 import "server-only";
+import { awaitingTriage } from "@/lib/triage";
 import { DateTime } from "luxon";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CalendarEvent, OccurrenceOverride, PlanBlock, Profile, Routine, Task } from "@/lib/types";
@@ -60,7 +61,7 @@ export async function buildBriefing(db: SupabaseClient, profile: Profile, kind: 
     const [{ items, conflicts }, blocksRes, dueRes, inboxRes, apprRes, hardRes, risks] = await Promise.all([
       fixedOn(db, userId, date, zone),
       db.from("plan_blocks").select("*").eq("user_id", userId).eq("plan_date", date).order("starts_at"),
-      db.from("tasks").select("id,title,due_at,due_is_hard").eq("user_id", userId).in("status", ["todo", "in_progress", "blocked"]).lte("due_at", dayEnd.toISO()!).order("due_at"),
+      db.from("tasks").select("id,title,due_at,due_is_hard,status,source,external_ref").eq("user_id", userId).in("status", ["todo", "in_progress", "blocked"]).lte("due_at", dayEnd.toISO()!).order("due_at"),
       db.from("proposals").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("status", "pending"),
       db.from("approvals").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("status", "proposed").gt("expires_at", new Date().toISOString()),
       db.from("tasks").select("id,title,due_at").eq("user_id", userId).in("status", ["todo", "in_progress", "blocked"]).eq("due_is_hard", true).gt("due_at", dayEnd.toISO()!).lte("due_at", dayEnd.plus({ days: 3 }).toISO()!).order("due_at"),
@@ -68,8 +69,11 @@ export async function buildBriefing(db: SupabaseClient, profile: Profile, kind: 
     ]);
     const blocks = (blocksRes.data ?? []) as PlanBlock[];
     const due = (dueRes.data ?? []) as Task[];
-    const overdue = due.filter((t) => t.due_at! < now.toISO()!);
-    const dueToday = due.filter((t) => !overdue.includes(t));
+    const overdueAll = due.filter((t) => t.due_at! < now.toISO()!);
+    // Overdue imported work may already be handed in: one line asking for a decision, not a list of failures.
+    const triage = overdueAll.filter((t) => awaitingTriage(t, now.toMillis()));
+    const overdue = overdueAll.filter((t) => !triage.includes(t));
+    const dueToday = due.filter((t) => !overdueAll.includes(t));
     // Plain and short: the times are on My day, so the plan isn't recited here.
     lines.push(items.length ? `Fixed today: ${list(items.map((i) => `${shortTitle(i.title)} (${i.start.toFormat(i.start.minute ? "h:mm a" : "h a")})`))}.` : "Nothing fixed today.");
     if (conflicts.length) lines.push(`⚠ Two things overlap: ${conflicts.join("; ")}.`);
@@ -79,6 +83,7 @@ export async function buildBriefing(db: SupabaseClient, profile: Profile, kind: 
     if (assumed.length) lines.push(`${assumed.join(" ")} Tell Navi if that's wrong.`);
     if (dueToday.length) lines.push(`Due today: ${list(dueToday.map((t) => `${shortTitle(t.title)}${t.due_is_hard ? " (hard deadline)" : ""}`))}.`);
     if (overdue.length) lines.push(`Overdue: ${list(overdue.map((t) => shortTitle(t.title)))}. Decide today: do it, move it, or drop it.`);
+    if (triage.length) lines.push(`${things(triage.length)} imported from Canvas ${triage.length === 1 ? "is" : "are"} past due. Navi can't see what you handed in: tell Navi which are done and which still need time.`);
     const hardSoon = (hardRes.data ?? []) as Pick<Task, "id" | "title" | "due_at">[];
     const when = (iso: string) => DateTime.fromISO(iso).setZone(zone).toFormat("ccc h:mm a");
     if (hardSoon.length) lines.push(`Hard deadlines in the next 3 days: ${hardSoon.map((t) => `${t.title} (${when(t.due_at!)})`).join("; ")}.`);
@@ -97,6 +102,7 @@ export async function buildBriefing(db: SupabaseClient, profile: Profile, kind: 
       planned: blocks.length,
       dueToday: dueToday.length,
       overdue: overdue.length,
+      needsDecision: triage.length,
       conflicts,
       hardSoon: hardSoon.map((t) => ({ id: t.id, title: t.title, due_at: t.due_at })),
       atRisk: risks,

@@ -2,19 +2,35 @@
 @import "@fontsource/figtree/500.css";
 @import "@fontsource/figtree/600.css";
 @import "@fontsource/figtree/700.css";
+@import "@fontsource/figtree/800.css";
+@import "@fontsource/figtree/500-italic.css";
+@import "@fontsource/figtree/600-italic.css";
+@import "@fontsource/figtree/700-italic.css";
+@import "@fontsource/figtree/800-italic.css";
 
+/* Navi M6 "Sky": light, glass, a flat orb. Spec: docs/navi-1.5/mobile/DESIGN_M6.md */
 :root {
   /* Safe areas. The status bar overlays the app; the app draws under it. */
   --sat: env(safe-area-inset-top, 0px);
-  --sab: max(env(safe-area-inset-bottom, 0px), 16px);
-  color-scheme: dark;
+  /* The keyboard (iOS): set from native/keyboard.ts the moment it starts to rise, and eased
+     here over the same time and curve, so the whole app follows it instead of jumping after it.
+     --kbo is 1 with no keyboard and 0 with one (the home-bar gap isn't needed above a keyboard). */
+  --kb: 0px;
+  --kbo: 1;
+  --sab: max(calc(env(safe-area-inset-bottom, 0px) * var(--kbo)), calc(10px + 6px * var(--kbo)));
+  transition: --kb 250ms cubic-bezier(0.17, 0.59, 0.4, 0.77), --kbo 250ms cubic-bezier(0.17, 0.59, 0.4, 0.77);
+  color-scheme: light;
 }
+@property --kb { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --kbo { syntax: "<number>"; inherits: true; initial-value: 1; }
 /* Browser preview at phone size: pretend there is a notch and a home bar, so screenshots match the device. */
-:root.sim { --sat: 50px; --sab: 34px; }
+:root.sim { --sat: 50px; --sab: max(calc(34px * var(--kbo)), calc(10px + 6px * var(--kbo))); }
 
-html, body, #root { height: 100%; margin: 0; background: #000; overflow: hidden; overscroll-behavior: none; }
+html, body, #root { height: 100%; margin: 0; background: #FBFBFD; overflow: hidden; overscroll-behavior: none; }
+/* The app ends where the keyboard begins (like a native resize, but in step with the keyboard). */
+#root { position: fixed; inset: 0 0 var(--kb) 0; height: auto; }
 body {
-  color: #F5F5F7;
+  color: #11141A;
   font-family: Figtree, -apple-system, system-ui, sans-serif;
   font-size: 17px;
   font-feature-settings: "tnum";
@@ -28,26 +44,73 @@ body {
 input, textarea { user-select: text; -webkit-user-select: text; }
 button { font: inherit; color: inherit; border: 0; background: none; padding: 0; margin: 0; cursor: pointer; text-align: left; -webkit-tap-highlight-color: transparent; }
 input, textarea { font: inherit; color: inherit; }
-input::placeholder, textarea::placeholder { color: #8E8E96; }
-button:focus-visible, input:focus-visible { outline: 2px solid rgba(255,255,255,0.6); outline-offset: 2px; }
+input::placeholder, textarea::placeholder { color: #5B6272; }
+button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid #2B6FFF; outline-offset: 2px; }
 .scroll { overflow-y: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 .scroll::-webkit-scrollbar { display: none; }
+
+/* The one word that matters, in a headline. */
+.em { font-style: italic; }
+
+/* Skies: a colour while the picture loads, one picture per screen, can be switched off. */
+.sky { background-repeat: no-repeat; background-size: cover; background-position: 50% 20%; }
+.sky-day { background-color: #C9DDF0; }
+.sky-dusk { background-color: #D9C7E3; }
+.sky-focus { background-color: #F1E7DD; }
+.sky-off { background-color: #E6EDF6; background-image: linear-gradient(180deg, #DCE6F3 0%, #EEF2F8 55%, #FBFBFD 100%) !important; }
+
+/* Navi's orb: a disc of sky turning slowly, soft petals, a breathing white ring. Flat, no lighting. */
+.orb { position: relative; display: block; flex: none; border-radius: 50%; overflow: hidden; isolation: isolate; background: #CADCFC; }
+.orb > .orb-sky { position: absolute; inset: -55%; background-size: cover; background-position: 50% 50%; animation: vSpin 26s linear infinite; }
+.orb > .orb-petal { position: absolute; inset: -20%; border-radius: 50%; background: conic-gradient(from 0deg, rgba(255,255,255,0) 0deg, rgba(255,255,255,0.6) 45deg, rgba(255,255,255,0) 95deg, rgba(160,185,209,0.45) 150deg, rgba(255,255,255,0) 205deg, rgba(255,255,255,0.55) 265deg, rgba(255,255,255,0) 320deg); filter: blur(16px); animation: vSpin 15s linear infinite reverse; }
+.orb > .orb-ring { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0) 56%, rgba(255,255,255,0.5) 69%, rgba(255,255,255,0) 80%); animation: vRing 4.5s ease-in-out infinite; }
+.orb.sm > .orb-petal { filter: blur(5px); }
+.orb.talk > .orb-sky { animation-duration: 9s; }
+.orb.talk > .orb-petal { animation-duration: 5s; }
+.orb.talk > .orb-ring { animation-duration: 1.6s; }
+.orb.mute { filter: grayscale(1) brightness(1.08); }
+.orb.mute > * { animation-play-state: paused; }
+
+@keyframes vSpin { to { transform: rotate(360deg) } }
+@keyframes vRing { 0%, 100% { transform: scale(0.97); opacity: 0.75 } 50% { transform: scale(1.03); opacity: 1 } }
 
 @keyframes nUp { from { transform: translateY(100%) } to { transform: none } }
 @keyframes nDown { from { transform: none } to { transform: translateY(100%) } }
 @keyframes nFade { from { opacity: 0 } to { opacity: 1 } }
 @keyframes nFadeOut { from { opacity: 1 } to { opacity: 0 } }
-@keyframes nRise { from { opacity: 0; transform: translateY(14px) } to { opacity: 1; transform: none } }
-@keyframes nSink { from { opacity: 1; transform: none } to { opacity: 0; transform: translateY(14px) } }
+@keyframes nRise { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
+@keyframes nSink { from { opacity: 1; transform: none } to { opacity: 0; transform: translateY(10px) } }
 @keyframes nRight { from { transform: translateX(100%) } to { transform: none } }
 @keyframes nRightOut { from { transform: none } to { transform: translateX(100%) } }
 @keyframes nLeft { from { transform: translateX(-100%) } to { transform: none } }
-@keyframes nLeftOut { from { transform: none } to { transform: translateX(-100%) } }
+@keyframes nLeftOut { from { transform: none } to { transform: translateX(-105%) } }
 @keyframes nGrow { from { opacity: 0; transform: scale(0.96) } to { opacity: 1; transform: none } }
+@keyframes nDim { from { opacity: 1; transform: none } to { opacity: 0; transform: scale(0.98) } }
+@keyframes nPop { from { opacity: 0; transform: scale(1.4) } to { opacity: 1; transform: none } }
+@keyframes nOrbIn { from { opacity: 0; transform: scale(0.7) } to { opacity: 1; transform: none } }
 @keyframes nPulse { 0% { transform: scale(1) } 50% { transform: scale(1.06) } 100% { transform: scale(1) } }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+@keyframes nDots { 0%, 80%, 100% { opacity: 0.25 } 40% { opacity: 1 } }
+
+/* Opening: the N, then the name from behind it, then home rises. */
+@keyframes opMarkIn { from { opacity: 0; transform: scale(0.82) } to { opacity: 1; transform: none } }
+@keyframes opSlide { from { transform: translateX(var(--op-shift, 86.5px)) } to { transform: none } }
+@keyframes opWord { from { opacity: 0; clip-path: inset(0 100% 0 0); transform: translateX(-18px) } to { opacity: 1; clip-path: inset(0 0 0 0); transform: none } }
+@keyframes opLockOut { from { opacity: 1; transform: none; filter: blur(0) } to { opacity: 0; transform: scale(0.94); filter: blur(6px) } }
+@keyframes opHomeUp { from { opacity: 0; transform: translateY(90px) scale(0.97) } to { opacity: 1; transform: none } }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; } }
 
 /* Settings: hairlines between grouped rows, inset like iOS; pressed rows dim. */
-.ngroup > * + *::before { content: ""; position: absolute; left: 16px; right: 0; top: 0; height: 1px; background: rgba(255,255,255,0.07); pointer-events: none; }
+.ngroup > * + *::before { content: ""; position: absolute; left: 16px; right: 0; top: 0; height: 1px; background: rgba(17,20,26,0.06); pointer-events: none; }
 .npress { transition: background-color 0.15s; -webkit-tap-highlight-color: transparent; }
-.npress:active { background-color: rgba(255,255,255,0.05); }
+.npress:active { background-color: rgba(17,20,26,0.04); }
+
+/* Hold to confirm: nothing selects or pops a menu while held. */
+.hold { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: none; }
+
+/* A grid of paired buttons: an odd one out takes the whole row. */
+.pairs > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+/* Focus: the sky drifts slowly; the glow behind the ring breathes. */
+@keyframes fDrift { 0%, 100% { transform: translate3d(0, 0, 0) scale(1.06) } 50% { transform: translate3d(0, -22px, 0) scale(1.1) } }
+@keyframes fGlow { 0%, 100% { opacity: 0.55 } 50% { opacity: 0.9 } }

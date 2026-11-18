@@ -461,3 +461,7 @@ Owner approved D1–D10 as recommended. Everything is behind `profiles.preferenc
 **Turning it on for one account:** `scripts/local-only.sh node scripts/planner-flag.mjs on person@example.com` (also `off`, `status`); or Settings → "How Navi plans (preview)" (shown to admins, in development, or once on); or SQL `update profiles set preferences = coalesce(preferences,'{}'::jsonb) || '{"planner_v2": true}' where id = '<user id>';`. The hosted project needs the migration first (owner approval).
 
 **Known limits:** turning the flag off returns to v1, whose `replace_day_plan` ignores pins (pinned Navi blocks can be re-planned). One-day exceptions created through chat in ask mode are saved at once (only plans become proposals). Real-model (Claude/Gemini) behaviour with the new tools is not verified; only the devsim simulator was used.
+
+## Part 7: Planner reliability overhaul (2026-11-16)
+
+The scheduling-command layer built on top of this planner (explicit placement, swaps, day scope, overdue triage, impact analysis, verified results) is documented in `PLANNER_RELIABILITY.md`.

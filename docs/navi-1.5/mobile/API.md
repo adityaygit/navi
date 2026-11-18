@@ -177,9 +177,11 @@ tasks due that day).
 | GET | `/api/m/tasks` | – | `MTaskGroups` `{ today, needsTime, later, doneToday }` of `MTaskItem` (task row + `space`, `steps { total, done }`, `next` planned time). **today**: open, with a time today or due by the end of today (overdue first, then by time). **needsTime**: open, not today, nothing planned, not parked. **later**: open, not today, planned for a later day or parked for someday (priority 4). **doneToday**: finished today. Top-level tasks only (steps are counted). |
 | POST | `/api/m/tasks` | `MTaskCreate` (`title` required; `id` = a uuid made once per submit, so a retry returns the same task) | `MTaskResult` `{ task }` |
 | PATCH | `/api/m/tasks/:id` | `MTaskUpdate` (any field, plus `status`) | `MTaskChange` `{ result }`: `{ kind: "updated", row }` or `{ kind: "approval_requested", approvalId, reason }`. `status: "done"` completes it (a recurring task gets its next one). |
+| POST | `/api/m/triage` | `MTriageDecision` `{ decision: "handed_in" \| "not_needed", ids? , all? }` | `MTriageResult` `{ changed, notChanged, remaining }`, read back. Overdue imported (Canvas) work only; other ids are reported, never touched. |
 | POST | `/api/m/tasks/:id/complete` | `{ actualMinutes? }` | `MTaskChange` (completing twice changes nothing) |
 | POST | `/api/m/tasks/:id/uncomplete` | – | `MTaskChange` (back to `todo`) |
 | POST | `/api/m/tasks/:id/place` | `MPlaceTask` `{ startsAt (ISO), minutes 5–480 }` | `MOk`. "Put it there": a flexible block the person placed. 400 `That time overlaps “…”.` if it would overlap anything on that day (planner v2: or anything fixed). |
+| POST | `/api/m/schedule` | `MScheduleCommand` `{ command: { kind: "schedule_task" \| "move_block" \| "resize_block" \| "move_many" \| "swap" \| "split_task" \| "unschedule" \| "clear_day" \| "lock" \| "set_scope" \| "group_session" \| "replan", … }, mode?: "preview" \| "apply", requestId?, allowOverlap? }` | `MScheduleResult` `{ status, ok, message, changeId, actionId, consequences[], checks[], alternatives[], undo[] }`. Planner commands only (400 otherwise). The same validated command Navi's tools use: preview → impact → apply as one change set → read back and verify. `requestId` makes a retry run once. `infeasible` = nothing changed (`message` says why, `alternatives` = free start times). Undo with `POST /api/m/undo { activityIds: undo }`. |
 | POST | `/api/m/plan/day` | `{ date? }` | `MPlanResult` `{ message }` — one plain sentence ("Planned 3 things for today. …") |
 | POST | `/api/m/plan/week` | `{ start? }` | `MPlanResult` |
 | POST | `/api/m/blocks/:id/outcome` | `MBlockOutcome` `{ status: done\|partial\|skipped\|missed\|rest\|interrupted\|planned, reason? }` | `MOk` (undoable from Activity) |
@@ -214,6 +216,38 @@ tasks due that day).
 | --- | --- | --- | --- |
 | POST | `/api/m/briefings/generate` | `MBriefingGenerate` `{ kind: "morning" \| "evening" \| "weekly" }` | `MBriefingGenerated` `{ title, body }` (replaces today's of that kind; `GET /api/m/day` then shows it) |
 | POST | `/api/m/briefings/:id/read` | – | `MOk` |
+
+### Progress and You (M6; types in `src/lib/mobile-api-you.ts`, routes in `src/server/mobile/you.ts`)
+
+| Method | Path | Request | Response |
+| --- | --- | --- | --- |
+| GET | `/api/m/progress` | – | `MProgress`: the 7 days ending today from the same code as Insights: `headline`, `kept { done, of }` (plan blocks done out of those that count; rest, interruptions, missing info and overruns don't count; null when nothing was planned), `focusedMinutes`, `slipping` (skipped 3+ times in 3 weeks, or a hard deadline within 2 days), `hours` by space (blocks done; partly done counts half), `question` (the first finding), `week` and `today` story cards `{ a, b, c }` (`b` italic). |
+| GET | `/api/m/memory` | – | `MMemoryList` `{ guesses, known }`; each `{ id, kind, content, guess, source }` |
+| POST | `/api/m/memory` | `MMemoryWrite` `{ content }` | `MMemoryList` (remembered as something you said) |
+| PATCH | `/api/m/memory/:id` | `MMemoryWrite` `{ content }` | `MMemoryList` (a correction replaces it; the old one is kept as superseded) |
+| POST | `/api/m/memory/:id/confirm` | – | `MMemoryList` ("That's right") |
+| POST | `/api/m/memory/:id/reject` | – | `MMemoryList` ("That's wrong": Navi stops using it) |
+| DELETE | `/api/m/memory/:id` | – | `MMemoryList` |
+| GET | `/api/m/notes` | – | `MNoteList` `{ notes }`; each `{ id, title, body, source }` |
+| POST | `/api/m/notes` | `MNoteWrite` `{ id?, title?, body }` | `MNote` (idempotent on `id`) |
+| PATCH | `/api/m/notes/:id` | `MNoteWrite` `{ title?, body }` | `MOk` |
+| DELETE | `/api/m/notes/:id` | – | `MOk` (for good; logged in Activity without Undo. Edits can be undone there.) |
+| GET | `/api/m/activity` | – | `MActivityList` `{ days: [{ label, entries }] }`; each `{ id, who, summary, at, canUndo, undone }`. Undo: `POST /api/m/activity/:id/revert`. |
+| GET | `/api/m/spaces` | – | `MSpaceList` `{ spaces }`; each `{ id, name, color, openTasks, projects }` |
+| PATCH | `/api/m/spaces/:id` | `MSpaceWrite` `{ name?, color? }` | `MOk` |
+
+### Setup (M6 step 5; types in `src/lib/mobile-api-welcome.ts`, routes in `src/server/mobile/welcome.ts`, logic shared with the web's /welcome in `src/server/domain/welcome.ts`)
+
+| Method | Path | Request | Response |
+| --- | --- | --- | --- |
+| GET | `/api/m/welcome` | – | `MWelcome` `{ step, status, firstName, basics, picked, checkIn }`. `step` is the screen to resume on (hello, basics, talk, review, notify, plan), or null when setup is done. |
+| GET | `/api/m/welcome/talk` | – | `MWelcomeTalk`: the setup conversation (same shape as a chat's history) plus `proposals` it has picked up so far. Send turns with `POST /api/chat` `{ kind: "onboarding" }`; voice with `/api/voice/session` `{ kind: "onboarding" }`. |
+| POST | `/api/m/welcome/step` | `MWelcomeStepSave` `{ step }` | `MWelcome` (step "talk" also marks setup under way; "done" leaves setup) |
+| POST | `/api/m/welcome/basics` | `MWelcomeBasics` `{ name, timezone, wake, bed }` | `MWelcome` (sets quiet hours bedtime→wake-up, the morning briefing at wake-up and when Navi may plan; goes on to talk) |
+| POST | `/api/m/welcome/talk-done` | – | `MWelcome` (to the review; 400 when nothing was picked up yet) |
+| POST | `/api/m/welcome/restart` | – | `MWelcome` (back to talking) |
+| POST | `/api/m/welcome/skip` | `{ step }` | `MOk` ("Later": setup is skipped and can be picked up again) |
+| POST | `/api/m/welcome/complete` | `MWelcomeComplete` `{ acceptIds }` (none for quick setup) | `MWelcomeCompleted` `{ accepted, failed, plannedBlocks }`; the rest stay in Inbox; the first week is planned; next step "notify" |
 
 ### Existing routes the app uses
 

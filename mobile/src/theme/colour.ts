@@ -53,8 +53,9 @@ export function paletteFromColour(c: ColourChoice["color"]): Palette {
   };
 }
 
-export function paletteFor(ch: ColourChoice, moment: Moment = momentAt()): Palette {
-  return ch.followsDay ? palettes[moment] : paletteFromColour(ch.color);
+export function paletteFor(_ch: ColourChoice, moment: Moment = momentAt()): Palette {
+  // M6 has one light palette; Navi's colour choice no longer tints the app.
+  return palettes[moment];
 }
 
 function subscribe(l: () => void) {
@@ -62,14 +63,18 @@ function subscribe(l: () => void) {
   return () => listeners.delete(l);
 }
 
-/** The palette every screen uses. Follows the person's choice and, when it follows the day, the clock. */
-export function usePalette(): Palette {
-  const ch = useSyncExternalStore(subscribe, () => choice);
+/** The part of the day, refreshed every minute. */
+export function useMoment(): Moment {
   const [moment, setMoment] = useState(momentAt());
   useEffect(() => {
-    if (!ch.followsDay) return;
     const t = window.setInterval(() => setMoment(momentAt()), 60_000);
     return () => window.clearInterval(t);
-  }, [ch.followsDay]);
-  return paletteFor(ch, moment);
+  }, []);
+  return moment;
+}
+
+/** The palette every screen uses (M6: one light palette). */
+export function usePalette(): Palette {
+  const ch = useSyncExternalStore(subscribe, () => choice);
+  return paletteFor(ch, useMoment());
 }

@@ -1,19 +1,22 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { supabase } from "../auth/supabase";
 import { feel } from "../native/haptics";
-import { useExit } from "../ui/useExit";
-import { ease, ink, meaning, type Palette } from "../theme/tokens";
+import { Sheet } from "../ui/Sheet";
+import { ink, meaning, type Palette } from "../theme/tokens";
 
 // Set or change the password (accounts start without one; the emailed code
 // always works). Same rules and messages as the website.
 
 export function PasswordSheet({ palette: P, onClose, onSaved }: { palette: Palette; onClose: () => void; onSaved: () => void }) {
-  const { closing, close } = useExit(280);
+  const closeRef = useRef<() => void>(() => onClose());
   const [pw, setPw] = useState("");
   const [again, setAgain] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const shut = (after?: () => void) => close(() => { onClose(); after?.(); });
+  const shut = (after?: () => void) => {
+    after?.();
+    closeRef.current();
+  };
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -44,17 +47,20 @@ export function PasswordSheet({ palette: P, onClose, onSaved }: { palette: Palet
 
   const field: React.CSSProperties = { height: 56, boxSizing: "border-box", width: "100%", padding: "0 20px", borderRadius: 16, background: ink.field, border: `1px solid ${ink.edge}`, outline: "none", fontSize: 17, color: ink.text };
   return (
-    <div style={{ position: "absolute", inset: 0, zIndex: 40 }}>
-      <button type="button" aria-label="Close" onClick={() => shut()} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", animation: closing ? "nFadeOut 0.28s ease both" : "nFade 0.3s ease both" }} />
-      <form role="dialog" aria-label="Password" onSubmit={submit} style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "10px 20px calc(var(--sab) + 12px)", borderRadius: "32px 32px 0 0", background: "#141416", display: "flex", flexDirection: "column", gap: 12, animation: closing ? `nDown 0.28s ${ease} both` : `nUp 0.36s ${ease} both` }}>
-        <span aria-hidden="true" style={{ alignSelf: "center", width: 36, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.2)", marginBottom: 6 }} />
-        <h2 style={{ margin: 0, fontSize: 24, fontWeight: 700, letterSpacing: "-0.015em" }}>Password</h2>
-        <p style={{ margin: "0 0 4px", fontSize: 15, lineHeight: 1.45, color: ink.muted }}>Optional. The emailed code always works; a password lets you sign in without checking email.</p>
-        <input aria-label="New password" placeholder="New password" type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} style={field} autoFocus />
-        <input aria-label="Repeat new password" placeholder="Repeat new password" type="password" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} style={field} />
-        {err ? <p role="alert" style={{ margin: 0, fontSize: 15, color: meaning.slipping }}>{err}</p> : null}
-        <button type="submit" disabled={busy} style={{ height: 56, marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 28, background: P.cta, color: "#0B0B0C", fontSize: 17, fontWeight: 600, opacity: busy ? 0.6 : 1 }}>{busy ? "Saving…" : "Save password"}</button>
-      </form>
-    </div>
+    <Sheet label="Password" z={40} onClose={onClose} style={{ padding: "0 20px" }}>
+      {(close) => {
+        closeRef.current = close;
+        return (
+          <form onSubmit={submit} style={{ padding: "4px 0 12px", display: "flex", flexDirection: "column", gap: 12 }}>
+            <h2 style={{ margin: 0, fontSize: 28, fontWeight: 700, letterSpacing: "-0.03em" }}>Password</h2>
+            <p style={{ margin: "0 0 4px", fontSize: 15, lineHeight: 1.45, fontWeight: 500, color: ink.muted }}>Optional. The emailed code always works; a password lets you sign in without checking email.</p>
+            <input aria-label="New password" placeholder="New password" type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} style={field} autoFocus />
+            <input aria-label="Repeat new password" placeholder="Repeat new password" type="password" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} style={field} />
+            {err ? <p role="alert" style={{ margin: 0, fontSize: 15, fontWeight: 500, color: meaning.slipping }}>{err}</p> : null}
+            <button type="submit" disabled={busy} style={{ height: 56, marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 28, background: P.cta, color: "#FFFFFF", fontSize: 17, fontWeight: 600, opacity: busy ? 0.6 : 1 }}>{busy ? "Saving…" : "Save password"}</button>
+          </form>
+        );
+      }}
+    </Sheet>
   );
 }

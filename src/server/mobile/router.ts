@@ -9,6 +9,9 @@ import { createConversation, deleteConversation, renameConversation } from "@/se
 import { changeTask, completeTask, createTask, endFocus, FocusEndInput, pauseFocus, resumeFocus, startFocus } from "@/server/domain/tasks";
 import { TaskCreate } from "@/server/domain/schemas";
 import { placeTask } from "@/server/planner/place";
+import { resolveTriage, triageList } from "@/server/domain/triage";
+import { executeCommand, commandMessage } from "@/server/planner/commands";
+import { plannerCommands } from "@/lib/planner-flag";
 import { BlockOutcomeInput, dayPlanMessage, generateDayPlan, generateWeekPlan, setBlockOutcome, weekPlanMessage } from "@/server/planner/plan";
 import { acceptMany, acceptManyProblem, acceptProposal, editProposal, mergeProposalIntoTask, setProposalStatus } from "@/server/domain/proposals";
 import { decideActionView, decisionMessage } from "@/server/domain/approvals";
@@ -17,6 +20,7 @@ import { BriefingKind, generateBriefing, markBriefingRead } from "@/server/domai
 import type { UpdateResult } from "@/server/domain/entities";
 import type { Task } from "@/lib/types";
 import type {
+  MTriageResult,
   MAcceptManyResult,
   MBriefingGenerated,
   MChatCreated,
@@ -24,6 +28,7 @@ import type {
   MFocusResult,
   MOk,
   MPlanResult,
+  MScheduleResult,
   MProposalResult,
   MTaskChange,
   MTaskResult,
@@ -32,6 +37,8 @@ import type {
   MTask,
 } from "@/lib/mobile-api-types";
 import { updateSettings } from "./settings";
+import { registerYouRoutes } from "./you";
+import { registerWelcomeRoutes } from "./welcome";
 import { chatHistoryView, chatListView, dayView, focusSessionView, focusView, inboxView, meView, proposalView, taskGroupsView, taskView, weekView } from "./views";
 
 // The phone app's JSON API: one table of routes under /api/m, each a thin
@@ -107,9 +114,26 @@ route("POST", "tasks/:id/complete", async (ctx, { params, body }): Promise<MTask
   return { result: updateResult(await completeTask(ctx, params.id, actualMinutes)) };
 });
 route("POST", "tasks/:id/uncomplete", async (ctx, { params }): Promise<MTaskChange> => ({ result: updateResult(await changeTask(ctx, params.id, { status: "todo" })) }));
+route("POST", "triage", async (ctx, { body }): Promise<MTriageResult> => {
+  const i = z.object({ decision: z.enum(["handed_in", "not_needed"]), ids: z.array(Uuid).max(200).optional(), all: z.boolean().optional() })
+    .refine((v) => v.all || (v.ids?.length ?? 0) > 0, "Say which items (ids) or all.").parse(body ?? {});
+  const r = await resolveTriage(ctx, i.decision, { ids: i.ids, all: i.all });
+  return { changed: r.changed.length, notChanged: r.notChanged.length + r.unknown.length, remaining: (await triageList(ctx)).length };
+});
 route("POST", "tasks/:id/place", async (ctx, { params, body }): Promise<MOk> => {
   await placeTask(ctx, { ...(body as object), taskId: params.id });
   return { ok: true };
+});
+route("POST", "schedule", async (ctx, { body }): Promise<MScheduleResult> => {
+  const v = z.object({ command: z.record(z.string(), z.unknown()), mode: z.enum(["preview", "apply"]).nullish(), requestId: z.string().min(8).max(80).nullish(), allowOverlap: z.boolean().nullish() }).parse(body ?? {});
+  const { data: prefRow } = await ctx.db.from("profiles").select("preferences").eq("id", ctx.userId).single();
+  if (!plannerCommands(prefRow?.preferences)) throw new UserFacingError("Scheduling commands aren't on for this account.", 400);
+  // The person's own edit: previews are shown inline (no chat card), applies run and are verified.
+  const r = await executeCommand(ctx, v.command as never, { mode: v.mode === "preview" ? "preview" : "apply", idempotencyKey: v.requestId ? `m:${v.requestId}` : null, allowOverlap: !!v.allowOverlap });
+  return {
+    status: r.status, ok: r.ok, message: commandMessage(r), changeId: r.changesetId, actionId: r.actionId,
+    consequences: r.impact?.consequences ?? [], checks: r.verification?.checks ?? [], alternatives: r.alternatives ?? [], undo: r.undo,
+  };
 });
 route("POST", "plan/day", async (ctx, { body }): Promise<MPlanResult> => {
   const { date } = z.object({ date: IsoDate.nullish() }).parse(body ?? {});
@@ -186,6 +210,10 @@ route("POST", "briefings/:id/read", async (ctx, { params }): Promise<MOk> => {
   await markBriefingRead(ctx, params.id);
   return { ok: true };
 });
+
+// ---- progress and You (src/server/mobile/you.ts) --------------------------------------------
+registerYouRoutes(route);
+registerWelcomeRoutes(route);
 
 // ---- dispatch -------------------------------------------------------------------------------
 

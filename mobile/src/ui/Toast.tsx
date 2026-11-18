@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
 import { feel } from "../native/haptics";
-import { ease } from "../theme/tokens";
+import { ease, glassStrong, ink } from "../theme/tokens";
 
 // One toast at a time, above the bottom bar, gone after 5 s. Undo runs the
 // given function; the toast closes with the same motion it opened with.
@@ -32,7 +32,7 @@ export function ToastHost({ children, bottom }: { children: ReactNode; bottom: s
     (text: string, opts?: { undo?: () => void; accent?: string }) => {
       window.clearTimeout(timer.current);
       setClosing(false);
-      setT({ id: ++n.current, text, undo: opts?.undo, accent: opts?.accent ?? "#A7EBC0" });
+      setT({ id: ++n.current, text, undo: opts?.undo, accent: opts?.accent ?? ink.link });
       timer.current = window.setTimeout(hide, 5000);
     },
     [hide],
@@ -43,8 +43,8 @@ export function ToastHost({ children, bottom }: { children: ReactNode; bottom: s
       <HideCtx.Provider value={hide}>
       {children}
       {t ? (
-        <div key={t.id} role="status" style={{ position: "absolute", left: 16, right: 16, bottom, zIndex: 30, minHeight: 52, display: "flex", alignItems: "center", gap: 12, padding: "0 8px 0 20px", borderRadius: 16, background: "#1C1C1F", border: "1px solid rgba(255,255,255,0.10)", boxShadow: "0 12px 30px rgba(0,0,0,0.5)", animation: closing ? `nSink 0.22s ${ease} both` : `nRise 0.3s ${ease} both` }}>
-          <span style={{ flex: 1, fontSize: 15, color: "#E8E8EC", padding: "14px 0" }}>{t.text}</span>
+        <div key={t.id} role="status" style={{ ...glassStrong, position: "absolute", left: 0, right: 0, margin: "0 auto", width: "fit-content", maxWidth: "calc(100% - 32px)", boxSizing: "border-box", bottom, zIndex: 40, minHeight: 48, display: "flex", alignItems: "center", gap: 6, padding: t.undo ? "0 6px 0 18px" : "0 18px", borderRadius: 24, animation: closing ? `nSink 0.22s ${ease} both` : `nRise 0.3s ${ease} both` }}>
+          <span style={{ fontSize: 16, fontWeight: 600, color: ink.text, padding: "12px 0" }}>{t.text}</span>
           {t.undo ? (
             <button
               type="button"
@@ -54,7 +54,7 @@ export function ToastHost({ children, bottom }: { children: ReactNode; bottom: s
                 t.undo?.();
                 hide();
               }}
-              style={{ minHeight: 44, padding: "0 12px", color: t.accent, fontWeight: 600, fontSize: 15 }}
+              style={{ minHeight: 44, padding: "0 12px", color: t.accent, fontWeight: 700, fontSize: 16 }}
             >
               Undo
             </button>

@@ -3,7 +3,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { DateTime } from "luxon";
 import type { Task } from "@/lib/types";
-import { completeTaskAction, dismissSuggestionAction, updateTaskAction } from "@/app/(app)/client-actions";
+import { completeTaskAction, dismissSuggestionAction, resolveTriageAction, updateTaskAction } from "@/app/(app)/client-actions";
 import { announceChange } from "@/lib/offline-queue";
 import { usePanel } from "../shell/panel-context";
 import { Stone } from "../shell/stone";
@@ -12,6 +12,7 @@ import { TaskCard } from "./task-card";
 export type SpaceOpt = { id: string; name: string; color: string };
 export type TaskGroup = { key: "overdue" | "morning" | "afternoon" | "evening" | "anytime" | "date" | "list"; label: string; ids: string[] };
 export type Nudge = { key: string; title: string; waited: string };
+export type TriageItem = { id: string; title: string; due_at: string | null };
 
 const GROUP_ICON: Partial<Record<TaskGroup["key"], React.ReactNode>> = {
   morning: (
@@ -44,6 +45,7 @@ export function TaskBoard({
   initialOpen,
   nudge,
   emptyText,
+  triage = [],
 }: {
   zone: string;
   tasks: Task[];
@@ -53,6 +55,8 @@ export function TaskBoard({
   initialOpen: string | null;
   nudge: Nudge | null;
   emptyText: string;
+  /** Overdue imported work waiting for the person's decision (one row). */
+  triage?: TriageItem[];
 }) {
   const byId = new Map(tasks.map((t) => [t.id, t]));
   // ?open= may name a step: open its parent.
@@ -62,6 +66,7 @@ export function TaskBoard({
 
   return (
     <div className="mt-[22px] flex flex-col">
+      {triage.length > 0 && <TriageRow items={triage} zone={zone} />}
       {groups.length === 0 && <p className="px-1 py-6 text-[15px] text-dim">{emptyText}</p>}
       {groups.map((g, gi) => (
         <section key={`${g.key}${g.label}`} aria-label={g.label || "Tasks"} className="flex flex-col">
@@ -214,5 +219,73 @@ function NudgeRow({ nudge }: { nudge: Nudge }) {
         Leave it
       </button>
     </div>
+  );
+}
+
+/**
+ * Overdue imported (Canvas) work as one row, not a wall of "overdue": Canvas
+ * can't tell Navi what was handed in, so the person decides. Same look as the
+ * nudge row. "Show" lists them (each can be ticked off on its own).
+ */
+function TriageRow({ items, zone }: { items: TriageItem[]; zone: string }) {
+  const router = useRouter();
+  const panel = usePanel();
+  const [open, setOpen] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const n = items.length;
+  const all = (decision: "handed_in") =>
+    start(async () => {
+      setError(null);
+      const r = await resolveTriageAction(decision, { ids: items.map((i) => i.id) });
+      if (!r.ok) return setError(r.error);
+      setConfirm(false);
+      announceChange();
+      router.refresh();
+    });
+  return (
+    <section aria-label="Past-due Canvas items" className="mb-2 flex flex-col gap-2 rounded-[18px] bg-white/[0.045] px-4 py-3 text-[14px] text-[#C8C8CE]">
+      <div className="flex flex-wrap items-center gap-3">
+        <Stone size={13} />
+        <span className="min-w-[200px] flex-1">
+          {n} past-due Canvas {n === 1 ? "item needs" : "items need"} a decision. Canvas doesn&apos;t tell Navi what you handed in.
+        </span>
+        <button type="button" className="font-semibold text-[var(--navi-text)] hover:underline" aria-expanded={open} onClick={() => setOpen(!open)}>
+          {open ? "Hide" : "Show"}
+        </button>
+        {!confirm ? (
+          <button type="button" className="text-dim hover:text-text disabled:opacity-50" disabled={pending} onClick={() => setConfirm(true)}>
+            All handed in
+          </button>
+        ) : (
+          <span className="flex items-center gap-3" role="group" aria-label="Confirm">
+            <button type="button" className="font-semibold text-[var(--navi-text)] hover:underline disabled:opacity-50" disabled={pending} onClick={() => all("handed_in")}>
+              {pending ? "Saving…" : `Mark all ${n} done`}
+            </button>
+            <button type="button" className="text-dim hover:text-text" disabled={pending} onClick={() => setConfirm(false)}>
+              Cancel
+            </button>
+          </span>
+        )}
+      </div>
+      {error && <p role="alert" className="text-[13px] text-due">{error}</p>}
+      {open && (
+        <ul className="flex flex-col gap-1 pt-1">
+          {items.map((t) => (
+            <li key={t.id} className="flex items-center gap-3">
+              <CheckCircle task={{ id: t.id, title: t.title, status: "todo" }} size={20} />
+              <span className="min-w-0 flex-1 truncate text-text">{t.title}</span>
+              {t.due_at && <span className="shrink-0 text-[12.5px] text-dim">was due {DateTime.fromISO(t.due_at).setZone(zone).toFormat("ccc, LLL d")}</span>}
+            </li>
+          ))}
+          <li className="pt-1">
+            <button type="button" className="text-dim hover:text-text" onClick={() => panel.ask("Help me go through my past-due Canvas items: which are handed in and which still need time.")}>
+              Go through them with Navi
+            </button>
+          </li>
+        </ul>
+      )}
+    </section>
   );
 }

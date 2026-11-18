@@ -14,6 +14,7 @@ import { emitter, stepEndEvent, stepStartEvent, toolEventOf } from "./live";
 import { actionViews } from "@/server/domain/approvals";
 import { legacyDisplay } from "@/lib/plain-text";
 import { stepDone } from "@/lib/tool-labels";
+import { correctionNote, emptyReply, stripUnsupported, unsupportedClaims, type TurnStep } from "@/lib/claims";
 
 export type AgentMode = "chat" | "onboarding" | "capture";
 
@@ -97,7 +98,7 @@ function providerMessage(err: unknown) {
 
 async function runAnthropic(req: AgentRequest, model: string, allowServerFallback: boolean): Promise<AgentResult> {
   const client = new Anthropic({ apiKey: serverEnv.anthropicApiKey()!, maxRetries: 2 });
-  const tools = toolsFor(req.mode, { plannerV2: req.ctx.plannerV2 }).map((t) => ({
+  const tools = toolsFor(req.mode, { plannerV2: req.ctx.plannerV2, plannerCommands: req.ctx.plannerCommands }).map((t) => ({
     name: t.name,
     description: t.description,
     input_schema: jsonSchemaFor(t) as Anthropic.Beta.BetaTool["input_schema"],
@@ -109,6 +110,9 @@ async function runAnthropic(req: AgentRequest, model: string, allowServerFallbac
   const useFallbacks = allowServerFallback && serverEnv.refusalFallbacks() && model.startsWith("claude-sonnet");
   const emit = emitter(req);
   const toolEvents: ToolEvent[] = [];
+  // Every step's verified outcome this turn (read-only ones too): the reply's claims are checked against these.
+  const steps: TurnStep[] = [];
+  let corrected = false;
   let mutated = false;
   let costUsd = 0;
   let finalText = "";
@@ -197,6 +201,17 @@ async function runAnthropic(req: AgentRequest, model: string, allowServerFallbac
       const toolUses = response.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use");
       if (response.stop_reason !== "tool_use" || toolUses.length === 0) {
         if (response.stop_reason === "max_tokens" && !finalText) finalText = "That got too long; please ask again more narrowly.";
+        // Success must come from a verified operation, never from the model's
+        // words: a reply claiming something no tool did gets one correction
+        // pass (the model can still do it properly, or say what happened).
+        const claims = text ? unsupportedClaims(text, steps) : [];
+        if (claims.length && !corrected && i < MAX_ITERATIONS - 1) {
+          corrected = true;
+          messages.push({ role: "assistant", content: response.content });
+          messages.push({ role: "user", content: correctionNote(claims, steps) });
+          finalText = "";
+          continue;
+        }
         break;
       }
       messages.push({ role: "assistant", content: response.content });
@@ -210,6 +225,7 @@ async function runAnthropic(req: AgentRequest, model: string, allowServerFallbac
         const action = result.actionId && req.onEvent ? (await actionViews(req.ctx, [result.actionId]))[result.actionId] : undefined;
         emit(stepEndEvent(use.id, use.name, result.ok, result, { action, undo: result.actionId ? undefined : result.undo }));
         if (result.mutated) mutated = true;
+        steps.push({ name: use.name, ok: result.ok, mutated: !!result.mutated, actionId: result.actionId ?? null });
         if (!READ_ONLY_TOOLS.includes(use.name)) toolEvents.push(toolEventOf(use.name, result));
         results.push({
           type: "tool_result",
@@ -241,5 +257,13 @@ async function runAnthropic(req: AgentRequest, model: string, allowServerFallbac
     for (const [id, name] of open) emit(stepEndEvent(id, name, false));
     open.clear();
   }
-  return { text: finalText || "Done.", toolEvents, mutated, model, simulated: false, costUsd };
+  const displays = toolEvents.map((e) => `${e.ok ? "" : "(didn't work) "}${e.display || legacyDisplay(e) || stepDone(e.name, e.ok)}`);
+  let text = finalText || emptyReply(displays, toolEvents.some((e) => !e.ok));
+  // Still claiming something unbacked after the correction pass: drop those sentences, state the facts.
+  const left = unsupportedClaims(text, steps);
+  if (left.length) {
+    console.warn(`[agent] unsupported claim removed (${left.map((c) => c.kind).join(",")})`);
+    text = stripUnsupported(text, left, displays);
+  }
+  return { text, toolEvents, mutated, model, simulated: false, costUsd };
 }

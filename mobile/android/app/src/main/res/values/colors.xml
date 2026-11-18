@@ -2,4 +2,6 @@
 <resources>
     <color name="navi_black">#000000</color>
     <color name="navi_lavender">#B9B2FF</color>
+    <color name="navi_white">#FBFBFD</color>
+    <color name="navi_ink">#11141A</color>
 </resources>

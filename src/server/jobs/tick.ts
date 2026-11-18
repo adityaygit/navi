@@ -1,4 +1,5 @@
 import "server-only";
+import { awaitingTriage } from "@/lib/triage";
 import { DateTime } from "luxon";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Profile } from "@/lib/types";
@@ -56,7 +57,7 @@ export async function tickUser(db: SupabaseClient, profile: Profile, now = DateT
   // Deadline reminders: hard deadlines 24h ahead, everything 2h ahead, overdue once.
   const { data: tasks } = await db
     .from("tasks")
-    .select("id,title,due_at,due_is_hard")
+    .select("id,title,due_at,due_is_hard,status,source,external_ref")
     .eq("user_id", profile.id)
     .in("status", ["todo", "in_progress", "blocked"])
     .not("due_at", "is", null)
@@ -67,7 +68,10 @@ export async function tickUser(db: SupabaseClient, profile: Profile, now = DateT
     const hours = due.diff(now, "hours").hours;
     const local = due.setZone(profile.timezone).toFormat("ccc h:mm a");
     if (hours < 0) {
-      await queueNotification(db, profile, { kind: "overdue", title: "Overdue", body: `“${t.title}” was due ${local}. Do it, reschedule it, or drop it.`, url: "/tasks", dedupeKey: `overdue:${t.id}:${t.due_at}` });
+      const body = awaitingTriage(t, now.toMillis())
+        ? `“${t.title}” was due ${local}. If you handed it in, mark it done; if not, give it a time.`
+        : `“${t.title}” was due ${local}. Do it, reschedule it, or drop it.`;
+      await queueNotification(db, profile, { kind: "overdue", title: "Overdue", body, url: "/tasks", dedupeKey: `overdue:${t.id}:${t.due_at}` });
     } else if (hours <= 2) {
       await queueNotification(db, profile, { kind: "deadline", title: "Due soon", body: `“${t.title}” is due ${local}.`, url: "/tasks", dedupeKey: `due2h:${t.id}:${t.due_at}`, expiresAt: due });
     } else if (t.due_is_hard) {
