@@ -7,7 +7,7 @@ import { getProfile } from "@/server/context";
 import { createProposals, proposalProblem } from "@/server/domain/proposals";
 import { createTask, completeTask, updateTask } from "@/server/domain/tasks";
 import { deleteEntity, getEntity, updateEntity, type EntityTable } from "@/server/domain/entities";
-import { logActivity, revertActivities } from "@/server/domain/activity";
+import { logActivity, revertActivities, revertActivity, sameValue } from "@/server/domain/activity";
 import { plannerV2, plannerCommands } from "@/lib/planner-flag";
 import { createHash } from "node:crypto";
 import { executeCommand, confirmChange, type Command, type CommandOptions, type CommandResult } from "@/server/planner/commands";
@@ -30,7 +30,7 @@ import { formatDue, formatTime, nowIn } from "@/lib/time";
 import { awaitingTriage, isImported } from "@/lib/triage";
 import { integrations } from "@/server/integrations";
 import { resolveTriage } from "@/server/domain/triage";
-import type { CalendarEvent, OccurrenceOverride, PlanBlock, Proposal, Routine, Task } from "@/lib/types";
+import type { CalendarEvent, OccurrenceOverride, PlanBlock, Proposal, Routine, Task, ToolEvent } from "@/lib/types";
 import { buildDayAgenda, describeDayAgenda, type AgendaEntry } from "@/server/planner/agenda";
 import { proposalTitle } from "@/server/domain/proposals";
 import { fixWeekdayNumbering, guardInventedTimes } from "./time-guard";
@@ -53,6 +53,38 @@ import type { StepView } from "@/lib/tool-events";
  * person's OK; the chat shows it as a card. `undo`: activity entries that undo
  * what the step changed on its own.
  */
+/**
+ * If Navi created this task earlier in the current chat (one of this chat's
+ * replies carries the creation's undo id) and nothing has changed it since
+ * (same values, no plan blocks, no steps), undo that creation and return the
+ * title. Anything else returns null and goes the normal way (a card).
+ * Found by the real-model stress test C3 (2026-11-17): "add a task to call
+ * grandma" → "actually forget what I just said" made a deletion card.
+ */
+async function undoOwnCreation(ctx: Ctx, taskId: string): Promise<string | null> {
+  if (!ctx.conversationId) return null;
+  const { data: msgs } = await ctx.db.from("messages").select("tool_events").eq("conversation_id", ctx.conversationId).eq("role", "assistant").order("created_at", { ascending: false }).limit(12);
+  const ids = ((msgs ?? []) as { tool_events: ToolEvent[] | null }[]).flatMap((m) => (m.tool_events ?? []).filter((e) => e.name === "create_task").flatMap((e) => e.undo ?? []));
+  if (!ids.length) return null;
+  const { data: entry } = await ctx.db.from("activity_log").select("id,after,actor").in("id", ids).eq("entity_type", "tasks").eq("entity_id", taskId).is("before", null).is("reverted_at", null).eq("reversible", true).maybeSingle();
+  if (!entry || entry.actor !== "navi") return null;
+  const [{ data: task }, { count: blocks }, { count: steps }, { count: later }] = await Promise.all([
+    ctx.db.from("tasks").select("*").eq("id", taskId).maybeSingle(),
+    ctx.db.from("plan_blocks").select("id", { count: "exact", head: true }).eq("task_id", taskId),
+    ctx.db.from("tasks").select("id", { count: "exact", head: true }).eq("parent_task_id", taskId),
+    ctx.db.from("activity_log").select("id", { count: "exact", head: true }).eq("entity_id", taskId).neq("id", entry.id).eq("reversible", true).is("reverted_at", null),
+  ]);
+  if (!task || blocks || steps || later) return null;
+  const after = (entry.after ?? {}) as Record<string, unknown>;
+  if (Object.entries(after).some(([k, v]) => k in task && k !== "updated_at" && !sameValue((task as Record<string, unknown>)[k], v))) return null;
+  try {
+    await revertActivity(ctx, entry.id);
+  } catch {
+    return null;
+  }
+  return (task as { title: string }).title;
+}
+
 export type ToolResult = { ok: boolean; summary: string; data?: unknown; mutated?: boolean; actionId?: string; undo?: string[] } & StepView;
 
 /** What a tool says when its change became a card instead of running. */
@@ -345,6 +377,20 @@ async function reviewData(ctx: Ctx, kind: "day" | "week", date: string | null | 
   };
 }
 
+/**
+ * When a recent task was added, as provenance for the snapshot: without it a
+ * task Navi created one turn earlier read as "already on the list at the start
+ * of this turn", and on "did you actually do that?" the model retracted a true
+ * "Added" (real-model stress test A1, 2026-11-17).
+ */
+function addedAgo(t: Task, now: DateTime): string {
+  const created = (t as Task & { created_at?: string }).created_at;
+  if (!created) return "";
+  const min = Math.floor((now.toMillis() - Date.parse(created)) / 60000);
+  if (min < 0 || min >= 360) return "";
+  return `, added ${min < 1 ? "just now" : min < 60 ? `${min} min ago` : `${Math.floor(min / 60)} h ago`}`;
+}
+
 async function overview(ctx: Ctx): Promise<string> {
   const profile = await getProfile(ctx);
   const zone = profile.timezone;
@@ -421,7 +467,7 @@ async function overview(ctx: Ctx): Promise<string> {
     }
   }
   lines.push(
-    `Open tasks: ${open.map((t) => `${t.title} (${v2 && t.commitment === "must" ? "MUST-COMPLETE, " : v2 && t.commitment === "optional" ? "optional, " : ""}P${t.priority}, ${t.status}${t.due_at ? `, due ${formatDue(t.due_at, zone)}${t.due_is_hard ? " HARD" : ""}` : ", no due date"}${t.estimate_minutes ? `, ~${t.estimate_minutes}m${commands && t.estimate_source === "user" ? " (user's estimate)" : ""}` : ""}${t.blocker ? `, blocked: ${t.blocker}` : ""}) [${t.id}]`).join("; ") || "none"}${triageLine}`,
+    `Open tasks: ${open.map((t) => `${t.title} (${v2 && t.commitment === "must" ? "MUST-COMPLETE, " : v2 && t.commitment === "optional" ? "optional, " : ""}P${t.priority}, ${t.status}${t.due_at ? `, due ${formatDue(t.due_at, zone)}${t.due_is_hard ? " HARD" : ""}` : ", no due date"}${t.estimate_minutes ? `, ~${t.estimate_minutes}m${commands && t.estimate_source === "user" ? " (user's estimate)" : ""}` : ""}${t.blocker ? `, blocked: ${t.blocker}` : ""}${addedAgo(t, now)}) [${t.id}]`).join("; ") || "none"}${triageLine}`,
   );
   const pending = (inbox.data ?? []) as Pick<Proposal, "kind" | "payload" | "source_excerpt">[];
   lines.push(
@@ -1461,6 +1507,12 @@ export const TOOLS = [
     run: async (ctx, { table, id }) => {
       // Taking a block off the plan isn't deleting anything: its task stays (one change, with Undo).
       if (table === "plan_blocks" && (await plannerCommandsFor(ctx))) return runCommand(ctx, "delete_item", { kind: "unschedule", block_ids: [id] });
+      // "Actually forget what I just said": a task Navi added in this chat and
+      // nothing has touched since is taken back as an undo, not a deletion card.
+      if (table === "tasks") {
+        const undone = await undoOwnCreation(ctx, id);
+        if (undone) return { ok: true, mutated: true, summary: `Took back “${undone}”: Navi had added it earlier in this chat and nothing had changed it since, so it's removed (undone, no card needed).`, display: `Removed ${q(undone)}` };
+      }
       const r = await deleteEntity(ctx, table as EntityTable, id);
       if (r.kind === "approval_requested") return { ok: true, mutated: true, summary: `Deleting needs the user's OK. ${WAITING}` };
       return { ok: true, mutated: true, summary: `Deleted the ${table.replace(/s$/, "")}`, display: "Deleted it" };

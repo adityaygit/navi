@@ -17,7 +17,7 @@ export type TurnStep = {
   actionId?: string | null;
 };
 
-export type ClaimKind = "card" | "done" | "removed" | "created" | "scheduled" | "generic";
+export type ClaimKind = "card" | "done" | "removed" | "created" | "scheduled" | "generic" | "checked";
 
 export type UnsupportedClaim = { kind: ClaimKind; sentence: string };
 
@@ -31,6 +31,29 @@ const PATTERNS: { kind: ClaimKind; re: RegExp }[] = [
   { kind: "scheduled", re: new RegExp(String.raw`${I} (?:moved|rescheduled|scheduled|planned|re-?planned|pinned|locked|blocked out|booked|put (?:it|that|them|this|the \w+) (?:at|on|in|into|for))\b`, "i") },
   { kind: "generic", re: /^\s*(?:done|all set|all done|got it, done)[.!]/i },
 ];
+
+/**
+ * "I checked / searching now shows / I just looked": a claim that this reply
+ * looked something up. Backed only by a tool that ran in this turn (stress
+ * test A1, 2026-11-17: "Searching now shows one task…" with no tool call, in a
+ * sentence that also mentioned "already", so the action check skipped it).
+ */
+const CHECKED: RegExp[] = [
+  new RegExp(String.raw`${I} (?:just )?(?:checked|looked(?: it)? up|looked|searched|double-checked|confirmed|verified)\b`, "i"),
+  /\b(?:searching|checking|looking)(?: (?:now|again|just now|your list|the list|your tasks|your plan))+[^.!?\n]{0,30}\b(?:shows?|finds?|found|confirms?|says)\b/i,
+  /\b(?:a|the|my) (?:quick |fresh )?(?:search|check|look)(?: just now| now)? (?:shows?|finds?|found|confirms?|says)\b/i,
+];
+/** A check sentence that isn't a claim: an offer, a refusal or a plan. */
+const NOT_A_CHECK = /\b(?:couldn'?t|could not|can'?t|cannot|didn'?t|did not|haven'?t|have not|not yet|unable|failed|if you|want me to|should i|would you like|i can|i'll|i will|i’ll|can’t|couldn’t|didn’t|haven’t|let me)\b/i;
+
+/** The sentence claims a look-up (a negation or offer only counts before or inside the claim). */
+function claimsCheck(sentence: string): boolean {
+  for (const re of CHECKED) {
+    const m = re.exec(sentence);
+    if (m && !NOT_A_CHECK.test(sentence.slice(0, m.index + m[0].length))) return true;
+  }
+  return false;
+}
 
 /** Words that make a sentence not a claim of something finished in this turn. */
 const NOT_A_CLAIM = /\b(?:couldn'?t|could not|can'?t|cannot|didn'?t|did not|haven'?t|have not|hasn'?t|won'?t|wasn'?t|not yet|unable|failed|earlier|before|previously|last time|yesterday|already|if you|once you|want me to|should i|would you like|i can|i'll|i will|i’ll|can’t|couldn’t|didn’t|haven’t|won’t|wasn’t)\b/i;
@@ -53,6 +76,8 @@ function supported(kind: ClaimKind, steps: TurnStep[]): boolean {
     case "scheduled":
     case "generic":
       return card || changed.length > 0;
+    case "checked":
+      return steps.some((s) => s.ok);
   }
 }
 
@@ -60,6 +85,10 @@ function supported(kind: ClaimKind, steps: TurnStep[]): boolean {
 export function unsupportedClaims(text: string, steps: TurnStep[]): UnsupportedClaim[] {
   const out: UnsupportedClaim[] = [];
   for (const sentence of sentences(text)) {
+    if (claimsCheck(sentence) && !supported("checked", steps)) {
+      out.push({ kind: "checked", sentence });
+      continue;
+    }
     if (NOT_A_CLAIM.test(sentence)) continue;
     const hit = PATTERNS.find((p) => p.re.test(sentence));
     if (hit && !supported(hit.kind, steps)) out.push({ kind: hit.kind, sentence });
@@ -74,6 +103,7 @@ const WHAT: Record<ClaimKind, string> = {
   created: "added or saved something",
   scheduled: "moved or scheduled something",
   generic: "completed the request",
+  checked: "looked something up",
 };
 
 /** The note the model gets when its reply claims something no tool did (one correction pass). */

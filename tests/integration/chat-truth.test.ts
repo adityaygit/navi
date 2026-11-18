@@ -20,6 +20,7 @@ vi.mock("@anthropic-ai/sdk", async (importOriginal) => {
 });
 
 const { runAgent } = await import("@/server/ai/agent");
+const { handleTurn } = await import("@/server/ai/chat");
 
 let db: Awaited<ReturnType<typeof userClient>>["db"];
 let userId = "";
@@ -165,5 +166,80 @@ describe("overdue imports: the person's decision, verified", () => {
       { title: "Old essay [Lit]", status: "done" },
       { title: "Old lab [Chem]", status: "done" },
     ]);
+  });
+});
+
+describe("found by the real-model stress test (2026-11-17)", () => {
+  const turn = (text: string, conversationId?: string) => handleTurn(ctxFor(db, userId), { kind: "chat", text, modality: "text", conversationId });
+
+  it("C3: 'actually forget what I just said' takes back the task Navi just added: gone, no card", async () => {
+    create
+      .mockResolvedValueOnce(toolCall("c1", "create_task", { title: "Call grandma", user_command: "add a task to call grandma tonight" }))
+      .mockResolvedValueOnce(text("I added “Call grandma”."));
+    const a = await turn("add a task to call grandma tonight");
+    const { data: made } = await db.from("tasks").select("id").eq("title", "Call grandma");
+    expect(made).toHaveLength(1);
+    create
+      .mockResolvedValueOnce(toolCall("c2", "delete_item", { table: "tasks", id: made![0].id }))
+      .mockResolvedValueOnce(text("Okay, it's gone."));
+    const b = await turn("actually forget what I just said", a.conversationId);
+    expect(b.assistantMessage.tool_events[0].summary).toMatch(/Took back “Call grandma”/);
+    expect((await db.from("tasks").select("id").eq("title", "Call grandma")).data).toEqual([]);
+    expect((await db.from("approvals").select("id")).data).toEqual([]);
+  });
+
+  it("deleting a task Navi didn't just add in this chat (or that changed since) still needs the card", async () => {
+    const { data: own } = await db.from("tasks").insert({ user_id: userId, title: "Essay outline" }).select("id").single();
+    create
+      .mockResolvedValueOnce(toolCall("d1", "delete_item", { table: "tasks", id: own!.id }))
+      .mockResolvedValueOnce(text("That's waiting for your OK."));
+    await turn("delete the essay outline");
+    expect((await db.from("tasks").select("id").eq("id", own!.id)).data).toHaveLength(1);
+    expect((await db.from("approvals").select("id").eq("status", "proposed")).data).toHaveLength(1);
+
+    create
+      .mockResolvedValueOnce(toolCall("e1", "create_task", { title: "Read poem", user_command: "add read poem" }))
+      .mockResolvedValueOnce(text("I added it."));
+    const a = await turn("add read poem");
+    const { data: poem } = await db.from("tasks").select("id").eq("title", "Read poem").single();
+    await db.from("tasks").update({ notes: "the person wrote this" }).eq("id", poem!.id);
+    create
+      .mockResolvedValueOnce(toolCall("e2", "delete_item", { table: "tasks", id: poem!.id }))
+      .mockResolvedValueOnce(text("That's waiting for your OK."));
+    await turn("never mind, delete it", a.conversationId);
+    expect((await db.from("tasks").select("notes").eq("id", poem!.id).single()).data).toEqual({ notes: "the person wrote this" });
+    expect((await db.from("approvals").select("id").eq("status", "proposed")).data).toHaveLength(2);
+  });
+
+  it("A1: on the next turn Navi is told, from the database, that its earlier step really happened and is still in place (or was undone)", async () => {
+    create
+      .mockResolvedValueOnce(toolCall("v1", "create_task", { title: "Bio lab report", user_command: "add bio lab report due friday" }))
+      .mockResolvedValueOnce(text("I added “Bio lab report”."));
+    const a = await turn("add bio lab report due friday");
+    create.mockResolvedValueOnce(text("Yes, it's on your list."));
+    await turn("wait did you actually do that?", a.conversationId);
+    const seen = (create.mock.calls.at(-1)![0].messages as { role: string; content: unknown }[]).map((m) => String(m.content)).join("\n");
+    expect(seen).toMatch(/create_task: Created task “Bio lab report”[^\n]*verified by Navi's code at the start of this turn: this reply really did it \(it created the item; it did not exist before\), and it is still in place/);
+
+    const undo = a.assistantMessage.tool_events[0].undo![0];
+    const { revertActivity } = await import("@/server/domain/activity");
+    await revertActivity(ctxFor(db, userId), undo);
+    create.mockResolvedValueOnce(text("You undid it, so it isn't on your list."));
+    await turn("is it still there?", a.conversationId);
+    const later = (create.mock.calls.at(-1)![0].messages as { role: string; content: unknown }[]).map((m) => String(m.content)).join("\n");
+    expect(later).toMatch(/Created task “Bio lab report”[^\n]* — the user undid this/);
+    expect(later).not.toMatch(/still in place/);
+  });
+
+  it("A1: 'Searching now shows…' with no tool run gets the correction pass", async () => {
+    create
+      .mockResolvedValueOnce(text("Yes. Searching now shows one “Bio lab report” task, and it was already on your list before I added it."))
+      .mockResolvedValueOnce(toolCall("s1", "search_items", { query: "bio lab report" }))
+      .mockResolvedValueOnce(text("Yes: “Bio lab report” is on your list, due Friday."));
+    const r = await runAgent(request("wait did you actually do that?"));
+    const notes = (create.mock.calls[1][0].messages as { content: unknown }[]).filter((m) => typeof m.content === "string" && m.content.includes("Navi system check"));
+    expect(String(notes[0]?.content)).toMatch(/looked something up/);
+    expect(create).toHaveBeenCalledTimes(3); // claim → correction note → search_items → answer
+    expect(r.text).toBe("Yes: “Bio lab report” is on your list, due Friday.");
   });
 });

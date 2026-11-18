@@ -54,7 +54,7 @@ Additive and idempotent: `day_plan_scope`, `planning_rules`, `accountability_che
 - `tests/integration/planner-commands.test.ts`: pipeline end to end, concurrency, idempotency, stale approvals, offers/"yes", grouped sessions, accountability, rules, RLS, Canvas-heavy overload.
 - `tests/integration/planner-reliability.test.ts`: R1–R14 through the chat turn; all but two fail with the switch off.
 - `tests/integration/mobile-api.test.ts`: `/api/m/schedule`.
-- `tests/integration/planner-real-model.test.ts`: real Claude, skipped unless `NAVI_REAL_MODEL_EVAL=1`. Run: `KEY="$NAVI_ANTHROPIC_API_KEY" scripts/local-only.sh env NAVI_ANTHROPIC_API_KEY="$KEY" NAVI_DAILY_BUDGET_USD=1 NAVI_REAL_MODEL_EVAL=1 NAVI_EVAL_OUT=/tmp/eval.txt npx vitest run tests/integration/planner-real-model.test.ts`.
+- `tests/integration/planner-real-model.test.ts`: real Claude, skipped unless `NAVI_REAL_MODEL_EVAL=1`. Run: `scripts/local-only.sh env NAVI_ANTHROPIC_API_KEY="$NAVI_ANTHROPIC_API_KEY" NAVI_DAILY_BUDGET_USD=1 NAVI_REAL_MODEL_EVAL=1 NAVI_EVAL_OUT=/tmp/eval.txt npx vitest run tests/integration/planner-real-model.test.ts`.
 
 **Real-model result (2026-11-16, local DB, Sonnet 5.5 planner / Haiku 5.5 fast, $1 local guard): 10/10 scenarios as intended, $0.29.** R1 schedule_task 14:00; R1b swap_work; R3 set_day_scope (only the two listed; Canvas left off; Algebra due tomorrow flagged); R4 one remove_work, 0 cards, 13 tasks kept; R11 estimate 30 (user), no rule; R9 one challenge then removed on "I know, take it off anyway"; R2 "isn't placed at a specific time yet"; R8 pamphlet planned at 4 PM, guitar to the inbox; R5 one session from 3 PM; offer → card → "yes" → confirm_change → planned at 4 PM.
 

@@ -28,6 +28,17 @@ describe("reply claims are checked against what the turn's tools did", () => {
     expect(unsupportedClaims("I added “PBL Major” under Engineering.", [created])).toEqual([]);
   });
 
+  it("catches a claimed look-up when no tool ran (stress test A1), even next to 'already'", () => {
+    const text = "Yes, the task exists. Searching now shows one “Bio lab report” task, due Friday, and it was already on your list before I added it, so I didn't create a second copy.";
+    expect(unsupportedClaims(text, []).map((c) => c.kind)).toEqual(["checked"]);
+    expect(unsupportedClaims("I just checked: it's on your list, due Friday.", []).map((c) => c.kind)).toEqual(["checked"]);
+    expect(unsupportedClaims("A quick search shows nothing called French essay.", []).map((c) => c.kind)).toEqual(["checked"]);
+    const read: TurnStep = { name: "search_items", ok: true, mutated: false };
+    expect(unsupportedClaims(text, [read])).toEqual([]);
+    expect(unsupportedClaims("I just checked: it's on your list.", [read])).toEqual([]);
+    for (const s of ["Let me check your list.", "I can check your plan for tomorrow.", "I couldn't check Canvas right now."]) expect(unsupportedClaims(s, []), s).toEqual([]);
+  });
+
   it("ignores offers, negations and references to earlier turns", () => {
     for (const s of [
       "I couldn't move it: that time overlaps your class.",
