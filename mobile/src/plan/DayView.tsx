@@ -154,6 +154,11 @@ export function DayView({ day, h, due }: { day: MDay; h: DayHandlers; due: DueMa
         <button type="button" onClick={() => h.onAsk(`Help me plan ${day.isToday ? "today" : "this day"}.`, true)} style={{ height: 50, padding: "0 22px", borderRadius: 25, background: ink.text, color: ink.onCta, fontSize: 16, fontWeight: 600 }}>
           Plan it with Navi
         </button>
+        {day.needsDecision?.count ? (
+          <div style={{ alignSelf: "stretch", marginTop: 6 }}>
+            <DecisionCard decision={day.needsDecision} tz={tz} onHandedIn={h.onHandedIn} onAsk={h.onAsk} />
+          </div>
+        ) : null}
       </div>
     );
 
