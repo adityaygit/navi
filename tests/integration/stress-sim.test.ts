@@ -76,7 +76,8 @@ afterAll(async () => {
 async function reset() {
   await resetUser(me.userId);
   const a = admin();
-  for (const t of ["plan_changesets", "day_exceptions", "availability_rules", "integration_connections"]) await a.from(t).delete().eq("user_id", me.userId);
+  // integration_rate_events too: the feed's connect limit is per person, and long runs reconnect often.
+  for (const t of ["plan_changesets", "day_exceptions", "availability_rules", "integration_connections", "integration_rate_events"]) await a.from(t).delete().eq("user_id", me.userId);
   await a.from("profiles").update({ preferences: { planner_v2: true, wake_time: "07:00", bed_time: "23:00" }, availability: [], timezone: zone }).eq("id", me.userId);
   // School on weekdays and practice twice a week: fixed time the planner must route around.
   const base = DateTime.now().setZone(zone).startOf("day");
@@ -185,6 +186,15 @@ async function simulate(seed: number, steps: number) {
   const openTasks = async () => ((await me.db.from("tasks").select("id,title,status,source,estimate_minutes").in("status", ["todo", "in_progress", "blocked"]).is("parent_task_id", null)).data ?? []) as Task[];
   const futureBlocks = async () => ((await me.db.from("plan_blocks").select("*").in("status", ["planned"]).gt("plan_date", DateTime.now().setZone(zone).toISODate()!)).data ?? []) as PlanBlock[];
 
+  // The app's connect limit refusing a burst of (re)connects is correct behaviour, not a failure: null.
+  const connect = async () => {
+    try {
+      return await connectFeed(user, "canvas", FEED, { admin: a, fetchText: async () => feed });
+    } catch (e) {
+      if (/Too many connection attempts/.test((e as Error).message)) return null;
+      throw e;
+    }
+  };
   const ops: [number, string, () => Promise<string>][] = [
     [10, "user adds a task", async () => {
       const t = await createTask(user, { title: r.pick(TITLES), estimate_minutes: r.pick([20, 30, 45, 60, 90, 150]), due_at: r.next() < 0.6 ? DateTime.fromISO(r.pick(days), { zone }).set({ hour: 23, minute: 59 }).toISO() : null });
@@ -278,7 +288,8 @@ async function simulate(seed: number, steps: number) {
     }],
     [6, "Canvas sync (feed changes)", async () => {
       if (!connId) {
-        const c = await connectFeed(user, "canvas", FEED, { admin: a, fetchText: async () => feed });
+        const c = await connect();
+        if (!c) return "connect refused by the connect rate limit (expected)";
         connId = c.connectionId;
         return `connected Canvas: ${c.outcome.ok ? "ok" : c.outcome.code}`;
       }
@@ -290,7 +301,8 @@ async function simulate(seed: number, steps: number) {
     [2, "disconnect (keep) and reconnect", async () => {
       if (!connId) return "not connected";
       await disconnectFeed(user, connId, { removeImported: false }, { admin: a });
-      const c = await connectFeed(user, "canvas", FEED, { admin: a, fetchText: async () => feed });
+      const c = await connect();
+      if (!c) { connId = null; return "reconnect refused by the connect rate limit (expected)"; }
       connId = c.connectionId;
       return `reconnected: ${c.outcome.ok ? `relinked ${c.outcome.counts.relinked}, created ${c.outcome.counts.created}` : c.outcome.code}`;
     }],
@@ -318,7 +330,13 @@ async function simulate(seed: number, steps: number) {
 }
 
 describe("stateful stress simulation", () => {
-  const SEEDS = (process.env.NAVI_STRESS_SEEDS ?? "1,2,3,4,5").split(",").map(Number);
+  // "1,2,3" or ranges like "13-40"; anything else is an error, not a silent pass.
+  const SEEDS = (process.env.NAVI_STRESS_SEEDS ?? "1-5").split(",").flatMap((part) => {
+    const m = /^\s*(\d+)\s*(?:-\s*(\d+)\s*)?$/.exec(part);
+    if (!m) throw new Error(`NAVI_STRESS_SEEDS: "${part}" is not a seed or a range like 13-40`);
+    const a = Number(m[1]), b = Number(m[2] ?? m[1]);
+    return Array.from({ length: Math.max(0, b - a + 1) }, (_, i) => a + i);
+  });
   const STEPS = Number(process.env.NAVI_STRESS_STEPS ?? 40);
   for (const seed of SEEDS) {
     it(`seed ${seed}: ${STEPS} steps keep every invariant`, async () => {

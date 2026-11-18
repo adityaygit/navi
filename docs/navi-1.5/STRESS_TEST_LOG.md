@@ -74,6 +74,8 @@ scripts/local-only.sh env NAVI_ANTHROPIC_API_KEY="$NAVI_ANTHROPIC_API_KEY" NAVI_
 - A failing `plan_day` call with a non-date argument (e.g. "tomorrow") is retried by the model with a date; harmless.
 
 ### Harness corrections (not app bugs)
+- `NAVI_STRESS_SEEDS=13-40` was read as one `NaN` seed that "passed": ranges are now supported and anything else is an error.
+- Long runs (150 steps) hit the Canvas connect rate limit ("Too many connection attempts"), correct app behaviour: the harness now clears rate events between seeds and records a refused (re)connect as an expected outcome.
 - A1's first check read "I didn't create a second copy" as a denial; C1/C2 first required a block tomorrow (keep-off-until-tomorrow is also a correct move); C5 first used a loose "claims a change" regex. Each was corrected and re-run.
 - Two "Navi moves" of the same block: the newer request replaces the older expectation.
 - Undoing Navi's "created task" deletes it: counted as an explicit deletion for I8.
@@ -84,6 +86,8 @@ scripts/local-only.sh env NAVI_ANTHROPIC_API_KEY="$NAVI_ANTHROPIC_API_KEY" NAVI_
 |---|---|---|---|
 | 2026-11-17 | stress simulation | seeds 1–8 × 40 steps (before fixes) | S1, S2 found |
 | 2026-11-17 | stress simulation | seeds 1–12 × 50 steps (after fixes) | 12/12 pass, all invariants hold |
+| 2026-11-17 | stress simulation | seeds 13–40 × 60 steps | 28/28 pass |
+| 2026-11-17 | stress simulation | seeds 41–70 × 150 steps (after the rate-limit harness fix) | 30/30 pass |
 | 2026-11-17 | real model | 13 scenarios (run 1, before fixes) | 10/13 by state; R1, R2, R3 found; $0.1008 |
 | 2026-11-17 | real model | A1 ×8, C1–C3, C5 re-runs while fixing | A1 retraction in 4/5 before R1's fix, 0/4 after; ≈$0.05 |
 | 2026-11-17 | real model | 13 scenarios (run 5, after fixes) | 13/13 as intended; $0.1024 |
