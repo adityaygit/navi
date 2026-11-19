@@ -163,7 +163,7 @@ export async function decide(db: SupabaseClient, id: string, decision: "approve"
   if (decision === "decline") {
     await db.from("waitlist").update({ status: "declined", decided_at: now.toISOString(), decided_by: by }).eq("id", id);
     if (!opts.notify) return { ok: true, emailed: false };
-    const sent = await send(row.email, declinedEmail());
+    const sent = await send(row.email, declinedEmail(publicEnv.siteUrl));
     if (sent.ok) await db.from("waitlist").update({ decision_email_sent: true }).eq("id", id);
     return { ok: true, emailed: sent.ok };
   }

@@ -66,7 +66,13 @@ describe("waitlist emails", () => {
     const a = applyEmail('https://x.test/?a="><script>');
     expect(a.html).not.toContain("<script>");
   });
-  it("keeps the black canvas on the table so clients don't drop it", () => {
-    expect(applyEmail("https://x.test").html).toContain('bgcolor="#000000"');
+  it("keeps the light sky page colour on the table so clients don't drop it", () => {
+    expect(applyEmail("https://x.test").html).toContain('bgcolor="#EEF3FA"');
+  });
+  it("loads its images from the site the link points at", () => {
+    const a = applyEmail("https://navi.example.com/early-access/apply?token=T");
+    expect(a.html).toContain('src="https://navi.example.com/email/navi-lockup.png"');
+    expect(a.html).toContain('src="https://navi.example.com/email/sky-header.jpg"');
+    expect(declinedEmail("https://navi.example.com/").html).toContain('src="https://navi.example.com/email/sky-header.jpg"');
   });
 });
